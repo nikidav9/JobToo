@@ -16,7 +16,7 @@ const NAV = [
   { href: '/', label: 'Обзор', icon: IconGrid },
   { href: '/users', label: 'Юзеры', icon: IconUsers },
   { href: '/vacancies', label: 'Вакансии', icon: IconJobs },
-  { href: '/engagement', label: 'Актив.', icon: IconPulse },
+  { href: '/chats', label: 'Чаты', icon: IconChat },
   { href: '/quality', label: 'Качество', icon: IconStar },
 ]
 
@@ -105,4 +105,7 @@ function IconPulse({ style }: { style?: React.CSSProperties }) {
 }
 function IconStar({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"><path d="M8 2.5l1.7 3.4 3.8.6-2.7 2.6.6 3.7L8 11.1l-3.4 1.8.6-3.7L2.5 6.5l3.8-.6L8 2.5z"/></svg>
+}
+function IconChat({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"><path d="M13 2H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2l3 3 3-3h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/></svg>
 }

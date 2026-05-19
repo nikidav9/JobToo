@@ -598,3 +598,88 @@ export async function fetchQuality() {
     recentComplaints,
   }
 }
+
+// ─── chats ───────────────────────────────────────────────────────────────────
+
+export async function fetchChats() {
+  const [{ data: chats }, { data: messages }, { data: users }] = await Promise.all([
+    supabase
+      .from('jm_chats')
+      .select('id,worker_id,employer_id,vac_title,company_name,unread_worker,unread_employer,created_at')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('jm_messages')
+      .select('id,chat_id,sender_id,text,created_at')
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('jm_users')
+      .select('id,first_name,last_name,phone,role,company'),
+  ])
+
+  const ch = chats ?? []
+  const ms = messages ?? []
+  const us = users ?? []
+
+  const userMap: Record<string, any> = {}
+  for (const u of us) userMap[(u as any).id] = u
+
+  function displayName(u: any) {
+    if (!u) return 'Неизвестно'
+    const fn = (u.first_name ?? '').trim()
+    const ln = (u.last_name ?? '').trim()
+    if (fn || ln) return [fn, ln].filter(Boolean).join(' ')
+    return u.phone ?? '—'
+  }
+
+  function initials(u: any) {
+    if (!u) return '?'
+    const fn = (u.first_name ?? '').trim()
+    const ln = (u.last_name ?? '').trim()
+    if (fn && ln) return (fn[0] + ln[0]).toUpperCase()
+    if (fn) return fn.slice(0, 2).toUpperCase()
+    return '??'
+  }
+
+  const chatList = ch.map((c: any) => {
+    const worker = userMap[c.worker_id]
+    const employer = userMap[c.employer_id]
+    const chatMsgs = ms.filter((m: any) => m.chat_id === c.id)
+    const last = chatMsgs[chatMsgs.length - 1]
+
+    return {
+      id: c.id,
+      vacTitle: c.vac_title ?? 'Вакансия',
+      companyName: c.company_name || (employer?.company ?? ''),
+      workerId: c.worker_id,
+      employerId: c.employer_id,
+      workerName: displayName(worker),
+      workerInitials: initials(worker),
+      employerName: displayName(employer),
+      employerInitials: initials(employer),
+      unreadWorker: c.unread_worker ?? 0,
+      unreadEmployer: c.unread_employer ?? 0,
+      createdAt: c.created_at,
+      messageCount: chatMsgs.length,
+      lastMessage: last ? {
+        text: last.text ?? '',
+        senderId: last.sender_id,
+        createdAt: last.created_at,
+      } : null,
+      messages: chatMsgs.map((m: any) => ({
+        id: m.id,
+        senderId: m.sender_id,
+        text: m.text ?? '',
+        createdAt: m.created_at,
+        senderName: m.sender_id === 'system' ? 'Система'
+          : m.sender_id === c.worker_id ? displayName(worker)
+          : m.sender_id === c.employer_id ? displayName(employer)
+          : 'Неизвестно',
+        side: m.sender_id === 'system' ? 'system'
+          : m.sender_id === c.worker_id ? 'worker'
+          : 'employer',
+      })),
+    }
+  })
+
+  return chatList
+}

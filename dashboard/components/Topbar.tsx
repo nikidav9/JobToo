@@ -8,6 +8,7 @@ const LABELS: Record<string, string> = {
   '/matching': 'Совпадения',
   '/engagement': 'Активность',
   '/quality': 'Качество',
+  '/chats': 'Переписки',
 }
 
 export default function Topbar() {
