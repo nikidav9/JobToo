@@ -29,8 +29,8 @@ export default function QualityPage() {
     <div>
       <PageHeader title="Качество" intervalSec={60} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
 
-      <div style={{ padding: '16px 24px 40px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+      <div className="page-content">
+        <div className="g-5">
           <KpiCard label="Средний рейтинг" value={d.kpi.avgRating} sub="Все оценки" sparkColor={ratingColor} />
           <KpiCard label="Рейтинг работников" value={d.kpi.avgWorkerRating} sparkColor={PALETTE.orange} />
           <KpiCard label="Рейтинг работодат." value={d.kpi.avgEmployerRating} sparkColor={PALETTE.blue} />
@@ -40,13 +40,13 @@ export default function QualityPage() {
             sparkColor={PALETTE.red} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div className="g-3">
           <KpiCard label="Заявок (пост.)" value={d.kpi.totalApplications} sparkColor={PALETTE.cyan} />
           <KpiCard label="Ожидает" value={d.kpi.pendingApplications} sparkColor={PALETTE.amber} />
           <KpiCard label="Одобрено" value={d.appStatus.find(a => a.name === 'Одобрено')?.value ?? 0} sparkColor={PALETTE.green} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="g-2">
           <ChartCard title="Распределение оценок" sub="Работники и работодатели">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={d.ratingDist} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
@@ -76,7 +76,7 @@ export default function QualityPage() {
           </ChartCard>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <div className="g-3">
           <ChartCard title="Жалобы" sub="По типу">
             <ResponsiveContainer width="100%" height={160}>
               <PieChart>

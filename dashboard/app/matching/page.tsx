@@ -26,15 +26,15 @@ export default function MatchingPage() {
     <div>
       <PageHeader title="Совпадения" intervalSec={30} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
 
-      <div style={{ padding: '16px 24px 40px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div className="page-content">
+        <div className="g-4">
           <KpiCard label="Лайков" value={d.kpi.totalLikes} sparkColor={PALETTE.pink} />
           <KpiCard label="Совпадений" value={d.kpi.totalMatches} sparkColor={PALETTE.purple} />
           <KpiCard label="Конверсия" value={`${d.kpi.matchRate}%`} sparkColor={PALETTE.purple} />
           <KpiCard label="Завершено смен" value={d.kpi.completed} sparkColor={PALETTE.green} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div className="g-4">
           <KpiCard label="Скипов" value={d.kpi.skipped} sparkColor={PALETTE.gray} />
           <KpiCard label="Подтверждено" value={d.kpi.confirmed} sparkColor={PALETTE.orange} />
           <KpiCard label="% подтверждения" value={`${d.kpi.confirmRate}%`} sparkColor={PALETTE.orange} />
@@ -63,7 +63,7 @@ export default function MatchingPage() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="g-2">
           <ChartCard title="Воронка совпадений" sub="От лайка до завершения смены">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8 }}>
               {d.funnel.map((item, i) => {

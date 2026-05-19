@@ -33,7 +33,7 @@ export default function Topbar() {
       <div style={{ flex: 1 }} />
 
       {/* Search */}
-      <div style={{
+      <div className="topbar-search" style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '5px 10px', border: '1px solid var(--line)',
         borderRadius: 7, background: 'var(--bg-elev)',

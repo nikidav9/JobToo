@@ -26,10 +26,10 @@ export default function OverviewPage() {
     <div>
       <PageHeader title="Обзор" intervalSec={30} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
 
-      <div style={{ padding: '16px 24px 40px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="page-content">
 
         {/* Main KPIs */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div className="g-4">
           <KpiCard label="Всего пользователей" value={d.kpi.totalUsers}
             sub={`+${d.kpi.newUsersWeek} за 7 дней`}
             delta={d.kpi.trendUsers ? `+${d.kpi.trendUsers}%` : undefined} deltaTone="pos" />
@@ -43,7 +43,7 @@ export default function OverviewPage() {
         </div>
 
         {/* Secondary KPIs */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div className="g-4">
           <KpiCard label="Работники" value={d.kpi.workers}
             sub={`${Math.round(d.kpi.workers / Math.max(d.kpi.totalUsers, 1) * 100)}% базы`}
             sparkColor={PALETTE.orange} />
@@ -55,7 +55,7 @@ export default function OverviewPage() {
         </div>
 
         {/* Charts */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 12 }}>
+        <div className="g-14">
           <ChartCard title="Регистрации по дням" sub="Работники и работодатели · 30 дней">
             <ResponsiveContainer width="100%" height={230}>
               <AreaChart data={d.dailyUsers} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
@@ -119,7 +119,7 @@ export default function OverviewPage() {
         </div>
 
         {/* Funnel + work types */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="g-2">
           <ChartCard title="Воронка" sub="От лайка до завершения смены">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
               {d.funnel.map((item, i) => {

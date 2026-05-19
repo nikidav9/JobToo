@@ -26,19 +26,19 @@ export default function EngagementPage() {
     <div>
       <PageHeader title="Активность" intervalSec={30} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
 
-      <div style={{ padding: '16px 24px 40px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+      <div className="page-content">
+        <div className="g-3">
           <KpiCard label="Всего чатов" value={d.kpi.totalChats} sparkColor={PALETTE.cyan} />
           <KpiCard label="Сообщений" value={d.kpi.totalMessages} sparkColor={PALETTE.blue} />
           <KpiCard label="Ср. сообщ./чат" value={d.kpi.avgMsgPerChat} sparkColor={PALETTE.purple} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div className="g-3">
           <KpiCard label="Чатов за 7 дней" value={d.kpi.activeChats} deltaTone="pos" delta={`+${d.kpi.activeChats}`} />
           <KpiCard label="Непрочит. (рабочие)" value={d.kpi.unreadWorker} sparkColor={PALETTE.orange} />
           <KpiCard label="Непрочит. (работод.)" value={d.kpi.unreadEmployer} sparkColor={PALETTE.blue} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="g-2">
           <ChartCard title="Сообщения по дням" sub="90 дней">
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={d.daily90} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
@@ -74,7 +74,7 @@ export default function EngagementPage() {
           </ChartCard>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="g-2">
           <ChartCard title="Распределение сообщений" sub="Сколько сообщений в каждом чате">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={d.msgDist} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>

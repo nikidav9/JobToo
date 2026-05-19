@@ -26,8 +26,8 @@ export default function VacanciesPage() {
     <div>
       <PageHeader title="Вакансии" intervalSec={30} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
 
-      <div style={{ padding: '16px 24px 40px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div className="page-content">
+        <div className="g-4">
           <KpiCard label="Врем. вакансий" value={d.kpi.totalTemp} sub={`${d.kpi.openTemp} открыто`} sparkColor={PALETTE.orange} />
           <KpiCard label="Пост. вакансий" value={d.kpi.totalPerm} sub={`${d.kpi.openPerm} открыто`} sparkColor={PALETTE.blue} />
           <KpiCard label="Срочных" value={d.kpi.urgentTemp} sparkColor={PALETTE.red} />
@@ -56,7 +56,7 @@ export default function VacanciesPage() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <div className="g-3">
           <ChartCard title="Типы работ" sub="Временные вакансии">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={d.workTypeDist} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
@@ -116,7 +116,7 @@ export default function VacanciesPage() {
           </ChartCard>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="g-2">
           <ChartCard title="Зарплатные диапазоны" sub="Постоянные вакансии">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={d.salaryDist} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
