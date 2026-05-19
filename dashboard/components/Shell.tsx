@@ -50,7 +50,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'var(--sidebar-w) 1fr', minHeight: '100vh' }}>
+      <div className="shell-layout">
         <div className="sidebar-desktop">
           <Sidebar />
         </div>

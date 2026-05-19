@@ -58,6 +58,13 @@ html, body {
 .recharts-cartesian-grid-horizontal line { stroke: var(--line) !important; }
 .recharts-cartesian-grid-vertical line { stroke: var(--line) !important; }
 
+/* ─── Shell layout ─── */
+.shell-layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  min-height: 100vh;
+}
+
 /* ─── Responsive grid helpers ─── */
 .g-4  { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .g-6  { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
@@ -87,6 +94,10 @@ html, body {
 /* ─── Mobile ≤640px ─── */
 @media (max-width: 640px) {
   :root { --sidebar-w: 0px; }
+
+  .shell-layout {
+    grid-template-columns: 1fr !important;
+  }
 
   .g-4  { grid-template-columns: 1fr 1fr; gap: 8px; }
   .g-6  { grid-template-columns: 1fr 1fr; gap: 8px; }
