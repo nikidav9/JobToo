@@ -18,7 +18,7 @@ export default function Sidebar() {
 
   function logout() {
     clearAuth()
-    window.location.replace('/login')
+    window.location.replace('/login/')
   }
   return (
     <aside style={{

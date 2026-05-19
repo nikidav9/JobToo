@@ -1,14 +1,7 @@
-const CACHE = 'jm-v1'
-const STATIC = [
-  '/',
-  '/login',
-  '/manifest.json',
-]
+const CACHE = 'jm-v2'
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting())
-  )
+  e.waitUntil(self.skipWaiting())
 })
 
 self.addEventListener('activate', e => {
@@ -20,21 +13,26 @@ self.addEventListener('activate', e => {
 })
 
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return
   const url = new URL(e.request.url)
-  // Don't cache Supabase API calls
-  if (url.hostname.includes('supabase.co')) return
 
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const net = fetch(e.request).then(res => {
-        if (res.ok && url.origin === location.origin) {
-          const clone = res.clone()
-          caches.open(CACHE).then(c => c.put(e.request, clone))
-        }
-        return res
-      })
-      return cached || net
-    })
-  )
+  // Never intercept: navigations, Supabase API, non-GET
+  if (e.request.mode === 'navigate') return
+  if (e.request.method !== 'GET') return
+  if (url.hostname.includes('supabase.co')) return
+  if (url.hostname !== location.hostname) return
+
+  // Cache-first for static assets, network-first for pages
+  if (url.pathname.startsWith('/_next/static/')) {
+    e.respondWith(
+      caches.open(CACHE).then(c =>
+        c.match(e.request).then(cached => {
+          if (cached) return cached
+          return fetch(e.request).then(res => {
+            if (res.ok) c.put(e.request, res.clone())
+            return res
+          })
+        })
+      )
+    )
+  }
 })

@@ -36,11 +36,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       setAuthed(true)
       setReady(true)
     } else {
-      window.location.replace('/login')
+      window.location.replace('/login/')
     }
   }, [path])
 
-  if (path === '/login' || rawPath === '/login/') {
+  if (path === '/login') {
     return <>{children}</>
   }
 
