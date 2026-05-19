@@ -14,7 +14,7 @@ export default function Topbar() {
   const path = usePathname()
   const label = LABELS[path] ?? path
   return (
-    <header style={{
+    <header className="topbar" style={{
       display: 'flex', alignItems: 'center', gap: 12,
       padding: '10px 24px',
       borderBottom: '1px solid var(--line)',

@@ -162,8 +162,29 @@ html, body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* ─── KPI card + page header mobile overrides ─── */
 @media (max-width: 640px) {
+  .page-header { padding: 12px 12px 10px !important; }
+  .page-header-refresh-label { display: none; }
+  .topbar { padding: 8px 12px !important; }
   .table-scroll table { min-width: 520px; }
-  /* KPI value size on small screens */
-  .kpi-value { font-size: 22px !important; }
+
+  .kpi-card {
+    padding: 10px 10px 12px !important;
+  }
+  .kpi-label {
+    font-size: 9.5px !important;
+    letter-spacing: 0.04em !important;
+  }
+  .kpi-value {
+    font-size: 22px !important;
+    letter-spacing: -0.02em !important;
+  }
+  .kpi-delta {
+    font-size: 10px !important;
+    padding: 1px 5px !important;
+  }
+  .kpi-sub {
+    font-size: 10.5px !important;
+  }
 }

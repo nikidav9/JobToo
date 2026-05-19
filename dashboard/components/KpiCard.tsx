@@ -23,7 +23,7 @@ export default function KpiCard({
     : { color: 'var(--ink-3)', bg: 'var(--bg-sunken)', border: 'var(--line)' }
 
   return (
-    <div style={{
+    <div className="kpi-card" style={{
       background: 'var(--bg-elev)',
       border: '1px solid var(--line)',
       borderRadius: 'var(--radius)',
@@ -32,18 +32,20 @@ export default function KpiCard({
       display: 'flex',
       flexDirection: 'column',
       minWidth: 0,
+      overflow: 'hidden',
     }}>
-      <div style={{
+      <div className="kpi-label" style={{
         fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em',
         color: 'var(--ink-3)', fontWeight: 500,
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+        gap: 4,
       }}>
-        <span>{label}</span>
-        {icon && <span style={{ fontSize: 14, opacity: 0.55 }}>{icon}</span>}
+        <span style={{ minWidth: 0, wordBreak: 'break-word', lineHeight: 1.3 }}>{label}</span>
+        {icon && <span style={{ fontSize: 14, opacity: 0.55, flexShrink: 0 }}>{icon}</span>}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 10 }}>
-        <div style={{
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+        <div className="kpi-value" style={{
           fontFamily: 'Geist, sans-serif',
           fontSize: 30, fontWeight: 500,
           letterSpacing: '-0.03em',
@@ -51,19 +53,20 @@ export default function KpiCard({
           color: 'var(--ink)', lineHeight: 1,
         }}>{value}</div>
         {delta && (
-          <span style={{
+          <span className="kpi-delta" style={{
             display: 'inline-flex', alignItems: 'center',
-            padding: '2px 7px', borderRadius: 999,
-            fontSize: 11.5, fontWeight: 500,
+            padding: '2px 6px', borderRadius: 999,
+            fontSize: 11, fontWeight: 500,
             color: chipColor.color,
             background: chipColor.bg,
             border: `1px solid ${chipColor.border}`,
+            whiteSpace: 'nowrap',
           }}>{delta}</span>
         )}
       </div>
 
       {sub && (
-        <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>{sub}</div>
+        <div className="kpi-sub" style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>{sub}</div>
       )}
 
       {spark && spark.length > 1 && (
