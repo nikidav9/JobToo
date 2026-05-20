@@ -139,15 +139,22 @@ export default function ChatsPage() {
                     </div>
                   </div>
                   {/* Vacancy tag */}
-                  <div style={{ marginTop: 3 }}>
+                  <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                     <span style={{
-                      display: 'inline-block', maxWidth: '100%',
-                      background: 'var(--accent-soft)', border: '1px solid var(--accent-line)',
-                      color: 'var(--accent)', borderRadius: 5, fontSize: 11, fontWeight: 500,
-                      padding: '1px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      display: 'inline-block',
+                      background: chat.vacType === 'perm' ? 'rgba(59,91,181,.08)' : 'var(--accent-soft)',
+                      border: `1px solid ${chat.vacType === 'perm' ? 'rgba(59,91,181,.2)' : 'var(--accent-line)'}`,
+                      color: chat.vacType === 'perm' ? 'var(--info)' : 'var(--accent)',
+                      borderRadius: 5, fontSize: 10.5, fontWeight: 500,
+                      padding: '1px 5px',
                     }}>
-                      {chat.companyName ? `${chat.companyName} · ` : ''}{chat.vacTitle}
+                      {chat.vacType === 'perm' ? '💼' : '⚡'} {chat.companyName ? `${chat.companyName} · ` : ''}{chat.vacTitle}
                     </span>
+                    {chat.vacDate && (
+                      <span style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>
+                        📅 {chat.vacDate}{chat.vacTimeStart ? ` ${chat.vacTimeStart}` : ''}
+                      </span>
+                    )}
                   </div>
                   {/* Last message */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
@@ -214,15 +221,48 @@ export default function ChatsPage() {
                   <span style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>и</span>
                   <span style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--ink)' }}>{selected.employerName}</span>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {/* Type badge */}
                   <span style={{
-                    background: 'var(--accent-soft)', border: '1px solid var(--accent-line)',
-                    color: 'var(--accent)', borderRadius: 5, padding: '2px 8px', fontSize: 11.5, fontWeight: 500,
+                    background: selected.vacType === 'perm' ? 'rgba(59,91,181,.08)' : 'var(--accent-soft)',
+                    border: `1px solid ${selected.vacType === 'perm' ? 'rgba(59,91,181,.2)' : 'var(--accent-line)'}`,
+                    color: selected.vacType === 'perm' ? 'var(--info)' : 'var(--accent)',
+                    borderRadius: 5, padding: '2px 8px', fontSize: 11.5, fontWeight: 500,
                   }}>
+                    {selected.vacType === 'perm' ? '💼 Постоянная' : '⚡ Подработка'}
+                  </span>
+                  {/* Vacancy title */}
+                  <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>
                     {selected.companyName ? `${selected.companyName} · ` : ''}{selected.vacTitle}
                   </span>
                   <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }}>{selected.messageCount} сообщений</span>
                 </div>
+                {/* Vacancy location/date details */}
+                {(selected.vacDate || selected.vacAddress || selected.vacMetro) && (
+                  <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    {selected.vacDate && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--ink-2)' }}>
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="3" width="12" height="11" rx="2"/><path d="M5 1v2M11 1v2M2 7h12"/>
+                        </svg>
+                        <span style={{ fontWeight: 500 }}>{selected.vacDate}</span>
+                        {selected.vacTimeStart && (
+                          <span style={{ color: 'var(--ink-3)' }}>
+                            {selected.vacTimeStart}{selected.vacTimeEnd ? ` – ${selected.vacTimeEnd}` : ''}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                    {(selected.vacMetro || selected.vacAddress) && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--ink-2)' }}>
+                        <svg width="11" height="13" viewBox="0 0 12 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M6 1C3.8 1 2 2.8 2 5c0 3 4 9 4 9s4-6 4-9c0-2.2-1.8-4-4-4z"/><circle cx="6" cy="5" r="1.5"/>
+                        </svg>
+                        <span>{[selected.vacMetro, selected.vacAddress].filter(Boolean).join(', ')}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Legend */}

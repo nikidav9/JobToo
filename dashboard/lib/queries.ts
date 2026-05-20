@@ -691,7 +691,7 @@ export async function fetchChats() {
   const [{ data: chats }, { data: messages }, { data: users }] = await Promise.all([
     supabase
       .from('jm_chats')
-      .select('id,worker_id,employer_id,vac_title,company_name,unread_worker,unread_employer,created_at')
+      .select('id,worker_id,employer_id,vac_title,company_name,unread_worker,unread_employer,created_at,vacancy_id')
       .order('created_at', { ascending: false }),
     supabase
       .from('jm_messages')
@@ -705,6 +705,20 @@ export async function fetchChats() {
   const ch = chats ?? []
   const ms = messages ?? []
   const us = users ?? []
+
+  // Fetch vacancy details for all unique vacancy IDs
+  const vacIds = Array.from(new Set(ch.map((c: any) => c.vacancy_id).filter(Boolean))) as string[]
+  const [{ data: tempVacs }, { data: permVacs }] = vacIds.length > 0
+    ? await Promise.all([
+        supabase.from('jm_vacancies').select('id,date,address,metro_station,time_start,time_end').in('id', vacIds),
+        supabase.from('jm_perm_vacancies').select('id,address,metro_station').in('id', vacIds),
+      ])
+    : [{ data: [] }, { data: [] }]
+
+  const tempVacMap: Record<string, any> = {}
+  for (const v of tempVacs ?? []) tempVacMap[(v as any).id] = { ...v, vacType: 'temp' }
+  const permVacMap: Record<string, any> = {}
+  for (const v of permVacs ?? []) permVacMap[(v as any).id] = { ...v, vacType: 'perm' }
 
   const userMap: Record<string, any> = {}
   for (const u of us) userMap[(u as any).id] = u
@@ -732,10 +746,22 @@ export async function fetchChats() {
     const chatMsgs = ms.filter((m: any) => m.chat_id === c.id)
     const last = chatMsgs[chatMsgs.length - 1]
 
+    const vacId = c.vacancy_id
+    const tempVac = vacId ? tempVacMap[vacId] : null
+    const permVac = vacId ? permVacMap[vacId] : null
+    const vacType: 'temp' | 'perm' | null = tempVac ? 'temp' : permVac ? 'perm' : null
+    const vacDetails = tempVac ?? permVac ?? null
+
     return {
       id: c.id,
       vacTitle: c.vac_title ?? 'Вакансия',
       companyName: c.company_name || (employer?.company ?? ''),
+      vacType,
+      vacAddress: vacDetails?.address ?? null,
+      vacMetro: vacDetails?.metro_station ?? null,
+      vacDate: tempVac?.date ?? null,
+      vacTimeStart: tempVac?.time_start ?? null,
+      vacTimeEnd: tempVac?.time_end ?? null,
       workerId: c.worker_id,
       employerId: c.employer_id,
       workerName: displayName(worker),
