@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -8,6 +8,9 @@ import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
 
 const TRACK_W = 140;
+const CARD_H = 160;
+const CHAR_H = 230;
+const CHAR_OVERFLOW = CHAR_H - CARD_H; // 70px above card
 
 export default function RootScreen() {
   const router = useRouter();
@@ -78,47 +81,63 @@ export default function RootScreen() {
 
         {/* Card — Employer (orange) */}
         <TouchableOpacity
-          style={[styles.card, styles.cardOrange]}
+          style={[styles.cardWrapper, { marginTop: CHAR_OVERFLOW }]}
           activeOpacity={0.9}
           onPress={() => router.push('/register-employer')}
         >
-          <View style={styles.cardInner}>
-            <View style={styles.cardLeft}>
-              <View style={styles.cardIconCircle}>
-                <Text style={styles.cardIcon}>💼</Text>
-              </View>
-              <Text style={styles.cardTitle}>Ищу{'\n'}работника</Text>
-              <Text style={styles.cardSub}>Размещайте вакансии{'\n'}и находите сотрудников</Text>
+          {/* Rounded background */}
+          <View style={[styles.cardBg, { backgroundColor: Colors.primary }]} />
+
+          {/* Text left side */}
+          <View style={styles.cardLeft}>
+            <View style={styles.cardIconCircle}>
+              <Text style={styles.cardIcon}>💼</Text>
             </View>
-            <View style={styles.cardRight}>
-              <Text style={styles.cardEmoji}>👷</Text>
-              <View style={styles.arrowBtn}>
-                <Text style={styles.arrowTxt}>›</Text>
-              </View>
-            </View>
+            <Text style={styles.cardTitle}>Ищу{'\n'}работника</Text>
+            <Text style={styles.cardSub}>Размещайте вакансии{'\n'}и находите сотрудников</Text>
+          </View>
+
+          {/* Character — overflows above */}
+          <Image
+            source={require('../assets/images/char-employer.png')}
+            style={styles.cardCharacter}
+            resizeMode="contain"
+          />
+
+          {/* Arrow button */}
+          <View style={styles.arrowBtn}>
+            <Text style={styles.arrowTxt}>›</Text>
           </View>
         </TouchableOpacity>
 
         {/* Card — Worker (dark) */}
         <TouchableOpacity
-          style={[styles.card, styles.cardDark]}
+          style={[styles.cardWrapper, { marginTop: CHAR_OVERFLOW + 14 }]}
           activeOpacity={0.9}
           onPress={() => router.push('/register-worker')}
         >
-          <View style={styles.cardInner}>
-            <View style={styles.cardLeft}>
-              <View style={[styles.cardIconCircle, styles.cardIconCircleDark]}>
-                <Text style={styles.cardIcon}>👤</Text>
-              </View>
-              <Text style={styles.cardTitle}>Ищу{'\n'}работодателя</Text>
-              <Text style={styles.cardSub}>Находите подработки{'\n'}на складах</Text>
+          {/* Rounded background */}
+          <View style={[styles.cardBg, { backgroundColor: '#1E1E1E' }]} />
+
+          {/* Text left side */}
+          <View style={styles.cardLeft}>
+            <View style={[styles.cardIconCircle, styles.cardIconCircleDark]}>
+              <Text style={styles.cardIcon}>👤</Text>
             </View>
-            <View style={styles.cardRight}>
-              <Text style={styles.cardEmoji}>🧑‍💻</Text>
-              <View style={styles.arrowBtn}>
-                <Text style={styles.arrowTxt}>›</Text>
-              </View>
-            </View>
+            <Text style={styles.cardTitle}>Ищу{'\n'}работодателя</Text>
+            <Text style={styles.cardSub}>Находите подработки{'\n'}на складах</Text>
+          </View>
+
+          {/* Character — overflows above */}
+          <Image
+            source={require('../assets/images/char-worker.png')}
+            style={styles.cardCharacter}
+            resizeMode="contain"
+          />
+
+          {/* Arrow button */}
+          <View style={styles.arrowBtn}>
+            <Text style={styles.arrowTxt}>›</Text>
           </View>
         </TouchableOpacity>
 
@@ -175,50 +194,60 @@ const styles = StyleSheet.create({
   tagline: { fontSize: 14, color: Colors.textSecondary, marginTop: 4 },
 
   // Headline
-  headlineBlock: { marginBottom: 28 },
+  headlineBlock: { marginBottom: 8 },
   headline: { fontSize: 40, fontWeight: '800', color: '#111111', lineHeight: 46 },
   headlineSub: { fontSize: 15, color: Colors.textSecondary, marginTop: 10, lineHeight: 22 },
 
   // Cards
-  card: {
+  cardWrapper: {
+    height: CARD_H,
+    marginBottom: 0,
+    overflow: 'visible',
+    position: 'relative',
+  },
+  cardBg: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
     borderRadius: 20,
-    marginBottom: 14,
-    overflow: 'hidden',
-    minHeight: 160,
   },
-  cardOrange: { backgroundColor: Colors.primary },
-  cardDark: { backgroundColor: '#1E1E1E' },
-  cardInner: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 20,
-    flex: 1,
-    minHeight: 160,
-  },
-  cardLeft: { flex: 1, justifyContent: 'flex-start' },
-  cardRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    alignSelf: 'stretch',
+  cardLeft: {
+    position: 'absolute',
+    left: 20,
+    top: 20,
+    bottom: 20,
+    right: 175,
+    justifyContent: 'flex-start',
   },
   cardIconCircle: {
-    width: 40, height: 40, borderRadius: 20,
+    width: 36, height: 36, borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   cardIconCircleDark: { backgroundColor: 'rgba(255,107,26,0.25)' },
-  cardIcon: { fontSize: 18 },
+  cardIcon: { fontSize: 17 },
   cardTitle: {
     fontSize: 22, fontWeight: '800', color: '#FFFFFF',
-    lineHeight: 26, marginBottom: 8,
+    lineHeight: 26, marginBottom: 6,
   },
   cardSub: { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 18 },
-  cardEmoji: { fontSize: 72, lineHeight: 80 },
+
+  cardCharacter: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    height: CHAR_H,
+    width: 165,
+    zIndex: 1,
+  },
   arrowBtn: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
+    zIndex: 2,
   },
   arrowTxt: { fontSize: 22, color: '#111111', lineHeight: 26, marginLeft: 2 },
 
@@ -226,7 +255,8 @@ const styles = StyleSheet.create({
   featuresRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8, marginBottom: 16,
+    marginTop: CHAR_OVERFLOW + 14 + 16,
+    marginBottom: 16,
   },
   feature: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
   featureIcon: { fontSize: 22, marginBottom: 4 },
