@@ -1,75 +1,71 @@
-# Welcome to OnSpace AI
+# JobToo — сервис поиска работы и подработки
 
-Onspace AI empowers anyone to turn ideas into powerful AI applications in minutes—no coding required. Our free, no-code platform enables effortless creation of custom AI apps; simply describe your vision and our agentic AI handles the rest. The onspace-app, built with React Native and Expo, demonstrates this capability—integrating popular third-party libraries to deliver seamless cross-platform performance across iOS, Android, and Web environments.
+JobToo — мобильное приложение для быстрого поиска подработки и постоянной работы в Москве. Работники находят смены и вакансии рядом с собой, работодатели — нужных сотрудников. Всё общение происходит прямо внутри приложения.
 
-## Getting Started
+## О проекте
 
-### 1. Install Dependencies
+- **Платформы:** Android, iOS
+- **Технологии:** React Native, Expo (SDK 53), TypeScript
+- **Бэкенд:** Supabase (база данных, уведомления)
+- **Деплой:** EAS Build + OTA-обновления (expo-updates), Vercel (API-прокси)
+- **Оператор:** Давыдов Никита Сергеевич (ИНН: 773423983287)
+
+## Основной функционал
+
+- Поиск подработки по дате и станции метро — свайп-интерфейс
+- Поиск постоянной работы с фильтрами (зарплата, метро, тип работы)
+- Чат между работником и работодателем
+- Push-уведомления о новых матчах и сообщениях
+- Личный кабинет с историей откликов и сохранёнными вакансиями
+- Система оценок работников и работодателей
+
+## Запуск проекта
 
 ```bash
 npm install
-# or
-yarn install
 ```
-
-### 2. Start the Project
-
-- Start the development server (choose your platform):
 
 ```bash
-npm run start         # Start Expo development server
-npm run android       # Launch Android emulator
-npm run ios           # Launch iOS simulator
-npm run web           # Start the web version
+npm run start      # Expo Dev Server
+npm run android    # Android
+npm run ios        # iOS
+npm run web        # Веб (для отладки)
 ```
 
-- Reset the project (clear cache, etc.):
+## Публикация обновлений (OTA)
 
 ```bash
-npm run reset-project
+EXPO_TOKEN=<токен> npx eas-cli update --channel production --message "описание"
 ```
 
-### 3. Lint the Code
+## Основные зависимости
 
-```bash
-npm run lint
+| Пакет | Версия |
+|---|---|
+| React Native | 0.79.6 |
+| Expo | ~53.0.12 |
+| Expo Router | ~5.1.0 |
+| Supabase JS | ^2.50.0 |
+| expo-updates | 0.28.18 |
+
+Полный список — в [package.json](./package.json).
+
+## Структура проекта
+
+```
+app/              — экраны (expo-router)
+  (tabs)/         — основные вкладки (лента, матчи, чаты, профиль)
+  register-*/     — регистрация работника / работодателя
+  chat-room.tsx   — экран чата
+  legal.tsx       — пользовательское соглашение и политика
+components/       — переиспользуемые компоненты
+contexts/         — AppContext (глобальное состояние)
+services/         — работа с БД, уведомления, хранилище
+lib/              — Supabase клиент, db-dispatch (Vercel)
+constants/        — типы, тема, список станций метро
+api/              — Vercel serverless (прокси к Supabase)
 ```
 
-## Main Dependencies
+## Лицензия
 
-- React Native: 0.79.4
-- React: 19.0.0
-- Expo: ~53.0.12
-- Expo Router: ~5.1.0
-- Supabase: ^2.50.0
-- Other commonly used libraries:  
-  - @expo/vector-icons  
-  - react-native-paper  
-  - react-native-calendars  
-  - lottie-react-native  
-  - react-native-webview  
-  - and more
-
-For a full list of dependencies, see [package.json](./package.json).
-
-## Development Tools
-
-- TypeScript: ~5.8.3
-- ESLint: ^9.25.0
-- @babel/core: ^7.25.2
-
-## Contributing
-
-1. Fork this repository
-2. Create a new branch (`git checkout -b main`)
-3. Commit your changes (`git commit -am 'Add new feature'`)
-4. Push to the branch (`git push origin feature/your-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is private ("private": true). For collaboration inquiries, please contact the author.
-
----
-
-Feel free to add project screenshots, API documentation, feature descriptions, or any other information as needed.
+Проект закрытый. По вопросам сотрудничества: zpouches@yandex.ru
