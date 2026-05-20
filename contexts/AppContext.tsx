@@ -1,6 +1,5 @@
 import React, { createContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Platform, AppState, AppStateStatus } from 'react-native';
-import * as bcrypt from 'bcryptjs';
 import { supabase } from '@/lib/supabase';
 import { getSupabaseClient } from '@/template';
 import { User, Vacancy, Like, Chat, PermVacancy, PermApplication } from '@/constants/types';
@@ -17,7 +16,6 @@ import {
   dbGetUsers,
   dbUpsertUser,
   dbGetUserByPhone,
-  dbLoginUser,
   dbGetVacancies,
   dbGetLikes,
   dbGetLikesForUser,
@@ -289,9 +287,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // ─── Auth actions ──────────────────────────────────────────────────────────
 
   const registerUser = async (u: User) => {
-    const hashed = await bcrypt.hash(u.password ?? '', 10);
-    await dbUpsertUser({ ...u, password: hashed });
-    _setCurrentUser({ ...u, password: '' });
+    await dbUpsertUser(u);
+    _setCurrentUser(u);
     await saveSessionUser(u);
     // Задержка нужна чтобы система успела обработать разрешения на уведомления
     setTimeout(() => { registerForPushNotifications(u.id).catch(() => {}); }, 2000);
@@ -311,37 +308,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const loginUser = async (phone: string, password: string): Promise<User | null> => {
     const digits = extractPhoneDigits(phone);
-    let safeUser: User | null = null;
-    if (Platform.OS !== 'web') {
-      // Native: bcrypt verification runs on server (Node.js), result has password stripped
-      safeUser = await dbLoginUser(digits, password);
-    } else {
-      // Web: verify locally with bcrypt
-      const found = await dbGetUserByPhone(digits);
-      if (!found) return null;
-      const stored = found.password ?? '';
-      const isHashed = stored.startsWith('$2b$') || stored.startsWith('$2a$');
-      const valid = isHashed ? await bcrypt.compare(password, stored) : stored === password;
-      if (!valid) return null;
-      safeUser = { ...found, password: '' };
-    }
-    if (!safeUser) return null;
-    _setCurrentUser(safeUser);
-    await saveSessionUser(safeUser);
-    registerForPushNotifications(safeUser.id).catch(() => {});
+    const found = await dbGetUserByPhone(digits);
+    if (!found || found.password !== password) return null;
+    _setCurrentUser(found);
+    await saveSessionUser(found);
+    registerForPushNotifications(found.id).catch(() => {});
     setTimeout(() => {
       Promise.all([
         refreshUsers(),
         refreshVacancies(),
-        refreshLikes(safeUser),
-        refreshChats(safeUser),
-        refreshSaved(safeUser),
-        refreshPermVacancies(safeUser),
-        refreshPermApplications(safeUser),
-        refreshPermSaved(safeUser),
+        refreshLikes(found),
+        refreshChats(found),
+        refreshSaved(found),
+        refreshPermVacancies(found),
+        refreshPermApplications(found),
+        refreshPermSaved(found),
       ]).catch(() => {});
     }, 300);
-    return safeUser;
+    return found;
   };
 
   const logout = async () => {

@@ -1,7 +1,6 @@
 import 'react-native-url-polyfill/auto';
-import React, { useEffect, useRef, useState } from 'react';
-import { Platform, View, Text, Animated, StyleSheet } from 'react-native';
-import * as Updates from 'expo-updates';
+import React, { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -85,79 +84,12 @@ function NotificationHandler() {
   return null;
 }
 
-function OTAUpdateScreen({ progress }: { progress: Animated.Value }) {
-  return (
-    <View style={otaStyles.container}>
-      <Text style={otaStyles.logo}>JobToo</Text>
-      <Text style={otaStyles.title}>Загружаем обновление...</Text>
-      <View style={otaStyles.track}>
-        <Animated.View style={[otaStyles.bar, {
-          width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-        }]} />
-      </View>
-      <Text style={otaStyles.sub}>Это займёт несколько секунд</Text>
-    </View>
-  );
-}
-
-const otaStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', padding: 40 },
-  logo: { fontSize: 36, fontWeight: '900', color: '#2563EB', marginBottom: 32 },
-  title: { fontSize: 17, fontWeight: '600', color: '#111827', marginBottom: 20 },
-  track: { width: '100%', height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, overflow: 'hidden' },
-  bar: { height: 6, backgroundColor: '#2563EB', borderRadius: 3 },
-  sub: { fontSize: 13, color: '#9CA3AF', marginTop: 14 },
-});
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
-  ]);
-}
-
-function useOTAUpdate() {
-  const [isUpdating, setIsUpdating] = useState(false);
-  const progress = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-
-    const check = async () => {
-      try {
-        const result = await withTimeout(Updates.checkForUpdateAsync(), 10_000);
-        if (!result.isAvailable) return;
-
-        setIsUpdating(true);
-        progress.setValue(0);
-
-        Animated.timing(progress, { toValue: 0.85, duration: 10_000, useNativeDriver: false }).start();
-
-        await withTimeout(Updates.fetchUpdateAsync(), 60_000);
-
-        Animated.timing(progress, { toValue: 1, duration: 400, useNativeDriver: false })
-          .start(async () => { try { await Updates.reloadAsync(); } catch {} });
-      } catch {
-        setIsUpdating(false);
-      }
-    };
-
-    check();
-  }, []);
-
-  return { isUpdating, progress };
-}
-
 export default function RootLayout() {
-  const { isUpdating, progress } = useOTAUpdate();
-
   useEffect(() => {
     if (Platform.OS === 'web') return;
     setupAndroidChannels().catch(() => {});
     requestNotificationPermissions().catch(() => {});
   }, []);
-
-  if (isUpdating) return <OTAUpdateScreen progress={progress} />;
 
   return (
     <AlertProvider>
