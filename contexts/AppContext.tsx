@@ -147,11 +147,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const boot = async () => {
       try {
-        // Show splash for at least 1 second, then check session
-        const [sessionUser] = await Promise.all([
-          getSessionUser().catch(() => null),
-          new Promise<void>(r => setTimeout(r, 1000)),
-        ]);
+        // Wait minimum 1s for splash, THEN read session sequentially.
+        // Reading in parallel with the timer caused AsyncStorage to return null
+        // on Android cold starts before storage finished initialising.
+        await new Promise<void>(r => setTimeout(r, 1000));
+        if (cancelled) return;
+        const sessionUser = await getSessionUser().catch(() => null);
 
         if (cancelled) return;
 
