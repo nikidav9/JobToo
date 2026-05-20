@@ -130,7 +130,7 @@ export default function RootScreen() {
 
           {/* Character — overflows above */}
           <Image
-            source={require('../assets/images/char-worker.png')}
+            source={require('../assets/images/char-worker.jpeg')}
             style={styles.cardCharacter}
             resizeMode="contain"
           />
