@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
-import React, { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Platform, View, Text, Animated, StyleSheet } from 'react-native';
+import * as Updates from 'expo-updates';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -84,12 +85,83 @@ function NotificationHandler() {
   return null;
 }
 
+function OTAUpdateScreen({ progress }: { progress: Animated.Value }) {
+  return (
+    <View style={otaStyles.container}>
+      <Text style={otaStyles.logo}>JobToo</Text>
+      <Text style={otaStyles.title}>Загружаем обновление...</Text>
+      <View style={otaStyles.track}>
+        <Animated.View style={[otaStyles.bar, {
+          width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+        }]} />
+      </View>
+      <Text style={otaStyles.sub}>Это займёт несколько секунд</Text>
+    </View>
+  );
+}
+
+const otaStyles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', padding: 40 },
+  logo: { fontSize: 36, fontWeight: '900', color: '#2563EB', marginBottom: 32 },
+  title: { fontSize: 17, fontWeight: '600', color: '#111827', marginBottom: 20 },
+  track: { width: '100%', height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, overflow: 'hidden' },
+  bar: { height: 6, backgroundColor: '#2563EB', borderRadius: 3 },
+  sub: { fontSize: 13, color: '#9CA3AF', marginTop: 14 },
+});
+
+function useOTAUpdate() {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    const check = async () => {
+      try {
+        const result = await Updates.checkForUpdateAsync();
+        if (!result.isAvailable) return;
+
+        setIsUpdating(true);
+        progress.setValue(0);
+
+        // Анимация до 85% пока качается
+        Animated.timing(progress, {
+          toValue: 0.85,
+          duration: 8000,
+          useNativeDriver: false,
+        }).start();
+
+        await Updates.fetchUpdateAsync();
+
+        // Добиваем до 100% и перезапускаем
+        Animated.timing(progress, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: false,
+        }).start(async () => {
+          await Updates.reloadAsync();
+        });
+      } catch {
+        setIsUpdating(false);
+      }
+    };
+
+    check();
+  }, []);
+
+  return { isUpdating, progress };
+}
+
 export default function RootLayout() {
+  const { isUpdating, progress } = useOTAUpdate();
+
   useEffect(() => {
     if (Platform.OS === 'web') return;
     setupAndroidChannels().catch(() => {});
     requestNotificationPermissions().catch(() => {});
   }, []);
+
+  if (isUpdating) return <OTAUpdateScreen progress={progress} />;
 
   return (
     <AlertProvider>
