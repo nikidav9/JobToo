@@ -276,27 +276,47 @@ export async function fetchUsers() {
 // ─── vacancies ───────────────────────────────────────────────────────────────
 
 export async function fetchVacancies() {
-  const [{ data: tv }, { data: pv }, { data: apps }] = await Promise.all([
+  const [{ data: tv }, { data: pv }, { data: apps }, { data: users }] = await Promise.all([
     supabase.from('jm_vacancies').select('id,status,work_type,work_type_label,created_at,employer_id,salary,workers_needed,workers_found,is_urgent,no_experience_needed,company'),
     supabase.from('jm_perm_vacancies').select('id,title,status,created_at,employer_id,salary,company,metro_station,address,description,schedule,work_type'),
-    supabase.from('jm_perm_applications').select('id,vacancy_id,status,created_at'),
+    supabase.from('jm_perm_applications').select('id,vacancy_id,worker_id,status,created_at').order('created_at', { ascending: false }),
+    supabase.from('jm_users').select('id,first_name,last_name,phone'),
   ])
 
   const t = tv ?? []
   const p = pv ?? []
   const ap = apps ?? []
 
-  // per-vacancy application counts
+  const userMap: Record<string, { name: string; phone: string }> = {}
+  for (const u of users ?? []) {
+    const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.phone || '—'
+    userMap[(u as any).id] = { name, phone: (u as any).phone ?? '—' }
+  }
+
+  type AppInfo = { id: string; workerId: string; name: string; phone: string; status: string; date: string }
+  const appsByVac: Record<string, AppInfo[]> = {}
   const appByVac: Record<string, { total: number; pending: number; approved: number; rejected: number }> = {}
+
   for (const a of ap) {
     const vid = (a as any).vacancy_id
+    const wid = (a as any).worker_id
     if (!vid) continue
     if (!appByVac[vid]) appByVac[vid] = { total: 0, pending: 0, approved: 0, rejected: 0 }
+    if (!appsByVac[vid]) appsByVac[vid] = []
     appByVac[vid].total++
     const st = (a as any).status ?? 'pending'
     if (st === 'approved') appByVac[vid].approved++
     else if (st === 'rejected') appByVac[vid].rejected++
     else appByVac[vid].pending++
+    const worker = userMap[wid]
+    appsByVac[vid].push({
+      id: (a as any).id,
+      workerId: wid,
+      name: worker?.name ?? '—',
+      phone: worker?.phone ?? '—',
+      status: st,
+      date: (a as any).created_at?.slice(0, 10) ?? '',
+    })
   }
 
   const permVacancyCards = p.map((v: any) => ({
@@ -309,6 +329,7 @@ export async function fetchVacancies() {
     schedule: v.schedule ?? null,
     createdAt: v.created_at?.slice(0, 10) ?? null,
     apps: appByVac[v.id] ?? { total: 0, pending: 0, approved: 0, rejected: 0 },
+    applicants: appsByVac[v.id] ?? [],
   })).sort((a: any, b: any) => b.apps.total - a.apps.total)
 
   const w30 = subDays(new Date(), 30).toISOString()

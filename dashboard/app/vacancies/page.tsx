@@ -1,5 +1,5 @@
 'use client'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { fetchVacancies, PALETTE } from '@/lib/queries'
 import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
@@ -164,6 +164,8 @@ export default function VacanciesPage() {
   )
 }
 
+type AppInfo = { id: string; name: string; phone: string; status: string; date: string }
+
 type PermCard = {
   id: string
   title: string
@@ -174,6 +176,7 @@ type PermCard = {
   schedule: string | null
   createdAt: string | null
   apps: { total: number; pending: number; approved: number; rejected: number }
+  applicants: AppInfo[]
 }
 
 function PermVacancyCards({ cards }: { cards: PermCard[] }) {
@@ -194,9 +197,14 @@ function PermVacancyCards({ cards }: { cards: PermCard[] }) {
 }
 
 function PermCard({ c }: { c: PermCard }) {
+  const [open, setOpen] = useState(false)
   const isOpen = c.status === 'open'
   const hasApps = c.apps.total > 0
   const approvedPct = hasApps ? Math.round(c.apps.approved / c.apps.total * 100) : 0
+
+  const pending = c.applicants.filter(a => a.status === 'pending')
+  const approved = c.applicants.filter(a => a.status === 'approved')
+  const rejected = c.applicants.filter(a => a.status === 'rejected')
 
   return (
     <div className="perm-vac-card">
@@ -227,54 +235,103 @@ function PermCard({ c }: { c: PermCard }) {
 
       {/* meta row */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginBottom: 10 }}>
-        {c.salary && (
-          <span style={{ fontSize: 12, fontWeight: 600, color: PALETTE.blue }}>{c.salary}</span>
-        )}
+        {c.salary && <span style={{ fontSize: 12, fontWeight: 600, color: PALETTE.blue }}>{c.salary}</span>}
         {c.metro && (
           <span style={{ fontSize: 11.5, color: 'var(--ink-3)', display: 'flex', alignItems: 'center', gap: 3 }}>
             <IconMetro /> {c.metro}
           </span>
         )}
-        {c.schedule && (
-          <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{c.schedule}</span>
-        )}
-        {c.createdAt && (
-          <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 'auto' }}>{c.createdAt}</span>
-        )}
+        {c.schedule && <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{c.schedule}</span>}
+        {c.createdAt && <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 'auto' }}>{c.createdAt}</span>}
       </div>
 
       {/* divider */}
       <div style={{ height: 1, background: 'var(--line)', marginBottom: 10 }} />
 
-      {/* applications row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      {/* applications row — кликабельная */}
+      <button
+        onClick={() => hasApps && setOpen(o => !o)}
+        style={{
+          all: 'unset', display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          cursor: hasApps ? 'pointer' : 'default',
+        }}
+      >
         <IconPeople color={hasApps ? PALETTE.blue : '#C8C5BF'} />
         <span style={{ fontSize: 18, fontWeight: 700, color: hasApps ? 'var(--ink)' : 'var(--ink-4)', lineHeight: 1 }}>
           {c.apps.total}
         </span>
-        <span style={{ fontSize: 11.5, color: 'var(--ink-3)', marginRight: 'auto' }}>
+        <span style={{ fontSize: 11.5, color: 'var(--ink-3)', flex: 1 }}>
           {c.apps.total === 1 ? 'отклик' : c.apps.total >= 2 && c.apps.total <= 4 ? 'отклика' : 'откликов'}
         </span>
         {hasApps && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <Pill color={PALETTE.amber} label="ожид." value={c.apps.pending} />
-            <Pill color={PALETTE.green} label="одобр." value={c.apps.approved} />
-            <Pill color={PALETTE.red} label="откл." value={c.apps.rejected} />
-          </div>
+          <>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Pill color={PALETTE.amber} label="ожид." value={c.apps.pending} />
+              <Pill color={PALETTE.green} label="одобр." value={c.apps.approved} />
+              <Pill color={PALETTE.red} label="откл." value={c.apps.rejected} />
+            </div>
+            <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 2 }}>{open ? '▲' : '▼'}</span>
+          </>
         )}
-      </div>
+      </button>
 
       {/* progress bar */}
       {hasApps && (
         <div style={{ marginTop: 8, height: 3, borderRadius: 2, background: '#F0EEE9', overflow: 'hidden' }}>
-          <div style={{
-            height: '100%', borderRadius: 2,
-            background: PALETTE.green,
-            width: `${approvedPct}%`,
-            transition: 'width 0.4s',
-          }} />
+          <div style={{ height: '100%', borderRadius: 2, background: PALETTE.green, width: `${approvedPct}%` }} />
         </div>
       )}
+
+      {/* раскрывающийся список заявителей */}
+      {open && hasApps && (
+        <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {approved.length > 0 && (
+            <ApplicantGroup title="Принято" color={PALETTE.green} people={approved} />
+          )}
+          {pending.length > 0 && (
+            <ApplicantGroup title="Ожидают" color={PALETTE.amber} people={pending} />
+          )}
+          {rejected.length > 0 && (
+            <ApplicantGroup title="Отклонено" color={PALETTE.red} people={rejected} />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ApplicantGroup({ title, color, people }: { title: string; color: string; people: AppInfo[] }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10.5, fontWeight: 600, color, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+        {title} · {people.length}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {people.map(p => (
+          <div key={p.id} style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '7px 10px', borderRadius: 8,
+            background: color + '0D',
+            border: '1px solid ' + color + '22',
+          }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+              background: color + '22',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 700, color,
+            }}>
+              {p.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?'}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {p.name}
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace' }}>{p.phone}</div>
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--ink-4)', flexShrink: 0 }}>{p.date}</div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
