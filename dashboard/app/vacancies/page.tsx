@@ -16,7 +16,7 @@ const AXIS = { fontSize: 10, fill: '#9A9690', fontFamily: 'Geist Mono, monospace
 export default function VacanciesPage() {
   const fetcher = useCallback(() => fetchVacancies(), [])
   const { data: d, loading, lastUpdated, pulse, refresh } = useRealtime(fetcher, {
-    tables: ['jm_vacancies', 'jm_perm_vacancies'],
+    tables: ['jm_vacancies', 'jm_perm_vacancies', 'jm_perm_applications'],
     intervalSec: 30,
   })
 
@@ -116,6 +116,8 @@ export default function VacanciesPage() {
           </ChartCard>
         </div>
 
+        <PermVacancyCards cards={d.permVacancyCards} />
+
         <div className="g-2">
           <ChartCard title="Зарплатные диапазоны" sub="Постоянные вакансии">
             <ResponsiveContainer width="100%" height={200}>
@@ -159,6 +161,157 @@ export default function VacanciesPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+type PermCard = {
+  id: string
+  title: string
+  company: string
+  metro: string | null
+  salary: string | null
+  status: string
+  schedule: string | null
+  createdAt: string | null
+  apps: { total: number; pending: number; approved: number; rejected: number }
+}
+
+function PermVacancyCards({ cards }: { cards: PermCard[] }) {
+  if (!cards || cards.length === 0) return null
+  return (
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 12, letterSpacing: '0.01em' }}>
+        Постоянные вакансии
+        <span style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 400, color: 'var(--ink-3)' }}>
+          {cards.length} всего · сортировка по откликам
+        </span>
+      </div>
+      <div className="perm-vac-grid">
+        {cards.map(c => <PermCard key={c.id} c={c} />)}
+      </div>
+    </div>
+  )
+}
+
+function PermCard({ c }: { c: PermCard }) {
+  const isOpen = c.status === 'open'
+  const hasApps = c.apps.total > 0
+  const approvedPct = hasApps ? Math.round(c.apps.approved / c.apps.total * 100) : 0
+
+  return (
+    <div className="perm-vac-card">
+      {/* header row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+          background: isOpen ? '#EBF5F0' : '#F2F1EE',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <IconBriefcase color={isOpen ? PALETTE.green : '#B0ADA6'} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.3, wordBreak: 'break-word' }}>
+            {c.title}
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{c.company}</div>
+        </div>
+        <span style={{
+          flexShrink: 0, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+          background: isOpen ? '#EBF5F0' : '#F2F1EE',
+          color: isOpen ? PALETTE.green : '#9A9690',
+          letterSpacing: '0.04em',
+        }}>
+          {isOpen ? 'ОТКРЫТА' : 'ЗАКРЫТА'}
+        </span>
+      </div>
+
+      {/* meta row */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginBottom: 10 }}>
+        {c.salary && (
+          <span style={{ fontSize: 12, fontWeight: 600, color: PALETTE.blue }}>{c.salary}</span>
+        )}
+        {c.metro && (
+          <span style={{ fontSize: 11.5, color: 'var(--ink-3)', display: 'flex', alignItems: 'center', gap: 3 }}>
+            <IconMetro /> {c.metro}
+          </span>
+        )}
+        {c.schedule && (
+          <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{c.schedule}</span>
+        )}
+        {c.createdAt && (
+          <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 'auto' }}>{c.createdAt}</span>
+        )}
+      </div>
+
+      {/* divider */}
+      <div style={{ height: 1, background: 'var(--line)', marginBottom: 10 }} />
+
+      {/* applications row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <IconPeople color={hasApps ? PALETTE.blue : '#C8C5BF'} />
+        <span style={{ fontSize: 18, fontWeight: 700, color: hasApps ? 'var(--ink)' : 'var(--ink-4)', lineHeight: 1 }}>
+          {c.apps.total}
+        </span>
+        <span style={{ fontSize: 11.5, color: 'var(--ink-3)', marginRight: 'auto' }}>
+          {c.apps.total === 1 ? 'отклик' : c.apps.total >= 2 && c.apps.total <= 4 ? 'отклика' : 'откликов'}
+        </span>
+        {hasApps && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Pill color={PALETTE.amber} label="ожид." value={c.apps.pending} />
+            <Pill color={PALETTE.green} label="одобр." value={c.apps.approved} />
+            <Pill color={PALETTE.red} label="откл." value={c.apps.rejected} />
+          </div>
+        )}
+      </div>
+
+      {/* progress bar */}
+      {hasApps && (
+        <div style={{ marginTop: 8, height: 3, borderRadius: 2, background: '#F0EEE9', overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', borderRadius: 2,
+            background: PALETTE.green,
+            width: `${approvedPct}%`,
+            transition: 'width 0.4s',
+          }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Pill({ color, label, value }: { color: string; label: string; value: number }) {
+  if (value === 0) return null
+  return (
+    <span style={{
+      fontSize: 10.5, fontWeight: 600, padding: '1px 6px', borderRadius: 10,
+      background: color + '18', color,
+    }}>
+      {value} {label}
+    </span>
+  )
+}
+
+function IconBriefcase({ color }: { color: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" /><line x1="12" y1="12" x2="12" y2="12.01" />
+    </svg>
+  )
+}
+
+function IconMetro() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9A9690" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><path d="M12 6 8 18M12 6l4 12M8 14h8" />
+    </svg>
+  )
+}
+
+function IconPeople({ color }: { color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
   )
 }
 

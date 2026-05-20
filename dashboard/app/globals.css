@@ -67,6 +67,20 @@ html, body {
 
 /* ─── Responsive grid helpers ─── */
 .g-4  { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+/* Permanent vacancy cards */
+.perm-vac-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.perm-vac-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+}
 .g-6  { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
 .g-5  { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
 .g-3  { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
@@ -89,6 +103,7 @@ html, body {
   .g-3  { grid-template-columns: repeat(2, 1fr); }
   .g-14 { grid-template-columns: 1fr; }
   .g-2  { grid-template-columns: 1fr 1fr; }
+  .perm-vac-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* ─── Mobile ≤640px ─── */
@@ -105,6 +120,7 @@ html, body {
   .g-3  { grid-template-columns: 1fr 1fr; gap: 8px; }
   .g-2  { grid-template-columns: 1fr; gap: 8px; }
   .g-14 { grid-template-columns: 1fr; }
+  .perm-vac-grid { grid-template-columns: 1fr; gap: 8px; }
 
   .page-content {
     padding: 12px 12px 88px; /* space for bottom nav */

@@ -276,13 +276,40 @@ export async function fetchUsers() {
 // ─── vacancies ───────────────────────────────────────────────────────────────
 
 export async function fetchVacancies() {
-  const [{ data: tv }, { data: pv }] = await Promise.all([
+  const [{ data: tv }, { data: pv }, { data: apps }] = await Promise.all([
     supabase.from('jm_vacancies').select('id,status,work_type,work_type_label,created_at,employer_id,salary,workers_needed,workers_found,is_urgent,no_experience_needed,company'),
-    supabase.from('jm_perm_vacancies').select('id,status,created_at,employer_id,salary,company,metro_station'),
+    supabase.from('jm_perm_vacancies').select('id,title,status,created_at,employer_id,salary,company,metro_station,description,work_schedule'),
+    supabase.from('jm_perm_applications').select('id,vacancy_id,status,created_at'),
   ])
 
   const t = tv ?? []
   const p = pv ?? []
+  const ap = apps ?? []
+
+  // per-vacancy application counts
+  const appByVac: Record<string, { total: number; pending: number; approved: number; rejected: number }> = {}
+  for (const a of ap) {
+    const vid = (a as any).vacancy_id
+    if (!vid) continue
+    if (!appByVac[vid]) appByVac[vid] = { total: 0, pending: 0, approved: 0, rejected: 0 }
+    appByVac[vid].total++
+    const st = (a as any).status ?? 'pending'
+    if (st === 'approved') appByVac[vid].approved++
+    else if (st === 'rejected') appByVac[vid].rejected++
+    else appByVac[vid].pending++
+  }
+
+  const permVacancyCards = p.map((v: any) => ({
+    id: v.id,
+    title: v.title ?? 'Без названия',
+    company: v.company ?? '—',
+    metro: v.metro_station ?? null,
+    salary: v.salary ? Number(v.salary).toLocaleString('ru-RU') + ' ₽' : null,
+    status: v.status ?? 'open',
+    schedule: v.work_schedule ?? null,
+    createdAt: v.created_at?.slice(0, 10) ?? null,
+    apps: appByVac[v.id] ?? { total: 0, pending: 0, approved: 0, rejected: 0 },
+  })).sort((a: any, b: any) => b.apps.total - a.apps.total)
 
   const w30 = subDays(new Date(), 30).toISOString()
   const days30 = dayRange(30)
@@ -367,6 +394,7 @@ export async function fetchVacancies() {
       { name: 'Открыто', value: p.filter((x: any) => x.status === 'open').length, fill: PALETTE.green },
       { name: 'Закрыто', value: p.filter((x: any) => x.status === 'closed').length, fill: PALETTE.gray },
     ],
+    permVacancyCards,
   }
 }
 
