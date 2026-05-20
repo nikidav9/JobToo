@@ -10,18 +10,28 @@ import { Colors } from '@/constants/theme';
 
 const TRACK_W = 140;
 
-// Масштаб по наименьшей стороне — чтобы всё влезало на один экран
+// Масштаб: min по ширине И высоте — чтобы всё влезало на один экран
 const { width: SW, height: SH } = Dimensions.get('window');
 const sc = Math.min(SW / 390, SH / 844);
 const r = (n: number) => Math.round(n * sc);
 
-// Размеры карточек и персонажей (базовые для 390×844)
-const CARD_H  = r(160);   // высота карточки
-const EMPL_W  = r(215);   // персонаж работодателя
-const EMPL_H  = r(323);   // 215 × 1.5 (соотношение 1024:1536)
-const WORK_W  = r(162);   // персонаж соискателя
-const WORK_H  = r(350);   // 162 × 2.16 (соотношение 1112:2400)
-const CARD2_MT = r(52);   // отступ перед второй карточкой
+// ── Ключевые размеры (базовые для 390×844 iPhone 14) ──────────────────
+// Карточка
+const CARD_H  = r(160);
+
+// char-employer.png: 1024×1536, персонаж в нижних 60% изображения
+// Чтобы голова торчала ~60px выше карточки: H=367, W=244
+// Формула: char_top = (CARD_H - H) + H*0.40 = (160-367)+147 = -60px ✓
+const EMPL_W  = r(244);
+const EMPL_H  = r(367);
+
+// char-worker.png: 1112×2400, персонаж в нижних 58% изображения
+// char_top = (160-370)+370*0.42 = -210+155 = -55px ✓
+const WORK_W  = r(171);
+const WORK_H  = r(370);
+
+// Отступ перед второй карточкой: overflow(55px) + зазор(10px) = 65px
+const CARD2_MT = r(65);
 
 export default function RootScreen() {
   const router = useRouter();
@@ -97,27 +107,29 @@ export default function RootScreen() {
           activeOpacity={0.9}
           onPress={() => router.push('/register-employer')}
         >
-          {/* Фон с rounded corners — отдельный слой (Android fix) */}
-          <View style={[StyleSheet.absoluteFill, styles.cardBgOrange]} />
+          {/* Фон с скруглёнными углами (отдельный слой — Android совместимость) */}
+          <View style={[StyleSheet.absoluteFill, styles.bgOrange]} />
 
-          {/* Персонаж: прозрачный PNG, ноги у низа, голова торчит выше */}
+          {/* Персонаж: прозрачный PNG, ноги у низа, голова 60px выше карточки */}
           <Image
             source={require('../assets/images/char-employer.png')}
-            style={{ position: 'absolute', right: 0, bottom: 0, width: EMPL_W, height: EMPL_H }}
+            style={[styles.charImg, { width: EMPL_W, height: EMPL_H }]}
             resizeMode="contain"
           />
 
-          {/* Текст */}
-          <View style={styles.cardText}>
-            <View style={styles.iconCircleOrange}>
-              <Text style={styles.iconTxt}>💼</Text>
+          {/* Иконка и текст — левая сторона */}
+          <View style={styles.cardLeft}>
+            <View style={styles.iconBadgeOrange}>
+              <Text style={styles.iconEmoji}>💼</Text>
             </View>
             <Text style={styles.cardTitle}>Ищу{'\n'}работника</Text>
             <Text style={styles.cardSub}>Размещайте вакансии{'\n'}и находите сотрудников</Text>
           </View>
 
-          {/* Стрелка */}
-          <View style={styles.arrow}><Text style={styles.arrowTxt}>›</Text></View>
+          {/* Стрелка справа по центру */}
+          <View style={styles.arrowBtn}>
+            <Text style={styles.arrowTxt}>›</Text>
+          </View>
         </TouchableOpacity>
 
         {/* ══ Карточка 2: Ищу работодателя (тёмная) ══ */}
@@ -126,23 +138,25 @@ export default function RootScreen() {
           activeOpacity={0.9}
           onPress={() => router.push('/register-worker')}
         >
-          <View style={[StyleSheet.absoluteFill, styles.cardBgDark]} />
+          <View style={[StyleSheet.absoluteFill, styles.bgDark]} />
 
           <Image
             source={require('../assets/images/char-worker.png')}
-            style={{ position: 'absolute', right: 0, bottom: 0, width: WORK_W, height: WORK_H }}
+            style={[styles.charImg, { width: WORK_W, height: WORK_H }]}
             resizeMode="contain"
           />
 
-          <View style={styles.cardText}>
-            <View style={styles.iconCircleDark}>
-              <Text style={styles.iconTxt}>👤</Text>
+          <View style={styles.cardLeft}>
+            <View style={styles.iconBadgeDark}>
+              <Text style={styles.iconEmoji}>👤</Text>
             </View>
             <Text style={styles.cardTitle}>Ищу{'\n'}работодателя</Text>
             <Text style={styles.cardSub}>Находите подработки{'\n'}на складах</Text>
           </View>
 
-          <View style={styles.arrow}><Text style={styles.arrowTxt}>›</Text></View>
+          <View style={styles.arrowBtn}>
+            <Text style={styles.arrowTxt}>›</Text>
+          </View>
         </TouchableOpacity>
 
         {/* ── Преимущества ── */}
@@ -177,7 +191,6 @@ export default function RootScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F5F7FA' },
 
-  // Сплэш
   splashCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   splashLogo: { fontSize: 44 },
   track: {
@@ -186,11 +199,18 @@ const styles = StyleSheet.create({
   },
   fill: { height: 3, backgroundColor: Colors.primary, borderRadius: 100 },
 
-  // Скролл — всё на одном экране
-  scroll: { paddingHorizontal: r(20), paddingTop: r(10), paddingBottom: r(12) },
+  // Скролл — ограничен шириной 430px (центрируется на вебе, правильно на мобиле)
+  scroll: {
+    paddingHorizontal: r(20),
+    paddingTop: r(10),
+    paddingBottom: r(12),
+    maxWidth: 430,
+    width: '100%',
+    alignSelf: 'center',
+  },
 
   // Лого
-  logoRow: { marginBottom: r(18) },
+  logoRow: { marginBottom: r(16) },
   logo: { fontSize: r(34) },
   logoBlack: { fontWeight: '800', color: '#111111' },
   logoOrange: { fontWeight: '800', color: Colors.primary },
@@ -198,54 +218,76 @@ const styles = StyleSheet.create({
 
   // Заголовок
   headlineBlock: { marginBottom: r(6) },
-  headline: { fontSize: r(38), fontWeight: '800', color: '#111111', lineHeight: r(44) },
+  headline: {
+    fontSize: r(38), fontWeight: '800', color: '#111111', lineHeight: r(44),
+  },
   headlineSub: {
     fontSize: r(14), color: Colors.textSecondary,
     marginTop: r(8), lineHeight: r(20),
   },
 
-  // Карточка — overflow visible: персонаж вылезает выше
+  // ── Карточки ──
+  // overflow visible — персонаж торчит выше карточки (голова над картой)
   card: {
     height: CARD_H,
     overflow: 'visible',
   },
 
-  // Фоны карточек (отдельный слой с overflow hidden для border-radius)
-  cardBgOrange: { backgroundColor: Colors.primary, borderRadius: r(20), overflow: 'hidden' },
-  cardBgDark:   { backgroundColor: '#1E1E1E',       borderRadius: r(20), overflow: 'hidden' },
+  // Фоны (отдельный View с overflow hidden → правильные скруглённые углы на Android)
+  bgOrange: { backgroundColor: Colors.primary, borderRadius: r(20), overflow: 'hidden' },
+  bgDark:   { backgroundColor: '#1E1E1E',       borderRadius: r(20), overflow: 'hidden' },
 
-  // Текст — левая часть (right оставляет место для персонажа)
-  cardText: {
+  // Персонаж — прозрачный PNG, ноги у нижнего края, голова торчит выше
+  charImg: {
     position: 'absolute',
-    left: r(20), top: r(14), bottom: r(18), right: r(172),
+    right: 0,
+    bottom: 0,
   },
 
-  // Иконка-круг
-  iconCircleOrange: {
-    width: r(36), height: r(36), borderRadius: r(18),
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center', justifyContent: 'center', marginBottom: r(8),
+  // Левая колонка: иконка + заголовок + подпись
+  cardLeft: {
+    position: 'absolute',
+    left: r(18),
+    top: r(16),
+    bottom: r(18),
+    right: r(178),   // не перекрывает персонажа
   },
-  iconCircleDark: {
-    width: r(36), height: r(36), borderRadius: r(18),
-    backgroundColor: 'rgba(255,107,26,0.25)',
-    alignItems: 'center', justifyContent: 'center', marginBottom: r(8),
+
+  // Иконка-бейдж (оранжевая карточка)
+  iconBadgeOrange: {
+    width: r(38), height: r(38), borderRadius: r(19),
+    backgroundColor: 'rgba(255,255,255,0.28)',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: r(10),
   },
-  iconTxt: { fontSize: r(17) },
+  // Иконка-бейдж (тёмная карточка)
+  iconBadgeDark: {
+    width: r(38), height: r(38), borderRadius: r(19),
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: r(10),
+  },
+  iconEmoji: { fontSize: r(18) },
 
   cardTitle: {
     fontSize: r(22), fontWeight: '800', color: '#FFFFFF',
-    lineHeight: r(26), marginBottom: r(5),
+    lineHeight: r(27), marginBottom: r(5),
   },
-  cardSub: { fontSize: r(13), color: 'rgba(255,255,255,0.75)', lineHeight: r(18) },
+  cardSub: {
+    fontSize: r(13), color: 'rgba(255,255,255,0.78)', lineHeight: r(18),
+  },
 
-  // Стрелка
-  arrow: {
-    position: 'absolute', right: r(20), bottom: r(18),
-    width: r(40), height: r(40), borderRadius: r(20),
-    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', zIndex: 2,
+  // Стрелка — правый центр карточки
+  arrowBtn: {
+    position: 'absolute',
+    right: r(20),
+    top: CARD_H / 2 - r(21),   // точно по центру высоты карточки
+    width: r(42), height: r(42), borderRadius: r(21),
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 2,
   },
-  arrowTxt: { fontSize: r(22), color: '#111111', lineHeight: r(26), marginLeft: 2 },
+  arrowTxt: { fontSize: r(24), color: '#111111', lineHeight: r(28), marginLeft: 2 },
 
   // Преимущества
   featuresRow: {
