@@ -127,22 +127,34 @@ export default function ChatsPage() {
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* Names row */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
                     <div style={{ fontWeight: 500, fontSize: 13, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {chat.workerName}
+                      <span style={{ fontWeight: 400, color: 'var(--ink-4)', margin: '0 4px' }}>·</span>
+                      <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>{chat.employerName}</span>
                     </div>
                     <div style={{ fontSize: 10.5, color: 'var(--ink-4)', flexShrink: 0 }}>
                       {chat.lastMessage ? timeLabel(chat.lastMessage.createdAt) : timeLabel(chat.createdAt)}
                     </div>
                   </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {chat.employerName} · {chat.vacTitle}
+                  {/* Vacancy tag */}
+                  <div style={{ marginTop: 3 }}>
+                    <span style={{
+                      display: 'inline-block', maxWidth: '100%',
+                      background: 'var(--accent-soft)', border: '1px solid var(--accent-line)',
+                      color: 'var(--accent)', borderRadius: 5, fontSize: 11, fontWeight: 500,
+                      padding: '1px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {chat.companyName ? `${chat.companyName} · ` : ''}{chat.vacTitle}
+                    </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                  {/* Last message */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
                     <div style={{ fontSize: 11.5, color: 'var(--ink-4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
                       {chat.lastMessage
-                        ? (chat.lastMessage.text.length > 45
-                            ? chat.lastMessage.text.slice(0, 45) + '…'
+                        ? (chat.lastMessage.text.length > 40
+                            ? chat.lastMessage.text.slice(0, 40) + '…'
                             : chat.lastMessage.text)
                         : 'Нет сообщений'}
                     </div>
@@ -202,12 +214,14 @@ export default function ChatsPage() {
                   <span style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>и</span>
                   <span style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--ink)' }}>{selected.employerName}</span>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{
-                    background: 'var(--bg-sunken)', border: '1px solid var(--line)',
-                    borderRadius: 5, padding: '1px 7px', fontSize: 11,
-                  }}>{selected.vacTitle}</span>
-                  <span style={{ marginLeft: 8, color: 'var(--ink-4)' }}>{selected.messageCount} сообщ.</span>
+                    background: 'var(--accent-soft)', border: '1px solid var(--accent-line)',
+                    color: 'var(--accent)', borderRadius: 5, padding: '2px 8px', fontSize: 11.5, fontWeight: 500,
+                  }}>
+                    {selected.companyName ? `${selected.companyName} · ` : ''}{selected.vacTitle}
+                  </span>
+                  <span style={{ color: 'var(--ink-4)', fontSize: 11.5 }}>{selected.messageCount} сообщений</span>
                 </div>
               </div>
 
