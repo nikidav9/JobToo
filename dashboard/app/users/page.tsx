@@ -1,5 +1,5 @@
 'use client'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { fetchUsers, PALETTE } from '@/lib/queries'
 import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
@@ -27,9 +27,14 @@ export default function UsersPage() {
     intervalSec: 30,
   })
 
+  const [phoneSearch, setPhoneSearch] = useState('')
+
   if (loading || !d) return <Loader />
 
   const workerPct = Math.round(d.kpi.workers / Math.max(d.kpi.total, 1) * 100)
+  const filteredUsers = phoneSearch.trim()
+    ? d.recent.filter((u: any) => (u.phone ?? '').includes(phoneSearch.trim()))
+    : d.recent
 
   return (
     <div>
@@ -105,9 +110,33 @@ export default function UsersPage() {
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* Users table — full info */}
+        {/* Users table — full list with phone search */}
         {d.recent.length > 0 && (
-          <ChartCard title="Последние регистрации" sub={`Показаны последние ${d.recent.length} · обновляется в реальном времени`}>
+          <ChartCard
+            title="Все пользователи"
+            sub={phoneSearch.trim()
+              ? `Найдено ${filteredUsers.length} из ${d.recent.length}`
+              : `${d.recent.length} пользователей · обновляется в реальном времени`}
+          >
+            {/* Phone search */}
+            <div style={{ marginBottom: 12 }}>
+              <input
+                type="text"
+                placeholder="Поиск по номеру телефона..."
+                value={phoneSearch}
+                onChange={e => setPhoneSearch(e.target.value)}
+                style={{
+                  width: '100%', maxWidth: 320, padding: '7px 12px',
+                  border: '1px solid var(--line)', borderRadius: 8,
+                  background: 'var(--bg-sunken)', color: 'var(--ink)',
+                  fontSize: 13, outline: 'none',
+                  fontFamily: 'Geist Mono, monospace',
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--line)')}
+              />
+            </div>
+            <div className="table-scroll">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--line)' }}>
@@ -121,7 +150,9 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {d.recent.map((u: any, i: number) => {
+                {filteredUsers.length === 0
+                  ? <tr><td colSpan={6} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Пользователи не найдены</td></tr>
+                  : filteredUsers.map((u: any, i: number) => {
                   const isWorker = u.role === 'worker'
                   const displayName = u.name || '—'
                   const ini = initials(u.name || '', u.phone || '')
@@ -211,10 +242,10 @@ export default function UsersPage() {
                         {u.date || '—'}
                       </td>
                     </tr>
-                  )
-                })}
+                  )})}
               </tbody>
             </table>
+            </div>
           </ChartCard>
         )}
       </div>

@@ -242,7 +242,7 @@ export async function fetchUsers() {
     return { date: d.date, workers: cumW, employers: cumE, total: cumW + cumE }
   })
 
-  const recent = u.slice(0, 20).map((x: any) => ({
+  const recent = u.map((x: any) => ({
     name: `${x.first_name ?? ''} ${x.last_name ?? ''}`.trim(),
     phone: x.phone,
     role: x.role,
