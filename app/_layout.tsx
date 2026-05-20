@@ -2,7 +2,6 @@ import 'react-native-url-polyfill/auto';
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, View, Text, Animated, StyleSheet } from 'react-native';
 import * as Updates from 'expo-updates';
-import { useUpdates } from 'expo-updates';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -120,19 +119,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 function useOTAUpdate() {
   const [isUpdating, setIsUpdating] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
-  const { isUpdatePending } = Platform.OS !== 'web' ? useUpdates() : { isUpdatePending: false };
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
-
-    // Если обновление уже скачано — сразу применяем без загрузки
-    if (isUpdatePending) {
-      setIsUpdating(true);
-      progress.setValue(0.9);
-      Animated.timing(progress, { toValue: 1, duration: 600, useNativeDriver: false })
-        .start(async () => { try { await Updates.reloadAsync(); } catch {} });
-      return;
-    }
 
     const check = async () => {
       try {
@@ -154,7 +143,7 @@ function useOTAUpdate() {
     };
 
     check();
-  }, [isUpdatePending]);
+  }, []);
 
   return { isUpdating, progress };
 }
