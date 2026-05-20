@@ -278,7 +278,7 @@ export async function fetchUsers() {
 export async function fetchVacancies() {
   const [{ data: tv }, { data: pv }, { data: apps }] = await Promise.all([
     supabase.from('jm_vacancies').select('id,status,work_type,work_type_label,created_at,employer_id,salary,workers_needed,workers_found,is_urgent,no_experience_needed,company'),
-    supabase.from('jm_perm_vacancies').select('id,title,status,created_at,employer_id,salary,company,metro_station,description,work_schedule'),
+    supabase.from('jm_perm_vacancies').select('id,title,status,created_at,employer_id,salary,company,metro_station,address,description,schedule,work_type'),
     supabase.from('jm_perm_applications').select('id,vacancy_id,status,created_at'),
   ])
 
@@ -306,7 +306,7 @@ export async function fetchVacancies() {
     metro: v.metro_station ?? null,
     salary: v.salary ? Number(v.salary).toLocaleString('ru-RU') + ' ₽' : null,
     status: v.status ?? 'open',
-    schedule: v.work_schedule ?? null,
+    schedule: v.schedule ?? null,
     createdAt: v.created_at?.slice(0, 10) ?? null,
     apps: appByVac[v.id] ?? { total: 0, pending: 0, approved: 0, rejected: 0 },
   })).sort((a: any, b: any) => b.apps.total - a.apps.total)
