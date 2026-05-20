@@ -40,7 +40,7 @@ export default function Sidebar() {
           fontWeight: 700, fontSize: 13, letterSpacing: '-0.02em',
         }}>J</div>
         <div>
-          <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: '-0.01em', color: 'var(--ink)' }}>JobMatch</div>
+          <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: '-0.01em', color: 'var(--ink)' }}>JobToo</div>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>Аналитика · Admin</div>
         </div>
       </div>

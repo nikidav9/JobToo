@@ -4,13 +4,13 @@ import Shell from '@/components/Shell'
 import SwRegister from '@/components/SwRegister'
 
 export const metadata: Metadata = {
-  title: 'JobMatch — Аналитика',
-  description: 'Аналитический дашборд JobMatch',
+  title: 'JobToo — Аналитика',
+  description: 'Аналитический дашборд JobToo',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'JobMatch',
+    title: 'JobToo',
   },
   formatDetection: { telephone: false },
   icons: {

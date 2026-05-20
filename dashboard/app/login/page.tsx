@@ -51,7 +51,7 @@ export default function LoginPage() {
             fontWeight: 700, fontSize: 16, letterSpacing: '-0.02em',
           }}>J</div>
           <div>
-            <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--ink)', letterSpacing: '-0.01em' }}>JobMatch</div>
+            <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--ink)', letterSpacing: '-0.01em' }}>JobToo</div>
             <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Аналитика · Admin</div>
           </div>
         </div>
@@ -137,7 +137,7 @@ export default function LoginPage() {
         </form>
 
         <p style={{ fontSize: 11.5, color: 'var(--ink-4)', textAlign: 'center', marginTop: 20 }}>
-          JobMatch Analytics · только Admin
+          JobToo Analytics · только Admin
         </p>
       </div>
     </div>

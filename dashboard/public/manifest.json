@@ -1,7 +1,7 @@
 {
-  "name": "JobMatch Аналитика",
-  "short_name": "JobMatch",
-  "description": "Аналитический дашборд JobMatch",
+  "name": "JobToo Аналитика",
+  "short_name": "JobToo",
+  "description": "Аналитический дашборд JobToo",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FAFAF7",

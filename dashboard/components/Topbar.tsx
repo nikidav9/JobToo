@@ -26,7 +26,7 @@ export default function Topbar() {
     }}>
       {/* Breadcrumb */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--ink-3)' }}>
-        <span>JobMatch</span>
+        <span>JobToo</span>
         <span style={{ color: 'var(--ink-4)' }}>/</span>
         <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{label}</span>
       </div>
