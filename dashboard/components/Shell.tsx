@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
@@ -23,6 +23,7 @@ const NAV = [
 export default function Shell({ children }: { children: React.ReactNode }) {
   const rawPath = usePathname()
   const path = rawPath.replace(/\/$/, '') || '/'
+  const router = useRouter()
   const [ready, setReady] = useState(false)
   const [authed, setAuthed] = useState(false)
 
@@ -36,7 +37,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       setAuthed(true)
       setReady(true)
     } else {
-      window.location.replace('/login/')
+      router.replace('/login')
     }
   }, [path])
 

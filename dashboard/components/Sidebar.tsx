@@ -18,7 +18,7 @@ export default function Sidebar() {
 
   function logout() {
     clearAuth()
-    window.location.replace('/login/')
+    window.location.href = window.location.origin + (window.location.pathname.includes('/JobMatch') ? '/JobMatch/login/' : '/login/')
   }
   return (
     <aside style={{
