@@ -109,6 +109,13 @@ const otaStyles = StyleSheet.create({
   sub: { fontSize: 13, color: '#9CA3AF', marginTop: 14 },
 });
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ]);
+}
+
 function useOTAUpdate() {
   const [isUpdating, setIsUpdating] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
@@ -118,30 +125,30 @@ function useOTAUpdate() {
 
     const check = async () => {
       try {
-        const result = await Updates.checkForUpdateAsync();
+        // Таймаут 10 сек — если сеть плохая, не зависаем
+        const result = await withTimeout(Updates.checkForUpdateAsync(), 10_000);
         if (!result.isAvailable) return;
 
         setIsUpdating(true);
         progress.setValue(0);
 
-        // Анимация до 85% пока качается
         Animated.timing(progress, {
           toValue: 0.85,
-          duration: 8000,
+          duration: 10_000,
           useNativeDriver: false,
         }).start();
 
-        await Updates.fetchUpdateAsync();
+        await withTimeout(Updates.fetchUpdateAsync(), 60_000);
 
-        // Добиваем до 100% и перезапускаем
         Animated.timing(progress, {
           toValue: 1,
           duration: 400,
           useNativeDriver: false,
         }).start(async () => {
-          await Updates.reloadAsync();
+          try { await Updates.reloadAsync(); } catch {}
         });
       } catch {
+        // Нет сети или нет обновления — просто запускаем приложение
         setIsUpdating(false);
       }
     };
