@@ -12,10 +12,12 @@ const DB_TIMEOUT = 12_000;
 const IS_NATIVE = Platform.OS !== 'web';
 const API_BASE = IS_NATIVE ? (process.env.EXPO_PUBLIC_API_URL ?? '') : '';
 
+const API_SECRET = process.env.EXPO_PUBLIC_API_SECRET ?? '';
+
 async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
   const res = await fetch(`${API_BASE}/api/db`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-App-Secret': API_SECRET },
     body: JSON.stringify({ fn, args }),
   });
   const body = await res.json() as { data?: T; error?: string };
