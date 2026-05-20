@@ -276,24 +276,28 @@ export async function fetchUsers() {
 // ─── vacancies ───────────────────────────────────────────────────────────────
 
 export async function fetchVacancies() {
-  const [{ data: tv }, { data: pv }, { data: apps }, { data: users }] = await Promise.all([
+  const [{ data: tv }, { data: pv }, { data: apps }, { data: users }, { data: likes }] = await Promise.all([
     supabase.from('jm_vacancies').select('id,status,work_type,work_type_label,created_at,employer_id,salary,workers_needed,workers_found,is_urgent,no_experience_needed,company'),
     supabase.from('jm_perm_vacancies').select('id,title,status,created_at,employer_id,salary,company,metro_station,address,description,schedule,work_type'),
     supabase.from('jm_perm_applications').select('id,vacancy_id,worker_id,status,created_at').order('created_at', { ascending: false }),
     supabase.from('jm_users').select('id,first_name,last_name,phone'),
+    supabase.from('jm_likes').select('id,vacancy_id,worker_id,is_match,worker_liked,employer_liked,worker_skipped,created_at').order('created_at', { ascending: false }),
   ])
 
   const t = tv ?? []
   const p = pv ?? []
   const ap = apps ?? []
+  const lk = likes ?? []
 
   const userMap: Record<string, { name: string; phone: string }> = {}
   for (const u of users ?? []) {
-    const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.phone || '—'
+    const name = [(u as any).first_name, (u as any).last_name].filter(Boolean).join(' ') || (u as any).phone || '—'
     userMap[(u as any).id] = { name, phone: (u as any).phone ?? '—' }
   }
 
   type AppInfo = { id: string; workerId: string; name: string; phone: string; status: string; date: string }
+
+  // ── perm applications ────────────────────────────────────────────────────
   const appsByVac: Record<string, AppInfo[]> = {}
   const appByVac: Record<string, { total: number; pending: number; approved: number; rejected: number }> = {}
 
@@ -309,14 +313,7 @@ export async function fetchVacancies() {
     else if (st === 'rejected') appByVac[vid].rejected++
     else appByVac[vid].pending++
     const worker = userMap[wid]
-    appsByVac[vid].push({
-      id: (a as any).id,
-      workerId: wid,
-      name: worker?.name ?? '—',
-      phone: worker?.phone ?? '—',
-      status: st,
-      date: (a as any).created_at?.slice(0, 10) ?? '',
-    })
+    appsByVac[vid].push({ id: (a as any).id, workerId: wid, name: worker?.name ?? '—', phone: worker?.phone ?? '—', status: st, date: (a as any).created_at?.slice(0, 10) ?? '' })
   }
 
   const permVacancyCards = p.map((v: any) => ({
@@ -330,6 +327,40 @@ export async function fetchVacancies() {
     createdAt: v.created_at?.slice(0, 10) ?? null,
     apps: appByVac[v.id] ?? { total: 0, pending: 0, approved: 0, rejected: 0 },
     applicants: appsByVac[v.id] ?? [],
+  })).sort((a: any, b: any) => b.apps.total - a.apps.total)
+
+  // ── temp vacancy applicants from likes ───────────────────────────────────
+  const likesByVac: Record<string, AppInfo[]> = {}
+  const likeCountByVac: Record<string, { total: number; matched: number; pending: number; rejected: number }> = {}
+
+  for (const l of lk) {
+    const vid = (l as any).vacancy_id
+    const wid = (l as any).worker_id
+    // only workers who showed interest (liked the vacancy)
+    if (!vid || !(l as any).worker_liked) continue
+    if (!likesByVac[vid]) likesByVac[vid] = []
+    if (!likeCountByVac[vid]) likeCountByVac[vid] = { total: 0, matched: 0, pending: 0, rejected: 0 }
+    likeCountByVac[vid].total++
+    let st: string
+    if ((l as any).is_match) { st = 'matched'; likeCountByVac[vid].matched++ }
+    else if ((l as any).employer_liked === false) { st = 'rejected'; likeCountByVac[vid].rejected++ }
+    else { st = 'pending'; likeCountByVac[vid].pending++ }
+    const worker = userMap[wid]
+    likesByVac[vid].push({ id: (l as any).id, workerId: wid, name: worker?.name ?? '—', phone: worker?.phone ?? '—', status: st, date: (l as any).created_at?.slice(0, 10) ?? '' })
+  }
+
+  const tempVacancyCards = t.map((v: any) => ({
+    id: v.id,
+    title: v.work_type_label ?? WORK_TYPE_LABELS[v.work_type ?? ''] ?? 'Вакансия',
+    company: v.company ?? '—',
+    salary: v.salary ? Number(v.salary).toLocaleString('ru-RU') + ' ₽' : null,
+    status: v.status ?? 'open',
+    isUrgent: !!v.is_urgent,
+    workersNeeded: v.workers_needed ?? null,
+    workersFound: v.workers_found ?? 0,
+    createdAt: v.created_at?.slice(0, 10) ?? null,
+    apps: likeCountByVac[v.id] ?? { total: 0, matched: 0, pending: 0, rejected: 0 },
+    applicants: likesByVac[v.id] ?? [],
   })).sort((a: any, b: any) => b.apps.total - a.apps.total)
 
   const w30 = subDays(new Date(), 30).toISOString()
@@ -416,6 +447,7 @@ export async function fetchVacancies() {
       { name: 'Закрыто', value: p.filter((x: any) => x.status === 'closed').length, fill: PALETTE.gray },
     ],
     permVacancyCards,
+    tempVacancyCards,
   }
 }
 

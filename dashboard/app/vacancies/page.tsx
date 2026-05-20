@@ -116,6 +116,8 @@ export default function VacanciesPage() {
           </ChartCard>
         </div>
 
+        <TempVacancyCards cards={d.tempVacancyCards} />
+
         <PermVacancyCards cards={d.permVacancyCards} />
 
         <div className="g-2">
@@ -165,6 +167,133 @@ export default function VacanciesPage() {
 }
 
 type AppInfo = { id: string; name: string; phone: string; status: string; date: string }
+
+// ─── Временные вакансии ────────────────────────────────────────────────────
+
+type TempCardData = {
+  id: string
+  title: string
+  company: string
+  salary: string | null
+  status: string
+  isUrgent: boolean
+  workersNeeded: number | null
+  workersFound: number
+  createdAt: string | null
+  apps: { total: number; matched: number; pending: number; rejected: number }
+  applicants: AppInfo[]
+}
+
+function TempVacancyCards({ cards }: { cards: TempCardData[] }) {
+  if (!cards || cards.length === 0) return null
+  return (
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 12, letterSpacing: '0.01em' }}>
+        Временные вакансии
+        <span style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 400, color: 'var(--ink-3)' }}>
+          {cards.length} всего · сортировка по откликам
+        </span>
+      </div>
+      <div className="perm-vac-grid">
+        {cards.map(c => <TempCard key={c.id} c={c} />)}
+      </div>
+    </div>
+  )
+}
+
+function TempCard({ c }: { c: TempCardData }) {
+  const [open, setOpen] = useState(false)
+  const isOpen = c.status === 'open'
+  const hasApps = c.apps.total > 0
+  const matchedPct = hasApps ? Math.round(c.apps.matched / c.apps.total * 100) : 0
+
+  const matched  = c.applicants.filter(a => a.status === 'matched')
+  const pending  = c.applicants.filter(a => a.status === 'pending')
+  const rejected = c.applicants.filter(a => a.status === 'rejected')
+
+  return (
+    <div className="perm-vac-card">
+      {/* header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+          background: isOpen ? '#FFF3EC' : '#F2F1EE',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <IconBriefcase color={isOpen ? PALETTE.orange : '#B0ADA6'} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.3, wordBreak: 'break-word' }}>
+            {c.title}
+            {c.isUrgent && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: PALETTE.red, background: PALETTE.red + '15', padding: '1px 5px', borderRadius: 4 }}>СРОЧНО</span>}
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{c.company}</div>
+        </div>
+        <span style={{
+          flexShrink: 0, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+          background: isOpen ? '#FFF3EC' : '#F2F1EE',
+          color: isOpen ? PALETTE.orange : '#9A9690',
+          letterSpacing: '0.04em',
+        }}>
+          {isOpen ? 'ОТКРЫТА' : 'ЗАКРЫТА'}
+        </span>
+      </div>
+
+      {/* meta */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginBottom: 10 }}>
+        {c.salary && <span style={{ fontSize: 12, fontWeight: 600, color: PALETTE.blue }}>{c.salary}</span>}
+        {c.workersNeeded && (
+          <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+            {c.workersFound}/{c.workersNeeded} найдено
+          </span>
+        )}
+        {c.createdAt && <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 'auto' }}>{c.createdAt}</span>}
+      </div>
+
+      <div style={{ height: 1, background: 'var(--line)', marginBottom: 10 }} />
+
+      {/* clicks row */}
+      <button
+        onClick={() => hasApps && setOpen(o => !o)}
+        style={{ all: 'unset', display: 'flex', alignItems: 'center', gap: 8, width: '100%', cursor: hasApps ? 'pointer' : 'default' }}
+      >
+        <IconPeople color={hasApps ? PALETTE.orange : '#C8C5BF'} />
+        <span style={{ fontSize: 18, fontWeight: 700, color: hasApps ? 'var(--ink)' : 'var(--ink-4)', lineHeight: 1 }}>
+          {c.apps.total}
+        </span>
+        <span style={{ fontSize: 11.5, color: 'var(--ink-3)', flex: 1 }}>
+          {c.apps.total === 1 ? 'лайк' : c.apps.total >= 2 && c.apps.total <= 4 ? 'лайка' : 'лайков'}
+        </span>
+        {hasApps && (
+          <>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Pill color={PALETTE.green}  label="совп." value={c.apps.matched} />
+              <Pill color={PALETTE.amber}  label="ожид." value={c.apps.pending} />
+              <Pill color={PALETTE.red}    label="откл." value={c.apps.rejected} />
+            </div>
+            <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 2 }}>{open ? '▲' : '▼'}</span>
+          </>
+        )}
+      </button>
+
+      {hasApps && (
+        <div style={{ marginTop: 8, height: 3, borderRadius: 2, background: '#F0EEE9', overflow: 'hidden' }}>
+          <div style={{ height: '100%', borderRadius: 2, background: PALETTE.green, width: `${matchedPct}%` }} />
+        </div>
+      )}
+
+      {open && hasApps && (
+        <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {matched.length  > 0 && <ApplicantGroup title="Совпадение" color={PALETTE.green}  people={matched} />}
+          {pending.length  > 0 && <ApplicantGroup title="Ожидают"    color={PALETTE.amber}  people={pending} />}
+          {rejected.length > 0 && <ApplicantGroup title="Отказали"   color={PALETTE.red}    people={rejected} />}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Постоянные вакансии ───────────────────────────────────────────────────
 
 type PermCard = {
   id: string
