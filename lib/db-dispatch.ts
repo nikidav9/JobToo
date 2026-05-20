@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import bcrypt from 'bcryptjs';
 
 function uid(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -60,6 +61,22 @@ export async function dispatch(supabase: SupabaseClient, fn: string, args: any[]
         .maybeSingle();
       if (error) throw new Error(error.message);
       return data;
+    }
+
+    case 'loginUser': {
+      const [phone, password] = args as [string, string];
+      const { data, error } = await supabase
+        .from('jm_users')
+        .select('*')
+        .eq('phone', phone)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) return null;
+      const stored = data.password ?? '';
+      const isHashed = stored.startsWith('$2b$') || stored.startsWith('$2a$');
+      const valid = isHashed ? await bcrypt.compare(password, stored) : stored === password;
+      if (!valid) return null;
+      return { ...data, password: '' };
     }
 
     // ─── Vacancies ───────────────────────────────────────────────────────────

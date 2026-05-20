@@ -17,6 +17,7 @@ import {
   dbGetUsers,
   dbUpsertUser,
   dbGetUserByPhone,
+  dbLoginUser,
   dbGetVacancies,
   dbGetLikes,
   dbGetLikesForUser,
@@ -310,15 +311,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const loginUser = async (phone: string, password: string): Promise<User | null> => {
     const digits = extractPhoneDigits(phone);
-    const found = await dbGetUserByPhone(digits);
-    if (!found) return null;
-    const storedPassword = found.password ?? '';
-    const isHashed = storedPassword.startsWith('$2b$') || storedPassword.startsWith('$2a$');
-    const valid = isHashed
-      ? await bcrypt.compare(password, storedPassword)
-      : storedPassword === password;
-    if (!valid) return null;
-    const safeUser = { ...found, password: '' };
+    let safeUser: User | null = null;
+    if (Platform.OS !== 'web') {
+      // Native: bcrypt verification runs on server (Node.js), result has password stripped
+      safeUser = await dbLoginUser(digits, password);
+    } else {
+      // Web: verify locally with bcrypt
+      const found = await dbGetUserByPhone(digits);
+      if (!found) return null;
+      const stored = found.password ?? '';
+      const isHashed = stored.startsWith('$2b$') || stored.startsWith('$2a$');
+      const valid = isHashed ? await bcrypt.compare(password, stored) : stored === password;
+      if (!valid) return null;
+      safeUser = { ...found, password: '' };
+    }
+    if (!safeUser) return null;
     _setCurrentUser(safeUser);
     await saveSessionUser(safeUser);
     registerForPushNotifications(safeUser.id).catch(() => {});

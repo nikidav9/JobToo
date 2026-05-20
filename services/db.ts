@@ -150,6 +150,11 @@ export async function dbGetUserByPhone(phone: string): Promise<User | null> {
   return data ? rowToUser(data) : null;
 }
 
+export async function dbLoginUser(phone: string, password: string): Promise<User | null> {
+  if (IS_NATIVE) { const d = await proxy<any>('loginUser', [phone, password]); return d ? rowToUser(d) : null; }
+  return null; // web login handled in AppContext with bcrypt
+}
+
 // ─── Vacancies ────────────────────────────────────────────────────────────────
 
 function rowToVacancy(r: any): Vacancy {
