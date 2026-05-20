@@ -277,7 +277,7 @@ export async function fetchUsers() {
 
 export async function fetchVacancies() {
   const [{ data: tv }, { data: pv }, { data: apps }, { data: users }, { data: likes }] = await Promise.all([
-    supabase.from('jm_vacancies').select('id,status,work_type,work_type_label,created_at,employer_id,salary,workers_needed,workers_found,is_urgent,no_experience_needed,company'),
+    supabase.from('jm_vacancies').select('id,status,work_type,work_type_label,created_at,employer_id,salary,workers_needed,workers_found,is_urgent,no_experience_needed,company,date,address,metro_station,time_start,time_end'),
     supabase.from('jm_perm_vacancies').select('id,title,status,created_at,employer_id,salary,company,metro_station,address,description,schedule,work_type'),
     supabase.from('jm_perm_applications').select('id,vacancy_id,worker_id,status,created_at').order('created_at', { ascending: false }),
     supabase.from('jm_users').select('id,first_name,last_name,phone'),
@@ -358,6 +358,11 @@ export async function fetchVacancies() {
     isUrgent: !!v.is_urgent,
     workersNeeded: v.workers_needed ?? null,
     workersFound: v.workers_found ?? 0,
+    shiftDate: v.date ?? null,
+    timeStart: v.time_start ?? null,
+    timeEnd: v.time_end ?? null,
+    address: v.address ?? null,
+    metro: v.metro_station ?? null,
     createdAt: v.created_at?.slice(0, 10) ?? null,
     apps: likeCountByVac[v.id] ?? { total: 0, matched: 0, pending: 0, rejected: 0 },
     applicants: likesByVac[v.id] ?? [],

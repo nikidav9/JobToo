@@ -179,6 +179,11 @@ type TempCardData = {
   isUrgent: boolean
   workersNeeded: number | null
   workersFound: number
+  shiftDate: string | null
+  timeStart: string | null
+  timeEnd: string | null
+  address: string | null
+  metro: string | null
   createdAt: string | null
   apps: { total: number; matched: number; pending: number; rejected: number }
   applicants: AppInfo[]
@@ -247,8 +252,27 @@ function TempCard({ c }: { c: TempCardData }) {
             {c.workersFound}/{c.workersNeeded} найдено
           </span>
         )}
-        {c.createdAt && <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 'auto' }}>{c.createdAt}</span>}
+        {c.createdAt && <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 'auto' }}>Опубл. {c.createdAt}</span>}
       </div>
+
+      {/* shift info row */}
+      {(c.shiftDate || c.address || c.metro) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10, padding: '8px 10px', background: 'var(--bg-sunken)', borderRadius: 8 }}>
+          {c.shiftDate && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <IconCalendar />
+              <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{c.shiftDate}</span>
+              {c.timeStart && <span style={{ color: 'var(--ink-3)' }}>{c.timeStart}{c.timeEnd ? ` – ${c.timeEnd}` : ''}</span>}
+            </div>
+          )}
+          {(c.metro || c.address) && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11.5, color: 'var(--ink-2)' }}>
+              <IconPin />
+              <span>{[c.metro, c.address].filter(Boolean).join(', ')}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ height: 1, background: 'var(--line)', marginBottom: 10 }} />
 
@@ -474,6 +498,22 @@ function Pill({ color, label, value }: { color: string; label: string; value: nu
     }}>
       {value} {label}
     </span>
+  )
+}
+
+function IconCalendar() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6B6760" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+  )
+}
+
+function IconPin() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6B6760" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+    </svg>
   )
 }
 
