@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Platform, AppState, AppStateStatus } from 'react-native';
+import * as bcrypt from 'bcryptjs';
 import { supabase } from '@/lib/supabase';
 import { getSupabaseClient } from '@/template';
 import { User, Vacancy, Like, Chat, PermVacancy, PermApplication } from '@/constants/types';
@@ -287,8 +288,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // ─── Auth actions ──────────────────────────────────────────────────────────
 
   const registerUser = async (u: User) => {
-    await dbUpsertUser(u);
-    _setCurrentUser(u);
+    const hashed = await bcrypt.hash(u.password ?? '', 10);
+    await dbUpsertUser({ ...u, password: hashed });
+    _setCurrentUser({ ...u, password: '' });
     await saveSessionUser(u);
     // Задержка нужна чтобы система успела обработать разрешения на уведомления
     setTimeout(() => { registerForPushNotifications(u.id).catch(() => {}); }, 2000);
@@ -309,23 +311,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const loginUser = async (phone: string, password: string): Promise<User | null> => {
     const digits = extractPhoneDigits(phone);
     const found = await dbGetUserByPhone(digits);
-    if (!found || found.password !== password) return null;
-    _setCurrentUser(found);
-    await saveSessionUser(found);
-    registerForPushNotifications(found.id).catch(() => {});
+    if (!found) return null;
+    const storedPassword = found.password ?? '';
+    const isHashed = storedPassword.startsWith('$2b$') || storedPassword.startsWith('$2a$');
+    const valid = isHashed
+      ? await bcrypt.compare(password, storedPassword)
+      : storedPassword === password;
+    if (!valid) return null;
+    const safeUser = { ...found, password: '' };
+    _setCurrentUser(safeUser);
+    await saveSessionUser(safeUser);
+    registerForPushNotifications(safeUser.id).catch(() => {});
     setTimeout(() => {
       Promise.all([
         refreshUsers(),
         refreshVacancies(),
-        refreshLikes(found),
-        refreshChats(found),
-        refreshSaved(found),
-        refreshPermVacancies(found),
-        refreshPermApplications(found),
-        refreshPermSaved(found),
+        refreshLikes(safeUser),
+        refreshChats(safeUser),
+        refreshSaved(safeUser),
+        refreshPermVacancies(safeUser),
+        refreshPermApplications(safeUser),
+        refreshPermSaved(safeUser),
       ]).catch(() => {});
     }, 300);
-    return found;
+    return safeUser;
   };
 
   const logout = async () => {
