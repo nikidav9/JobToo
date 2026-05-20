@@ -8,9 +8,9 @@ import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
 
 const TRACK_W = 140;
-const CARD_H = 160;
-const CHAR_H = 230;
-const CHAR_OVERFLOW = CHAR_H - CARD_H; // 70px above card
+const CARD_H = 158;   // visible card height
+const CHAR_H = 240;   // character image height (overflows above card)
+const OVERFLOW = CHAR_H - CARD_H; // 82px peeking above card
 
 export default function RootScreen() {
   const router = useRouter();
@@ -64,7 +64,6 @@ export default function RootScreen() {
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* Logo + tagline */}
         <View style={styles.logoRow}>
           <Text style={styles.logo}>
             <Text style={styles.logoBlack}>Job</Text>
@@ -73,23 +72,30 @@ export default function RootScreen() {
           <Text style={styles.tagline}>Подработки в Москве · Склад</Text>
         </View>
 
-        {/* Headline */}
         <View style={styles.headlineBlock}>
           <Text style={styles.headline}>{'Выберите,\nкто вы'}</Text>
           <Text style={styles.headlineSub}>{'Мы адаптируем приложение\nпод ваши задачи'}</Text>
         </View>
 
-        {/* Card — Employer (orange) */}
+        {/* Card — Ищу работника (orange) */}
+        {/* Wrapper height = CHAR_H so character overflow is inside the wrapper */}
         <TouchableOpacity
-          style={[styles.cardWrapper, { marginTop: CHAR_OVERFLOW }]}
+          style={styles.cardWrapper}
           activeOpacity={0.9}
           onPress={() => router.push('/register-employer')}
         >
-          {/* Rounded background */}
+          {/* Colored background — only bottom CARD_H portion */}
           <View style={[styles.cardBg, { backgroundColor: Colors.primary }]} />
 
-          {/* Text left side */}
-          <View style={styles.cardLeft}>
+          {/* Character — full CHAR_H, right side */}
+          <Image
+            source={require('../assets/images/char-employer.png')}
+            style={styles.cardChar}
+            resizeMode="contain"
+          />
+
+          {/* Text — inside card zone */}
+          <View style={styles.cardText}>
             <View style={styles.cardIconCircle}>
               <Text style={styles.cardIcon}>💼</Text>
             </View>
@@ -97,30 +103,26 @@ export default function RootScreen() {
             <Text style={styles.cardSub}>Размещайте вакансии{'\n'}и находите сотрудников</Text>
           </View>
 
-          {/* Character — overflows above */}
-          <Image
-            source={require('../assets/images/char-employer.png')}
-            style={styles.cardCharacter}
-            resizeMode="contain"
-          />
-
-          {/* Arrow button */}
           <View style={styles.arrowBtn}>
             <Text style={styles.arrowTxt}>›</Text>
           </View>
         </TouchableOpacity>
 
-        {/* Card — Worker (dark) */}
+        {/* Card — Ищу работодателя (dark) */}
         <TouchableOpacity
-          style={[styles.cardWrapper, { marginTop: CHAR_OVERFLOW + 14 }]}
+          style={[styles.cardWrapper, { marginTop: 14 }]}
           activeOpacity={0.9}
           onPress={() => router.push('/register-worker')}
         >
-          {/* Rounded background */}
           <View style={[styles.cardBg, { backgroundColor: '#1E1E1E' }]} />
 
-          {/* Text left side */}
-          <View style={styles.cardLeft}>
+          <Image
+            source={require('../assets/images/char-worker.jpeg')}
+            style={styles.cardChar}
+            resizeMode="contain"
+          />
+
+          <View style={styles.cardText}>
             <View style={[styles.cardIconCircle, styles.cardIconCircleDark]}>
               <Text style={styles.cardIcon}>👤</Text>
             </View>
@@ -128,20 +130,12 @@ export default function RootScreen() {
             <Text style={styles.cardSub}>Находите подработки{'\n'}на складах</Text>
           </View>
 
-          {/* Character — overflows above */}
-          <Image
-            source={require('../assets/images/char-worker.jpeg')}
-            style={styles.cardCharacter}
-            resizeMode="contain"
-          />
-
-          {/* Arrow button */}
           <View style={styles.arrowBtn}>
             <Text style={styles.arrowTxt}>›</Text>
           </View>
         </TouchableOpacity>
 
-        {/* Features row */}
+        {/* Features */}
         <View style={styles.featuresRow}>
           {[
             { icon: '🛡️', title: 'Безопасно', sub: 'Проверенные\nкомпании' },
@@ -156,7 +150,6 @@ export default function RootScreen() {
           ))}
         </View>
 
-        {/* Login row */}
         <View style={styles.loginCard}>
           <Text style={styles.loginGray}>Уже есть аккаунт? </Text>
           <TouchableOpacity onPress={() => router.push('/login')}>
@@ -173,7 +166,6 @@ export default function RootScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F5F7FA' },
 
-  // Splash
   splashCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   splashLogo: { fontSize: 44 },
   track: {
@@ -183,87 +175,87 @@ const styles = StyleSheet.create({
   },
   fill: { height: 3, backgroundColor: Colors.primary, borderRadius: 100 },
 
-  // Scroll
   scroll: { paddingHorizontal: 20, paddingBottom: 32, paddingTop: 12 },
 
-  // Logo
   logoRow: { marginBottom: 28 },
   logo: { fontSize: 36 },
   logoBlack: { fontWeight: '800', color: '#111111' },
   logoOrange: { fontWeight: '800', color: Colors.primary },
   tagline: { fontSize: 14, color: Colors.textSecondary, marginTop: 4 },
 
-  // Headline
-  headlineBlock: { marginBottom: 8 },
+  headlineBlock: { marginBottom: 20 },
   headline: { fontSize: 40, fontWeight: '800', color: '#111111', lineHeight: 46 },
   headlineSub: { fontSize: 15, color: Colors.textSecondary, marginTop: 10, lineHeight: 22 },
 
-  // Cards
+  // cardWrapper: full width, height = CHAR_H (character + card combined)
   cardWrapper: {
-    height: CARD_H,
-    marginBottom: 0,
-    overflow: 'visible',
-    position: 'relative',
+    height: CHAR_H,
+    // no overflow needed — wrapper already sized to contain everything
   },
+
+  // Colored card background — sits at the BOTTOM of the wrapper
   cardBg: {
     position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: CARD_H,
     borderRadius: 20,
   },
-  cardLeft: {
+
+  // Character image — full wrapper height, anchored to bottom-right
+  cardChar: {
     position: 'absolute',
-    left: 20,
-    top: 20,
-    bottom: 20,
-    right: 175,
-    justifyContent: 'flex-start',
+    bottom: 0,
+    right: 0,
+    width: 185,
+    height: CHAR_H,
   },
+
+  // Text block — inside the card zone (bottom CARD_H), left side
+  cardText: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    top: OVERFLOW + 16, // starts inside the card zone
+    right: 185,
+  },
+
   cardIconCircle: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 38, height: 38, borderRadius: 19,
     backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 10,
   },
   cardIconCircleDark: { backgroundColor: 'rgba(255,107,26,0.25)' },
-  cardIcon: { fontSize: 17 },
+  cardIcon: { fontSize: 18 },
   cardTitle: {
-    fontSize: 22, fontWeight: '800', color: '#FFFFFF',
-    lineHeight: 26, marginBottom: 6,
+    fontSize: 24, fontWeight: '800', color: '#FFFFFF',
+    lineHeight: 28, marginBottom: 6,
   },
   cardSub: { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 18 },
 
-  cardCharacter: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    height: CHAR_H,
-    width: 165,
-    zIndex: 1,
-  },
+  // Arrow button — bottom-right inside card zone
   arrowBtn: {
     position: 'absolute',
     right: 20,
     bottom: 20,
-    width: 40, height: 40, borderRadius: 20,
+    width: 42, height: 42, borderRadius: 21,
     backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
-    zIndex: 2,
   },
-  arrowTxt: { fontSize: 22, color: '#111111', lineHeight: 26, marginLeft: 2 },
+  arrowTxt: { fontSize: 24, color: '#111111', lineHeight: 28, marginLeft: 2 },
 
-  // Features
   featuresRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: CHAR_OVERFLOW + 14 + 16,
-    marginBottom: 16,
+    marginTop: 20, marginBottom: 16,
   },
   feature: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
   featureIcon: { fontSize: 22, marginBottom: 4 },
   featureTitle: { fontSize: 13, fontWeight: '700', color: '#111111', marginBottom: 3 },
   featureSub: { fontSize: 11, color: Colors.textSecondary, textAlign: 'center', lineHeight: 15 },
 
-  // Login
   loginCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
