@@ -188,6 +188,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               refreshPermSaved(sessionUser),
             ]).catch(() => {});
           }, 100);
+
+          // Register/refresh push token on every app open — catches users
+          // who registered before push notifications were added.
+          setTimeout(() => {
+            if (cancelled) return;
+            registerForPushNotifications(sessionUser.id).catch(() => {});
+          }, 2000);
         }
       } catch (e) {
         console.warn('[AppContext] boot error', e);
