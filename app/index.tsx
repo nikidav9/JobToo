@@ -16,22 +16,20 @@ const sc = Math.min(SW / 390, SH / 844);
 const r = (n: number) => Math.round(n * sc);
 
 // ── Ключевые размеры (базовые для 390×844 iPhone 14) ──────────────────
-// Карточка
 const CARD_H  = r(160);
 
-// char-employer.png: 1024×1536, персонаж в нижних 60% изображения
-// Чтобы голова торчала ~60px выше карточки: H=367, W=244
-// Формула: char_top = (CARD_H - H) + H*0.40 = (160-367)+147 = -60px ✓
-const EMPL_W  = r(244);
-const EMPL_H  = r(367);
+// char-employer.png: 1024×1536, W/H=0.667
+// char_top = (160-420)+420*0.40 = -260+168 = -92px above card ✓
+const EMPL_W  = r(280);
+const EMPL_H  = r(420);
 
-// char-worker.png: 1112×2400, персонаж в нижних 58% изображения
-// char_top = (160-370)+370*0.42 = -210+155 = -55px ✓
-const WORK_W  = r(171);
-const WORK_H  = r(370);
+// char-worker.png: 1112×2400, W/H=0.463
+// char_top = (160-420)+420*0.42 = -260+176 = -84px above card ✓
+const WORK_W  = r(194);
+const WORK_H  = r(420);
 
-// Отступ перед второй карточкой: overflow(55px) + зазор(10px) = 65px
-const CARD2_MT = r(65);
+// Отступ перед второй карточкой: overflow(84px) + зазор(10px) = 94px
+const CARD2_MT = r(94);
 
 export default function RootScreen() {
   const router = useRouter();
@@ -107,26 +105,22 @@ export default function RootScreen() {
           activeOpacity={0.9}
           onPress={() => router.push('/register-employer')}
         >
-          {/* Фон с скруглёнными углами (отдельный слой — Android совместимость) */}
           <View style={[StyleSheet.absoluteFill, styles.bgOrange]} />
 
-          {/* Персонаж: прозрачный PNG, ноги у низа, голова 60px выше карточки */}
           <Image
             source={require('../assets/images/char-employer.png')}
             style={[styles.charImg, { width: EMPL_W, height: EMPL_H }]}
             resizeMode="contain"
           />
 
-          {/* Иконка и текст — левая сторона */}
           <View style={styles.cardLeft}>
-            <View style={styles.iconBadgeOrange}>
+            <View style={styles.iconBadge}>
               <Text style={styles.iconEmoji}>💼</Text>
             </View>
             <Text style={styles.cardTitle}>Ищу{'\n'}работника</Text>
             <Text style={styles.cardSub}>Размещайте вакансии{'\n'}и находите сотрудников</Text>
           </View>
 
-          {/* Стрелка справа по центру */}
           <View style={styles.arrowBtn}>
             <Text style={styles.arrowTxt}>›</Text>
           </View>
@@ -147,7 +141,7 @@ export default function RootScreen() {
           />
 
           <View style={styles.cardLeft}>
-            <View style={styles.iconBadgeDark}>
+            <View style={styles.iconBadge}>
               <Text style={styles.iconEmoji}>👤</Text>
             </View>
             <Text style={styles.cardTitle}>Ищу{'\n'}работодателя</Text>
@@ -199,7 +193,6 @@ const styles = StyleSheet.create({
   },
   fill: { height: 3, backgroundColor: Colors.primary, borderRadius: 100 },
 
-  // Скролл — ограничен шириной 430px (центрируется на вебе, правильно на мобиле)
   scroll: {
     paddingHorizontal: r(20),
     paddingTop: r(10),
@@ -209,14 +202,12 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
 
-  // Лого
   logoRow: { marginBottom: r(16) },
   logo: { fontSize: r(34) },
   logoBlack: { fontWeight: '800', color: '#111111' },
   logoOrange: { fontWeight: '800', color: Colors.primary },
   tagline: { fontSize: r(13), color: Colors.textSecondary, marginTop: r(4) },
 
-  // Заголовок
   headlineBlock: { marginBottom: r(6) },
   headline: {
     fontSize: r(38), fontWeight: '800', color: '#111111', lineHeight: r(44),
@@ -226,44 +217,32 @@ const styles = StyleSheet.create({
     marginTop: r(8), lineHeight: r(20),
   },
 
-  // ── Карточки ──
-  // overflow visible — персонаж торчит выше карточки (голова над картой)
   card: {
     height: CARD_H,
     overflow: 'visible',
   },
 
-  // Фоны (отдельный View с overflow hidden → правильные скруглённые углы на Android)
   bgOrange: { backgroundColor: Colors.primary, borderRadius: r(20), overflow: 'hidden' },
   bgDark:   { backgroundColor: '#1E1E1E',       borderRadius: r(20), overflow: 'hidden' },
 
-  // Персонаж — прозрачный PNG, ноги у нижнего края, голова торчит выше
   charImg: {
     position: 'absolute',
     right: 0,
     bottom: 0,
   },
 
-  // Левая колонка: иконка + заголовок + подпись
   cardLeft: {
     position: 'absolute',
     left: r(18),
     top: r(16),
     bottom: r(18),
-    right: r(178),   // не перекрывает персонажа
+    right: r(190),
   },
 
-  // Иконка-бейдж (оранжевая карточка)
-  iconBadgeOrange: {
-    width: r(38), height: r(38), borderRadius: r(19),
-    backgroundColor: 'rgba(255,255,255,0.28)',
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: r(10),
-  },
-  // Иконка-бейдж (тёмная карточка)
-  iconBadgeDark: {
-    width: r(38), height: r(38), borderRadius: r(19),
-    backgroundColor: 'rgba(255,255,255,0.14)',
+  // Оранжевый бейдж — одинаковый на обеих карточках (как в референсе)
+  iconBadge: {
+    width: r(40), height: r(40), borderRadius: r(20),
+    backgroundColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: r(10),
   },
@@ -277,11 +256,10 @@ const styles = StyleSheet.create({
     fontSize: r(13), color: 'rgba(255,255,255,0.78)', lineHeight: r(18),
   },
 
-  // Стрелка — правый центр карточки
   arrowBtn: {
     position: 'absolute',
     right: r(20),
-    top: CARD_H / 2 - r(21),   // точно по центру высоты карточки
+    top: CARD_H / 2 - r(21),
     width: r(42), height: r(42), borderRadius: r(21),
     backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
@@ -289,7 +267,6 @@ const styles = StyleSheet.create({
   },
   arrowTxt: { fontSize: r(24), color: '#111111', lineHeight: r(28), marginLeft: 2 },
 
-  // Преимущества
   featuresRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     marginTop: r(14), marginBottom: r(10),
@@ -299,7 +276,6 @@ const styles = StyleSheet.create({
   featureTitle: { fontSize: r(12), fontWeight: '700', color: '#111111', marginBottom: r(2) },
   featureSub: { fontSize: r(10), color: Colors.textSecondary, textAlign: 'center', lineHeight: r(14) },
 
-  // Вход
   loginCard: {
     backgroundColor: '#FFFFFF', borderRadius: r(14),
     paddingVertical: r(13),
