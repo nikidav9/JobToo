@@ -111,7 +111,7 @@ export default function RootScreen() {
           onPress={() => router.push('/register-employer')}
         >
           <LinearGradient
-            colors={['#FF8C3A', '#FF6200']}
+            colors={['#FFA040', '#FF4D00']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[StyleSheet.absoluteFill, { borderRadius: r(20), overflow: 'hidden' }]}
@@ -302,8 +302,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     marginBottom: r(10),
   },
-  loginGray: { fontSize: r(13), color: Colors.textSecondary },
+  loginGray: { fontSize: r(13), color: '#111111' },
   loginLink: { fontSize: r(13), fontWeight: '900', color: Colors.primary },
 
-  version: { textAlign: 'center', fontSize: r(10), color: Colors.textMuted },
+  version: { textAlign: 'center', fontSize: r(10), color: '#6B7280' },
 });
