@@ -20,17 +20,17 @@ const r = (n: number) => Math.round(n * sc);
 const CARD_H = r(140);
 
 // Персонаж работодателя: 77×104 в Figma, right-отступ 42px
-const EMPL_W     = r(114);
+const EMPL_W     = r(113);
 const EMPL_H     = r(153);
 const EMPL_RIGHT = r(62);
 
 // Персонаж работника: 78×98 в Figma, right-отступ 35px
 const WORK_W     = r(115);
-const WORK_H     = r(145);
+const WORK_H     = r(144);
 const WORK_RIGHT = r(52);
 
 // Зазор между карточками: 12px + overflow 4px = 16px × 1.474
-const CARD2_MT = r(20);
+const CARD2_MT = r(18);
 
 export default function RootScreen() {
   const router = useRouter();
@@ -109,9 +109,9 @@ export default function RootScreen() {
           <View style={[StyleSheet.absoluteFill, styles.bgOrange]} />
 
           <Image
-            source={require('../assets/images/char-employer.png')}
+            source={require('../assets/images/char-employer-crop.png')}
             style={[styles.charImg, { width: EMPL_W, height: EMPL_H, right: EMPL_RIGHT }]}
-            resizeMode="cover"
+            resizeMode="contain"
           />
 
           <View style={styles.cardLeft}>
@@ -135,9 +135,9 @@ export default function RootScreen() {
           <View style={[StyleSheet.absoluteFill, styles.bgDark]} />
 
           <Image
-            source={require('../assets/images/char-worker.png')}
+            source={require('../assets/images/char-worker-crop.png')}
             style={[styles.charImg, { width: WORK_W, height: WORK_H, right: WORK_RIGHT }]}
-            resizeMode="cover"
+            resizeMode="contain"
           />
 
           <View style={styles.cardLeft}>
