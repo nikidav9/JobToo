@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Star } from 'lucide-react-native';
+import { Asset } from 'expo-asset';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
 
@@ -40,6 +41,13 @@ export default function RootScreen() {
   const slowAnim = useRef<Animated.CompositeAnimation | null>(null);
   const finishing = useRef(false);
   const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    Asset.loadAsync([
+      require('../assets/images/char-employer-crop.png'),
+      require('../assets/images/char-worker-crop.png'),
+    ]);
+  }, []);
 
   useEffect(() => {
     slowAnim.current = Animated.sequence([
