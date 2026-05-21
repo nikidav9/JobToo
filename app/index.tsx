@@ -4,7 +4,6 @@ import {
   ScrollView, Image, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Star } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
@@ -118,12 +117,7 @@ export default function RootScreen() {
           activeOpacity={0.9}
           onPress={() => router.push('/register-employer')}
         >
-          <LinearGradient
-            colors={['#FF4D00', '#FFA040']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[StyleSheet.absoluteFill, { borderRadius: r(20), overflow: 'hidden' }]}
-          />
+          <View style={[StyleSheet.absoluteFill, styles.bgOrange]} />
 
           <Image
             source={require('../assets/images/char-employer-crop.png')}
@@ -149,12 +143,7 @@ export default function RootScreen() {
           activeOpacity={0.9}
           onPress={() => router.push('/register-worker')}
         >
-          <LinearGradient
-            colors={['#2E3338', '#16191C']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[StyleSheet.absoluteFill, { borderRadius: r(20), overflow: 'hidden' }]}
-          />
+          <View style={[StyleSheet.absoluteFill, styles.bgDark]} />
 
           <Image
             source={require('../assets/images/char-worker-crop.png')}
@@ -259,8 +248,8 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
 
-  bgOrange: { backgroundColor: Colors.primary, borderRadius: r(20), overflow: 'hidden' },
-  bgDark:   { backgroundColor: '#23272A',      borderRadius: r(20), overflow: 'hidden' },
+  bgOrange: { backgroundColor: '#FF5500', borderRadius: r(20), overflow: 'hidden' },
+  bgDark:   { backgroundColor: '#1E2225', borderRadius: r(20), overflow: 'hidden' },
 
   charImg: {
     position: 'absolute',
