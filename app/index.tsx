@@ -4,11 +4,14 @@ import {
   ScrollView, Image, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
 import { Star } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
+
+SplashScreen.preventAutoHideAsync();
 
 const TRACK_W = 140;
 
@@ -49,6 +52,7 @@ export default function RootScreen() {
   }, []);
 
   useEffect(() => {
+    SplashScreen.hideAsync();
     slowAnim.current = Animated.sequence([
       Animated.timing(progress, { toValue: TRACK_W * 0.55, duration: 350, useNativeDriver: false }),
       Animated.timing(progress, { toValue: TRACK_W * 0.88, duration: 3500, useNativeDriver: false }),
@@ -201,7 +205,7 @@ export default function RootScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.version}>JobToo v1.1</Text>
+        <Text style={styles.version}>JobToo v1.3</Text>
       </ScrollView>
     </SafeAreaView>
   );
