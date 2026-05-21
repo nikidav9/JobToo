@@ -87,7 +87,7 @@ export default function RootScreen() {
         scrollEnabled={false}
       >
         {/* Спейсер вверху — на больших экранах отступ идёт над логотипом */}
-        <View style={{ flex: 1, minHeight: r(8) }} />
+        <View style={{ minHeight: r(8) }} />
 
         {/* ── Лого ── */}
         <View style={styles.logoRow}>
