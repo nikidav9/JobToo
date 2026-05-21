@@ -130,7 +130,7 @@ export default function RootScreen() {
             </Text>
           </View>
 
-          <View style={styles.arrowBtn}>
+          <View style={[styles.arrowBtn, { right: r(13) }]}>
             <Text style={styles.arrowTxt}>›</Text>
           </View>
         </TouchableOpacity>
@@ -159,7 +159,7 @@ export default function RootScreen() {
             <Text style={styles.cardSub}>{'Находите подработки\nна складах'}</Text>
           </View>
 
-          <View style={styles.arrowBtn}>
+          <View style={[styles.arrowBtn, { right: r(8) }]}>
             <Text style={styles.arrowTxt}>›</Text>
           </View>
         </TouchableOpacity>
@@ -278,14 +278,13 @@ const styles = StyleSheet.create({
 
   arrowBtn: {
     position: 'absolute',
-    right: r(20),
-    top: CARD_H / 2 - r(21),
-    width: r(42), height: r(42), borderRadius: r(21),
+    top: CARD_H / 2 - r(18),
+    width: r(36), height: r(36), borderRadius: r(18),
     backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
     zIndex: 2,
   },
-  arrowTxt: { fontSize: r(24), color: '#111111', lineHeight: r(28), marginLeft: 2 },
+  arrowTxt: { fontSize: r(21), color: '#111111', lineHeight: r(26), marginLeft: 2 },
 
   featuresRow: {
     flexDirection: 'row', justifyContent: 'space-between',
