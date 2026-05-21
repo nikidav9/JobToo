@@ -218,18 +218,18 @@ const styles = StyleSheet.create({
   },
 
   logoRow: { marginBottom: r(16) },
-  logo: { fontSize: r(34) },
+  logo: { fontSize: r(37) },
   logoBlack: { fontWeight: '800', color: '#111111' },
   logoOrange: { fontWeight: '800', color: Colors.primary },
-  tagline: { fontSize: r(13), color: Colors.textSecondary, marginTop: r(4) },
+  tagline: { fontSize: r(15), color: Colors.textSecondary, marginTop: r(4) },
 
   headlineBlock: { marginBottom: r(20) },
   headline: {
-    fontSize: r(38), fontWeight: '800', color: '#111111', lineHeight: r(44),
+    fontSize: r(42), fontWeight: '800', color: '#111111', lineHeight: r(48),
   },
   headlineSub: {
-    fontSize: r(14), color: Colors.textSecondary,
-    marginTop: r(8), lineHeight: r(20),
+    fontSize: r(16), color: Colors.textSecondary,
+    marginTop: r(8), lineHeight: r(22),
   },
 
   card: {
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     marginBottom: r(10),
   },
   loginGray: { fontSize: r(13), color: Colors.textSecondary },
-  loginLink: { fontSize: r(13), fontWeight: '700', color: Colors.primary },
+  loginLink: { fontSize: r(13), fontWeight: '900', color: Colors.primary },
 
   version: { textAlign: 'center', fontSize: r(10), color: Colors.textMuted },
 });
