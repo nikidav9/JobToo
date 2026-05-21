@@ -5,31 +5,32 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Star } from 'lucide-react-native';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
 
 const TRACK_W = 140;
 
-// Масштаб: min по ширине И высоте — чтобы всё влезало на один экран
 const { width: SW, height: SH } = Dimensions.get('window');
 const sc = Math.min(SW / 390, SH / 844);
 const r = (n: number) => Math.round(n * sc);
 
-// ── Ключевые размеры (базовые для 390×844 iPhone 14) ──────────────────
-const CARD_H  = r(160);
+// Figma: фрейм 265px → телефон 390px → масштаб 1.474
+// Карточки в Figma: 211×94px
+const CARD_H = r(140);
 
-// char-employer.png: 1024×1536, W/H=0.667
-// char_top = (160-420)+420*0.40 = -260+168 = -92px above card ✓
-const EMPL_W  = r(280);
-const EMPL_H  = r(420);
+// Персонаж работодателя: 77×104 в Figma, right-отступ 42px
+const EMPL_W     = r(114);
+const EMPL_H     = r(153);
+const EMPL_RIGHT = r(62);
 
-// char-worker.png: 1112×2400, W/H=0.463
-// char_top = (160-420)+420*0.42 = -260+176 = -84px above card ✓
-const WORK_W  = r(194);
-const WORK_H  = r(420);
+// Персонаж работника: 78×98 в Figma, right-отступ 35px
+const WORK_W     = r(115);
+const WORK_H     = r(145);
+const WORK_RIGHT = r(52);
 
-// Отступ перед второй карточкой: overflow(84px) + зазор(10px) = 94px
-const CARD2_MT = r(94);
+// Зазор между карточками: 12px + overflow 4px = 16px × 1.474
+const CARD2_MT = r(20);
 
 export default function RootScreen() {
   const router = useRouter();
@@ -109,13 +110,15 @@ export default function RootScreen() {
 
           <Image
             source={require('../assets/images/char-employer.png')}
-            style={[styles.charImg, { width: EMPL_W, height: EMPL_H }]}
-            resizeMode="contain"
+            style={[styles.charImg, { width: EMPL_W, height: EMPL_H, right: EMPL_RIGHT }]}
+            resizeMode="cover"
           />
 
           <View style={styles.cardLeft}>
             <Text style={styles.cardTitle}>Ищу{'\n'}работника</Text>
-            <Text style={styles.cardSub}>Размещайте вакансии{'\n'}и находите сотрудников</Text>
+            <Text style={[styles.cardSub, styles.cardSubOrange]}>
+              {'Размещайте вакансии\nи находите сотрудников'}
+            </Text>
           </View>
 
           <View style={styles.arrowBtn}>
@@ -123,7 +126,7 @@ export default function RootScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* ══ Карточка 2: Ищу работодателя (тёмная) ══ */}
+        {/* ══ Карточка 2: Ищу подработку (тёмная) ══ */}
         <TouchableOpacity
           style={[styles.card, { marginTop: CARD2_MT }]}
           activeOpacity={0.9}
@@ -133,13 +136,13 @@ export default function RootScreen() {
 
           <Image
             source={require('../assets/images/char-worker.png')}
-            style={[styles.charImg, { width: WORK_W, height: WORK_H }]}
-            resizeMode="contain"
+            style={[styles.charImg, { width: WORK_W, height: WORK_H, right: WORK_RIGHT }]}
+            resizeMode="cover"
           />
 
           <View style={styles.cardLeft}>
             <Text style={styles.cardTitle}>Ищу{'\n'}подработку</Text>
-            <Text style={styles.cardSub}>Находите подработки{'\n'}на складах</Text>
+            <Text style={styles.cardSub}>{'Находите подработки\nна складах'}</Text>
           </View>
 
           <View style={styles.arrowBtn}>
@@ -149,17 +152,31 @@ export default function RootScreen() {
 
         {/* ── Преимущества ── */}
         <View style={styles.featuresRow}>
-          {[
-            { icon: '🛡️', title: 'Безопасно', sub: 'Проверенные\nкомпании' },
-            { icon: '⚡', title: 'Быстро', sub: 'Отклики и подбор\nза 1 день' },
-            { icon: '⭐', title: 'Надёжно', sub: 'Поддержка\n24/7' },
-          ].map((f) => (
-            <View key={f.title} style={styles.feature}>
-              <Text style={styles.featureIcon}>{f.icon}</Text>
-              <Text style={styles.featureTitle}>{f.title}</Text>
-              <Text style={styles.featureSub}>{f.sub}</Text>
-            </View>
-          ))}
+          <View style={styles.feature}>
+            <Image
+              source={require('../assets/images/icon-security.png')}
+              style={styles.featureIcon}
+              resizeMode="contain"
+            />
+            <Text style={styles.featureTitle}>Безопасно</Text>
+            <Text style={styles.featureSub}>{'Проверенные\nкомпании'}</Text>
+          </View>
+
+          <View style={styles.feature}>
+            <Image
+              source={require('../assets/images/icon-flash.png')}
+              style={styles.featureIcon}
+              resizeMode="contain"
+            />
+            <Text style={styles.featureTitle}>Быстро</Text>
+            <Text style={styles.featureSub}>{'Отклики и подбор\nза 1 день'}</Text>
+          </View>
+
+          <View style={styles.feature}>
+            <Star size={r(20)} color={Colors.primary} fill={Colors.primary} />
+            <Text style={styles.featureTitle}>Надёжно</Text>
+            <Text style={styles.featureSub}>{'Поддержка\n24/7'}</Text>
+          </View>
         </View>
 
         {/* ── Вход ── */}
@@ -217,20 +234,19 @@ const styles = StyleSheet.create({
   },
 
   bgOrange: { backgroundColor: Colors.primary, borderRadius: r(20), overflow: 'hidden' },
-  bgDark:   { backgroundColor: '#1E1E1E',       borderRadius: r(20), overflow: 'hidden' },
+  bgDark:   { backgroundColor: '#23272A',      borderRadius: r(20), overflow: 'hidden' },
 
   charImg: {
     position: 'absolute',
-    right: 0,
     bottom: 0,
   },
 
   cardLeft: {
     position: 'absolute',
     left: r(18),
-    top: r(20),
-    bottom: r(18),
-    right: r(190),
+    top: r(0),
+    bottom: r(0),
+    right: r(185),
     justifyContent: 'center',
   },
 
@@ -239,7 +255,10 @@ const styles = StyleSheet.create({
     lineHeight: r(27), marginBottom: r(5),
   },
   cardSub: {
-    fontSize: r(13), color: 'rgba(255,255,255,0.78)', lineHeight: r(18),
+    fontSize: r(13), color: 'rgba(255,255,255,0.65)', lineHeight: r(18),
+  },
+  cardSubOrange: {
+    color: '#FFC69C',
   },
 
   arrowBtn: {
@@ -257,9 +276,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
     marginTop: r(14), marginBottom: r(10),
   },
-  feature: { flex: 1, alignItems: 'center', paddingHorizontal: r(4) },
-  featureIcon: { fontSize: r(20), marginBottom: r(3) },
-  featureTitle: { fontSize: r(12), fontWeight: '700', color: '#111111', marginBottom: r(2) },
+  feature: { flex: 1, alignItems: 'center', paddingHorizontal: r(4), gap: r(3) },
+  featureIcon: { width: r(20), height: r(20) },
+  featureTitle: { fontSize: r(12), fontWeight: '700', color: '#111111' },
   featureSub: { fontSize: r(10), color: Colors.textSecondary, textAlign: 'center', lineHeight: r(14) },
 
   loginCard: {
