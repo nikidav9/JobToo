@@ -17,16 +17,16 @@ const r = (n: number) => Math.round(n * sc);
 
 // Figma: фрейм 265px → телефон 390px → масштаб 1.474
 // Карточки в Figma: 211×94px
-const CARD_H = r(140);
+const CARD_H = r(156);
 
 // Персонаж работодателя: 77×104 в Figma, right-отступ 42px
-const EMPL_W     = r(113);
-const EMPL_H     = r(153);
+const EMPL_W     = r(119);
+const EMPL_H     = r(169);
 const EMPL_RIGHT = r(62);
 
 // Персонаж работника: 78×98 в Figma, right-отступ 35px
-const WORK_W     = r(115);
-const WORK_H     = r(144);
+const WORK_W     = r(123);
+const WORK_H     = r(160);
 const WORK_RIGHT = r(52);
 
 // Зазор между карточками: 12px + overflow 4px = 16px × 1.474
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   logoOrange: { fontWeight: '800', color: Colors.primary },
   tagline: { fontSize: r(13), color: Colors.textSecondary, marginTop: r(4) },
 
-  headlineBlock: { marginBottom: r(6) },
+  headlineBlock: { marginBottom: r(20) },
   headline: {
     fontSize: r(38), fontWeight: '800', color: '#111111', lineHeight: r(44),
   },
