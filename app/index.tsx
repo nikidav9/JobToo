@@ -111,9 +111,9 @@ export default function RootScreen() {
           onPress={() => router.push('/register-employer')}
         >
           <LinearGradient
-            colors={['#FFA040', '#FF4D00']}
+            colors={['#FF4D00', '#FFA040']}
             start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+            end={{ x: 1, y: 0 }}
             style={[StyleSheet.absoluteFill, { borderRadius: r(20), overflow: 'hidden' }]}
           />
 
