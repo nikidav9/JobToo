@@ -85,6 +85,9 @@ export default function RootScreen() {
         bounces={false}
         scrollEnabled={false}
       >
+        {/* Спейсер вверху — на больших экранах отступ идёт над логотипом */}
+        <View style={{ flex: 1, minHeight: r(8) }} />
+
         {/* ── Лого ── */}
         <View style={styles.logoRow}>
           <Text style={styles.logo}>
@@ -149,9 +152,6 @@ export default function RootScreen() {
             <Text style={styles.arrowTxt}>›</Text>
           </View>
         </TouchableOpacity>
-
-        {/* Flexible spacer — pushes features+login to the bottom on tall screens */}
-        <View style={{ flex: 1, minHeight: r(14) }} />
 
         {/* ── Преимущества ── */}
         <View style={styles.featuresRow}>
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
 
   featuresRow: {
     flexDirection: 'row', justifyContent: 'space-between',
-    marginBottom: r(10),
+    marginTop: r(14), marginBottom: r(10),
   },
   feature: { flex: 1, alignItems: 'center', paddingHorizontal: r(4), gap: r(3) },
   featureIcon: { width: r(20), height: r(20) },
