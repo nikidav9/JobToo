@@ -150,6 +150,9 @@ export default function RootScreen() {
           </View>
         </TouchableOpacity>
 
+        {/* Flexible spacer — pushes features+login to the bottom on tall screens */}
+        <View style={{ flex: 1, minHeight: r(14) }} />
+
         {/* ── Преимущества ── */}
         <View style={styles.featuresRow}>
           <View style={styles.feature}>
@@ -205,6 +208,7 @@ const styles = StyleSheet.create({
   fill: { height: 3, backgroundColor: Colors.primary, borderRadius: 100 },
 
   scroll: {
+    flexGrow: 1,
     paddingHorizontal: r(20),
     paddingTop: r(10),
     paddingBottom: r(12),
@@ -274,7 +278,7 @@ const styles = StyleSheet.create({
 
   featuresRow: {
     flexDirection: 'row', justifyContent: 'space-between',
-    marginTop: r(14), marginBottom: r(10),
+    marginBottom: r(10),
   },
   feature: { flex: 1, alignItems: 'center', paddingHorizontal: r(4), gap: r(3) },
   featureIcon: { width: r(20), height: r(20) },
