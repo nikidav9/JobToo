@@ -4,6 +4,7 @@ import {
   ScrollView, Image, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Star } from 'lucide-react-native';
 import { useApp } from '@/hooks/useApp';
@@ -109,7 +110,12 @@ export default function RootScreen() {
           activeOpacity={0.9}
           onPress={() => router.push('/register-employer')}
         >
-          <View style={[StyleSheet.absoluteFill, styles.bgOrange]} />
+          <LinearGradient
+            colors={['#FF8C3A', '#FF6200']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[StyleSheet.absoluteFill, { borderRadius: r(20), overflow: 'hidden' }]}
+          />
 
           <Image
             source={require('../assets/images/char-employer-crop.png')}
@@ -135,7 +141,12 @@ export default function RootScreen() {
           activeOpacity={0.9}
           onPress={() => router.push('/register-worker')}
         >
-          <View style={[StyleSheet.absoluteFill, styles.bgDark]} />
+          <LinearGradient
+            colors={['#2E3338', '#16191C']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[StyleSheet.absoluteFill, { borderRadius: r(20), overflow: 'hidden' }]}
+          />
 
           <Image
             source={require('../assets/images/char-worker-crop.png')}
