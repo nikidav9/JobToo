@@ -193,6 +193,9 @@ export default function RootScreen() {
           </View>
         </View>
 
+        {/* Спейсер — прижимает логин и версию к низу экрана */}
+        <View style={{ flex: 1, minHeight: r(12) }} />
+
         {/* ── Вход ── */}
         <View style={styles.loginCard}>
           <Text style={styles.loginGray}>Уже есть аккаунт? </Text>
@@ -301,8 +304,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     marginBottom: r(10),
   },
-  loginGray: { fontSize: r(13), color: '#111111' },
-  loginLink: { fontSize: r(13), fontWeight: '900', color: Colors.primary },
+  loginGray: { fontSize: r(15), color: '#111111' },
+  loginLink: { fontSize: r(15), fontWeight: '900', color: Colors.primary },
 
-  version: { textAlign: 'center', fontSize: r(10), color: '#6B7280' },
+  version: { textAlign: 'center', fontSize: r(12), color: '#6B7280' },
 });
