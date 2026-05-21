@@ -90,7 +90,7 @@ export default function RootScreen() {
             <Text style={styles.logoBlack}>Job</Text>
             <Text style={styles.logoOrange}>Too</Text>
           </Text>
-          <Text style={styles.tagline}>Подработки в Москве · Склад</Text>
+          <Text style={styles.tagline}>Подработки на складах в Москве</Text>
         </View>
 
         {/* ── Заголовок ── */}
@@ -114,9 +114,6 @@ export default function RootScreen() {
           />
 
           <View style={styles.cardLeft}>
-            <View style={styles.iconBadge}>
-              <Text style={styles.iconEmoji}>💼</Text>
-            </View>
             <Text style={styles.cardTitle}>Ищу{'\n'}работника</Text>
             <Text style={styles.cardSub}>Размещайте вакансии{'\n'}и находите сотрудников</Text>
           </View>
@@ -141,10 +138,7 @@ export default function RootScreen() {
           />
 
           <View style={styles.cardLeft}>
-            <View style={styles.iconBadge}>
-              <Text style={styles.iconEmoji}>👤</Text>
-            </View>
-            <Text style={styles.cardTitle}>Ищу{'\n'}работодателя</Text>
+            <Text style={styles.cardTitle}>Ищу{'\n'}подработку</Text>
             <Text style={styles.cardSub}>Находите подработки{'\n'}на складах</Text>
           </View>
 
@@ -234,19 +228,11 @@ const styles = StyleSheet.create({
   cardLeft: {
     position: 'absolute',
     left: r(18),
-    top: r(16),
+    top: r(20),
     bottom: r(18),
     right: r(190),
+    justifyContent: 'center',
   },
-
-  // Оранжевый бейдж — одинаковый на обеих карточках (как в референсе)
-  iconBadge: {
-    width: r(40), height: r(40), borderRadius: r(20),
-    backgroundColor: Colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: r(10),
-  },
-  iconEmoji: { fontSize: r(18) },
 
   cardTitle: {
     fontSize: r(22), fontWeight: '800', color: '#FFFFFF',
