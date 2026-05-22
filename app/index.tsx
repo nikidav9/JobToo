@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Star } from 'lucide-react-native';
+import { Asset } from 'expo-asset';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
 
@@ -17,16 +18,16 @@ const r = (n: number) => Math.round(n * sc);
 
 // Figma: фрейм 265px → телефон 390px → масштаб 1.474
 // Карточки в Figma: 211×94px
-const CARD_H = r(140);
+const CARD_H = r(156);
 
 // Персонаж работодателя: 77×104 в Figma, right-отступ 42px
-const EMPL_W     = r(113);
-const EMPL_H     = r(153);
+const EMPL_W     = r(119);
+const EMPL_H     = r(169);
 const EMPL_RIGHT = r(62);
 
 // Персонаж работника: 78×98 в Figma, right-отступ 35px
-const WORK_W     = r(115);
-const WORK_H     = r(144);
+const WORK_W     = r(123);
+const WORK_H     = r(160);
 const WORK_RIGHT = r(52);
 
 // Зазор между карточками: 12px + overflow 4px = 16px × 1.474
@@ -39,6 +40,13 @@ export default function RootScreen() {
   const slowAnim = useRef<Animated.CompositeAnimation | null>(null);
   const finishing = useRef(false);
   const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    Asset.loadAsync([
+      require('../assets/images/char-employer-crop.png'),
+      require('../assets/images/char-worker-crop.png'),
+    ]);
+  }, []);
 
   useEffect(() => {
     slowAnim.current = Animated.sequence([
@@ -85,6 +93,9 @@ export default function RootScreen() {
         bounces={false}
         scrollEnabled={false}
       >
+        {/* Спейсер вверху — на больших экранах отступ идёт над логотипом */}
+        <View style={{ minHeight: r(8) }} />
+
         {/* ── Лого ── */}
         <View style={styles.logoRow}>
           <Text style={styles.logo}>
@@ -121,7 +132,7 @@ export default function RootScreen() {
             </Text>
           </View>
 
-          <View style={styles.arrowBtn}>
+          <View style={[styles.arrowBtn, { right: r(13) }]}>
             <Text style={styles.arrowTxt}>›</Text>
           </View>
         </TouchableOpacity>
@@ -145,13 +156,10 @@ export default function RootScreen() {
             <Text style={styles.cardSub}>{'Находите подработки\nна складах'}</Text>
           </View>
 
-          <View style={styles.arrowBtn}>
+          <View style={[styles.arrowBtn, { right: r(8) }]}>
             <Text style={styles.arrowTxt}>›</Text>
           </View>
         </TouchableOpacity>
-
-        {/* Flexible spacer — pushes features+login to the bottom on tall screens */}
-        <View style={{ flex: 1, minHeight: r(14) }} />
 
         {/* ── Преимущества ── */}
         <View style={styles.featuresRow}>
@@ -181,6 +189,9 @@ export default function RootScreen() {
             <Text style={styles.featureSub}>{'Поддержка\n24/7'}</Text>
           </View>
         </View>
+
+        {/* Спейсер — прижимает логин и версию к низу экрана */}
+        <View style={{ flex: 1, minHeight: r(12) }} />
 
         {/* ── Вход ── */}
         <View style={styles.loginCard}>
@@ -218,18 +229,18 @@ const styles = StyleSheet.create({
   },
 
   logoRow: { marginBottom: r(16) },
-  logo: { fontSize: r(34) },
+  logo: { fontSize: r(37) },
   logoBlack: { fontWeight: '800', color: '#111111' },
   logoOrange: { fontWeight: '800', color: Colors.primary },
-  tagline: { fontSize: r(13), color: Colors.textSecondary, marginTop: r(4) },
+  tagline: { fontSize: r(15), color: Colors.textSecondary, marginTop: r(4) },
 
-  headlineBlock: { marginBottom: r(6) },
+  headlineBlock: { marginBottom: r(20) },
   headline: {
-    fontSize: r(38), fontWeight: '800', color: '#111111', lineHeight: r(44),
+    fontSize: r(42), fontWeight: '800', color: '#111111', lineHeight: r(48),
   },
   headlineSub: {
-    fontSize: r(14), color: Colors.textSecondary,
-    marginTop: r(8), lineHeight: r(20),
+    fontSize: r(16), color: Colors.textSecondary,
+    marginTop: r(8), lineHeight: r(22),
   },
 
   card: {
@@ -237,8 +248,8 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
 
-  bgOrange: { backgroundColor: Colors.primary, borderRadius: r(20), overflow: 'hidden' },
-  bgDark:   { backgroundColor: '#23272A',      borderRadius: r(20), overflow: 'hidden' },
+  bgOrange: { backgroundColor: '#FF5500', borderRadius: r(20), overflow: 'hidden' },
+  bgDark:   { backgroundColor: '#1E2225', borderRadius: r(20), overflow: 'hidden' },
 
   charImg: {
     position: 'absolute',
@@ -267,18 +278,17 @@ const styles = StyleSheet.create({
 
   arrowBtn: {
     position: 'absolute',
-    right: r(20),
-    top: CARD_H / 2 - r(21),
-    width: r(42), height: r(42), borderRadius: r(21),
+    top: CARD_H / 2 - r(18),
+    width: r(36), height: r(36), borderRadius: r(18),
     backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
     zIndex: 2,
   },
-  arrowTxt: { fontSize: r(24), color: '#111111', lineHeight: r(28), marginLeft: 2 },
+  arrowTxt: { fontSize: r(21), color: '#111111', lineHeight: r(26), marginLeft: 2 },
 
   featuresRow: {
     flexDirection: 'row', justifyContent: 'space-between',
-    marginBottom: r(10),
+    marginTop: r(14), marginBottom: r(10),
   },
   feature: { flex: 1, alignItems: 'center', paddingHorizontal: r(4), gap: r(3) },
   featureIcon: { width: r(20), height: r(20) },
@@ -291,8 +301,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     marginBottom: r(10),
   },
-  loginGray: { fontSize: r(13), color: Colors.textSecondary },
-  loginLink: { fontSize: r(13), fontWeight: '700', color: Colors.primary },
+  loginGray: { fontSize: r(15), color: '#111111' },
+  loginLink: { fontSize: r(15), fontWeight: '900', color: Colors.primary },
 
-  version: { textAlign: 'center', fontSize: r(10), color: Colors.textMuted },
+  version: { textAlign: 'center', fontSize: r(12), color: '#6B7280' },
 });
