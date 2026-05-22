@@ -274,12 +274,13 @@ export default function ProfileScreen() {
       if (editSection === 'worktypes') updated.workTypes = editWorkTypes;
       if (editSection === 'company') { updated.company = editCompany; updated.bio = editBio; }
       if (editSection === 'bio') updated.bio = editBio;
-      await updateUser(updated);
-      showToast('Сохранено', 'success');
+      // Close modal immediately — sync to server in background
       setEditSection(null);
+      setSavingEdit(false);
+      showToast('Сохранено', 'success');
+      updateUser(updated).catch(() => showToast('Ошибка синхронизации', 'error'));
     } catch {
       showToast('Ошибка при сохранении', 'error');
-    } finally {
       setSavingEdit(false);
     }
   };

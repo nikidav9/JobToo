@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Animated,
+  View, Text, StyleSheet, TouchableOpacity,
   ScrollView, Image, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,9 +39,6 @@ const CARD2_MT = r(18);
 export default function RootScreen() {
   const router = useRouter();
   const { currentUser, loading } = useApp();
-  const progress = useRef(new Animated.Value(0)).current;
-  const slowAnim = useRef<Animated.CompositeAnimation | null>(null);
-  const finishing = useRef(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -52,42 +49,16 @@ export default function RootScreen() {
   }, []);
 
   useEffect(() => {
+    if (loading) return;
     SplashScreen.hideAsync();
-    slowAnim.current = Animated.sequence([
-      Animated.timing(progress, { toValue: TRACK_W * 0.55, duration: 350, useNativeDriver: false }),
-      Animated.timing(progress, { toValue: TRACK_W * 0.88, duration: 3500, useNativeDriver: false }),
-    ]);
-    slowAnim.current.start();
-  }, []);
-
-  useEffect(() => {
-    if (loading || finishing.current) return;
-    finishing.current = true;
-    slowAnim.current?.stop();
-    Animated.timing(progress, { toValue: TRACK_W, duration: 220, useNativeDriver: false }).start(() => {
-      if (currentUser) {
-        router.replace('/(tabs)');
-      } else {
-        setReady(true);
-      }
-    });
+    if (currentUser) {
+      router.replace('/(tabs)');
+    } else {
+      setReady(true);
+    }
   }, [loading, currentUser]);
 
-  if (!ready) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.splashCenter}>
-          <Text style={styles.splashLogo}>
-            <Text style={styles.logoBlack}>Job</Text>
-            <Text style={styles.logoOrange}>Too</Text>
-          </Text>
-          <View style={styles.track}>
-            <Animated.View style={[styles.fill, { width: progress }]} />
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (!ready) return null;
 
   return (
     <SafeAreaView style={styles.safe}>

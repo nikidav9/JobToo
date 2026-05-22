@@ -175,12 +175,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (cachedPermVac) setPermVacancies(cachedPermVac);
           if (cachedPermApps) setPermApplications(cachedPermApps);
 
-          // Refresh from Supabase in background — don't block loading
-          setTimeout(() => {
-            if (cancelled) return;
-            Promise.all([
-              refreshUsers(),
+          // Refresh from Supabase — block loading so splash waits for fresh data
+          if (!cancelled) {
+            await Promise.all([
               refreshVacancies(),
+              refreshUsers(),
               refreshLikes(sessionUser),
               refreshChats(sessionUser),
               refreshSaved(sessionUser),
@@ -188,7 +187,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               refreshPermApplications(sessionUser),
               refreshPermSaved(sessionUser),
             ]).catch(() => {});
-          }, 100);
+          }
         }
       } catch (e) {
         console.warn('[AppContext] boot error', e);
