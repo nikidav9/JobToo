@@ -10,7 +10,9 @@ const DB_TIMEOUT = 12_000;
 // All DB calls go through the web API endpoint instead.
 
 const IS_NATIVE = Platform.OS !== 'web';
-const API_BASE = IS_NATIVE ? (process.env.EXPO_PUBLIC_API_URL ?? '') : '';
+const API_BASE = IS_NATIVE
+  ? (process.env.EXPO_PUBLIC_API_URL || 'https://job-match-seven-roan.vercel.app')
+  : '';
 
 async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
   const res = await fetch(`${API_BASE}/api/db`, {
