@@ -732,25 +732,18 @@ function WorkerFeed() {
       {/* Card area */}
       <View style={styles.cardArea}>
         {!currentCard ? (
-          vacanciesLoading ? (
-            <View style={styles.emptyState}>
-              <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={styles.emptySubtitle}>Загружаем вакансии...</Text>
+          <View style={styles.emptyState}>
+            <View style={styles.emptyCharContainer}>
+              <Image
+                source={require('../../assets/images/char-seeker-empty.png')}
+                style={styles.emptyCharImg}
+                contentFit="cover"
+                contentPosition={{ top: '22%' }}
+              />
             </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyCharContainer}>
-                <Image
-                  source={require('../../assets/images/char-seeker-empty.png')}
-                  style={styles.emptyCharImg}
-                  contentFit="cover"
-                  contentPosition={{ top: '22%' }}
-                />
-              </View>
-              <Text style={styles.emptyTitle}>Новых вакансий пока нет</Text>
-              <Text style={styles.emptySubtitle}>Попробуй другую дату или дождись новых объявлений</Text>
-            </View>
-          )
+            <Text style={styles.emptyTitle}>Новых вакансий пока нет</Text>
+            <Text style={styles.emptySubtitle}>Попробуй другую дату или дождись новых объявлений</Text>
+          </View>
         ) : (
           <>
             {cards[2] ? <View style={styles.ghost2} /> : null}

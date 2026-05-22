@@ -58,7 +58,7 @@ export default function RootScreen() {
     }
   }, [loading, currentUser]);
 
-  if (!ready) return null;
+  if (!ready) return <View style={{ flex: 1, backgroundColor: '#ffffff' }} />;
 
   return (
     <SafeAreaView style={styles.safe}>

@@ -178,7 +178,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           // Refresh from Supabase — block loading so splash waits for fresh data
           if (!cancelled) {
             await Promise.all([
-              refreshVacancies(),
+              refreshVacancies(true), // silent — don't show loading indicator
               refreshUsers(),
               refreshLikes(sessionUser),
               refreshChats(sessionUser),
@@ -362,14 +362,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   };
 
-  const refreshVacancies = async () => {
-    setVacanciesLoading(true);
+  const refreshVacancies = async (silent = false) => {
+    if (!silent) setVacanciesLoading(true);
     try {
       const data = await dbGetVacancies();
       setVacancies(data);
       saveCache(CACHE_KEYS.vacancies, data).catch(() => {});
     } finally {
-      setVacanciesLoading(false);
+      if (!silent) setVacanciesLoading(false);
     }
   };
 
