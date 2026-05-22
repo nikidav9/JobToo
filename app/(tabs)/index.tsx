@@ -992,7 +992,6 @@ function WorkerPermMode() {
   const matchesFilters = (v: PermVacancy) => {
     if (filterLineId && v.metroLineId !== filterLineId) return false;
     if (minSalary > 0 && v.salary < minSalary) return false;
-    if (currentUser?.workTypes?.length && v.workType && !currentUser.workTypes.includes(v.workType)) return false;
     return true;
   };
 
