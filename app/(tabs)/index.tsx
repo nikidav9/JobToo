@@ -1763,7 +1763,7 @@ const styles = StyleSheet.create({
   detailWantBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
   detailWantTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  emptyCharImg: { width: 220, height: 220, marginBottom: 8 },
+  emptyCharImg: { width: 280, height: 380, marginBottom: 4 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginTop: 4, textAlign: 'center' },
   emptySubtitle: { fontSize: 14, color: Colors.textMuted, marginTop: 6, textAlign: 'center' },
   filterOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 100, justifyContent: 'flex-end' },
