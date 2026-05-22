@@ -29,6 +29,7 @@ import {
 } from '@/services/db';
 import { notifyEmployerNewApplicant, notifyEmployerGotMatch, notifyWorkerGotMatch } from '@/services/notifications';
 import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials } from '@/services/storage';
@@ -50,14 +51,16 @@ function ModeSwitcher({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode
         onPress={() => onChange('shift')}
         activeOpacity={0.8}
       >
-        <Text style={[ms.btnTxt, mode === 'shift' && ms.btnTxtActive]}>⚡ Подработка</Text>
+        <Ionicons name="flash" size={15} color={mode === 'shift' ? '#fff' : Colors.textMuted} style={{ marginRight: 5 }} />
+        <Text style={[ms.btnTxt, mode === 'shift' && ms.btnTxtActive]}>Подработка</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[ms.btn, mode === 'perm' && ms.btnActive]}
         onPress={() => onChange('perm')}
         activeOpacity={0.8}
       >
-        <Text style={[ms.btnTxt, mode === 'perm' && ms.btnTxtActive]}>💼 Работа</Text>
+        <Ionicons name="briefcase" size={15} color={mode === 'perm' ? '#fff' : Colors.textMuted} style={{ marginRight: 5 }} />
+        <Text style={[ms.btnTxt, mode === 'perm' && ms.btnTxtActive]}>Работа</Text>
       </TouchableOpacity>
     </View>
   );
@@ -70,7 +73,7 @@ const ms = StyleSheet.create({
     borderRadius: 100, padding: 4,
     borderWidth: 1, borderColor: Colors.divider,
   },
-  btn: { flex: 1, borderRadius: 100, paddingVertical: 8, alignItems: 'center' },
+  btn: { flex: 1, borderRadius: 100, paddingVertical: 9, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   btnActive: { backgroundColor: Colors.primary },
   btnTxt: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
   btnTxtActive: { color: '#FFFFFF', fontWeight: '700' },
@@ -736,11 +739,14 @@ function WorkerFeed() {
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Image
-                source={require('../../assets/images/char-seeker-empty.png')}
-                style={styles.emptyCharImg}
-                resizeMode="contain"
-              />
+              <View style={styles.emptyCharContainer}>
+                <Image
+                  source={require('../../assets/images/char-seeker-empty.png')}
+                  style={styles.emptyCharImg}
+                  contentFit="cover"
+                  contentPosition={{ top: '22%' }}
+                />
+              </View>
               <Text style={styles.emptyTitle}>Новых вакансий пока нет</Text>
               <Text style={styles.emptySubtitle}>Попробуй другую дату или дождись новых объявлений</Text>
             </View>
@@ -1586,11 +1592,11 @@ const pS = StyleSheet.create({
   inlineFilterActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   inlineFilterIcon: { fontSize: 20 },
   metroIconWrap: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#1A1A1A',
+    width: 30, height: 30, borderRadius: 15,
+    borderWidth: 2.5, borderColor: '#111111',
     alignItems: 'center', justifyContent: 'center',
   },
-  metroIconText: { fontSize: 15, fontWeight: '900', color: '#FFFFFF', lineHeight: 20 },
+  metroIconText: { fontSize: 14, fontWeight: '900', color: '#111111', lineHeight: 17 },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   searchBox: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -1762,7 +1768,8 @@ const styles = StyleSheet.create({
   detailWantBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
   detailWantTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  emptyCharImg: { width: 320, height: 440, marginBottom: -16 },
+  emptyCharContainer: { width: SW - 40, height: Math.round((SW - 40) * 1.28), marginBottom: 8 },
+  emptyCharImg: { width: '100%', height: '100%' },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
   emptySubtitle: { fontSize: 14, color: Colors.textMuted, marginTop: 4, textAlign: 'center', lineHeight: 20 },
   filterOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 100, justifyContent: 'flex-end' },
