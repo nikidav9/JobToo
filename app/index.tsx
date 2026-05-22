@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F5F7FA' },
 
   splashCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  splashLogo: { fontSize: 44 },
+  splashLogo: { fontSize: r(44), fontWeight: '800' },
   track: {
     width: TRACK_W, height: 3, backgroundColor: Colors.inputBorder,
     borderRadius: 100, overflow: 'hidden', marginTop: 28,

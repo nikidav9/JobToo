@@ -147,10 +147,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const boot = async () => {
       try {
-        // Wait minimum 1s for splash, THEN read session sequentially.
-        // Reading in parallel with the timer caused AsyncStorage to return null
-        // on Android cold starts before storage finished initialising.
-        await new Promise<void>(r => setTimeout(r, 1000));
+        // On Android, AsyncStorage may return null on cold start if read too early.
+        // On web, localStorage is synchronous so no delay needed.
+        if (Platform.OS !== 'web') {
+          await new Promise<void>(r => setTimeout(r, 1000));
+        }
         if (cancelled) return;
         const sessionUser = await getSessionUser().catch(() => null);
 
@@ -179,8 +180,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           setTimeout(() => {
             if (cancelled) return;
             Promise.all([
+              refreshVacancies(true),
               refreshUsers(),
-              refreshVacancies(),
               refreshLikes(sessionUser),
               refreshChats(sessionUser),
               refreshSaved(sessionUser),
@@ -363,14 +364,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   };
 
-  const refreshVacancies = async () => {
-    setVacanciesLoading(true);
+  const refreshVacancies = async (silent = false) => {
+    if (!silent) setVacanciesLoading(true);
     try {
       const data = await dbGetVacancies();
       setVacancies(data);
       saveCache(CACHE_KEYS.vacancies, data).catch(() => {});
     } finally {
-      setVacanciesLoading(false);
+      if (!silent) setVacanciesLoading(false);
     }
   };
 
