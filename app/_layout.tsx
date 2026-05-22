@@ -5,10 +5,15 @@ import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
 import { AlertProvider } from '@/template';
 import { AppProvider, AppContext } from '@/contexts/AppContext';
 import { ToastLayer } from '@/components/ui/ToastLayer';
 import { requestNotificationPermissions, setupAndroidChannels } from '@/services/notifications';
+
+// Keep the web/native splash visible until hideAsync() is called from the tabs layout or index screen.
+// This prevents the white flash while expo-router navigates and hydrates the tabs route on web.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function AuthGuard() {
   const router = useRouter();

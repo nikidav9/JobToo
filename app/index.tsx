@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Star } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
+import * as SplashScreen from 'expo-splash-screen';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
 
@@ -62,8 +63,11 @@ export default function RootScreen() {
     slowAnim.current?.stop();
     Animated.timing(progress, { toValue: TRACK_W, duration: 220, useNativeDriver: false }).start(() => {
       if (currentUser) {
+        // Splash hides in /(tabs)/_layout.tsx once tabs are mounted
         router.replace('/(tabs)');
       } else {
+        // No tabs will mount — hide splash now and show the welcome screen
+        SplashScreen.hideAsync().catch(() => {});
         setReady(true);
       }
     });
