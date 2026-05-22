@@ -143,7 +143,7 @@ export default function TabLayout() {
             <TabIcon
               iconActive="people"
               iconInactive="people-outline"
-              label="Мэтчи"
+              label="Отклики"
               focused={focused}
               badge={matchBadge}
             />
