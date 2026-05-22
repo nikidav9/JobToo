@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { Platform, View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as SplashScreen from 'expo-splash-screen';
 import { Colors } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 
@@ -91,6 +92,10 @@ export default function TabLayout() {
     ).length;
     return pending + matched + needsRating;
   })();
+
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   const tabBarHeight = Platform.select({
     ios: insets.bottom + 60,

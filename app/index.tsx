@@ -50,10 +50,10 @@ export default function RootScreen() {
 
   useEffect(() => {
     if (loading) return;
-    SplashScreen.hideAsync();
     if (currentUser) {
       router.replace('/(tabs)');
     } else {
+      SplashScreen.hideAsync().catch(() => {});
       setReady(true);
     }
   }, [loading, currentUser]);
