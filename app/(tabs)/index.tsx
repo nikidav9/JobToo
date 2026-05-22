@@ -718,7 +718,9 @@ function WorkerFeed() {
             {filterLineId && activeFilterLine ? (
               <View style={[pS.filterLineDot, { backgroundColor: activeFilterLine.color }]} />
             ) : (
-              <Text style={pS.inlineFilterIcon}>🚇</Text>
+              <View style={pS.metroIconWrap}>
+                <Text style={pS.metroIconText}>М</Text>
+              </View>
             )}
           </TouchableOpacity>
         </View>
@@ -1145,7 +1147,9 @@ function WorkerPermMode() {
           {filterLineId && activeFilterLine ? (
             <View style={[pS.filterLineDot, { backgroundColor: activeFilterLine.color }]} />
           ) : (
-            <Text style={pS.inlineFilterIcon}>🚇</Text>
+            <View style={pS.metroIconWrap}>
+              <Text style={pS.metroIconText}>М</Text>
+            </View>
           )}
         </TouchableOpacity>
       </View>
@@ -1572,6 +1576,12 @@ export default function HomeScreen() {
 // ─────────────────────────────────────────────────
 const pS = StyleSheet.create({
   filterLineDot: { width: 8, height: 8, borderRadius: 4 },
+  metroIconWrap: {
+    width: 30, height: 30, borderRadius: 15,
+    borderWidth: 2.5, borderColor: '#111111',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  metroIconText: { fontSize: 14, fontWeight: '900', color: '#111111', lineHeight: 17 },
   inlineFilter: {
     width: 44, height: 44, borderRadius: 12, marginRight: 8,
     borderWidth: 1.5, borderColor: Colors.inputBorder,
