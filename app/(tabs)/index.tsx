@@ -1138,14 +1138,14 @@ function WorkerPermMode() {
           ) : null}
         </View>
         <TouchableOpacity
-          style={[pS.filterBtn, filterLineId ? pS.filterBtnActive : null]}
+          style={[pS.inlineFilter, filterLineId ? pS.inlineFilterActive : null]}
           onPress={() => setFilterPicker(true)}
           activeOpacity={0.8}
         >
           {filterLineId && activeFilterLine ? (
-            <View style={[pS.filterLineDot, { backgroundColor: activeFilterLine.color, width: 14, height: 14, borderRadius: 7 }]} />
+            <View style={[pS.filterLineDot, { backgroundColor: activeFilterLine.color }]} />
           ) : (
-            <Text style={pS.filterBtnTxt}>🚇</Text>
+            <Text style={pS.inlineFilterIcon}>🚇</Text>
           )}
         </TouchableOpacity>
       </View>
