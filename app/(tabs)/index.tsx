@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Animated, PanResponder, Dimensions, RefreshControl, Modal, FlatList,
-  TextInput, ActivityIndicator,
+  TextInput, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -718,7 +718,9 @@ function WorkerFeed() {
             {filterLineId && activeFilterLine ? (
               <View style={[pS.filterLineDot, { backgroundColor: activeFilterLine.color }]} />
             ) : (
-              <Text style={pS.inlineFilterIcon}>🚇</Text>
+              <View style={pS.metroIconWrap}>
+                <Text style={pS.metroIconText}>М</Text>
+              </View>
             )}
           </TouchableOpacity>
         </View>
@@ -734,7 +736,11 @@ function WorkerFeed() {
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Text style={{ fontSize: 52 }}>😔</Text>
+              <Image
+                source={require('../../assets/images/char-seeker-empty.png')}
+                style={styles.emptyCharImg}
+                resizeMode="contain"
+              />
               <Text style={styles.emptyTitle}>Новых вакансий пока нет</Text>
               <Text style={styles.emptySubtitle}>Попробуй другую дату или дождись новых объявлений</Text>
             </View>
@@ -1580,6 +1586,12 @@ const pS = StyleSheet.create({
   },
   inlineFilterActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   inlineFilterIcon: { fontSize: 20 },
+  metroIconWrap: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: '#1A1A1A',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  metroIconText: { fontSize: 15, fontWeight: '900', color: '#FFFFFF', lineHeight: 20 },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   searchBox: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -1751,7 +1763,8 @@ const styles = StyleSheet.create({
   detailWantBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
   detailWantTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginTop: 12, textAlign: 'center' },
+  emptyCharImg: { width: 220, height: 220, marginBottom: 8 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginTop: 4, textAlign: 'center' },
   emptySubtitle: { fontSize: 14, color: Colors.textMuted, marginTop: 6, textAlign: 'center' },
   filterOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 100, justifyContent: 'flex-end' },
   filterSheet: { backgroundColor: Colors.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 40, maxHeight: '70%' },
