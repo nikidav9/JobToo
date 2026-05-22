@@ -119,7 +119,7 @@ export default function RootScreen() {
         <TouchableOpacity
           style={styles.card}
           activeOpacity={0.9}
-          onPress={() => router.push('/register-employer')}
+          onPress={() => router.push('/register-worker')}
         >
           <View style={[StyleSheet.absoluteFill, styles.bgOrange]} />
 
@@ -130,9 +130,9 @@ export default function RootScreen() {
           />
 
           <View style={styles.cardLeft}>
-            <Text style={styles.cardTitle}>Ищу{'\n'}работника</Text>
+            <Text style={styles.cardTitle}>Ищу{'\n'}подработку</Text>
             <Text style={[styles.cardSub, styles.cardSubOrange]}>
-              {'Размещайте вакансии\nи находите сотрудников'}
+              {'Находите подработки\nна складах'}
             </Text>
           </View>
 
@@ -141,11 +141,11 @@ export default function RootScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* ══ Карточка 2: Ищу подработку (тёмная) ══ */}
+        {/* ══ Карточка 2: Ищу работника (тёмная) ══ */}
         <TouchableOpacity
           style={[styles.card, { marginTop: CARD2_MT }]}
           activeOpacity={0.9}
-          onPress={() => router.push('/register-worker')}
+          onPress={() => router.push('/register-employer')}
         >
           <View style={[StyleSheet.absoluteFill, styles.bgDark]} />
 
@@ -156,8 +156,8 @@ export default function RootScreen() {
           />
 
           <View style={styles.cardLeft}>
-            <Text style={styles.cardTitle}>Ищу{'\n'}подработку</Text>
-            <Text style={styles.cardSub}>{'Находите подработки\nна складах'}</Text>
+            <Text style={styles.cardTitle}>Ищу{'\n'}работника</Text>
+            <Text style={styles.cardSub}>{'Размещайте вакансии\nи находите сотрудников'}</Text>
           </View>
 
           <View style={[styles.arrowBtn, { right: r(8) }]}>
