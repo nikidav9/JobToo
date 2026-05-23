@@ -20,7 +20,7 @@ function AuthGuard() {
   const pathname = usePathname();
   const ctx = React.useContext(AppContext);
 
-  const publicPaths = new Set(['/', '/login', '/register-worker', '/register-employer', '/legal']);
+  const publicPaths = new Set(['/', '/login', '/register-worker', '/register-employer', '/legal', '/perm-vacancy-detail']);
 
   useEffect(() => {
     if (!ctx) return;
@@ -104,8 +104,8 @@ export default function RootLayout() {
           <AuthGuard />
           <NotificationHandler />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FFFFFF' } }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="index" options={{ animation: 'none' }} />
+            <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
             <Stack.Screen name="register-worker" />
             <Stack.Screen name="register-employer" />
             <Stack.Screen name="login" options={{ presentation: 'modal' }} />

@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["TEAMID.com.nikidav23.onspaceapp"],
+        "components": [
+          {
+            "/": "/perm-vacancy-detail*",
+            "comment": "Opens perm vacancy detail in the JobToo app"
+          }
+        ]
+      }
+    ]
+  }
+}

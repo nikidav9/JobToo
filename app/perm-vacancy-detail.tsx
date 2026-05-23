@@ -5,11 +5,11 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator,
+  TouchableOpacity, ActivityIndicator, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { getInitials, nameColorFromString } from '@/services/storage';
@@ -22,21 +22,41 @@ import { METRO_LINES } from '@/constants/metro';
 
 export default function PermVacancyDetailScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { vacancyId } = useLocalSearchParams<{ vacancyId: string }>();
   const {
-    currentUser, users, permVacancies, permApplications,
+    currentUser, loading, users, permVacancies, permApplications,
     permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved,
     refreshPermApplications, refreshPermSaved,
     showToast,
   } = useApp();
 
   const [applying, setApplying] = useState(false);
+  const [authModalDismissed, setAuthModalDismissed] = useState(false);
+
+  const isGuest = !currentUser && !loading;
+  const showAuthModal = isGuest && !authModalDismissed;
+
+  const goBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      router.replace('/');
+    }
+  };
 
   const vacancy = permVacancies.find(v => v.id === vacancyId);
   const employer = vacancy ? users.find(u => u.id === vacancy.employerId) : null;
 
-  // Check if worker is matched (chat exists for this employer → matched on any perm vacancy)
-  // We define "matched" as: application approved
+  const employerDisplayName = vacancy?.company?.trim()
+    ? vacancy.company
+    : employer
+      ? `${employer.firstName ?? ''} ${employer.lastName ?? ''}`.trim() || 'Работодатель'
+      : 'Работодатель';
+
+  const employerColor = employer ? nameColorFromString(employer.id) : Colors.primary;
+  const employerInitials = getInitials(employerDisplayName);
+
   const myApp = useMemo(() => {
     if (!currentUser || !vacancy) return null;
     return permApplications.find(a => a.vacancyId === vacancy.id && a.workerId === currentUser.id) ?? null;
@@ -46,13 +66,69 @@ export default function PermVacancyDetailScreen() {
   const isApproved = myApp?.status === 'approved';
   const isSaved = vacancy ? permSavedIds.includes(vacancy.id) : false;
 
-  const metroLine = METRO_LINES.find(l => l.id === vacancy?.metroLineId);
+  const metroLine = vacancy?.metroStation
+    ? METRO_LINES.find(l => l.stations.includes(vacancy.metroStation!)) ?? null
+    : null;
+
+  const authModalJSX = (
+    <Modal
+      visible={showAuthModal}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setAuthModalDismissed(true)}
+    >
+      <View style={styles.authOverlay}>
+        <View style={styles.authSheet}>
+          <TouchableOpacity
+            style={styles.authClose}
+            onPress={() => setAuthModalDismissed(true)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.authCloseTxt}>✕</Text>
+          </TouchableOpacity>
+          <Text style={styles.authEmoji}>👋</Text>
+          <Text style={styles.authTitle}>Войдите, чтобы откликнуться</Text>
+          <Text style={styles.authSub}>Зарегистрируйтесь или войдите — это бесплатно</Text>
+          <TouchableOpacity style={styles.authBtnPrimary} onPress={() => router.push('/login')} activeOpacity={0.85}>
+            <Text style={styles.authBtnPrimaryTxt}>Войти</Text>
+          </TouchableOpacity>
+          <View style={styles.authDivider}>
+            <View style={styles.authDividerLine} />
+            <Text style={styles.authDividerTxt}>или</Text>
+            <View style={styles.authDividerLine} />
+          </View>
+          <TouchableOpacity style={styles.authBtnSecondary} onPress={() => router.push('/register-worker')} activeOpacity={0.85}>
+            <Text style={styles.authBtnSecondaryTxt}>Ищу работу — Зарегистрироваться</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.authBtnSecondary, { marginTop: 8 }]} onPress={() => router.push('/register-employer')} activeOpacity={0.85}>
+            <Text style={styles.authBtnSecondaryTxt}>Ищу сотрудников — Зарегистрироваться</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={goBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.backTxt}>← Назад</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.emptyCenter}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+        {authModalJSX}
+      </SafeAreaView>
+    );
+  }
 
   if (!vacancy) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={goBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text style={styles.backTxt}>← Назад</Text>
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
@@ -61,6 +137,7 @@ export default function PermVacancyDetailScreen() {
           <Text style={{ fontSize: 48 }}>🔍</Text>
           <Text style={styles.emptyTitle}>Вакансия не найдена</Text>
         </View>
+        {authModalJSX}
       </SafeAreaView>
     );
   }
@@ -92,12 +169,6 @@ export default function PermVacancyDetailScreen() {
     }
   };
 
-  const employerColor = employer ? nameColorFromString(employer.id) : Colors.primary;
-  const employerInitials = employer
-    ? getInitials(employer.company ?? `${employer.firstName} ${employer.lastName}`)
-    : '?';
-  const employerName = employer?.company ?? (employer ? `${employer.firstName} ${employer.lastName}` : 'Работодатель');
-
   const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
     pending:  { label: '⏳ На рассмотрении', color: '#92400E', bg: '#FFF7ED' },
     approved: { label: '✅ Вы приглашены!',  color: Colors.green, bg: '#D1FAE5' },
@@ -110,11 +181,10 @@ export default function PermVacancyDetailScreen() {
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity onPress={goBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Text style={styles.backTxt}>← Назад</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }} />
-        {/* Save button */}
         {currentUser?.role === 'worker' ? (
           <TouchableOpacity
             onPress={toggleSave}
@@ -144,7 +214,7 @@ export default function PermVacancyDetailScreen() {
 
         {/* Title + company */}
         <Text style={styles.jobTitle}>{vacancy.title}</Text>
-        <Text style={styles.companyName}>{vacancy.company}</Text>
+        <Text style={styles.companyName}>{employerDisplayName}</Text>
 
         {/* Key info cards */}
         <View style={styles.infoGrid}>
@@ -213,7 +283,7 @@ export default function PermVacancyDetailScreen() {
               </View>
             )}
             <View style={{ flex: 1, gap: 3 }}>
-              <Text style={styles.employerName}>{employerName}</Text>
+              <Text style={styles.employerName}>{employerDisplayName}</Text>
               {employer?.metroStation ? (
                 <Text style={styles.employerMeta}>🚇 {employer.metroStation}</Text>
               ) : null}
@@ -296,6 +366,8 @@ export default function PermVacancyDetailScreen() {
           </TouchableOpacity>
         </View>
       ) : null}
+
+      {authModalJSX}
     </SafeAreaView>
   );
 }
@@ -406,4 +478,46 @@ const styles = StyleSheet.create({
   },
   applyBtnDone: { backgroundColor: '#D1FAE5' },
   applyBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+  authOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  authSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 40,
+    alignItems: 'center', gap: 0,
+  },
+  authClose: {
+    position: 'absolute', top: 16, right: 20,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: Colors.surface,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  authCloseTxt: { fontSize: 14, color: Colors.textMuted },
+  authEmoji: { fontSize: 36, marginBottom: 10, marginTop: 4 },
+  authTitle: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
+  authSub: {
+    fontSize: 14, color: Colors.textMuted, textAlign: 'center',
+    marginTop: 6, marginBottom: 20, lineHeight: 20,
+  },
+  authBtnPrimary: {
+    width: '100%', backgroundColor: Colors.primary,
+    borderRadius: 100, paddingVertical: 15, alignItems: 'center',
+  },
+  authBtnPrimaryTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  authDivider: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 10, marginVertical: 14, width: '100%',
+  },
+  authDividerLine: { flex: 1, height: 1, backgroundColor: Colors.divider },
+  authDividerTxt: { fontSize: 13, color: Colors.textMuted },
+  authBtnSecondary: {
+    width: '100%', borderWidth: 1.5, borderColor: Colors.inputBorder,
+    borderRadius: 100, paddingVertical: 14, alignItems: 'center',
+    backgroundColor: Colors.bg,
+  },
+  authBtnSecondaryTxt: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
 });
