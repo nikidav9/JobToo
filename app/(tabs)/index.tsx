@@ -1127,11 +1127,11 @@ function WorkerPermMode() {
     ? METRO_LINES.find(l => l.stations.includes(filterStation)) ?? null
     : null;
 
-  const TAB_CONFIG: { key: PermTab; icon: string; label: string; count: number; activeColor: string; activeBg: string }[] = [
-    { key: 'open',     icon: '📋', label: 'Открытые',    count: openVacancies.length,     activeColor: '#1D4ED8', activeBg: '#EFF6FF' },
-    { key: 'applied',  icon: '📨', label: 'Откликнулся', count: appliedVacancies.length,  activeColor: '#7C3AED', activeBg: '#EDE9FE' },
-    { key: 'rejected', icon: '✕',  label: 'Отказали',    count: rejectedVacancies.length, activeColor: Colors.red, activeBg: '#FEE2E2' },
-    { key: 'saved',    icon: '❤️', label: 'Избранное',   count: savedVacancies.length,    activeColor: Colors.primary, activeBg: Colors.primaryLight },
+  const TAB_CONFIG: { key: PermTab; label: string; count: number }[] = [
+    { key: 'open',     label: 'Открытые',     count: openVacancies.length },
+    { key: 'applied',  label: 'Откликнулись', count: appliedVacancies.length },
+    { key: 'saved',    label: 'Избранные',    count: savedVacancies.length },
+    { key: 'rejected', label: 'Отказы',       count: rejectedVacancies.length },
   ];
 
   const renderPerm = ({ item: v }: { item: PermVacancy }) => {
@@ -1140,6 +1140,11 @@ function WorkerPermMode() {
     const isApplying = applying === v.id;
     const appStatus = getAppStatus(v.id);
     const statusInfo = appStatus ? STATUS_MAP[appStatus] : null;
+    const metroLine = v.metroStation
+      ? METRO_LINES.find(l => l.stations.includes(v.metroStation!)) ?? null
+      : null;
+    const avatarColor = nameColorFromString(v.company);
+    const avatarInitials = getInitials(v.company);
 
     return (
       <TouchableOpacity
@@ -1153,50 +1158,115 @@ function WorkerPermMode() {
           </View>
         ) : null}
 
-        <View style={pS.cardHead}>
-          <View style={{ flex: 1 }}>
-            <Text style={pS.jobTitle} numberOfLines={2}>{v.title}</Text>
-            <Text style={pS.company}>{v.company}</Text>
+        {/* Company row */}
+        <View style={pS.companyRow}>
+          <View style={[pS.companyAvatar, { backgroundColor: avatarColor }]}>
+            <Text style={pS.companyAvatarTxt}>{avatarInitials}</Text>
+          </View>
+          <View style={pS.companyMeta}>
+            <Text style={pS.companyName} numberOfLines={1}>{v.company}</Text>
+            <View style={pS.verifiedRow}>
+              <View style={pS.verifiedBadge}>
+                <Ionicons name="checkmark" size={9} color="#fff" />
+              </View>
+              <Text style={pS.verifiedTxt}>Проверено</Text>
+            </View>
           </View>
           <TouchableOpacity
             style={pS.saveBtn}
             onPress={() => toggleSave(v)}
             activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={pS.saveBtnIcon}>{isSaved ? '❤️' : '🤍'}</Text>
+            <Ionicons
+              name={isSaved ? 'heart' : 'heart-outline'}
+              size={22}
+              color={isSaved ? Colors.primary : Colors.textMuted}
+            />
           </TouchableOpacity>
         </View>
 
-        <View style={pS.metaRow}>
-          {v.metroStation ? <Text style={pS.metaItem}>🚇 {v.metroStation}</Text> : null}
-          {v.address ? <Text style={pS.metaItem} numberOfLines={1}>📍 {v.address}</Text> : null}
-        </View>
+        {/* Title */}
+        <Text style={pS.jobTitle} numberOfLines={2}>{v.title}</Text>
 
-        <View style={pS.tagsRow}>
-          <View style={pS.salaryTag}>
-            <Text style={pS.salaryTxt}>{v.salary.toLocaleString('ru-RU')} ₽/мес</Text>
-          </View>
-          <View style={pS.scheduleTag}>
-            <Text style={pS.scheduleTxt}>🗓 {v.schedule}</Text>
+        {/* Salary */}
+        <View style={pS.salaryRow}>
+          <Text style={pS.salaryMain}>{v.salary.toLocaleString('ru-RU')} ₽/мес</Text>
+          <View style={pS.naRukiBadge}>
+            <Text style={pS.naRukiTxt}>На руки</Text>
           </View>
         </View>
 
+        {/* Metro + address */}
+        {(v.metroStation || v.address) ? (
+          <View style={pS.locationRow}>
+            {v.metroStation ? (
+              <View style={pS.locationItem}>
+                <View style={[pS.metroCircle, { backgroundColor: metroLine?.color ?? Colors.primary }]}>
+                  <Text style={pS.metroCircleTxt}>М</Text>
+                </View>
+                <Text style={pS.locationTxt} numberOfLines={1}>{v.metroStation}</Text>
+              </View>
+            ) : null}
+            {v.address ? (
+              <View style={pS.locationItem}>
+                <Ionicons name="location-outline" size={14} color={Colors.textMuted} />
+                <Text style={pS.locationTxt} numberOfLines={1}>{v.address}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Schedule */}
+        {v.schedule ? (
+          <View style={pS.scheduleRow}>
+            <View style={pS.locationItem}>
+              <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
+              <Text style={pS.locationTxt}>{v.schedule}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Description */}
         {v.description ? (
           <Text style={pS.desc} numberOfLines={2}>{v.description}</Text>
         ) : null}
 
+        {/* Actions */}
         {tab !== 'rejected' ? (
-          <TouchableOpacity
-            style={[pS.applyBtn, isApplied && pS.applyBtnDone, isApplying && { opacity: 0.6 }]}
-            onPress={(e) => { e.stopPropagation?.(); applyTo(v); }}
-            disabled={isApplied || isApplying}
-            activeOpacity={0.8}
-          >
-            <Text style={[pS.applyBtnTxt, isApplied && { color: Colors.green }]}>
-              {isApplied ? '✓ Отклик отправлен' : 'Откликнуться'}
-            </Text>
-          </TouchableOpacity>
+          <View style={pS.actionRow}>
+            <TouchableOpacity
+              style={[pS.applyBtn, isApplied && pS.applyBtnDone, isApplying && { opacity: 0.6 }]}
+              onPress={(e) => { e.stopPropagation?.(); applyTo(v); }}
+              disabled={isApplied || isApplying}
+              activeOpacity={0.8}
+            >
+              <Text style={[pS.applyBtnTxt, isApplied && { color: Colors.green }]}>
+                {isApplied ? '✓ Отклик отправлен' : 'Откликнуться'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={pS.actionIconBtn}
+              onPress={() => router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId: v.id } })}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={pS.actionIconBtn}
+              onPress={() => router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId: v.id } })}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="navigate-outline" size={17} color={Colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={pS.actionIconBtn}
+              onPress={() => router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId: v.id } })}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="arrow-forward-outline" size={17} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
         ) : (
           <View style={pS.rejectedInfo}>
             <Text style={pS.rejectedInfoTxt}>Работодатель отказал по этой вакансии</Text>
@@ -1215,9 +1285,10 @@ function WorkerPermMode() {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* Search + Filters */}
       <View style={pS.searchRow}>
         <View style={pS.searchBox}>
-          <Text style={pS.searchIcon}>🔍</Text>
+          <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
           <TextInput
             style={pS.searchInput}
             value={searchText}
@@ -1227,73 +1298,61 @@ function WorkerPermMode() {
           />
           {searchText ? (
             <TouchableOpacity onPress={() => setSearchText('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text style={pS.searchClear}>✕</Text>
+              <Ionicons name="close" size={16} color={Colors.textMuted} />
             </TouchableOpacity>
           ) : null}
         </View>
         <TouchableOpacity
-          style={[pS.inlineFilter, filterStation ? pS.inlineFilterActive : null]}
+          style={[pS.filtersBtn, (filterStation || minSalary > 0) ? pS.filtersBtnActive : null]}
           onPress={() => setFilterPicker(true)}
           activeOpacity={0.8}
         >
-          {filterStation && activeStationLine ? (
-            <View style={[pS.filterLineDot, { backgroundColor: activeStationLine.color }]} />
-          ) : (
-            <View style={pS.metroIconWrap}>
-              <Text style={pS.metroIconText}>М</Text>
-            </View>
-          )}
+          <Ionicons
+            name="options-outline"
+            size={16}
+            color={(filterStation || minSalary > 0) ? Colors.primary : Colors.textSecondary}
+          />
+          <Text style={[pS.filtersBtnTxt, (filterStation || minSalary > 0) ? pS.filtersBtnTxtActive : null]}>
+            Фильтры
+          </Text>
         </TouchableOpacity>
       </View>
 
+      {/* Tab chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={pS.salaryChipsRow}
-        style={pS.salaryChipsScroll}
-      >
-        {SALARY_CHIPS.map(chip => (
-          <TouchableOpacity
-            key={chip.value}
-            style={[pS.salaryChip, minSalary === chip.value && pS.salaryChipActive]}
-            onPress={() => setMinSalary(chip.value)}
-            activeOpacity={0.75}
-          >
-            <Text style={[pS.salaryChipTxt, minSalary === chip.value && pS.salaryChipTxtActive]}>
-              {chip.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={pS.statusChipsRow}
-        style={pS.statusChipsScroll}
+        contentContainerStyle={pS.tabChipsRow}
+        style={pS.tabChipsScroll}
       >
         {TAB_CONFIG.map(t => {
           const isActive = tab === t.key;
           return (
             <TouchableOpacity
               key={t.key}
-              style={[
-                pS.statusChip,
-                isActive && { backgroundColor: t.activeBg, borderColor: t.activeColor },
-              ]}
+              style={[pS.tabChip, isActive && pS.tabChipActive]}
               onPress={() => setTab(t.key)}
               activeOpacity={0.8}
             >
-              <Text style={pS.statusChipIcon}>{t.icon}</Text>
-              <Text style={[pS.statusChipLabel, isActive && { color: t.activeColor, fontWeight: '700' }]}>
+              {t.key === 'saved' ? (
+                <Ionicons
+                  name={isActive ? 'heart' : 'heart-outline'}
+                  size={13}
+                  color={isActive ? Colors.primary : Colors.textMuted}
+                />
+              ) : t.key === 'rejected' ? (
+                <Ionicons
+                  name="close-circle-outline"
+                  size={13}
+                  color={isActive ? Colors.primary : Colors.textMuted}
+                />
+              ) : null}
+              <Text style={[pS.tabChipTxt, isActive && pS.tabChipTxtActive]}>
                 {t.label}
               </Text>
-              <View style={[
-                pS.statusChipBadge,
-                isActive ? { backgroundColor: t.activeColor } : { backgroundColor: Colors.textMuted },
-              ]}>
-                <Text style={pS.statusChipBadgeTxt}>{t.count}</Text>
-              </View>
+              <Text style={[pS.tabChipCount, isActive && pS.tabChipCountActive]}>
+                {t.count}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -1642,93 +1701,123 @@ export default function HomeScreen() {
 // Permanent mode styles
 // ─────────────────────────────────────────────────
 const pS = StyleSheet.create({
-  filterLineDot: { width: 8, height: 8, borderRadius: 4 },
-  metroIconWrap: {
-    width: 30, height: 30, borderRadius: 15,
-    borderWidth: 2.5, borderColor: '#111111',
-    alignItems: 'center', justifyContent: 'center',
+  // — search row —
+  searchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10,
   },
-  metroIconText: { fontSize: 14, fontWeight: '900', color: '#111111', lineHeight: 17 },
-  inlineFilter: {
-    width: 44, height: 44, borderRadius: 12, marginRight: 8,
-    borderWidth: 1.5, borderColor: Colors.inputBorder,
-    backgroundColor: Colors.bg,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  inlineFilterActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  inlineFilterIcon: { fontSize: 20 },
-  metroIconWrap: {
-    width: 30, height: 30, borderRadius: 15,
-    borderWidth: 2.5, borderColor: '#111111',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  metroIconText: { fontSize: 14, fontWeight: '900', color: '#111111', lineHeight: 17 },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   searchBox: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 10, backgroundColor: Colors.bg,
+    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: 14,
+    paddingHorizontal: 12, paddingVertical: 11, backgroundColor: Colors.bg,
   },
-  searchIcon: { fontSize: 16 },
   searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary },
   searchClear: { fontSize: 14, color: Colors.textMuted },
-  filterBtn: {
-    width: 44, height: 44, borderRadius: 12,
-    borderWidth: 1.5, borderColor: Colors.inputBorder,
-    alignItems: 'center', justifyContent: 'center',
+  filtersBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: 14,
+    paddingHorizontal: 12, paddingVertical: 11, backgroundColor: Colors.bg,
   },
-  filterBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  filterBtnTxt: { fontSize: 18 },
-  salaryChipsScroll: { flexGrow: 0, flexShrink: 0, alignSelf: 'stretch' },
-  salaryChipsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 10 },
-  salaryChip: {
-    borderRadius: 100, paddingHorizontal: 14, paddingVertical: 7,
-    borderWidth: 1.5, borderColor: Colors.inputBorder,
-    backgroundColor: Colors.bg,
+  filtersBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  filtersBtnTxt: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
+  filtersBtnTxtActive: { color: Colors.primary },
+
+  // — tab chips —
+  tabChipsScroll: {
+    flexGrow: 0, flexShrink: 0, alignSelf: 'stretch',
+    borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  salaryChipActive: { borderColor: Colors.green, backgroundColor: '#D1FAE5' },
-  salaryChipTxt: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
-  salaryChipTxtActive: { color: Colors.green },
-  statusChipsScroll: { flexGrow: 0, flexShrink: 0, alignSelf: 'stretch', borderBottomWidth: 1, borderBottomColor: Colors.divider },
-  statusChipsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
-  statusChip: {
+  tabChipsRow: {
+    flexDirection: 'row', gap: 8,
+    paddingHorizontal: 16, paddingVertical: 10,
+  },
+  tabChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     borderRadius: 100, paddingHorizontal: 12, paddingVertical: 8,
     borderWidth: 1.5, borderColor: Colors.inputBorder,
+    backgroundColor: Colors.bg, flexShrink: 0,
+  },
+  tabChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  tabChipTxt: { fontSize: 13, fontWeight: '500', color: Colors.textSecondary },
+  tabChipTxtActive: { color: Colors.primary, fontWeight: '700' },
+  tabChipCount: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
+  tabChipCountActive: { color: Colors.primary },
+
+  // — card —
+  card: {
+    backgroundColor: Colors.bg, borderRadius: 18,
+    padding: 16, gap: 10, ...Shadow.card,
+  },
+  statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start' },
+  statusTxt: { fontSize: 12, fontWeight: '700' },
+
+  // company row
+  companyRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  companyAvatar: {
+    width: 42, height: 42, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  companyAvatarTxt: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  companyMeta: { flex: 1 },
+  companyName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  verifiedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  verifiedBadge: {
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: '#3B82F6',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  verifiedTxt: { fontSize: 11, color: Colors.textMuted },
+  saveBtn: { padding: 4 },
+
+  // title & salary
+  jobTitle: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary, lineHeight: 28 },
+  salaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  salaryMain: { fontSize: 20, fontWeight: '800', color: Colors.primary },
+  naRukiBadge: {
+    backgroundColor: '#D1FAE5', borderRadius: 100,
+    paddingHorizontal: 10, paddingVertical: 4,
+  },
+  naRukiTxt: { fontSize: 12, fontWeight: '700', color: Colors.green },
+
+  // location row
+  locationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  locationItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  metroCircle: {
+    width: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  metroCircleTxt: { fontSize: 10, fontWeight: '900', color: '#fff', lineHeight: 12 },
+  locationTxt: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', flexShrink: 1 },
+
+  // schedule row
+  scheduleRow: { flexDirection: 'row', gap: 16 },
+
+  // desc
+  desc: { fontSize: 13, color: Colors.textMuted, lineHeight: 19 },
+
+  // action row
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  applyBtn: {
+    flex: 1, backgroundColor: Colors.primary, borderRadius: 100,
+    paddingVertical: 13, alignItems: 'center',
+  },
+  applyBtnDone: { backgroundColor: '#D1FAE5' },
+  applyBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  actionIconBtn: {
+    width: 44, height: 44, borderRadius: 100,
+    borderWidth: 1.5, borderColor: Colors.inputBorder,
+    alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.bg,
-    flexShrink: 0, flexGrow: 0,
   },
-  statusChipIcon: { fontSize: 13, flexShrink: 0, flexGrow: 0 },
-  statusChipLabel: { fontSize: 13, fontWeight: '500', color: Colors.textSecondary, flexShrink: 0, flexGrow: 0 },
-  statusChipBadge: {
-    minWidth: 18, height: 18, borderRadius: 9,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
-  },
-  statusChipBadgeTxt: { fontSize: 10, fontWeight: '800', color: '#fff' },
+
+  // rejected info
   rejectedInfo: {
     backgroundColor: '#FEE2E2', borderRadius: 10,
     paddingHorizontal: 12, paddingVertical: 10,
   },
   rejectedInfoTxt: { fontSize: 13, color: Colors.red, fontWeight: '500', textAlign: 'center' },
-  card: { backgroundColor: Colors.bg, borderRadius: Radius.lg, padding: 16, ...Shadow.card, gap: 10 },
-  cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  jobTitle: { fontSize: 17, fontWeight: '800', color: Colors.textPrimary, lineHeight: 22 },
-  company: { fontSize: 12, color: Colors.textMuted, marginTop: 3 },
-  saveBtn: { padding: 4 },
-  saveBtnIcon: { fontSize: 22 },
-  metaRow: { gap: 2 },
-  metaItem: { fontSize: 13, color: Colors.textMuted },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  salaryTag: { backgroundColor: '#D1FAE5', borderRadius: 100, paddingHorizontal: 12, paddingVertical: 5 },
-  salaryTxt: { fontSize: 13, fontWeight: '800', color: Colors.green },
-  scheduleTag: { backgroundColor: Colors.surface, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 5 },
-  scheduleTxt: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
-  desc: { fontSize: 13, color: Colors.textMuted, lineHeight: 18 },
-  applyBtn: { backgroundColor: '#7C3AED', borderRadius: 100, paddingVertical: 12, alignItems: 'center' },
-  applyBtnDone: { backgroundColor: '#D1FAE5' },
-  applyBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start' },
-  statusTxt: { fontSize: 12, fontWeight: '700' },
+
+  // Employer-side perm card styles (used in EmployerHome)
   permVacCard: { borderLeftWidth: 3, borderLeftColor: '#7C3AED' },
   permCompany: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   permMetaRow: { gap: 2 },
@@ -1744,6 +1833,22 @@ const pS = StyleSheet.create({
   appStatNum: { fontSize: 20, fontWeight: '800', color: '#7C3AED' },
   appStatLabel: { fontSize: 12, color: '#7C3AED', flex: 1 },
   appStatArrow: { fontSize: 12, color: '#7C3AED', fontWeight: '600' },
+
+  // legacy (used by WorkerFeed M-button)
+  filterLineDot: { width: 8, height: 8, borderRadius: 4 },
+  metroIconWrap: {
+    width: 30, height: 30, borderRadius: 15,
+    borderWidth: 2.5, borderColor: '#111111',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  metroIconText: { fontSize: 14, fontWeight: '900', color: '#111111', lineHeight: 17 },
+  inlineFilter: {
+    width: 44, height: 44, borderRadius: 12, marginRight: 8,
+    borderWidth: 1.5, borderColor: Colors.inputBorder,
+    backgroundColor: Colors.bg,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  inlineFilterActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
 });
 
 // ─────────────────────────────────────────────────
