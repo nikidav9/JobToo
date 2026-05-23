@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Animated, PanResponder, Dimensions, RefreshControl, Modal, FlatList,
-  TextInput, ActivityIndicator, Share,
+  TextInput, ActivityIndicator, Share, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -1134,14 +1134,14 @@ function WorkerPermMode() {
     { key: 'rejected', label: 'Отказы',       count: rejectedVacancies.length },
   ];
 
-  const shareVacancy = async (v: PermVacancy, displayName: string) => {
+  const shareVacancy = async (v: PermVacancy) => {
     const url = `https://job-match-2d0wug3k7-nujus-projects.vercel.app/perm-vacancy-detail?vacancyId=${v.id}`;
     try {
-      await Share.share({
-        title: `${v.title} — ${displayName}`,
-        message: `${v.title}\n${displayName}\n${v.salary.toLocaleString('ru-RU')} ₽/мес\n\n${url}`,
-        url,
-      });
+      // iOS: pass url only — system appends it cleanly, no duplicate text
+      // Android: url param is ignored, pass as message
+      await Share.share(
+        Platform.OS === 'ios' ? { url } : { message: url }
+      );
     } catch {}
   };
 
@@ -1274,7 +1274,7 @@ function WorkerPermMode() {
             </TouchableOpacity>
             <TouchableOpacity
               style={pS.actionIconBtn}
-              onPress={(e) => { e.stopPropagation?.(); shareVacancy(v, displayCompany); }}
+              onPress={(e) => { e.stopPropagation?.(); shareVacancy(v); }}
               activeOpacity={0.8}
             >
               <Ionicons name="share-outline" size={17} color={Colors.textSecondary} />
