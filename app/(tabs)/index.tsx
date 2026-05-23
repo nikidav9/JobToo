@@ -1047,6 +1047,7 @@ function WorkerPermMode() {
     currentUser, users, permVacancies, permApplications,
     permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved,
     refreshPermVacancies, refreshPermApplications, refreshPermSaved,
+    chats, refreshChats,
     showToast,
   } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
@@ -1058,6 +1059,7 @@ function WorkerPermMode() {
   const [filterPicker, setFilterPicker] = useState(false);
   const [minSalary, setMinSalary] = useState(0);
   const [applying, setApplying] = useState<string | null>(null);
+  const [chatLoading, setChatLoading] = useState<string | null>(null);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -1114,6 +1116,32 @@ function WorkerPermMode() {
       optimisticAddPermSaved(v.id);
       dbAddPermSaved(currentUser.id, v.id).catch(() => {});
       showToast('Сохранено ❤️', 'success');
+    }
+  };
+
+  const openPermChat = async (v: PermVacancy, displayCompany: string) => {
+    if (!currentUser || chatLoading) return;
+    // Check if chat already exists
+    const existing = chats.find(c => c.vacancyId === v.id && c.workerId === currentUser.id);
+    if (existing) {
+      router.push({ pathname: '/chat-room', params: { chatId: existing.id } });
+      return;
+    }
+    setChatLoading(v.id);
+    try {
+      const chatId = await dbCreateChat(
+        currentUser.id,
+        v.employerId,
+        v.id,
+        v.title,
+        displayCompany,
+      );
+      refreshChats().catch(() => {});
+      router.push({ pathname: '/chat-room', params: { chatId } });
+    } catch {
+      showToast('Ошибка при открытии чата', 'error');
+    } finally {
+      setChatLoading(null);
     }
   };
 
@@ -1266,11 +1294,15 @@ function WorkerPermMode() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={pS.actionIconBtn}
-              onPress={() => router.push('/(tabs)/chats')}
+              style={[pS.actionIconBtn, chatLoading === v.id && { opacity: 0.5 }]}
+              onPress={(e) => { e.stopPropagation?.(); openPermChat(v, displayCompany); }}
+              disabled={chatLoading === v.id}
               activeOpacity={0.8}
             >
-              <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
+              {chatLoading === v.id
+                ? <ActivityIndicator size={14} color={Colors.textSecondary} />
+                : <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
+              }
             </TouchableOpacity>
             <TouchableOpacity
               style={pS.actionIconBtn}
