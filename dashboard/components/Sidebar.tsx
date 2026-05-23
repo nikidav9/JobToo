@@ -11,6 +11,7 @@ const NAV = [
   { href: '/engagement', icon: IconPulse,  label: 'Активность' },
   { href: '/quality',    icon: IconStar,   label: 'Качество' },
   { href: '/chats',      icon: IconChat,   label: 'Переписки' },
+  { href: '/reviews',    icon: IconReview, label: 'Отзывы' },
 ]
 
 export default function Sidebar() {
@@ -148,4 +149,7 @@ function IconStar({ style }: { style?: React.CSSProperties }) {
 }
 function IconChat({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M13 2H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2l3 3 3-3h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/></svg>
+}
+function IconReview({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M8 2.5l1.2 2.4 2.7.4-2 1.9.5 2.7L8 8.6 5.6 9.9l.5-2.7-2-1.9 2.7-.4L8 2.5z"/><path d="M3 12.5h10M3 14.5h6"/></svg>
 }

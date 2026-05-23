@@ -9,6 +9,7 @@ const LABELS: Record<string, string> = {
   '/engagement': 'Активность',
   '/quality': 'Качество',
   '/chats': 'Переписки',
+  '/reviews': 'Отзывы',
 }
 
 export default function Topbar() {

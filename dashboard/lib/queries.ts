@@ -685,6 +685,70 @@ export async function fetchQuality() {
   }
 }
 
+// ─── reviews ─────────────────────────────────────────────────────────────────
+
+export async function fetchReviews() {
+  const [{ data: ratings }, { data: users }, { data: tv }, { data: pv }] = await Promise.all([
+    supabase.from('jm_ratings').select('id,from_user_id,to_user_id,vacancy_id,rating,role,review_text,created_at').order('created_at', { ascending: false }),
+    supabase.from('jm_users').select('id,first_name,last_name,phone,role,company'),
+    supabase.from('jm_vacancies').select('id,work_type_label,work_type,company,status'),
+    supabase.from('jm_perm_vacancies').select('id,title,company,status'),
+  ])
+
+  const rt = ratings ?? []
+  const us = users ?? []
+  const tempMap: Record<string, any> = {}
+  const permMap: Record<string, any> = {}
+  for (const v of tv ?? []) tempMap[v.id] = { ...v, vacType: 'temp' }
+  for (const v of pv ?? []) permMap[v.id] = { ...v, vacType: 'perm' }
+
+  const userMap: Record<string, any> = {}
+  for (const u of us) userMap[u.id] = u
+
+  function userName(u: any) {
+    if (!u) return '—'
+    const fn = (u.first_name ?? '').trim()
+    const ln = (u.last_name ?? '').trim()
+    if (fn || ln) return [fn, ln].filter(Boolean).join(' ')
+    return u.phone ?? '—'
+  }
+
+  const WORK_LABELS: Record<string, string> = {
+    stocker: 'Кладовщик', cook: 'Повар', shift_supervisor: 'Менеджер', picker: 'Комплектовщик',
+  }
+
+  const list = rt.map((r: any) => {
+    const from = userMap[r.from_user_id]
+    const to = userMap[r.to_user_id]
+    const tempVac = tempMap[r.vacancy_id]
+    const permVac = permMap[r.vacancy_id]
+    const vac = tempVac ?? permVac ?? null
+    return {
+      id: r.id,
+      rating: Number(r.rating),
+      role: r.role as 'worker' | 'employer',
+      reviewText: r.review_text ?? null,
+      createdAt: r.created_at?.slice(0, 10) ?? '',
+      fromName: userName(from),
+      fromRole: from?.role ?? r.role,
+      toName: userName(to),
+      toRole: to?.role ?? (r.role === 'employer' ? 'worker' : 'employer'),
+      vacTitle: vac ? (vac.title ?? vac.work_type_label ?? WORK_LABELS[vac.work_type ?? ''] ?? 'Вакансия') : '—',
+      vacCompany: vac?.company ?? '—',
+      vacStatus: vac?.status ?? null,
+      vacType: vac?.vacType ?? null,
+    }
+  })
+
+  const avgRating = list.length > 0
+    ? (list.reduce((s: number, r: any) => s + r.rating, 0) / list.length).toFixed(2)
+    : '—'
+
+  const withText = list.filter((r: any) => r.reviewText).length
+
+  return { list, avgRating, total: list.length, withText }
+}
+
 // ─── chats ───────────────────────────────────────────────────────────────────
 
 export async function fetchChats() {
