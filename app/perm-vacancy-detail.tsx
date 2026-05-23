@@ -2,10 +2,10 @@
  * Permanent vacancy detail screen
  * Shows full info, employer contact (phone only after match), apply/save actions
  */
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Platform,
+  TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -31,20 +31,32 @@ export default function PermVacancyDetailScreen() {
   } = useApp();
 
   const [applying, setApplying] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalDismissed, setAuthModalDismissed] = useState(false);
 
-  // Show auth modal automatically on web for guests
-  useEffect(() => {
-    if (!currentUser && !loading) {
-      setShowAuthModal(true);
+  const isGuest = !currentUser && !loading;
+  const showAuthModal = isGuest && !authModalDismissed;
+
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
     }
-  }, [currentUser, loading]);
+  };
 
   const vacancy = permVacancies.find(v => v.id === vacancyId);
   const employer = vacancy ? users.find(u => u.id === vacancy.employerId) : null;
 
-  // Check if worker is matched (chat exists for this employer → matched on any perm vacancy)
-  // We define "matched" as: application approved
+  // Normalize employer display name — same logic as vacancy cards
+  const employerDisplayName = vacancy?.company?.trim()
+    ? vacancy.company
+    : employer
+      ? `${employer.firstName ?? ''} ${employer.lastName ?? ''}`.trim() || 'Работодатель'
+      : 'Работодатель';
+
+  const employerColor = employer ? nameColorFromString(employer.id) : Colors.primary;
+  const employerInitials = getInitials(employerDisplayName);
+
   const myApp = useMemo(() => {
     if (!currentUser || !vacancy) return null;
     return permApplications.find(a => a.vacancyId === vacancy.id && a.workerId === currentUser.id) ?? null;
@@ -54,13 +66,61 @@ export default function PermVacancyDetailScreen() {
   const isApproved = myApp?.status === 'approved';
   const isSaved = vacancy ? permSavedIds.includes(vacancy.id) : false;
 
-  const metroLine = METRO_LINES.find(l => l.id === vacancy?.metroLineId);
+  const metroLine = vacancy?.metroStation
+    ? METRO_LINES.find(l => l.stations.includes(vacancy.metroStation!)) ?? null
+    : null;
+
+  const authModalJSX = showAuthModal ? (
+    <View style={styles.authOverlay}>
+      <View style={styles.authSheet}>
+        <TouchableOpacity
+          style={styles.authClose}
+          onPress={() => setAuthModalDismissed(true)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.authCloseTxt}>✕</Text>
+        </TouchableOpacity>
+        <Text style={styles.authEmoji}>👋</Text>
+        <Text style={styles.authTitle}>Войдите, чтобы откликнуться</Text>
+        <Text style={styles.authSub}>Зарегистрируйтесь или войдите — это бесплатно</Text>
+        <TouchableOpacity style={styles.authBtnPrimary} onPress={() => router.push('/login')} activeOpacity={0.85}>
+          <Text style={styles.authBtnPrimaryTxt}>Войти</Text>
+        </TouchableOpacity>
+        <View style={styles.authDivider}>
+          <View style={styles.authDividerLine} />
+          <Text style={styles.authDividerTxt}>или</Text>
+          <View style={styles.authDividerLine} />
+        </View>
+        <TouchableOpacity style={styles.authBtnSecondary} onPress={() => router.push('/register-worker')} activeOpacity={0.85}>
+          <Text style={styles.authBtnSecondaryTxt}>Ищу работу — Зарегистрироваться</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.authBtnSecondary, { marginTop: 8 }]} onPress={() => router.push('/register-employer')} activeOpacity={0.85}>
+          <Text style={styles.authBtnSecondaryTxt}>Ищу сотрудников — Зарегистрироваться</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  ) : null;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={goBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.backTxt}>← Назад</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.emptyCenter}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!vacancy) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={goBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text style={styles.backTxt}>← Назад</Text>
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
@@ -69,6 +129,7 @@ export default function PermVacancyDetailScreen() {
           <Text style={{ fontSize: 48 }}>🔍</Text>
           <Text style={styles.emptyTitle}>Вакансия не найдена</Text>
         </View>
+        {authModalJSX}
       </SafeAreaView>
     );
   }
@@ -100,12 +161,6 @@ export default function PermVacancyDetailScreen() {
     }
   };
 
-  const employerColor = employer ? nameColorFromString(employer.id) : Colors.primary;
-  const employerInitials = employer
-    ? getInitials(employer.company ?? `${employer.firstName} ${employer.lastName}`)
-    : '?';
-  const employerName = employer?.company ?? (employer ? `${employer.firstName} ${employer.lastName}` : 'Работодатель');
-
   const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
     pending:  { label: '⏳ На рассмотрении', color: '#92400E', bg: '#FFF7ED' },
     approved: { label: '✅ Вы приглашены!',  color: Colors.green, bg: '#D1FAE5' },
@@ -118,11 +173,10 @@ export default function PermVacancyDetailScreen() {
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity onPress={goBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Text style={styles.backTxt}>← Назад</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }} />
-        {/* Save button */}
         {currentUser?.role === 'worker' ? (
           <TouchableOpacity
             onPress={toggleSave}
@@ -152,7 +206,7 @@ export default function PermVacancyDetailScreen() {
 
         {/* Title + company */}
         <Text style={styles.jobTitle}>{vacancy.title}</Text>
-        <Text style={styles.companyName}>{vacancy.company}</Text>
+        <Text style={styles.companyName}>{employerDisplayName}</Text>
 
         {/* Key info cards */}
         <View style={styles.infoGrid}>
@@ -221,7 +275,7 @@ export default function PermVacancyDetailScreen() {
               </View>
             )}
             <View style={{ flex: 1, gap: 3 }}>
-              <Text style={styles.employerName}>{employerName}</Text>
+              <Text style={styles.employerName}>{employerDisplayName}</Text>
               {employer?.metroStation ? (
                 <Text style={styles.employerMeta}>🚇 {employer.metroStation}</Text>
               ) : null}
@@ -305,56 +359,7 @@ export default function PermVacancyDetailScreen() {
         </View>
       ) : null}
 
-      {/* Auth modal for guests */}
-      {showAuthModal && !currentUser ? (
-        <View style={styles.authOverlay}>
-          <View style={styles.authSheet}>
-            <TouchableOpacity
-              style={styles.authClose}
-              onPress={() => setShowAuthModal(false)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={styles.authCloseTxt}>✕</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.authEmoji}>👋</Text>
-            <Text style={styles.authTitle}>Войдите, чтобы откликнуться</Text>
-            <Text style={styles.authSub}>
-              Зарегистрируйтесь или войдите — это бесплатно
-            </Text>
-
-            <TouchableOpacity
-              style={styles.authBtnPrimary}
-              onPress={() => router.push('/login')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.authBtnPrimaryTxt}>Войти</Text>
-            </TouchableOpacity>
-
-            <View style={styles.authDivider}>
-              <View style={styles.authDividerLine} />
-              <Text style={styles.authDividerTxt}>или</Text>
-              <View style={styles.authDividerLine} />
-            </View>
-
-            <TouchableOpacity
-              style={styles.authBtnSecondary}
-              onPress={() => router.push('/register-worker')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.authBtnSecondaryTxt}>Ищу работу — Зарегистрироваться</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.authBtnSecondary, { marginTop: 8 }]}
-              onPress={() => router.push('/register-employer')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.authBtnSecondaryTxt}>Ищу сотрудников — Зарегистрироваться</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : null}
+      {authModalJSX}
     </SafeAreaView>
   );
 }
