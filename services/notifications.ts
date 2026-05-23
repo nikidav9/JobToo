@@ -120,6 +120,26 @@ type ExpoPushTicket = {
 };
 
 async function sendExpoPush(messages: ExpoPushMessage[]): Promise<void> {
+  if (Platform.OS === 'web') {
+    // exp.host blocks cross-origin requests from browsers — route through server proxy
+    const tokens = messages.map(m => m.to);
+    const first = messages[0];
+    await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fn: 'sendPushNotification',
+        args: [
+          tokens.length === 1 ? tokens[0] : tokens,
+          first.title,
+          first.body,
+          { channelId: first.channelId, ...first.data },
+        ],
+      }),
+    }).catch(e => console.warn('[push] Server proxy error:', e));
+    return;
+  }
+
   const response = await fetch('https://exp.host/--/api/v2/push/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
