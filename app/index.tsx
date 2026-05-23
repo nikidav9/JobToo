@@ -1,17 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity, Animated,
   ScrollView, Image, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
 import { Star } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
+import * as SplashScreen from 'expo-splash-screen';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
-
-SplashScreen.preventAutoHideAsync();
 
 const TRACK_W = 140;
 
@@ -39,6 +37,9 @@ const CARD2_MT = r(18);
 export default function RootScreen() {
   const router = useRouter();
   const { currentUser, loading } = useApp();
+  const progress = useRef(new Animated.Value(0)).current;
+  const slowAnim = useRef<Animated.CompositeAnimation | null>(null);
+  const finishing = useRef(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -49,16 +50,44 @@ export default function RootScreen() {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
-    if (currentUser) {
-      router.replace('/(tabs)');
-    } else {
-      SplashScreen.hideAsync().catch(() => {});
-      setReady(true);
-    }
+    slowAnim.current = Animated.sequence([
+      Animated.timing(progress, { toValue: TRACK_W * 0.55, duration: 350, useNativeDriver: false }),
+      Animated.timing(progress, { toValue: TRACK_W * 0.88, duration: 3500, useNativeDriver: false }),
+    ]);
+    slowAnim.current.start();
+  }, []);
+
+  useEffect(() => {
+    if (loading || finishing.current) return;
+    finishing.current = true;
+    slowAnim.current?.stop();
+    Animated.timing(progress, { toValue: TRACK_W, duration: 220, useNativeDriver: false }).start(() => {
+      if (currentUser) {
+        // Splash hides in /(tabs)/_layout.tsx once tabs are mounted
+        router.replace('/(tabs)');
+      } else {
+        // No tabs will mount — hide splash now and show the welcome screen
+        SplashScreen.hideAsync().catch(() => {});
+        setReady(true);
+      }
+    });
   }, [loading, currentUser]);
 
-  if (!ready) return <View style={{ flex: 1, backgroundColor: '#ffffff' }} />;
+  if (!ready) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.splashCenter}>
+          <Text style={styles.splashLogo}>
+            <Text style={styles.logoBlack}>Job</Text>
+            <Text style={styles.logoOrange}>Too</Text>
+          </Text>
+          <View style={styles.track}>
+            <Animated.View style={[styles.fill, { width: progress }]} />
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -90,7 +119,7 @@ export default function RootScreen() {
         <TouchableOpacity
           style={styles.card}
           activeOpacity={0.9}
-          onPress={() => router.push('/register-worker')}
+          onPress={() => router.push('/register-employer')}
         >
           <View style={[StyleSheet.absoluteFill, styles.bgOrange]} />
 
@@ -101,9 +130,9 @@ export default function RootScreen() {
           />
 
           <View style={styles.cardLeft}>
-            <Text style={styles.cardTitle}>Ищу{'\n'}подработку</Text>
+            <Text style={styles.cardTitle}>Ищу{'\n'}работника</Text>
             <Text style={[styles.cardSub, styles.cardSubOrange]}>
-              {'Находите подработки\nна складах'}
+              {'Размещайте вакансии\nи находите сотрудников'}
             </Text>
           </View>
 
@@ -112,11 +141,11 @@ export default function RootScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* ══ Карточка 2: Ищу работника (тёмная) ══ */}
+        {/* ══ Карточка 2: Ищу подработку (тёмная) ══ */}
         <TouchableOpacity
           style={[styles.card, { marginTop: CARD2_MT }]}
           activeOpacity={0.9}
-          onPress={() => router.push('/register-employer')}
+          onPress={() => router.push('/register-worker')}
         >
           <View style={[StyleSheet.absoluteFill, styles.bgDark]} />
 
@@ -127,8 +156,8 @@ export default function RootScreen() {
           />
 
           <View style={styles.cardLeft}>
-            <Text style={styles.cardTitle}>Ищу{'\n'}работника</Text>
-            <Text style={styles.cardSub}>{'Размещайте вакансии\nи находите сотрудников'}</Text>
+            <Text style={styles.cardTitle}>Ищу{'\n'}подработку</Text>
+            <Text style={styles.cardSub}>{'Находите подработки\nна складах'}</Text>
           </View>
 
           <View style={[styles.arrowBtn, { right: r(8) }]}>
@@ -176,7 +205,7 @@ export default function RootScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.version}>JobToo v2.0</Text>
+        <Text style={styles.version}>JobToo v1.1</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -186,7 +215,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F5F7FA' },
 
   splashCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  splashLogo: { fontSize: 44 },
+  splashLogo: { fontSize: r(44), fontWeight: '800' },
   track: {
     width: TRACK_W, height: 3, backgroundColor: Colors.inputBorder,
     borderRadius: 100, overflow: 'hidden', marginTop: 28,

@@ -147,10 +147,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const boot = async () => {
       try {
-        // Wait minimum 1s for splash, THEN read session sequentially.
-        // Reading in parallel with the timer caused AsyncStorage to return null
-        // on Android cold starts before storage finished initialising.
-        await new Promise<void>(r => setTimeout(r, 1000));
+        // On Android, AsyncStorage may return null on cold start if read too early.
+        // On web, localStorage is synchronous so no delay needed.
+        if (Platform.OS !== 'web') {
+          await new Promise<void>(r => setTimeout(r, 1000));
+        }
         if (cancelled) return;
         const sessionUser = await getSessionUser().catch(() => null);
 
@@ -175,10 +176,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (cachedPermVac) setPermVacancies(cachedPermVac);
           if (cachedPermApps) setPermApplications(cachedPermApps);
 
-          // Refresh from Supabase — block loading so splash waits for fresh data
-          if (!cancelled) {
-            await Promise.all([
-              refreshVacancies(true), // silent — don't show loading indicator
+          // Refresh from Supabase in background — don't block loading
+          setTimeout(() => {
+            if (cancelled) return;
+            Promise.all([
+              refreshVacancies(true),
               refreshUsers(),
               refreshLikes(sessionUser),
               refreshChats(sessionUser),
@@ -187,7 +189,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               refreshPermApplications(sessionUser),
               refreshPermSaved(sessionUser),
             ]).catch(() => {});
-          }
+          }, 100);
         }
       } catch (e) {
         console.warn('[AppContext] boot error', e);

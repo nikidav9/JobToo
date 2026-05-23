@@ -93,6 +93,7 @@ export default function TabLayout() {
     return pending + matched + needsRating;
   })();
 
+  // Hide the splash (web overlay or native splash) once tabs are rendered
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
   }, []);
@@ -148,7 +149,7 @@ export default function TabLayout() {
             <TabIcon
               iconActive="people"
               iconInactive="people-outline"
-              label="Отклики"
+              label="Мэтчи"
               focused={focused}
               badge={matchBadge}
             />
