@@ -5,11 +5,11 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator,
+  TouchableOpacity, ActivityIndicator, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { getInitials, nameColorFromString } from '@/services/storage';
@@ -22,6 +22,7 @@ import { METRO_LINES } from '@/constants/metro';
 
 export default function PermVacancyDetailScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { vacancyId } = useLocalSearchParams<{ vacancyId: string }>();
   const {
     currentUser, loading, users, permVacancies, permApplications,
@@ -37,8 +38,8 @@ export default function PermVacancyDetailScreen() {
   const showAuthModal = isGuest && !authModalDismissed;
 
   const goBack = () => {
-    if (router.canGoBack()) {
-      router.back();
+    if (navigation.canGoBack()) {
+      navigation.goBack();
     } else {
       router.replace('/');
     }
@@ -47,7 +48,6 @@ export default function PermVacancyDetailScreen() {
   const vacancy = permVacancies.find(v => v.id === vacancyId);
   const employer = vacancy ? users.find(u => u.id === vacancy.employerId) : null;
 
-  // Normalize employer display name — same logic as vacancy cards
   const employerDisplayName = vacancy?.company?.trim()
     ? vacancy.company
     : employer
@@ -70,36 +70,43 @@ export default function PermVacancyDetailScreen() {
     ? METRO_LINES.find(l => l.stations.includes(vacancy.metroStation!)) ?? null
     : null;
 
-  const authModalJSX = showAuthModal ? (
-    <View style={styles.authOverlay}>
-      <View style={styles.authSheet}>
-        <TouchableOpacity
-          style={styles.authClose}
-          onPress={() => setAuthModalDismissed(true)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={styles.authCloseTxt}>✕</Text>
-        </TouchableOpacity>
-        <Text style={styles.authEmoji}>👋</Text>
-        <Text style={styles.authTitle}>Войдите, чтобы откликнуться</Text>
-        <Text style={styles.authSub}>Зарегистрируйтесь или войдите — это бесплатно</Text>
-        <TouchableOpacity style={styles.authBtnPrimary} onPress={() => router.push('/login')} activeOpacity={0.85}>
-          <Text style={styles.authBtnPrimaryTxt}>Войти</Text>
-        </TouchableOpacity>
-        <View style={styles.authDivider}>
-          <View style={styles.authDividerLine} />
-          <Text style={styles.authDividerTxt}>или</Text>
-          <View style={styles.authDividerLine} />
+  const authModalJSX = (
+    <Modal
+      visible={showAuthModal}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setAuthModalDismissed(true)}
+    >
+      <View style={styles.authOverlay}>
+        <View style={styles.authSheet}>
+          <TouchableOpacity
+            style={styles.authClose}
+            onPress={() => setAuthModalDismissed(true)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.authCloseTxt}>✕</Text>
+          </TouchableOpacity>
+          <Text style={styles.authEmoji}>👋</Text>
+          <Text style={styles.authTitle}>Войдите, чтобы откликнуться</Text>
+          <Text style={styles.authSub}>Зарегистрируйтесь или войдите — это бесплатно</Text>
+          <TouchableOpacity style={styles.authBtnPrimary} onPress={() => router.push('/login')} activeOpacity={0.85}>
+            <Text style={styles.authBtnPrimaryTxt}>Войти</Text>
+          </TouchableOpacity>
+          <View style={styles.authDivider}>
+            <View style={styles.authDividerLine} />
+            <Text style={styles.authDividerTxt}>или</Text>
+            <View style={styles.authDividerLine} />
+          </View>
+          <TouchableOpacity style={styles.authBtnSecondary} onPress={() => router.push('/register-worker')} activeOpacity={0.85}>
+            <Text style={styles.authBtnSecondaryTxt}>Ищу работу — Зарегистрироваться</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.authBtnSecondary, { marginTop: 8 }]} onPress={() => router.push('/register-employer')} activeOpacity={0.85}>
+            <Text style={styles.authBtnSecondaryTxt}>Ищу сотрудников — Зарегистрироваться</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.authBtnSecondary} onPress={() => router.push('/register-worker')} activeOpacity={0.85}>
-          <Text style={styles.authBtnSecondaryTxt}>Ищу работу — Зарегистрироваться</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.authBtnSecondary, { marginTop: 8 }]} onPress={() => router.push('/register-employer')} activeOpacity={0.85}>
-          <Text style={styles.authBtnSecondaryTxt}>Ищу сотрудников — Зарегистрироваться</Text>
-        </TouchableOpacity>
       </View>
-    </View>
-  ) : null;
+    </Modal>
+  );
 
   if (loading) {
     return (
@@ -112,6 +119,7 @@ export default function PermVacancyDetailScreen() {
         <View style={styles.emptyCenter}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
+        {authModalJSX}
       </SafeAreaView>
     );
   }
@@ -472,10 +480,9 @@ const styles = StyleSheet.create({
   applyBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   authOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
-    zIndex: 200,
   },
   authSheet: {
     backgroundColor: '#fff',
