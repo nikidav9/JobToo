@@ -40,19 +40,7 @@ export default function Login() {
 
     setLoading(true);
 
-    // Admin check
-    if (digits === ADMIN_PHONE_DIGITS) {
-      if (password !== ADMIN_PASSWORD) {
-        setPassError('Неверный пароль');
-        setLoading(false);
-        return;
-      }
-      router.replace('/admin');
-      setLoading(false);
-      return;
-    }
-
-    // Regular user
+    // Regular user check first — DB is the source of truth
     let user = null;
     try {
       user = await loginUser(phone, password);
@@ -63,15 +51,22 @@ export default function Login() {
       return;
     }
 
-    if (!user) {
-      setPhoneError('Пользователь с таким номером не найден или неверный пароль');
+    if (user) {
+      showToast('Добро пожаловать! 👋', 'success');
+      setLoading(false);
+      router.replace('/(tabs)');
+      return;
+    }
+
+    // Admin check — only if no regular user found
+    if (digits === ADMIN_PHONE_DIGITS && password === ADMIN_PASSWORD) {
+      router.replace('/admin');
       setLoading(false);
       return;
     }
 
-    showToast('Добро пожаловать! 👋', 'success');
+    setPhoneError('Пользователь с таким номером не найден или неверный пароль');
     setLoading(false);
-    router.replace('/(tabs)');
   };
 
   const openSupport = () => {
