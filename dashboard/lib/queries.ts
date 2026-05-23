@@ -691,8 +691,8 @@ export async function fetchReviews() {
   const [{ data: ratings }, { data: users }, { data: tv }, { data: pv }] = await Promise.all([
     supabase.from('jm_ratings').select('id,from_user_id,to_user_id,vacancy_id,rating,role,review_text,created_at').order('created_at', { ascending: false }),
     supabase.from('jm_users').select('id,first_name,last_name,phone,role,company'),
-    supabase.from('jm_vacancies').select('id,work_type_label,work_type,company,status'),
-    supabase.from('jm_perm_vacancies').select('id,title,company,status'),
+    supabase.from('jm_vacancies').select('id,work_type_label,work_type,company,status,address,metro_station'),
+    supabase.from('jm_perm_vacancies').select('id,title,company,status,address,metro_station'),
   ])
 
   const rt = ratings ?? []
@@ -737,6 +737,8 @@ export async function fetchReviews() {
       vacCompany: vac?.company ?? '—',
       vacStatus: vac?.status ?? null,
       vacType: vac?.vacType ?? null,
+      vacAddress: vac?.address ?? null,
+      vacMetro: vac?.metro_station ?? null,
     }
   })
 

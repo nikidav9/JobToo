@@ -132,6 +132,15 @@ export default function ReviewsPage() {
                       }}>
                         {r.vacType === 'perm' ? '💼' : '⚡'} {r.vacCompany} · {r.vacTitle}
                       </span>
+                      {/* Address */}
+                      {(r.vacMetro || r.vacAddress) && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: 'var(--ink-3)' }}>
+                          <svg width="9" height="11" viewBox="0 0 10 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M5 1C3 1 1.5 2.5 1.5 4.5c0 2.5 3.5 7 3.5 7s3.5-4.5 3.5-7C8.5 2.5 7 1 5 1z"/><circle cx="5" cy="4.5" r="1.2"/>
+                          </svg>
+                          {[r.vacMetro, r.vacAddress].filter(Boolean).join(', ')}
+                        </span>
+                      )}
                       {/* Vacancy status */}
                       {r.vacStatus && (
                         <span style={{
