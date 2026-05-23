@@ -11,7 +11,7 @@ const DB_TIMEOUT = 12_000;
 
 const IS_NATIVE = Platform.OS !== 'web';
 const API_BASE = IS_NATIVE
-  ? (process.env.EXPO_PUBLIC_API_URL || 'https://job-match-seven-roan.vercel.app')
+  ? (process.env.EXPO_PUBLIC_API_URL || 'https://job-match-2d0wug3k7-nujus-projects.vercel.app')
   : '';
 
 async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
