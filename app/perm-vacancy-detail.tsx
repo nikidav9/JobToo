@@ -2,10 +2,10 @@
  * Permanent vacancy detail screen
  * Shows full info, employer contact (phone only after match), apply/save actions
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator,
+  TouchableOpacity, ActivityIndicator, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -24,13 +24,21 @@ export default function PermVacancyDetailScreen() {
   const router = useRouter();
   const { vacancyId } = useLocalSearchParams<{ vacancyId: string }>();
   const {
-    currentUser, users, permVacancies, permApplications,
+    currentUser, loading, users, permVacancies, permApplications,
     permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved,
     refreshPermApplications, refreshPermSaved,
     showToast,
   } = useApp();
 
   const [applying, setApplying] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Show auth modal automatically on web for guests
+  useEffect(() => {
+    if (!currentUser && !loading) {
+      setShowAuthModal(true);
+    }
+  }, [currentUser, loading]);
 
   const vacancy = permVacancies.find(v => v.id === vacancyId);
   const employer = vacancy ? users.find(u => u.id === vacancy.employerId) : null;
@@ -296,6 +304,57 @@ export default function PermVacancyDetailScreen() {
           </TouchableOpacity>
         </View>
       ) : null}
+
+      {/* Auth modal for guests */}
+      {showAuthModal && !currentUser ? (
+        <View style={styles.authOverlay}>
+          <View style={styles.authSheet}>
+            <TouchableOpacity
+              style={styles.authClose}
+              onPress={() => setShowAuthModal(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.authCloseTxt}>✕</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.authEmoji}>👋</Text>
+            <Text style={styles.authTitle}>Войдите, чтобы откликнуться</Text>
+            <Text style={styles.authSub}>
+              Зарегистрируйтесь или войдите — это бесплатно
+            </Text>
+
+            <TouchableOpacity
+              style={styles.authBtnPrimary}
+              onPress={() => router.push('/login')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.authBtnPrimaryTxt}>Войти</Text>
+            </TouchableOpacity>
+
+            <View style={styles.authDivider}>
+              <View style={styles.authDividerLine} />
+              <Text style={styles.authDividerTxt}>или</Text>
+              <View style={styles.authDividerLine} />
+            </View>
+
+            <TouchableOpacity
+              style={styles.authBtnSecondary}
+              onPress={() => router.push('/register-worker')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.authBtnSecondaryTxt}>Ищу работу — Зарегистрироваться</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.authBtnSecondary, { marginTop: 8 }]}
+              onPress={() => router.push('/register-employer')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.authBtnSecondaryTxt}>Ищу сотрудников — Зарегистрироваться</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -406,4 +465,47 @@ const styles = StyleSheet.create({
   },
   applyBtnDone: { backgroundColor: '#D1FAE5' },
   applyBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+  authOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+    zIndex: 200,
+  },
+  authSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 40,
+    alignItems: 'center', gap: 0,
+  },
+  authClose: {
+    position: 'absolute', top: 16, right: 20,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: Colors.surface,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  authCloseTxt: { fontSize: 14, color: Colors.textMuted },
+  authEmoji: { fontSize: 36, marginBottom: 10, marginTop: 4 },
+  authTitle: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
+  authSub: {
+    fontSize: 14, color: Colors.textMuted, textAlign: 'center',
+    marginTop: 6, marginBottom: 20, lineHeight: 20,
+  },
+  authBtnPrimary: {
+    width: '100%', backgroundColor: Colors.primary,
+    borderRadius: 100, paddingVertical: 15, alignItems: 'center',
+  },
+  authBtnPrimaryTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  authDivider: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 10, marginVertical: 14, width: '100%',
+  },
+  authDividerLine: { flex: 1, height: 1, backgroundColor: Colors.divider },
+  authDividerTxt: { fontSize: 13, color: Colors.textMuted },
+  authBtnSecondary: {
+    width: '100%', borderWidth: 1.5, borderColor: Colors.inputBorder,
+    borderRadius: 100, paddingVertical: 14, alignItems: 'center',
+    backgroundColor: Colors.bg,
+  },
+  authBtnSecondaryTxt: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
 });

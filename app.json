@@ -10,23 +10,40 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "associatedDomains": [
+        "applinks:job-match-2d0wug3k7-nujus-projects.vercel.app"
+      ]
     },
     "android": {
-  "googleServicesFile": "./google-services.json",
-  "adaptiveIcon": {
-    "foregroundImage": "./assets/images/jt-logo.png",
-    "backgroundColor": "#ffffff"
-  },
-  "edgeToEdgeEnabled": true,
-  "package": "com.nikidav23.onspaceapp",
-  "versionCode": 4,
-  "blockedPermissions": [
-    "android.permission.ACTIVITY_RECOGNITION",
-    "android.permission.READ_MEDIA_AUDIO",
-    "android.permission.READ_MEDIA_VIDEO"
-  ]
-},
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/jt-logo.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.nikidav23.onspaceapp",
+      "versionCode": 4,
+      "blockedPermissions": [
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VIDEO"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "job-match-2d0wug3k7-nujus-projects.vercel.app",
+              "pathPrefix": "/perm-vacancy-detail"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
     "web": {
       "bundler": "metro",
       "output": "static",

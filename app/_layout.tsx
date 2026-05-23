@@ -20,7 +20,7 @@ function AuthGuard() {
   const pathname = usePathname();
   const ctx = React.useContext(AppContext);
 
-  const publicPaths = new Set(['/', '/login', '/register-worker', '/register-employer', '/legal']);
+  const publicPaths = new Set(['/', '/login', '/register-worker', '/register-employer', '/legal', '/perm-vacancy-detail']);
 
   useEffect(() => {
     if (!ctx) return;
