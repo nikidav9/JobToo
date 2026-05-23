@@ -176,6 +176,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (cachedPermVac) setPermVacancies(cachedPermVac);
           if (cachedPermApps) setPermApplications(cachedPermApps);
 
+          // Refresh push token on every cold start — FCM token can change after APK reinstall
+          setTimeout(() => { registerForPushNotifications(sessionUser.id).catch(() => {}); }, 2000);
+
           // Refresh from Supabase in background — don't block loading
           setTimeout(() => {
             if (cancelled) return;
