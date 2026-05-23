@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Animated, PanResponder, Dimensions, RefreshControl, Modal, FlatList,
-  TextInput, ActivityIndicator,
+  TextInput, ActivityIndicator, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -1044,7 +1044,7 @@ const SALARY_CHIPS = [
 function WorkerPermMode() {
   const router = useRouter();
   const {
-    currentUser, permVacancies, permApplications,
+    currentUser, users, permVacancies, permApplications,
     permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved,
     refreshPermVacancies, refreshPermApplications, refreshPermSaved,
     showToast,
@@ -1134,6 +1134,17 @@ function WorkerPermMode() {
     { key: 'rejected', label: 'Отказы',       count: rejectedVacancies.length },
   ];
 
+  const shareVacancy = async (v: PermVacancy, displayName: string) => {
+    const url = `https://job-match-2d0wug3k7-nujus-projects.vercel.app/perm-vacancy-detail?vacancyId=${v.id}`;
+    try {
+      await Share.share({
+        title: `${v.title} — ${displayName}`,
+        message: `${v.title}\n${displayName}\n${v.salary.toLocaleString('ru-RU')} ₽/мес\n\n${url}`,
+        url,
+      });
+    } catch {}
+  };
+
   const renderPerm = ({ item: v }: { item: PermVacancy }) => {
     const isApplied = myAppVacIds.has(v.id);
     const isSaved = permSavedIds.includes(v.id);
@@ -1143,8 +1154,17 @@ function WorkerPermMode() {
     const metroLine = v.metroStation
       ? METRO_LINES.find(l => l.stations.includes(v.metroStation!)) ?? null
       : null;
-    const avatarColor = nameColorFromString(v.company);
-    const avatarInitials = getInitials(v.company);
+
+    // Company name: use v.company, fall back to employer first+last name
+    const employer = users.find((u: User) => u.id === v.employerId);
+    const displayCompany = v.company?.trim()
+      ? v.company
+      : employer
+        ? `${employer.firstName} ${employer.lastName}`.trim()
+        : 'Работодатель';
+
+    const avatarColor = nameColorFromString(displayCompany);
+    const avatarInitials = getInitials(displayCompany);
 
     return (
       <TouchableOpacity
@@ -1164,7 +1184,7 @@ function WorkerPermMode() {
             <Text style={pS.companyAvatarTxt}>{avatarInitials}</Text>
           </View>
           <View style={pS.companyMeta}>
-            <Text style={pS.companyName} numberOfLines={1}>{v.company}</Text>
+            <Text style={pS.companyName} numberOfLines={1}>{displayCompany}</Text>
             <View style={pS.verifiedRow}>
               <View style={pS.verifiedBadge}>
                 <Ionicons name="checkmark" size={9} color="#fff" />
@@ -1247,24 +1267,24 @@ function WorkerPermMode() {
             </TouchableOpacity>
             <TouchableOpacity
               style={pS.actionIconBtn}
-              onPress={() => router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId: v.id } })}
+              onPress={() => router.push('/(tabs)/chats')}
               activeOpacity={0.8}
             >
               <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={pS.actionIconBtn}
-              onPress={() => router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId: v.id } })}
+              onPress={(e) => { e.stopPropagation?.(); shareVacancy(v, displayCompany); }}
               activeOpacity={0.8}
             >
-              <Ionicons name="navigate-outline" size={17} color={Colors.textSecondary} />
+              <Ionicons name="share-outline" size={17} color={Colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={pS.actionIconBtn}
               onPress={() => router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId: v.id } })}
               activeOpacity={0.8}
             >
-              <Ionicons name="arrow-forward-outline" size={17} color={Colors.textSecondary} />
+              <Ionicons name="information-circle-outline" size={17} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
         ) : (
