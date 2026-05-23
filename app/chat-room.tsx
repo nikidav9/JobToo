@@ -18,6 +18,9 @@ import { getSupabaseClient } from '@/template';
 
 const POLL_INTERVAL = 8000;
 
+// Module-level message cache — survives navigation but cleared on app restart
+const msgCache = new Map<string, Message[]>();
+
 export default function ChatRoom() {
   const router = useRouter();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
@@ -33,14 +36,15 @@ export default function ChatRoom() {
   const chat = foundChat ?? chatRef.current ?? dbChat;
 
   // Declare state/refs before effects that reference them
-  const [messages, setMessages] = useState<Message[]>(chat?.messages ?? []);
+  const cached = chatId ? (msgCache.get(chatId) ?? chat?.messages ?? []) : (chat?.messages ?? []);
+  const [messages, setMessages] = useState<Message[]>(cached);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [decidingLike, setDecidingLike] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [likeStatus, setLikeStatus] = useState<'pending' | 'approved' | 'rejected' | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
-  const lastCountRef = useRef(messages.length);
+  const lastCountRef = useRef(cached.length);
 
   // If chat is not in context (freshly created, or navigated from push notification),
   // fetch it directly from DB so the chat room is fully functional immediately.
@@ -108,6 +112,7 @@ export default function ChatRoom() {
           dbGetLikeByVacancyWorker(chat.vacancyId, chat.workerId),
         ]);
         if (msgs.length !== lastCountRef.current) {
+          msgCache.set(localChatId, msgs);
           setMessages(msgs);
           const newMsgs = msgs.slice(lastCountRef.current);
           const fromOther = newMsgs.filter(m => m.senderId !== userId && m.senderId !== 'system');
@@ -146,8 +151,10 @@ export default function ChatRoom() {
         const msg: Message = { id: r.id, senderId: r.sender_id, text: r.text, timestamp: r.created_at };
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
-          lastCountRef.current = prev.length + 1;
-          return [...prev, msg];
+          const next = [...prev, msg];
+          msgCache.set(chatId, next);
+          lastCountRef.current = next.length;
+          return next;
         });
         setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
         if (r.sender_id !== userId) {
@@ -255,7 +262,11 @@ export default function ChatRoom() {
     setInput('');
     try {
       const msg = await dbInsertMessage(chat.id, currentUser.id, text);
-      setMessages(prev => [...prev, msg]);
+      setMessages(prev => {
+        const next = [...prev, msg];
+        msgCache.set(chat.id, next);
+        return next;
+      });
       lastCountRef.current += 1;
       const forRole = currentUser.role === 'worker' ? 'employer' : 'worker';
       dbIncrementUnread(chat.id, forRole).catch(() => {});
