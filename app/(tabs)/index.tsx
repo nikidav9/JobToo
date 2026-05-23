@@ -38,6 +38,118 @@ const { width: SW } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 80;
 const VELOCITY_THRESHOLD = 0.3;
 
+// Flat list of all metro stations with their line metadata
+const ALL_STATIONS = METRO_LINES.flatMap(l =>
+  l.stations.map(s => ({ station: s, lineId: l.id, lineColor: l.color, lineName: l.name }))
+).sort((a, b) => a.station.localeCompare(b.station, 'ru'));
+
+function MetroStationPicker({
+  visible,
+  selectedStation,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  selectedStation: string | null;
+  onSelect: (station: string | null) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return ALL_STATIONS;
+    return ALL_STATIONS.filter(s => s.station.toLowerCase().includes(q));
+  }, [query]);
+
+  if (!visible) return null;
+
+  return (
+    <View style={styles.filterOverlay}>
+      <View style={[styles.filterSheet, { maxHeight: '85%' }]}>
+        <View style={styles.filterSheetHeader}>
+          <Text style={styles.filterSheetTitle}>Станция метро</Text>
+          <TouchableOpacity onPress={() => { setQuery(''); onClose(); }}>
+            <Text style={styles.filterClose}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={metroPickerSt.searchRow}>
+          <Text style={metroPickerSt.searchIcon}>🔍</Text>
+          <TextInput
+            style={metroPickerSt.searchInput}
+            placeholder="Введите название станции..."
+            placeholderTextColor={Colors.textMuted}
+            value={query}
+            onChangeText={setQuery}
+            autoFocus
+            clearButtonMode="while-editing"
+            returnKeyType="search"
+          />
+          {query.length > 0 ? (
+            <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={metroPickerSt.searchClear}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {selectedStation ? (
+          <TouchableOpacity
+            style={styles.clearFilterRow}
+            onPress={() => { setQuery(''); onSelect(null); onClose(); }}
+          >
+            <Text style={styles.clearFilterTxt}>✕ Сбросить фильтр</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        <FlatList
+          data={results}
+          keyExtractor={(item, i) => `${item.lineId}-${i}`}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.lineRow, selectedStation === item.station ? styles.lineRowActive : null]}
+              onPress={() => { setQuery(''); onSelect(item.station); onClose(); }}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.lineDot, { backgroundColor: item.lineColor }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.lineName, selectedStation === item.station ? { color: Colors.primary, fontWeight: '700' } : null]}>
+                  {item.station}
+                </Text>
+                <Text style={metroPickerSt.lineSubtitle}>{item.lineName}</Text>
+              </View>
+              {selectedStation === item.station ? <Text style={{ color: Colors.primary }}>✓</Text> : null}
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <View style={metroPickerSt.empty}>
+              <Text style={metroPickerSt.emptyTxt}>Станция не найдена</Text>
+            </View>
+          }
+        />
+      </View>
+    </View>
+  );
+}
+
+const metroPickerSt = StyleSheet.create({
+  searchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginVertical: 10,
+    backgroundColor: Colors.surface, borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: Colors.inputBorder,
+  },
+  searchIcon: { fontSize: 15 },
+  searchInput: { flex: 1, fontSize: 15, color: Colors.textPrimary },
+  searchClear: { fontSize: 14, color: Colors.textMuted, paddingLeft: 4 },
+  lineSubtitle: { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
+  empty: { padding: 24, alignItems: 'center' },
+  emptyTxt: { fontSize: 14, color: Colors.textMuted },
+});
+
 // ─────────────────────────────────────────────────
 // Mode switcher
 // ─────────────────────────────────────────────────
@@ -468,7 +580,7 @@ function WorkerFeed() {
   const [history, setHistory] = useState<Record<string, Vacancy[]>>({});
   const [swiping, setSwiping] = useState(false);
   const [detailVacancy, setDetailVacancy] = useState<Vacancy | null>(null);
-  const [filterLineId, setFilterLineId] = useState<string | null>(null);
+  const [filterStation, setFilterStation] = useState<string | null>(null);
   const [filterPicker, setFilterPicker] = useState(false);
 
   const pan = useRef(new Animated.ValueXY()).current;
@@ -506,13 +618,13 @@ function WorkerFeed() {
         if (pendingLikeIds.current.has(v.id)) return false;
         const liked = likes.find(l => l.vacancyId === v.id && l.workerId === currentUser.id);
         if (liked) return false;
-        if (filterLineId && v.metroLineId !== filterLineId) return false;
+        if (filterStation && v.metroStation !== filterStation) return false;
         return true;
       })
       .sort((a, b) => scoreVacancy(b, currentUser) - scoreVacancy(a, currentUser));
     setCards(filtered);
     if (!swipingRef.current) pan.setValue({ x: 0, y: 0 });
-  }, [selectedDate, vacancies, likes, currentUser, filterLineId]);
+  }, [selectedDate, vacancies, likes, currentUser, filterStation]);
 
   const currentCard = cards[0];
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;
@@ -677,13 +789,15 @@ function WorkerFeed() {
       if (!currentUser.workTypes?.includes(v.workType)) return false;
       const alreadySwiped = likes.find(l => l.vacancyId === v.id && l.workerId === currentUser.id);
       if (alreadySwiped) return false;
-      if (filterLineId && v.metroLineId !== filterLineId) return false;
+      if (filterStation && v.metroStation !== filterStation) return false;
       return true;
     }).length;
   };
 
   const visibleDates = dates;
-  const activeFilterLine = METRO_LINES.find(l => l.id === filterLineId);
+  const activeStationLine = filterStation
+    ? METRO_LINES.find(l => l.stations.includes(filterStation)) ?? null
+    : null;
 
   const getRuDay = (iso: string) => {
     const d = new Date(iso + 'T00:00:00');
@@ -714,12 +828,12 @@ function WorkerFeed() {
             })}
           </ScrollView>
           <TouchableOpacity
-            style={[pS.inlineFilter, filterLineId ? pS.inlineFilterActive : null]}
+            style={[pS.inlineFilter, filterStation ? pS.inlineFilterActive : null]}
             onPress={() => setFilterPicker(true)}
             activeOpacity={0.8}
           >
-            {filterLineId && activeFilterLine ? (
-              <View style={[pS.filterLineDot, { backgroundColor: activeFilterLine.color }]} />
+            {filterStation && activeStationLine ? (
+              <View style={[pS.filterLineDot, { backgroundColor: activeStationLine.color }]} />
             ) : (
               <View style={pS.metroIconWrap}>
                 <Text style={pS.metroIconText}>М</Text>
@@ -879,38 +993,12 @@ function WorkerFeed() {
         )}
       </View>
 
-      {/* Metro filter overlay */}
-      {filterPicker ? (
-        <View style={styles.filterOverlay}>
-          <View style={styles.filterSheet}>
-            <View style={styles.filterSheetHeader}>
-              <Text style={styles.filterSheetTitle}>Фильтр по линии метро</Text>
-              <TouchableOpacity onPress={() => setFilterPicker(false)}>
-                <Text style={styles.filterClose}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            {filterLineId ? (
-              <TouchableOpacity style={styles.clearFilterRow} onPress={() => { setFilterLineId(null); setFilterPicker(false); }}>
-                <Text style={styles.clearFilterTxt}>✕ Сбросить фильтр</Text>
-              </TouchableOpacity>
-            ) : null}
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {METRO_LINES.map((l: any) => (
-                <TouchableOpacity
-                  key={l.id}
-                  style={[styles.lineRow, filterLineId === l.id ? styles.lineRowActive : null]}
-                  onPress={() => { setFilterLineId(l.id); setFilterPicker(false); }}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.lineDot, { backgroundColor: l.color }]} />
-                  <Text style={[styles.lineName, filterLineId === l.id ? { color: Colors.primary, fontWeight: '700' } : null]}>{l.name}</Text>
-                  {filterLineId === l.id ? <Text style={{ color: Colors.primary }}>✓</Text> : null}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      ) : null}
+      <MetroStationPicker
+        visible={filterPicker}
+        selectedStation={filterStation}
+        onSelect={s => setFilterStation(s)}
+        onClose={() => setFilterPicker(false)}
+      />
 
       {/* Detail modal */}
       <VacancyDetailModal
@@ -966,7 +1054,7 @@ function WorkerPermMode() {
   const [tab, setTab] = useState<PermTab>('open');
   const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [filterLineId, setFilterLineId] = useState<string | null>(null);
+  const [filterStation, setFilterStation] = useState<string | null>(null);
   const [filterPicker, setFilterPicker] = useState(false);
   const [minSalary, setMinSalary] = useState(0);
   const [applying, setApplying] = useState<string | null>(null);
@@ -989,7 +1077,7 @@ function WorkerPermMode() {
     return v.title.toLowerCase().includes(q) || v.company.toLowerCase().includes(q);
   };
   const matchesFilters = (v: PermVacancy) => {
-    if (filterLineId && v.metroLineId !== filterLineId) return false;
+    if (filterStation && v.metroStation !== filterStation) return false;
     if (minSalary > 0 && v.salary < minSalary) return false;
     return true;
   };
@@ -1035,7 +1123,9 @@ function WorkerPermMode() {
     rejected: { label: '✕ Отказ',            color: Colors.red,   bg: '#FEE2E2' },
   };
 
-  const activeFilterLine = METRO_LINES.find(l => l.id === filterLineId);
+  const activeStationLine = filterStation
+    ? METRO_LINES.find(l => l.stations.includes(filterStation)) ?? null
+    : null;
 
   const TAB_CONFIG: { key: PermTab; icon: string; label: string; count: number; activeColor: string; activeBg: string }[] = [
     { key: 'open',     icon: '📋', label: 'Открытые',    count: openVacancies.length,     activeColor: '#1D4ED8', activeBg: '#EFF6FF' },
@@ -1142,12 +1232,12 @@ function WorkerPermMode() {
           ) : null}
         </View>
         <TouchableOpacity
-          style={[pS.inlineFilter, filterLineId ? pS.inlineFilterActive : null]}
+          style={[pS.inlineFilter, filterStation ? pS.inlineFilterActive : null]}
           onPress={() => setFilterPicker(true)}
           activeOpacity={0.8}
         >
-          {filterLineId && activeFilterLine ? (
-            <View style={[pS.filterLineDot, { backgroundColor: activeFilterLine.color }]} />
+          {filterStation && activeStationLine ? (
+            <View style={[pS.filterLineDot, { backgroundColor: activeStationLine.color }]} />
           ) : (
             <View style={pS.metroIconWrap}>
               <Text style={pS.metroIconText}>М</Text>
@@ -1226,37 +1316,12 @@ function WorkerPermMode() {
         />
       )}
 
-      {filterPicker ? (
-        <View style={styles.filterOverlay}>
-          <View style={styles.filterSheet}>
-            <View style={styles.filterSheetHeader}>
-              <Text style={styles.filterSheetTitle}>Фильтр по линии метро</Text>
-              <TouchableOpacity onPress={() => setFilterPicker(false)}>
-                <Text style={styles.filterClose}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            {filterLineId ? (
-              <TouchableOpacity style={styles.clearFilterRow} onPress={() => { setFilterLineId(null); setFilterPicker(false); }}>
-                <Text style={styles.clearFilterTxt}>✕ Сбросить фильтр</Text>
-              </TouchableOpacity>
-            ) : null}
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {METRO_LINES.map((l: any) => (
-                <TouchableOpacity
-                  key={l.id}
-                  style={[styles.lineRow, filterLineId === l.id ? styles.lineRowActive : null]}
-                  onPress={() => { setFilterLineId(l.id); setFilterPicker(false); }}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.lineDot, { backgroundColor: l.color }]} />
-                  <Text style={[styles.lineName, filterLineId === l.id ? { color: Colors.primary, fontWeight: '700' } : null]}>{l.name}</Text>
-                  {filterLineId === l.id ? <Text style={{ color: Colors.primary }}>✓</Text> : null}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      ) : null}
+      <MetroStationPicker
+        visible={filterPicker}
+        selectedStation={filterStation}
+        onSelect={s => setFilterStation(s)}
+        onClose={() => setFilterPicker(false)}
+      />
     </View>
   );
 }
