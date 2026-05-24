@@ -698,6 +698,21 @@ export async function dispatch(supabase: SupabaseClient, fn: string, args: any[]
       return data ?? [];
     }
 
+    case 'sendPushNotification': {
+      const [to, title, body, data] = args as [string | string[], string, string, Record<string, unknown>];
+      const tokens = Array.isArray(to) ? to : [to];
+      const messages = tokens.map(token => ({
+        to: token, title, body, sound: 'default',
+        priority: 'high', channelId: data?.channelId ?? 'default', data,
+      }));
+      const res = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(messages.length === 1 ? messages[0] : messages),
+      });
+      return await res.json().catch(() => null);
+    }
+
     default:
       throw new Error(`Unknown function: ${fn}`);
   }
