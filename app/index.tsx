@@ -40,6 +40,8 @@ export default function RootScreen() {
   const progress = useRef(new Animated.Value(0)).current;
   const slowAnim = useRef<Animated.CompositeAnimation | null>(null);
   const finishing = useRef(false);
+  // true if loading was already false when this component mounted (post-logout navigation)
+  const skipSplash = useRef(!loading);
   const [ready, setReady] = useState(false);
   // Always holds latest currentUser — avoids stale closure inside animation callback
   const currentUserRef = useRef(currentUser);
@@ -61,6 +63,17 @@ export default function RootScreen() {
   }, []);
 
   useEffect(() => {
+    // Post-logout: loading was already false when we mounted — skip splash, show screen now
+    if (skipSplash.current && !loading) {
+      SplashScreen.hideAsync().catch(() => {});
+      if (currentUserRef.current) {
+        router.replace('/(tabs)');
+      } else {
+        setReady(true);
+      }
+      return;
+    }
+
     if (loading || finishing.current) return;
     finishing.current = true;
     slowAnim.current?.stop();
