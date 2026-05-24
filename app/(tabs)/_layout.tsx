@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { Platform, View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { StackActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { Colors } from '@/constants/theme';
@@ -56,13 +58,14 @@ export default function TabLayout() {
   const vacancies = app?.vacancies ?? [];
   const isWorker = currentUser?.role === 'worker';
 
-  const router = useRouter();
+  // useNavigation() here gives the ROOT Stack's navigation (TabLayout is a screen in that Stack).
+  // StackActions.replace('index') bypasses URL resolution entirely — directly replaces (tabs)
+  // with app/index.tsx by route name, so no ambiguity with (tabs)/index.tsx URL collision.
+  const navigation = useNavigation();
 
-  // When currentUser is cleared (logout/delete), navigate to welcome screen.
-  // useEffect fires after React commits state, so currentUser is guaranteed null here.
   useEffect(() => {
     if (!app?.loading && !currentUser) {
-      router.replace('/');
+      navigation.dispatch(StackActions.replace('index'));
     }
   }, [app?.loading, currentUser]);
 
