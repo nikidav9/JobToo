@@ -41,6 +41,9 @@ export default function RootScreen() {
   const slowAnim = useRef<Animated.CompositeAnimation | null>(null);
   const finishing = useRef(false);
   const [ready, setReady] = useState(false);
+  // Always holds latest currentUser — avoids stale closure inside animation callback
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
 
   useEffect(() => {
     Asset.loadAsync([
@@ -62,7 +65,8 @@ export default function RootScreen() {
     finishing.current = true;
     slowAnim.current?.stop();
     Animated.timing(progress, { toValue: TRACK_W, duration: 220, useNativeDriver: false }).start(() => {
-      if (currentUser) {
+      // Read from ref so we get the committed value, not a stale closure
+      if (currentUserRef.current) {
         // Splash hides in /(tabs)/_layout.tsx once tabs are mounted
         router.replace('/(tabs)');
       } else {

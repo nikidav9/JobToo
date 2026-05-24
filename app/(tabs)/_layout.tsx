@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Platform, View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -56,10 +56,15 @@ export default function TabLayout() {
   const vacancies = app?.vacancies ?? [];
   const isWorker = currentUser?.role === 'worker';
 
-  // Redirect to welcome screen when logged out (Expo Router v5 pattern)
-  if (!app?.loading && !currentUser) {
-    return <Redirect href="/" />;
-  }
+  const router = useRouter();
+
+  // When currentUser is cleared (logout/delete), navigate to welcome screen.
+  // useEffect fires after React commits state, so currentUser is guaranteed null here.
+  useEffect(() => {
+    if (!app?.loading && !currentUser) {
+      router.replace('/');
+    }
+  }, [app?.loading, currentUser]);
 
   const matchBadge = (() => {
     if (!currentUser) return 0;
