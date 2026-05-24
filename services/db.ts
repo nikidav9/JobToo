@@ -15,7 +15,7 @@ const API_BASE = IS_NATIVE
   : '';
 
 async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
-  const res = await fetch(`${API_BASE}/api/db`, {
+  const res = await fetch(`${API_BASE}/api/db.php`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ fn, args }),
