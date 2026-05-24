@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import { Platform, View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -55,6 +55,11 @@ export default function TabLayout() {
   const likes = app?.likes ?? [];
   const vacancies = app?.vacancies ?? [];
   const isWorker = currentUser?.role === 'worker';
+
+  // Redirect to welcome screen when logged out (Expo Router v5 pattern)
+  if (!app?.loading && !currentUser) {
+    return <Redirect href="/" />;
+  }
 
   const matchBadge = (() => {
     if (!currentUser) return 0;

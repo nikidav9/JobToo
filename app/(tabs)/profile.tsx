@@ -429,9 +429,8 @@ export default function ProfileScreen() {
     } catch (error) {
       console.warn('[Profile] logout failed', error);
       showToast('Ошибка при выходе, попробуйте снова', 'error');
-    } finally {
-      router.replace('/');
     }
+    // Navigation is handled by <Redirect href="/" /> in (tabs)/_layout.tsx
   };
 
   const handleDeleteAccount = async () => {
@@ -448,8 +447,8 @@ export default function ProfileScreen() {
       showToast('Ошибка при удалении, попробуйте снова', 'error');
     } finally {
       setDeletingAccount(false);
-      router.replace('/');
     }
+    // Navigation is handled by <Redirect href="/" /> in (tabs)/_layout.tsx
   };
 
   return (
