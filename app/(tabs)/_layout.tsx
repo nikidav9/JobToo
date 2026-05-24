@@ -116,6 +116,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName="feed"
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
@@ -135,7 +136,7 @@ export default function TabLayout() {
     >
       {/* Home: search (worker) or vacancies (employer) */}
       <Tabs.Screen
-        name="index"
+        name="feed"
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon
@@ -147,6 +148,9 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* Hide the old index redirect from the tab bar */}
+      <Tabs.Screen name="index" options={{ href: null }} />
 
       {/* Saved — hidden from tab bar */}
       <Tabs.Screen name="saved" options={{ href: null }} />
