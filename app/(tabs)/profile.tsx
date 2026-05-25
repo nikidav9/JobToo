@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { getInitials, nameColorFromString } from '@/services/storage';
@@ -25,6 +26,7 @@ import { WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
 import { METRO_LINES } from '@/constants/metro';
 
 type EditSection = 'personal' | 'metro' | 'worktypes' | 'company' | 'bio' | null;
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 function StarRating({ rating, count, onPress }: { rating: number; count: number; onPress?: () => void }) {
   const content = (
@@ -49,7 +51,7 @@ function StarRating({ rating, count, onPress }: { rating: number; count: number;
 }
 
 const rS = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 2, marginTop: 6, justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 2, marginTop: 2 },
   star: { fontSize: 18 },
   starFilled: { color: '#FBBF24' },
   starEmpty: { color: '#E5E7EB' },
@@ -224,7 +226,7 @@ const rmS = StyleSheet.create({
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { currentUser, logout, users, showToast, updateUser } = useApp();
+  const { currentUser, logout, users, showToast, updateUser, unreadCount } = useApp();
   const [editSection, setEditSection] = useState<EditSection>(null);
   const [showRatings, setShowRatings] = useState(false);
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
@@ -454,10 +456,30 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.pageTitle}>Профиль</Text>
 
-        <View style={styles.topCard}>
-          {/* Avatar — tappable to change photo */}
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.logo}>
+            <Text style={styles.logoBlack}>Job</Text>
+            <Text style={styles.logoOrange}>Too</Text>
+          </Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/chats')} style={styles.headerBtn}>
+              <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
+              {unreadCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerBtn}>
+              <Ionicons name="settings-outline" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* User card — horizontal layout */}
+        <View style={styles.userCard}>
           <TouchableOpacity onPress={pickAndUploadPhoto} activeOpacity={0.8} style={styles.avatarWrapper}>
             {currentUser.avatarUrl ? (
               <Image
@@ -477,76 +499,119 @@ export default function ProfileScreen() {
               </View>
             ) : (
               <View style={styles.avatarCameraBtn}>
-                <Text style={styles.avatarCameraIcon}>📷</Text>
+                <Ionicons name="camera" size={12} color="#fff" />
               </View>
             )}
-            {/* Hint under avatar for employers */}
           </TouchableOpacity>
 
-          <Text style={styles.fullName}>{currentUser.firstName} {currentUser.lastName}</Text>
-          {currentUser.role === 'employer' ? (
-            <Text style={styles.avatarHint}>Фото компании — видно работникам в карточке вакансии</Text>
-          ) : null}
-          <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>{currentUser.role === 'worker' ? 'Работник' : 'Работодатель'}</Text>
+          <View style={styles.userInfo}>
+            <Text style={styles.fullName}>{currentUser.firstName} {currentUser.lastName}</Text>
+            <View style={styles.roleBadge}>
+              <Text style={styles.roleText}>{currentUser.role === 'worker' ? 'Работник' : 'Работодатель'}</Text>
+            </View>
+            <Text style={styles.phone}>{currentUser.phone}</Text>
+            <StarRating
+              rating={currentUser.avgRating ?? 0}
+              count={currentUser.ratingCount ?? 0}
+              onPress={() => setShowRatings(true)}
+            />
           </View>
-          <Text style={styles.phone}>{currentUser.phone}</Text>
-          <StarRating
-            rating={currentUser.avgRating ?? 0}
-            count={currentUser.ratingCount ?? 0}
-            onPress={() => setShowRatings(true)}
-          />
+
+          <TouchableOpacity onPress={() => openEdit('personal')} style={styles.userCardArrowBtn}>
+            <Text style={styles.userCardArrow}>›</Text>
+          </TouchableOpacity>
         </View>
 
         {currentUser.role === 'worker' ? (
           <>
-            <SectionCard icon="👤" title="Личные данные" onEdit={() => openEdit('personal')}
+            <SectionCard
+              iconName="briefcase"
+              iconBg={Colors.primary}
+              title="Специализация"
+              onEdit={() => openEdit('worktypes')}
+              rows={[]}
+              chips={(currentUser.workTypes ?? []).map(t => `${WORK_TYPE_META[t]?.emoji ?? ''} ${WORK_TYPE_META[t]?.label ?? t}`)}
+            />
+            <SectionCard
+              iconName="document-text"
+              iconBg={Colors.primary}
+              title="О себе"
+              onEdit={() => openEdit('bio')}
+              rows={currentUser.bio ? [{ label: '', value: currentUser.bio }] : []}
+              placeholder="Расскажите о себе — опыт, навыки, предпочтения"
+            />
+            <SectionCard
+              iconName="person"
+              iconBg={Colors.primary}
+              title="Личные данные"
+              onEdit={() => openEdit('personal')}
               rows={[
                 { label: 'Телефон', value: currentUser.phone },
                 { label: 'Фамилия', value: currentUser.lastName },
                 { label: 'Имя', value: currentUser.firstName },
               ]}
             />
-            <SectionCard icon="🚇" title="Метро" onEdit={() => openEdit('metro')}
+            <SectionCard
+              iconName="train"
+              iconBg="#1C1C1E"
+              title="Метро"
+              onEdit={() => openEdit('metro')}
               rows={[
                 { label: 'Линия', value: line?.name ?? '—', lineColor: line?.color },
                 { label: 'Станция', value: currentUser.metroStation ?? '—' },
               ]}
             />
-            <SectionCard icon="💼" title="Специализация" onEdit={() => openEdit('worktypes')} rows={[]} chips={(currentUser.workTypes ?? []).map(t => `${WORK_TYPE_META[t]?.emoji ?? ''} ${WORK_TYPE_META[t]?.label ?? t}`)} />
-            <SectionCard icon="📝" title="О себе" onEdit={() => openEdit('bio')}
-              rows={currentUser.bio ? [{ label: '', value: currentUser.bio }] : []}
-              placeholder="Расскажите о себе — опыт, навыки, предпочтения"
-            />
           </>
         ) : (
           <>
-            <SectionCard icon="👤" title="Личные данные" onEdit={() => openEdit('personal')}
+            <SectionCard
+              iconName="business"
+              iconBg={Colors.primary}
+              title="Компания"
+              onEdit={() => openEdit('company')}
+              rows={[{ label: 'Название', value: currentUser.company ?? '—' }]}
+            />
+            <SectionCard
+              iconName="document-text"
+              iconBg={Colors.primary}
+              title="О компании"
+              onEdit={() => openEdit('bio')}
+              rows={currentUser.bio ? [{ label: '', value: currentUser.bio }] : []}
+              placeholder="Расскажите о компании, условиях, коллективе"
+            />
+            <SectionCard
+              iconName="person"
+              iconBg={Colors.primary}
+              title="Личные данные"
+              onEdit={() => openEdit('personal')}
               rows={[
                 { label: 'Телефон', value: currentUser.phone },
                 { label: 'Фамилия', value: currentUser.lastName },
                 { label: 'Имя', value: currentUser.firstName },
               ]}
-            />
-            <SectionCard icon="🏢" title="Компания" onEdit={() => openEdit('company')} rows={[{ label: 'Название', value: currentUser.company ?? '—' }]} />
-            <SectionCard icon="📝" title="О компании" onEdit={() => openEdit('bio')}
-              rows={currentUser.bio ? [{ label: '', value: currentUser.bio }] : []}
-              placeholder="Расскажите о компании, условиях, коллективе"
             />
           </>
         )}
 
         {/* Documents section */}
         <View style={styles.docsCard}>
-          <Text style={styles.docsSectionTitle}>📄 Документы</Text>
+          <View style={styles.docsHeader}>
+            <View style={[sS.iconSquare, { backgroundColor: '#6B7280' }]}>
+              <Ionicons name="document-text" size={18} color="#fff" />
+            </View>
+            <Text style={styles.docsSectionTitle}>Документы</Text>
+            <TouchableOpacity onPress={() => setShowConfirmLogout(true)}>
+              <Text style={styles.logoutLink}>Выйти из аккаунта</Text>
+            </TouchableOpacity>
+          </View>
           {[
             { label: 'Пользовательское соглашение', doc: 'terms' },
             { label: 'Политика конфиденциальности', doc: 'privacy' },
             { label: 'Согласие на обработку данных', doc: 'consent' },
-          ].map((item, i, arr) => (
+          ].map((item) => (
             <TouchableOpacity
               key={item.doc}
-              style={[styles.docRow, i < arr.length - 1 && styles.docRowBorder]}
+              style={styles.docRow}
               onPress={() => router.push({ pathname: '/legal', params: { doc: item.doc } })}
               activeOpacity={0.7}
             >
@@ -556,10 +621,7 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={() => setShowConfirmLogout(true)}>
-          <Text style={styles.logoutText}>Выйти из аккаунта</Text>
-        </TouchableOpacity>
-
+        {/* Delete account button */}
         <TouchableOpacity
           style={styles.deleteAccountBtn}
           onPress={() => setShowConfirmDelete(true)}
@@ -570,7 +632,6 @@ export default function ProfileScreen() {
           </Text>
         </TouchableOpacity>
 
-        <View style={{ height: 20 }} />
       </ScrollView>
 
       {/* Photo source picker */}
@@ -725,8 +786,11 @@ export default function ProfileScreen() {
   );
 }
 
-function SectionCard({ icon, title, onEdit, rows, chips, placeholder }: {
-  icon: string; title: string; onEdit: () => void;
+function SectionCard({ iconName, iconBg, title, onEdit, rows, chips, placeholder }: {
+  iconName: IoniconName;
+  iconBg?: string;
+  title: string;
+  onEdit: () => void;
   rows: { label: string; value: string; lineColor?: string }[];
   chips?: string[];
   placeholder?: string;
@@ -734,7 +798,10 @@ function SectionCard({ icon, title, onEdit, rows, chips, placeholder }: {
   return (
     <View style={sS.card}>
       <View style={sS.header}>
-        <Text style={sS.title}>{icon} {title}</Text>
+        <View style={[sS.iconSquare, { backgroundColor: iconBg ?? Colors.primary }]}>
+          <Ionicons name={iconName} size={18} color="#fff" />
+        </View>
+        <Text style={sS.title}>{title}</Text>
         <TouchableOpacity onPress={onEdit}><Text style={sS.editLink}>Изменить</Text></TouchableOpacity>
       </View>
       {rows.map((r, i) => (
@@ -744,15 +811,14 @@ function SectionCard({ icon, title, onEdit, rows, chips, placeholder }: {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {r.lineColor ? <View style={[sS.dot, { backgroundColor: r.lineColor }]} /> : null}
               <Text style={sS.value}>{r.value}</Text>
+              <Text style={sS.rowArrow}>›</Text>
             </View>
           </View>
         ) : (
           <Text key={i} style={sS.bioText}>{r.value}</Text>
         )
       ))}
-      {rows.length === 0 && placeholder ? (
-        <Text style={sS.placeholder}>{placeholder}</Text>
-      ) : null}
+      {rows.length === 0 && placeholder ? <Text style={sS.placeholder}>{placeholder}</Text> : null}
       {chips && chips.length > 0 ? (
         <View style={sS.chipsRow}>
           {chips.map((c, i) => <View key={i} style={sS.chip}><Text style={sS.chipText}>{c}</Text></View>)}
@@ -763,15 +829,17 @@ function SectionCard({ icon, title, onEdit, rows, chips, placeholder }: {
 }
 
 const sS = StyleSheet.create({
-  card: { backgroundColor: Colors.bg, borderRadius: Radius.lg, padding: 16, ...Shadow.card, marginBottom: 12 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  title: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  card: { backgroundColor: Colors.bg, borderRadius: 16, padding: 16, ...Shadow.card },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  iconSquare: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  title: { flex: 1, fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
   editLink: { fontSize: 13, fontWeight: '600', color: Colors.primary },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.divider },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.divider },
   label: { fontSize: 13, color: Colors.textMuted },
   value: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  rowArrow: { fontSize: 16, color: Colors.textMuted, marginLeft: 2 },
   dot: { width: 10, height: 10, borderRadius: 5 },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   chip: { backgroundColor: Colors.primaryLight, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 6 },
   chipText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
   bioText: { fontSize: 14, color: Colors.textPrimary, lineHeight: 20, paddingTop: 8 },
@@ -779,42 +847,44 @@ const sS = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.outerBg ?? Colors.bg },
+  safe: { flex: 1, backgroundColor: Colors.outerBg ?? '#F5F7FA' },
   scroll: { padding: 16, paddingBottom: 100, gap: 12 },
-  pageTitle: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary, marginBottom: 4 },
-  topCard: { backgroundColor: Colors.bg, borderRadius: Radius.xl, padding: 24, alignItems: 'center', ...Shadow.card },
-  avatarWrapper: { position: 'relative', marginBottom: 0 },
-  bigAvatarImg: { width: 88, height: 88, borderRadius: 44 },
-  bigAvatar: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
-  bigAvatarText: { color: '#fff', fontSize: 30, fontWeight: '800' },
-  avatarOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    borderRadius: 44, backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarCameraBtn: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: Colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: Colors.bg,
-  },
-  avatarCameraIcon: { fontSize: 13 },
-  fullName: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary, marginTop: 12 },
-  roleBadge: { backgroundColor: Colors.primary, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 4, marginTop: 8 },
-  roleText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  phone: { fontSize: 14, color: Colors.textMuted, marginTop: 6 },
-  avatarHint: { fontSize: 11, color: Colors.textMuted, marginTop: 4, textAlign: 'center', maxWidth: 220 },
-  logoutBtn: { alignItems: 'center', paddingVertical: 14, marginTop: 4 },
-  logoutText: { color: Colors.textMuted, fontSize: 14, fontWeight: '600' },
-  deleteAccountBtn: { alignItems: 'center', paddingVertical: 10, marginBottom: 4 },
-  deleteAccountText: { color: Colors.red, fontSize: 13, fontWeight: '500' },
-  docsCard: { backgroundColor: Colors.bg, borderRadius: 16, ...Shadow.card, overflow: 'hidden', marginBottom: 4 },
-  docsSectionTitle: { fontSize: 13, fontWeight: '700', color: Colors.textMuted, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 },
-  docRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
-  docRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.divider },
+  // Header
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, marginBottom: 8 },
+  logo: { fontSize: 26, fontWeight: '800' },
+  logoBlack: { color: '#111111' },
+  logoOrange: { color: Colors.primary },
+  headerActions: { flexDirection: 'row', gap: 8 },
+  headerBtn: { position: 'relative', padding: 6 },
+  notifBadge: { position: 'absolute', top: 2, right: 2, backgroundColor: Colors.primary, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  notifBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  // User card
+  userCard: { backgroundColor: Colors.bg, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, ...Shadow.card },
+  avatarWrapper: { position: 'relative' },
+  bigAvatarImg: { width: 72, height: 72, borderRadius: 36 },
+  bigAvatar: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  bigAvatarText: { color: '#fff', fontSize: 26, fontWeight: '800' },
+  avatarOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 36, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
+  avatarCameraBtn: { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Colors.bg },
+  userInfo: { flex: 1, gap: 3 },
+  fullName: { fontSize: 17, fontWeight: '800', color: Colors.textPrimary },
+  roleBadge: { backgroundColor: Colors.primary, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 3, alignSelf: 'flex-start', marginTop: 2 },
+  roleText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  phone: { fontSize: 13, color: Colors.textMuted },
+  userCardArrowBtn: { padding: 8 },
+  userCardArrow: { fontSize: 22, color: Colors.textMuted },
+  // Docs card
+  docsCard: { backgroundColor: Colors.bg, borderRadius: 16, ...Shadow.card, overflow: 'hidden' },
+  docsHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, paddingBottom: 12 },
+  docsSectionTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
+  logoutLink: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
+  docRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: 1, borderTopColor: Colors.divider },
   docRowLabel: { fontSize: 14, color: Colors.textPrimary, fontWeight: '500' },
   docRowArrow: { fontSize: 20, color: Colors.textMuted },
+  // Delete account
+  deleteAccountBtn: { backgroundColor: '#FFF1F0', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
+  deleteAccountText: { color: '#EF4444', fontSize: 15, fontWeight: '700' },
+  // Modals
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: Colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, gap: 12 },
   handle: { width: 36, height: 4, backgroundColor: Colors.inputBorder, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
