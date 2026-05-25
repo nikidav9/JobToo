@@ -236,6 +236,12 @@ export default function ProfileScreen() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [showPhotoSource, setShowPhotoSource] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [curPassword, setCurPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const [editPhone, setEditPhone] = useState('');
   const [editLast, setEditLast] = useState('');
@@ -787,6 +793,99 @@ export default function ProfileScreen() {
           </View>
         </View>
       ) : null}
+
+      {/* Notifications modal */}
+      <Modal visible={showNotifications} transparent animationType="slide" onRequestClose={() => setShowNotifications(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowNotifications(false)}>
+          <View style={styles.modalSheet} onStartShouldSetResponder={() => true}>
+            <View style={styles.handle} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={styles.modalTitle}>Уведомления</Text>
+              <TouchableOpacity onPress={() => setShowNotifications(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={22} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ alignItems: 'center', paddingVertical: 48, gap: 12 }}>
+              <Ionicons name="notifications-outline" size={56} color={Colors.textMuted} />
+              <Text style={{ fontSize: 17, fontWeight: '700', color: Colors.textPrimary }}>Уведомлений пока нет</Text>
+              <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: 'center' }}>
+                Здесь будут появляться уведомления и новости от приложения
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Change password modal */}
+      <Modal visible={showSettings} transparent animationType="slide" onRequestClose={() => setShowSettings(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowSettings(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.handle} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={styles.modalTitle}>Изменить пароль</Text>
+              <TouchableOpacity onPress={() => setShowSettings(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={22} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ gap: 12 }}>
+              <AppInput
+                label="Текущий пароль"
+                value={curPassword}
+                onChangeText={setCurPassword}
+                secureTextEntry
+                placeholder="Введите текущий пароль"
+              />
+              <AppInput
+                label="Новый пароль"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                placeholder="Минимум 6 символов"
+              />
+              <AppInput
+                label="Повторите новый пароль"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                placeholder="Повторите новый пароль"
+              />
+            </View>
+            <View style={{ marginTop: 8, gap: 10 }}>
+              <PrimaryButton
+                label={savingPassword ? 'Сохранение...' : 'Сохранить пароль'}
+                disabled={savingPassword}
+                onPress={async () => {
+                  if (!curPassword || !newPassword || !confirmPassword) {
+                    showToast('Заполните все поля', 'error'); return;
+                  }
+                  if (curPassword !== currentUser.password) {
+                    showToast('Неверный текущий пароль', 'error'); return;
+                  }
+                  if (newPassword.length < 6) {
+                    showToast('Пароль должен быть не менее 6 символов', 'error'); return;
+                  }
+                  if (newPassword !== confirmPassword) {
+                    showToast('Пароли не совпадают', 'error'); return;
+                  }
+                  setSavingPassword(true);
+                  try {
+                    await updateUser({ ...currentUser, password: newPassword });
+                    setCurPassword(''); setNewPassword(''); setConfirmPassword('');
+                    setShowSettings(false);
+                    showToast('Пароль изменён', 'success');
+                  } catch {
+                    showToast('Ошибка при сохранении', 'error');
+                  } finally {
+                    setSavingPassword(false);
+                  }
+                }}
+              />
+              <PrimaryButton label="Отмена" onPress={() => setShowSettings(false)} secondary />
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
