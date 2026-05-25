@@ -1,9 +1,9 @@
 interface Props {
   title: string
-  intervalSec: number
-  lastUpdated: string
-  pulse: boolean
-  onRefresh: () => void
+  intervalSec?: number
+  lastUpdated?: string
+  pulse?: boolean
+  onRefresh?: () => void
 }
 
 export default function PageHeader({ title, intervalSec, lastUpdated, pulse, onRefresh }: Props) {

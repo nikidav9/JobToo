@@ -4,14 +4,16 @@ import { usePathname } from 'next/navigation'
 import { clearAuth } from './AuthGuard'
 
 const NAV = [
-  { href: '/',           icon: IconGrid,   label: 'Обзор' },
-  { href: '/users',      icon: IconUsers,  label: 'Пользователи' },
-  { href: '/vacancies',  icon: IconJobs,   label: 'Вакансии' },
-  { href: '/matching',   icon: IconMatch,  label: 'Совпадения' },
-  { href: '/engagement', icon: IconPulse,  label: 'Активность' },
-  { href: '/quality',    icon: IconStar,   label: 'Качество' },
-  { href: '/chats',      icon: IconChat,   label: 'Переписки' },
-  { href: '/reviews',    icon: IconReview, label: 'Отзывы' },
+  { href: '/',            icon: IconGrid,   label: 'Обзор' },
+  { href: '/users',       icon: IconUsers,  label: 'Пользователи' },
+  { href: '/vacancies',   icon: IconJobs,   label: 'Вакансии' },
+  { href: '/matching',    icon: IconMatch,  label: 'Совпадения' },
+  { href: '/engagement',  icon: IconPulse,  label: 'Активность' },
+  { href: '/quality',     icon: IconStar,   label: 'Качество' },
+  { href: '/chats',       icon: IconChat,   label: 'Переписки' },
+  { href: '/reviews',     icon: IconReview, label: 'Отзывы' },
+  { href: '/moderation',  icon: IconShield, label: 'Модерация' },
+  { href: '/broadcast',   icon: IconBell,   label: 'Рассылка' },
 ]
 
 export default function Sidebar() {
@@ -152,4 +154,10 @@ function IconChat({ style }: { style?: React.CSSProperties }) {
 }
 function IconReview({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M8 2.5l1.2 2.4 2.7.4-2 1.9.5 2.7L8 8.6 5.6 9.9l.5-2.7-2-1.9 2.7-.4L8 2.5z"/><path d="M3 12.5h10M3 14.5h6"/></svg>
+}
+function IconShield({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M8 1.5L2.5 4v4c0 3 2.5 5.5 5.5 6 3-0.5 5.5-3 5.5-6V4L8 1.5z"/></svg>
+}
+function IconBell({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 3 1 4 1 4H2.5s1-1 1-4A4.5 4.5 0 0 1 8 1.5z"/><path d="M6.5 13.5a1.5 1.5 0 0 0 3 0"/></svg>
 }
