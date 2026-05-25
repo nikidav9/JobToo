@@ -632,6 +632,11 @@ export default function ProfileScreen() {
           </Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.logoutBtn} onPress={() => setShowConfirmLogout(true)}>
+          <Text style={styles.logoutBtnText}>Выйти из аккаунта</Text>
+        </TouchableOpacity>
+
+        <View style={{ height: 8 }} />
       </ScrollView>
 
       {/* Photo source picker */}
@@ -884,6 +889,8 @@ const styles = StyleSheet.create({
   // Delete account
   deleteAccountBtn: { backgroundColor: '#FFF1F0', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
   deleteAccountText: { color: '#EF4444', fontSize: 15, fontWeight: '700' },
+  logoutBtn: { alignItems: 'center', paddingVertical: 14 },
+  logoutBtnText: { color: Colors.textMuted, fontSize: 14, fontWeight: '600' },
   // Modals
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: Colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, gap: 12 },
