@@ -4,16 +4,18 @@ import { usePathname } from 'next/navigation'
 import { clearAuth } from './AuthGuard'
 
 const NAV = [
-  { href: '/',            icon: IconGrid,   label: 'Обзор' },
-  { href: '/users',       icon: IconUsers,  label: 'Пользователи' },
-  { href: '/vacancies',   icon: IconJobs,   label: 'Вакансии' },
-  { href: '/matching',    icon: IconMatch,  label: 'Совпадения' },
-  { href: '/engagement',  icon: IconPulse,  label: 'Активность' },
-  { href: '/quality',     icon: IconStar,   label: 'Качество' },
-  { href: '/chats',       icon: IconChat,   label: 'Переписки' },
-  { href: '/reviews',     icon: IconReview, label: 'Отзывы' },
-  { href: '/moderation',  icon: IconShield, label: 'Модерация' },
-  { href: '/broadcast',   icon: IconBell,   label: 'Рассылка' },
+  { href: '/',            icon: IconGrid,     label: 'Обзор' },
+  { href: '/users',       icon: IconUsers,    label: 'Пользователи' },
+  { href: '/vacancies',   icon: IconJobs,     label: 'Вакансии' },
+  { href: '/matching',    icon: IconMatch,    label: 'Совпадения' },
+  { href: '/engagement',  icon: IconPulse,    label: 'Активность' },
+  { href: '/quality',     icon: IconStar,     label: 'Качество' },
+  { href: '/chats',       icon: IconChat,     label: 'Переписки' },
+  { href: '/reviews',     icon: IconReview,   label: 'Отзывы' },
+  { href: '/moderation',  icon: IconShield,   label: 'Модерация' },
+  { href: '/tickets',     icon: IconTicket,   label: 'Тикеты' },
+  { href: '/broadcast',   icon: IconBell,     label: 'Рассылка' },
+  { href: '/activity',    icon: IconActivity, label: 'Лог действий' },
 ]
 
 export default function Sidebar() {
@@ -160,4 +162,10 @@ function IconShield({ style }: { style?: React.CSSProperties }) {
 }
 function IconBell({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 3 1 4 1 4H2.5s1-1 1-4A4.5 4.5 0 0 1 8 1.5z"/><path d="M6.5 13.5a1.5 1.5 0 0 0 3 0"/></svg>
+}
+function IconTicket({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M1 5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v2a1.5 1.5 0 0 0 0 3v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-2a1.5 1.5 0 0 0 0-3V5z"/></svg>
+}
+function IconActivity({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M2 8h2.5l1-3 2 7 1.5-5H14"/><circle cx="2" cy="8" r=".5" fill="currentColor"/></svg>
 }

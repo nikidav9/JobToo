@@ -5,6 +5,8 @@ import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
+import { updateTempVacancy, updatePermVacancy, deleteVacancy, deletePermVacancy, setVacancyStatus, setPermVacancyStatus } from '@/lib/admin-actions'
+import { downloadCSV } from '@/lib/csv-export'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -19,6 +21,46 @@ export default function VacanciesPage() {
     tables: ['jm_vacancies', 'jm_perm_vacancies', 'jm_perm_applications'],
     intervalSec: 30,
   })
+
+  function exportTempCSV() {
+    if (!d) return
+    const rows = d.tempVacancyCards.map((c: any) => ({
+      Название: c.title,
+      Компания: c.company,
+      Статус: c.status,
+      Срочно: c.isUrgent ? 'Да' : 'Нет',
+      Зарплата: c.salary || '',
+      Дата: c.shiftDate || '',
+      Начало: c.timeStart || '',
+      Конец: c.timeEnd || '',
+      Адрес: c.address || '',
+      Метро: c.metro || '',
+      'Нужно работников': c.workersNeeded || '',
+      'Найдено работников': c.workersFound || 0,
+      'Откликов': c.apps.total,
+      'Совпадений': c.apps.matched,
+      Опубликовано: c.createdAt || '',
+    }))
+    downloadCSV(rows, `temp_vacancies_${new Date().toISOString().slice(0, 10)}.csv`)
+  }
+
+  function exportPermCSV() {
+    if (!d) return
+    const rows = d.permVacancyCards.map((c: any) => ({
+      Название: c.title,
+      Компания: c.company,
+      Статус: c.status,
+      Зарплата: c.salary || '',
+      Метро: c.metro || '',
+      График: c.schedule || '',
+      Откликов: c.apps.total,
+      Ожидает: c.apps.pending,
+      Принято: c.apps.approved,
+      Отклонено: c.apps.rejected,
+      Опубликовано: c.createdAt || '',
+    }))
+    downloadCSV(rows, `perm_vacancies_${new Date().toISOString().slice(0, 10)}.csv`)
+  }
 
   if (loading || !d) return <Loader />
 
@@ -116,9 +158,9 @@ export default function VacanciesPage() {
           </ChartCard>
         </div>
 
-        <TempVacancyCards cards={d.tempVacancyCards} />
+        <TempVacancyCards cards={d.tempVacancyCards} onExport={exportTempCSV} onRefresh={refresh} />
 
-        <PermVacancyCards cards={d.permVacancyCards} />
+        <PermVacancyCards cards={d.permVacancyCards} onExport={exportPermCSV} onRefresh={refresh} />
 
         <div className="g-2">
           <ChartCard title="Зарплатные диапазоны" sub="Постоянные вакансии">
@@ -189,26 +231,65 @@ type TempCardData = {
   applicants: AppInfo[]
 }
 
-function TempVacancyCards({ cards }: { cards: TempCardData[] }) {
+function TempVacancyCards({ cards, onExport, onRefresh }: { cards: TempCardData[]; onExport: () => void; onRefresh: () => void }) {
   if (!cards || cards.length === 0) return null
   return (
     <div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 12, letterSpacing: '0.01em' }}>
-        Временные вакансии
-        <span style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 400, color: 'var(--ink-3)' }}>
-          {cards.length} всего · сортировка по откликам
-        </span>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', flex: 1 }}>
+          Временные вакансии
+          <span style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 400, color: 'var(--ink-3)' }}>
+            {cards.length} всего · сортировка по откликам
+          </span>
+        </div>
+        <button onClick={onExport} style={{ height: 30, padding: '0 12px', borderRadius: 7, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink-2)', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>
+          CSV
+        </button>
       </div>
       <div className="perm-vac-grid">
-        {cards.map(c => <TempCard key={c.id} c={c} />)}
+        {cards.map(c => <TempCard key={c.id} c={c} onRefresh={onRefresh} />)}
       </div>
     </div>
   )
 }
 
-function TempCard({ c }: { c: TempCardData }) {
+function TempCard({ c, onRefresh }: { c: TempCardData; onRefresh: () => void }) {
   const [open, setOpen] = useState(false)
-  const isOpen = c.status === 'open'
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editFields, setEditFields] = useState({
+    status: c.status as 'open' | 'closed',
+    is_urgent: c.isUrgent,
+    address: c.address ?? '',
+    metro_station: c.metro ?? '',
+    date: c.shiftDate ?? '',
+    time_start: c.timeStart ?? '',
+    time_end: c.timeEnd ?? '',
+    salary: c.salary ? c.salary.replace(/[^\d]/g, '') : '',
+    workers_needed: c.workersNeeded ? String(c.workersNeeded) : '',
+  })
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await updateTempVacancy(c.id, {
+        status: editFields.status,
+        is_urgent: editFields.is_urgent,
+        address: editFields.address || undefined,
+        metro_station: editFields.metro_station || undefined,
+        date: editFields.date || undefined,
+        time_start: editFields.time_start || undefined,
+        time_end: editFields.time_end || undefined,
+        salary: editFields.salary ? Number(editFields.salary) : null,
+        workers_needed: editFields.workers_needed ? Number(editFields.workers_needed) : null,
+      })
+      setEditing(false)
+      onRefresh()
+    } catch { } finally { setSaving(false) }
+  }
+
+  const isOpen = editing ? editFields.status === 'open' : c.status === 'open'
   const hasApps = c.apps.total > 0
   const matchedPct = hasApps ? Math.round(c.apps.matched / c.apps.total * 100) : 0
 
@@ -230,19 +311,73 @@ function TempCard({ c }: { c: TempCardData }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.3, wordBreak: 'break-word' }}>
             {c.title}
-            {c.isUrgent && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: PALETTE.red, background: PALETTE.red + '15', padding: '1px 5px', borderRadius: 4 }}>СРОЧНО</span>}
+            {(editing ? editFields.is_urgent : c.isUrgent) && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: PALETTE.red, background: PALETTE.red + '15', padding: '1px 5px', borderRadius: 4 }}>СРОЧНО</span>}
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{c.company}</div>
         </div>
-        <span style={{
-          flexShrink: 0, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-          background: isOpen ? '#FFF3EC' : '#F2F1EE',
-          color: isOpen ? PALETTE.orange : '#9A9690',
-          letterSpacing: '0.04em',
-        }}>
-          {isOpen ? 'ОТКРЫТА' : 'ЗАКРЫТА'}
-        </span>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <button onClick={() => setEditing(e => !e)} style={{
+            fontSize: 10.5, padding: '2px 7px', borderRadius: 5, border: '1px solid var(--line)', cursor: 'pointer',
+            background: editing ? 'var(--ink)' : 'var(--bg-sunken)', color: editing ? '#fff' : 'var(--ink-3)',
+          }}>✏️</button>
+          <span style={{
+            flexShrink: 0, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+            background: isOpen ? '#FFF3EC' : '#F2F1EE',
+            color: isOpen ? PALETTE.orange : '#9A9690',
+            letterSpacing: '0.04em',
+          }}>
+            {isOpen ? 'ОТКРЫТА' : 'ЗАКРЫТА'}
+          </span>
+        </div>
       </div>
+
+      {/* Inline edit form */}
+      {editing && (
+        <div style={{ marginBottom: 12, padding: '12px', background: 'var(--bg-sunken)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+              <span style={{ color: 'var(--ink-3)' }}>Статус:</span>
+              <select value={editFields.status} onChange={e => setEditFields(f => ({ ...f, status: e.target.value as any }))}
+                style={{ height: 28, padding: '0 6px', border: '1px solid var(--line)', borderRadius: 5, background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, outline: 'none' }}>
+                <option value="open">Открыта</option>
+                <option value="closed">Закрыта</option>
+              </select>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={editFields.is_urgent} onChange={e => setEditFields(f => ({ ...f, is_urgent: e.target.checked }))} />
+              <span>Срочно</span>
+            </label>
+          </div>
+          {[
+            ['Адрес', 'address'],
+            ['Метро', 'metro_station'],
+            ['Дата смены', 'date'],
+            ['Начало', 'time_start'],
+            ['Конец', 'time_end'],
+            ['Зарплата', 'salary'],
+            ['Нужно чел.', 'workers_needed'],
+          ].map(([label, key]) => (
+            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+              <span style={{ color: 'var(--ink-3)', minWidth: 80 }}>{label}</span>
+              <input
+                value={(editFields as any)[key]}
+                onChange={e => setEditFields(f => ({ ...f, [key]: e.target.value }))}
+                style={{ flex: 1, height: 28, padding: '0 8px', border: '1px solid var(--line)', borderRadius: 5, background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, outline: 'none' }}
+              />
+            </label>
+          ))}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={handleSave} disabled={saving}
+              style={{ height: 30, padding: '0 14px', borderRadius: 6, border: 'none', background: 'var(--positive)', color: '#fff', fontSize: 12.5, fontWeight: 500, cursor: 'pointer' }}>
+              {saving ? '…' : '✓ Сохранить'}
+            </button>
+            <button onClick={() => setEditing(false)}
+              style={{ height: 30, padding: '0 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink-2)', fontSize: 12.5, cursor: 'pointer' }}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* meta */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginBottom: 10 }}>
@@ -332,26 +467,57 @@ type PermCard = {
   applicants: AppInfo[]
 }
 
-function PermVacancyCards({ cards }: { cards: PermCard[] }) {
+function PermVacancyCards({ cards, onExport, onRefresh }: { cards: PermCard[]; onExport: () => void; onRefresh: () => void }) {
   if (!cards || cards.length === 0) return null
   return (
     <div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 12, letterSpacing: '0.01em' }}>
-        Постоянные вакансии
-        <span style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 400, color: 'var(--ink-3)' }}>
-          {cards.length} всего · сортировка по откликам
-        </span>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', flex: 1 }}>
+          Постоянные вакансии
+          <span style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 400, color: 'var(--ink-3)' }}>
+            {cards.length} всего · сортировка по откликам
+          </span>
+        </div>
+        <button onClick={onExport} style={{ height: 30, padding: '0 12px', borderRadius: 7, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink-2)', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>
+          CSV
+        </button>
       </div>
       <div className="perm-vac-grid">
-        {cards.map(c => <PermCard key={c.id} c={c} />)}
+        {cards.map(c => <PermCard key={c.id} c={c} onRefresh={onRefresh} />)}
       </div>
     </div>
   )
 }
 
-function PermCard({ c }: { c: PermCard }) {
+function PermCard({ c, onRefresh }: { c: PermCard; onRefresh: () => void }) {
   const [open, setOpen] = useState(false)
-  const isOpen = c.status === 'open'
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editFields, setEditFields] = useState({
+    status: c.status as 'open' | 'closed',
+    title: c.title,
+    salary: c.salary ? c.salary.replace(/[^\d]/g, '') : '',
+    metro_station: c.metro ?? '',
+    schedule: c.schedule ?? '',
+  })
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await updatePermVacancy(c.id, {
+        status: editFields.status,
+        title: editFields.title || undefined,
+        salary: editFields.salary ? Number(editFields.salary) : null,
+        metro_station: editFields.metro_station || undefined,
+        schedule: editFields.schedule || undefined,
+      })
+      setEditing(false)
+      onRefresh()
+    } catch { } finally { setSaving(false) }
+  }
+
+  const isOpen = editing ? editFields.status === 'open' : c.status === 'open'
   const hasApps = c.apps.total > 0
   const approvedPct = hasApps ? Math.round(c.apps.approved / c.apps.total * 100) : 0
 
@@ -372,19 +538,64 @@ function PermCard({ c }: { c: PermCard }) {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.3, wordBreak: 'break-word' }}>
-            {c.title}
+            {editing ? editFields.title : c.title}
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{c.company}</div>
         </div>
-        <span style={{
-          flexShrink: 0, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-          background: isOpen ? '#EBF5F0' : '#F2F1EE',
-          color: isOpen ? PALETTE.green : '#9A9690',
-          letterSpacing: '0.04em',
-        }}>
-          {isOpen ? 'ОТКРЫТА' : 'ЗАКРЫТА'}
-        </span>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <button onClick={() => setEditing(e => !e)} style={{
+            fontSize: 10.5, padding: '2px 7px', borderRadius: 5, border: '1px solid var(--line)', cursor: 'pointer',
+            background: editing ? 'var(--ink)' : 'var(--bg-sunken)', color: editing ? '#fff' : 'var(--ink-3)',
+          }}>✏️</button>
+          <span style={{
+            flexShrink: 0, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+            background: isOpen ? '#EBF5F0' : '#F2F1EE',
+            color: isOpen ? PALETTE.green : '#9A9690',
+            letterSpacing: '0.04em',
+          }}>
+            {isOpen ? 'ОТКРЫТА' : 'ЗАКРЫТА'}
+          </span>
+        </div>
       </div>
+
+      {/* Inline edit form */}
+      {editing && (
+        <div style={{ marginBottom: 12, padding: '12px', background: 'var(--bg-sunken)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+            <span style={{ color: 'var(--ink-3)', minWidth: 60 }}>Статус:</span>
+            <select value={editFields.status} onChange={e => setEditFields(f => ({ ...f, status: e.target.value as any }))}
+              style={{ height: 28, padding: '0 6px', border: '1px solid var(--line)', borderRadius: 5, background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, outline: 'none' }}>
+              <option value="open">Открыта</option>
+              <option value="closed">Закрыта</option>
+            </select>
+          </label>
+          {[
+            ['Название', 'title'],
+            ['Зарплата', 'salary'],
+            ['Метро', 'metro_station'],
+            ['График', 'schedule'],
+          ].map(([label, key]) => (
+            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+              <span style={{ color: 'var(--ink-3)', minWidth: 60 }}>{label}</span>
+              <input
+                value={(editFields as any)[key]}
+                onChange={e => setEditFields(f => ({ ...f, [key]: e.target.value }))}
+                style={{ flex: 1, height: 28, padding: '0 8px', border: '1px solid var(--line)', borderRadius: 5, background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, outline: 'none' }}
+              />
+            </label>
+          ))}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={handleSave} disabled={saving}
+              style={{ height: 30, padding: '0 14px', borderRadius: 6, border: 'none', background: 'var(--positive)', color: '#fff', fontSize: 12.5, fontWeight: 500, cursor: 'pointer' }}>
+              {saving ? '…' : '✓ Сохранить'}
+            </button>
+            <button onClick={() => setEditing(false)}
+              style={{ height: 30, padding: '0 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink-2)', fontSize: 12.5, cursor: 'pointer' }}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* meta row */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginBottom: 10 }}>

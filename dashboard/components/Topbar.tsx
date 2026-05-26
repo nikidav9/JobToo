@@ -11,7 +11,9 @@ const LABELS: Record<string, string> = {
   '/chats': 'Переписки',
   '/reviews': 'Отзывы',
   '/moderation': 'Модерация',
+  '/tickets': 'Тикеты',
   '/broadcast': 'Рассылка',
+  '/activity': 'Лог действий',
 }
 
 export default function Topbar() {

@@ -755,6 +755,141 @@ export async function fetchReviews() {
   return { list, avgRating, total: list.length, withText }
 }
 
+// ─── user profile ────────────────────────────────────────────────────────────
+
+export async function fetchUserProfile(userId: string) {
+  const [
+    { data: user },
+    { data: chats },
+    { data: ratingsReceived },
+    { data: ratingsSent },
+    { data: likes },
+    { data: vacancies },
+    { data: permVacancies },
+    { data: permApps },
+  ] = await Promise.all([
+    supabase.from('jm_users').select('*').eq('id', userId).maybeSingle(),
+    supabase.from('jm_chats').select('id,vac_title,company_name,created_at,worker_id,employer_id,vacancy_id')
+      .or(`worker_id.eq.${userId},employer_id.eq.${userId}`)
+      .order('created_at', { ascending: false }).limit(20),
+    supabase.from('jm_ratings').select('id,rating,review_text,role,created_at,from_user_id')
+      .eq('to_user_id', userId).order('created_at', { ascending: false }).limit(20),
+    supabase.from('jm_ratings').select('id,rating,review_text,role,created_at,to_user_id')
+      .eq('from_user_id', userId).order('created_at', { ascending: false }).limit(10),
+    supabase.from('jm_likes').select('id,vacancy_id,is_match,worker_liked,employer_liked,created_at')
+      .eq('worker_id', userId).order('created_at', { ascending: false }).limit(30),
+    supabase.from('jm_vacancies').select('id,work_type_label,work_type,status,created_at,company,address')
+      .eq('employer_id', userId).order('created_at', { ascending: false }).limit(20),
+    supabase.from('jm_perm_vacancies').select('id,title,status,created_at,company,address')
+      .eq('employer_id', userId).order('created_at', { ascending: false }).limit(20),
+    supabase.from('jm_perm_applications').select('id,vacancy_id,status,created_at')
+      .eq('worker_id', userId).order('created_at', { ascending: false }).limit(20),
+  ])
+
+  const avgRating = ratingsReceived && ratingsReceived.length > 0
+    ? (ratingsReceived.reduce((s: number, r: any) => s + Number(r.rating), 0) / ratingsReceived.length).toFixed(1)
+    : null
+
+  return {
+    user: user ?? null,
+    chats: chats ?? [],
+    ratingsReceived: ratingsReceived ?? [],
+    ratingsSent: ratingsSent ?? [],
+    likes: likes ?? [],
+    vacancies: vacancies ?? [],
+    permVacancies: permVacancies ?? [],
+    permApps: permApps ?? [],
+    avgRating,
+    totalLikes: (likes ?? []).length,
+    totalMatches: (likes ?? []).filter((l: any) => l.is_match).length,
+  }
+}
+
+// ─── cohorts ─────────────────────────────────────────────────────────────────
+
+export async function fetchCohorts() {
+  const [{ data: users }, { data: likes }, { data: messages }] = await Promise.all([
+    supabase.from('jm_users').select('id,created_at,role'),
+    supabase.from('jm_likes').select('worker_id,created_at'),
+    supabase.from('jm_messages').select('sender_id,created_at'),
+  ])
+
+  const u = users ?? []
+
+  function weekStart(date: Date): number {
+    const d = new Date(date)
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - d.getDay())
+    return d.getTime()
+  }
+
+  // Build activity map: userId -> Set of week timestamps
+  const activityWeeks: Record<string, Set<number>> = {}
+  for (const l of likes ?? []) {
+    if (!l.worker_id || !l.created_at) continue
+    if (!activityWeeks[l.worker_id]) activityWeeks[l.worker_id] = new Set()
+    activityWeeks[l.worker_id].add(weekStart(new Date(l.created_at)))
+  }
+  for (const m of messages ?? []) {
+    const sid = (m as any).sender_id
+    if (!sid || !(m as any).created_at || sid === 'system') continue
+    if (!activityWeeks[sid]) activityWeeks[sid] = new Set()
+    activityWeeks[sid].add(weekStart(new Date((m as any).created_at)))
+  }
+
+  // Last 12 weeks
+  const now = new Date()
+  const weeks: number[] = []
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now)
+    d.setDate(d.getDate() - i * 7)
+    weeks.push(weekStart(d))
+  }
+
+  // Group users by registration week
+  const cohortUsers: Record<number, string[]> = {}
+  for (const user of u) {
+    if (!user.created_at) continue
+    const wk = weekStart(new Date(user.created_at))
+    if (!cohortUsers[wk]) cohortUsers[wk] = []
+    cohortUsers[wk].push(user.id)
+  }
+
+  // Build cohort table rows
+  const table = weeks.map((wk, wi) => {
+    const members = cohortUsers[wk] ?? []
+    const size = members.length
+    const label = format(new Date(wk), 'dd.MM')
+
+    // Retention for subsequent weeks (up to 4 weeks out)
+    const cols: (number | null)[] = []
+    for (let delta = 0; delta <= 4; delta++) {
+      const targetWk = weeks[wi + delta]
+      if (targetWk === undefined) { cols.push(null); continue }
+      if (delta === 0) { cols.push(100); continue }
+      if (size === 0) { cols.push(0); continue }
+      const active = members.filter(id => activityWeeks[id]?.has(targetWk)).length
+      cols.push(Math.round(active / size * 100))
+    }
+
+    // activation: % who had any activity within 7 days of registering
+    const activated = size > 0
+      ? members.filter(id => activityWeeks[id]?.has(wk) || activityWeeks[id]?.has(weeks[wi + 1] ?? 0)).length
+      : 0
+
+    return { label, size, cols, activationRate: size > 0 ? Math.round(activated / size * 100) : 0 }
+  })
+
+  // Weekly new users bar
+  const weeklyBar = weeks.map((wk, i) => ({
+    label: format(new Date(wk), 'dd.MM'),
+    workers: u.filter(u => u.role === 'worker' && weekStart(new Date(u.created_at)) === wk).length,
+    employers: u.filter(u => u.role === 'employer' && weekStart(new Date(u.created_at)) === wk).length,
+  }))
+
+  return { table, weeklyBar }
+}
+
 // ─── chats ───────────────────────────────────────────────────────────────────
 
 export async function fetchChats() {

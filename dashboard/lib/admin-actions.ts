@@ -1,13 +1,15 @@
 import { supabaseAdmin } from './supabase'
+import { logActivity } from './activity-log'
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
-export async function blockUser(userId: string, block: boolean) {
+export async function blockUser(userId: string, block: boolean, userName?: string) {
   const { error } = await supabaseAdmin
     .from('jm_users')
     .update({ is_blocked: block })
     .eq('id', userId)
   if (error) throw new Error(error.message)
+  logActivity(block ? 'Заблокирован' : 'Разблокирован', `ID: ${userId}`, userId, userName)
 }
 
 export async function resetPassword(userId: string): Promise<string> {
@@ -141,6 +143,58 @@ export async function broadcastPush(
     await sendExpoBatch(messages.slice(i, i + 100))
   }
   return tokens.length
+}
+
+// ─── Vacancy editing ─────────────────────────────────────────────────────────
+
+export async function updateTempVacancy(id: string, fields: {
+  status?: 'open' | 'closed'
+  is_urgent?: boolean
+  salary?: number | null
+  workers_needed?: number | null
+  address?: string
+  metro_station?: string
+  date?: string
+  time_start?: string
+  time_end?: string
+}) {
+  const { error } = await supabaseAdmin.from('jm_vacancies').update(fields).eq('id', id)
+  if (error) throw new Error(error.message)
+  logActivity('Вакансия (врем.) обновлена', `ID: ${id}, поля: ${Object.keys(fields).join(', ')}`)
+}
+
+export async function updatePermVacancy(id: string, fields: {
+  status?: 'open' | 'closed'
+  title?: string
+  salary?: number | null
+  address?: string
+  metro_station?: string
+  schedule?: string
+  description?: string
+}) {
+  const { error } = await supabaseAdmin.from('jm_perm_vacancies').update(fields).eq('id', id)
+  if (error) throw new Error(error.message)
+  logActivity('Вакансия (пост.) обновлена', `ID: ${id}, поля: ${Object.keys(fields).join(', ')}`)
+}
+
+// ─── Tickets (complaints) ─────────────────────────────────────────────────────
+
+export async function addComplaintNote(complaintId: string, note: string) {
+  const { error } = await supabaseAdmin
+    .from('jm_complaints')
+    .update({ admin_note: note } as any)
+    .eq('id', complaintId)
+  if (error) throw new Error(error.message)
+  logActivity('Заметка к жалобе', `ID: ${complaintId}`)
+}
+
+export async function setComplaintStatus(id: string, status: 'pending' | 'in_review' | 'resolved' | 'dismissed') {
+  const { error } = await supabaseAdmin
+    .from('jm_complaints')
+    .update({ status } as any)
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+  logActivity('Статус жалобы изменён', `ID: ${id} → ${status}`)
 }
 
 // ─── Push helpers ─────────────────────────────────────────────────────────────

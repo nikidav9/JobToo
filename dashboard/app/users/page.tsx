@@ -1,11 +1,13 @@
 'use client'
-import { useCallback, useState } from 'react'
-import { fetchUsers, PALETTE } from '@/lib/queries'
+import { useCallback, useState, useEffect } from 'react'
+import { fetchUsers, fetchUserProfile, PALETTE } from '@/lib/queries'
 import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
 import { blockUser, resetPassword, sendPushToUser } from '@/lib/admin-actions'
+import { downloadCSV } from '@/lib/csv-export'
+import { getVerifiedUsers, setUserVerified } from '@/lib/verification'
 import {
   AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -23,6 +25,237 @@ function initials(name: string, phone: string) {
 
 type ActionState = 'idle' | 'loading' | 'ok' | 'err'
 
+// ─── User Profile Drawer ───────────────────────────────────────────────────
+
+function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
+  userId: string
+  onClose: () => void
+  verifiedSet: Set<string>
+  onVerifyToggle: (id: string) => void
+}) {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<'overview' | 'likes' | 'reviews' | 'vacancies' | 'chats'>('overview')
+
+  useEffect(() => {
+    fetchUserProfile(userId).then(d => { setData(d); setLoading(false) })
+  }, [userId])
+
+  const isVerified = verifiedSet.has(userId)
+
+  if (loading || !data) return (
+    <div style={{ flex: 1, display: 'grid', placeItems: 'center' }}>
+      <div style={{ fontSize: 13, color: 'var(--ink-4)' }}>Загрузка…</div>
+    </div>
+  )
+
+  const { user, chats, ratingsReceived, likes, vacancies, permVacancies, permApps, avgRating, totalLikes, totalMatches } = data
+  if (!user) return null
+
+  const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.phone || '—'
+  const isWorker = user.role === 'worker'
+  const ini = initials(name, user.phone ?? '')
+
+  const tabs = [
+    { id: 'overview', label: 'Обзор' },
+    { id: 'likes', label: `Лайки (${totalLikes})` },
+    { id: 'reviews', label: `Отзывы (${ratingsReceived.length})` },
+    { id: 'vacancies', label: `Вакансии (${vacancies.length + permVacancies.length})` },
+    { id: 'chats', label: `Чаты (${chats.length})` },
+  ]
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', background: 'var(--bg-elev)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+            background: isWorker ? 'linear-gradient(135deg,#C8501E,#7D2D0E)' : 'linear-gradient(135deg,#3B5BB5,#1F3A8A)',
+            display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700, fontSize: 16,
+          }}>{ini}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>{name}</span>
+              {isVerified && (
+                <span style={{ fontSize: 11.5, padding: '1px 7px', borderRadius: 4, background: 'rgba(46,125,84,.1)', color: 'var(--positive)', border: '1px solid rgba(46,125,84,.25)', fontWeight: 500 }}>✓ Верифицирован</span>
+              )}
+              {user.is_blocked && (
+                <span style={{ fontSize: 11.5, padding: '1px 7px', borderRadius: 4, background: 'rgba(179,60,42,.1)', color: 'var(--negative)', border: '1px solid rgba(179,60,42,.25)', fontWeight: 500 }}>🚫 Заблокирован</span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 3, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'Geist Mono, monospace' }}>{user.phone || '—'}</span>
+              {user.metro_station && <span>🚇 {user.metro_station}</span>}
+              {user.company && <span>🏢 {user.company}</span>}
+              <span style={{ color: 'var(--ink-4)' }}>с {user.created_at?.slice(0, 10)}</span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink-3)', padding: 4, fontSize: 18 }}
+          >✕</button>
+        </div>
+
+        {/* Verify toggle */}
+        <div style={{ marginTop: 10, display: 'flex', gap: 6 }}>
+          <button
+            onClick={() => { setUserVerified(userId, !isVerified); onVerifyToggle(userId) }}
+            style={{
+              height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 500,
+              background: isVerified ? 'rgba(46,125,84,.1)' : 'var(--bg-sunken)',
+              border: `1px solid ${isVerified ? 'rgba(46,125,84,.3)' : 'var(--line)'}`,
+              color: isVerified ? 'var(--positive)' : 'var(--ink-2)',
+            }}
+          >
+            {isVerified ? '✓ Верифицирован' : '☑ Верифицировать'}
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--line)', background: 'var(--bg-elev)', overflowX: 'auto' }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id as any)} style={{
+            height: 38, padding: '0 14px', border: 0, cursor: 'pointer', fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap',
+            background: 'transparent',
+            color: tab === t.id ? 'var(--ink)' : 'var(--ink-3)',
+            borderBottom: `2px solid ${tab === t.id ? 'var(--accent)' : 'transparent'}`,
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
+        {tab === 'overview' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="g-3">
+              <StatBox label="Лайков" value={totalLikes} />
+              <StatBox label="Совпадений" value={totalMatches} />
+              <StatBox label="Чатов" value={chats.length} />
+              {avgRating && <StatBox label="Средний рейтинг" value={avgRating + ' ★'} />}
+              <StatBox label="Отзывов о нём" value={ratingsReceived.length} />
+            </div>
+            <div style={{ background: 'var(--bg-sunken)', borderRadius: 8, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 8 }}>Информация об аккаунте</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12.5 }}>
+                {[
+                  ['ID', user.id],
+                  ['Роль', isWorker ? 'Работник' : 'Работодатель'],
+                  ['Телефон', user.phone || '—'],
+                  ['Метро', user.metro_station || '—'],
+                  ['Компания', user.company || '—'],
+                  ['Регистрация', user.created_at?.slice(0, 10) || '—'],
+                  ['Push-токен', user.push_token ? '✓ Есть' : '✗ Нет'],
+                ].map(([k, v]) => (
+                  <div key={k as string} style={{ display: 'flex', gap: 8 }}>
+                    <span style={{ color: 'var(--ink-3)', minWidth: 100 }}>{k}</span>
+                    <span style={{ color: 'var(--ink)', fontFamily: (k === 'ID' || k === 'Телефон') ? 'Geist Mono, monospace' : 'inherit', fontSize: k === 'ID' ? 10.5 : 12.5, wordBreak: 'break-all' }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'likes' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {likes.length === 0 && <Empty text="Нет лайков" />}
+            {likes.map((l: any) => (
+              <div key={l.id} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13 }}>{l.is_match ? '💚' : l.worker_liked ? '🟡' : '⚪'}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11.5, color: 'var(--ink)', fontWeight: 500 }}>
+                    {l.is_match ? 'Совпадение' : l.worker_liked ? 'Лайк' : 'Просмотр'}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'Geist Mono, monospace' }}>{l.created_at?.slice(0, 10)}</div>
+                </div>
+                <div style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'Geist Mono, monospace', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {l.vacancy_id?.slice(0, 8)}…
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === 'reviews' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {ratingsReceived.length === 0 && <Empty text="Нет отзывов" />}
+            {ratingsReceived.map((r: any) => (
+              <div key={r.id} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontSize: 14, letterSpacing: 1 }}>{'★'.repeat(Number(r.rating))}{'☆'.repeat(5 - Number(r.rating))}</span>
+                  <span style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'Geist Mono, monospace' }}>{r.created_at?.slice(0, 10)}</span>
+                </div>
+                {r.review_text && <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.5 }}>{r.review_text}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === 'vacancies' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {vacancies.length === 0 && permVacancies.length === 0 && <Empty text="Нет вакансий" />}
+            {vacancies.map((v: any) => (
+              <div key={v.id} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', display: 'flex', gap: 10, alignItems: 'center' }}>
+                <span style={{ fontSize: 13 }}>⚡</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{v.work_type_label || v.work_type || 'Вакансия'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{v.address || '—'} · {v.created_at?.slice(0, 10)}</div>
+                </div>
+                <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 4, background: v.status === 'open' ? 'rgba(46,125,84,.1)' : 'var(--bg-sunken)', color: v.status === 'open' ? 'var(--positive)' : 'var(--ink-4)' }}>
+                  {v.status === 'open' ? 'Открыта' : 'Закрыта'}
+                </span>
+              </div>
+            ))}
+            {permVacancies.map((v: any) => (
+              <div key={v.id} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', display: 'flex', gap: 10, alignItems: 'center' }}>
+                <span style={{ fontSize: 13 }}>💼</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{v.title || 'Вакансия'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{v.address || '—'} · {v.created_at?.slice(0, 10)}</div>
+                </div>
+                <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 4, background: v.status === 'open' ? 'rgba(46,125,84,.1)' : 'var(--bg-sunken)', color: v.status === 'open' ? 'var(--positive)' : 'var(--ink-4)' }}>
+                  {v.status === 'open' ? 'Открыта' : 'Закрыта'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === 'chats' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {chats.length === 0 && <Empty text="Нет чатов" />}
+            {chats.map((c: any) => (
+              <div key={c.id} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{c.vac_title || 'Чат'}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>
+                  {c.company_name && `${c.company_name} · `}{c.created_at?.slice(0, 10)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function StatBox({ label, value }: { label: string; value: any }) {
+  return (
+    <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 14px', boxShadow: 'var(--shadow-sm)' }}>
+      <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink)', lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>{label}</div>
+    </div>
+  )
+}
+
+function Empty({ text }: { text: string }) {
+  return <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>{text}</div>
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────
+
 export default function UsersPage() {
   const fetcher = useCallback(() => fetchUsers(), [])
   const { data: d, loading, lastUpdated, pulse, refresh } = useRealtime(fetcher, {
@@ -31,8 +264,12 @@ export default function UsersPage() {
 
   const [phoneSearch, setPhoneSearch] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [profileId, setProfileId] = useState<string | null>(null)
   const [actions, setActions] = useState<Record<string, { s: ActionState; msg?: string }>>({})
   const [pushText, setPushText] = useState<Record<string, string>>({})
+  const [verifiedSet, setVerifiedSet] = useState<Set<string>>(new Set())
+
+  useEffect(() => { setVerifiedSet(getVerifiedUsers()) }, [])
 
   if (loading || !d) return <Loader />
 
@@ -48,7 +285,7 @@ export default function UsersPage() {
   async function handleBlock(u: any) {
     setA(u.id, 'loading')
     try {
-      await blockUser(u.id, !u.blocked)
+      await blockUser(u.id, !u.blocked, u.name)
       setA(u.id, 'ok', u.blocked ? 'Разблокирован' : 'Заблокирован')
       setTimeout(refresh, 800)
     } catch (e: any) { setA(u.id, 'err', e.message) }
@@ -73,8 +310,23 @@ export default function UsersPage() {
     } catch (e: any) { setA(u.id + '_push', 'err', e.message) }
   }
 
+  function handleExportCSV() {
+    const rows = filteredUsers.map((u: any) => ({
+      Имя: u.name || '',
+      Телефон: u.phone || '',
+      Роль: u.role === 'worker' ? 'Работник' : 'Работодатель',
+      Метро: u.metro || '',
+      Компания: u.company || '',
+      Статус: u.blocked ? 'Заблокирован' : 'Активен',
+      'Пуш-токен': u.hasPushToken ? 'Есть' : 'Нет',
+      Верифицирован: verifiedSet.has(u.id) ? 'Да' : 'Нет',
+      Дата: u.date || '',
+    }))
+    downloadCSV(rows, `users_${new Date().toISOString().slice(0, 10)}.csv`)
+  }
+
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
       <PageHeader title="Пользователи" intervalSec={30} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
       <div className="page-content">
 
@@ -143,14 +395,14 @@ export default function UsersPage() {
             title="Все пользователи"
             sub={phoneSearch.trim() ? `Найдено ${filteredUsers.length} из ${d.recent.length}` : `${d.recent.length} пользователей · CRM`}
           >
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               <input
                 type="text"
                 placeholder="Поиск по номеру телефона..."
                 value={phoneSearch}
                 onChange={e => setPhoneSearch(e.target.value)}
                 style={{
-                  width: '100%', maxWidth: 320, padding: '7px 12px',
+                  width: '100%', maxWidth: 300, padding: '7px 12px',
                   border: '1px solid var(--line)', borderRadius: 8,
                   background: 'var(--bg-sunken)', color: 'var(--ink)',
                   fontSize: 13, outline: 'none', fontFamily: 'Geist Mono, monospace',
@@ -158,20 +410,29 @@ export default function UsersPage() {
                 onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
                 onBlur={e => (e.currentTarget.style.borderColor = 'var(--line)')}
               />
+              <button
+                onClick={handleExportCSV}
+                style={{ height: 34, padding: '0 14px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-sunken)', color: 'var(--ink-2)', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
+              >
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 2v8M5 7l3 3 3-3M3 13h10"/>
+                </svg>
+                Экспорт CSV
+              </button>
             </div>
 
             <div className="table-scroll">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                    {['Пользователь', 'Роль', 'Метро', 'Компания', 'Статус', 'Пуш', 'Дата', 'Действия'].map(h => (
+                    {['Пользователь', 'Роль', 'Метро', 'Компания', 'Статус', 'Пуш', 'Верификация', 'Дата', 'Действия'].map(h => (
                       <th key={h} style={{ textAlign: 'left', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', fontWeight: 500, padding: '8px 12px 10px', background: 'var(--bg)', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.length === 0
-                    ? <tr><td colSpan={8} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Не найдено</td></tr>
+                    ? <tr><td colSpan={9} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Не найдено</td></tr>
                     : filteredUsers.map((u: any) => {
                         const isWorker = u.role === 'worker'
                         const ini = initials(u.name || '', u.phone || '')
@@ -179,6 +440,7 @@ export default function UsersPage() {
                         const aBlock = actions[u.id]
                         const aPwd = actions[u.id + '_pwd']
                         const aPush = actions[u.id + '_push']
+                        const isVerified = verifiedSet.has(u.id)
 
                         return (
                           <>
@@ -226,17 +488,26 @@ export default function UsersPage() {
                                       — нет
                                     </span>}
                               </td>
+                              <td style={{ padding: '10px 12px' }}>
+                                {isVerified
+                                  ? <span style={{ fontSize: 11.5, color: 'var(--positive)', fontWeight: 500 }}>✓ Верифицирован</span>
+                                  : <span style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>—</span>}
+                              </td>
                               <td style={{ padding: '10px 12px', fontFamily: 'Geist Mono, monospace', fontSize: 11.5, color: 'var(--ink-3)' }}>{u.date || '—'}</td>
                               <td style={{ padding: '10px 12px' }} onClick={e => e.stopPropagation()}>
                                 <div style={{ display: 'flex', gap: 5 }}>
+                                  {/* Profile button */}
+                                  <button onClick={() => setProfileId(u.id)}
+                                    style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-sunken)', color: 'var(--ink-2)', fontSize: 11.5, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                    👤
+                                  </button>
                                   {/* Block */}
                                   {aBlock?.s === 'ok'
                                     ? <span style={{ fontSize: 11.5, color: 'var(--positive)', fontWeight: 500 }}>{aBlock.msg}</span>
                                     : <button onClick={() => handleBlock(u)} disabled={aBlock?.s === 'loading'}
                                         style={{ padding: '3px 9px', borderRadius: 6, border: '1px solid var(--line)', background: u.blocked ? 'rgba(46,125,84,.08)' : 'rgba(179,60,42,.08)', color: u.blocked ? 'var(--positive)' : 'var(--negative)', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                                        {aBlock?.s === 'loading' ? '…' : u.blocked ? 'Разблокировать' : 'Заблокировать'}
+                                        {aBlock?.s === 'loading' ? '…' : u.blocked ? 'Разблок.' : 'Блок.'}
                                       </button>}
-
                                   {/* Expand toggle */}
                                   <button onClick={() => setExpandedId(expanded ? null : u.id)}
                                     style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-sunken)', color: 'var(--ink-3)', fontSize: 11.5, cursor: 'pointer' }}>
@@ -249,9 +520,8 @@ export default function UsersPage() {
                             {/* Expanded CRM panel */}
                             {expanded && (
                               <tr key={u.id + '_exp'} style={{ borderBottom: '1px solid var(--line)' }}>
-                                <td colSpan={8} style={{ padding: '0 12px 14px 60px', background: 'var(--bg-sunken)' }}>
+                                <td colSpan={9} style={{ padding: '0 12px 14px 60px', background: 'var(--bg-sunken)' }}>
                                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingTop: 10 }}>
-
                                     {/* Reset password */}
                                     <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '12px 14px', minWidth: 200 }}>
                                       <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 8 }}>🔑 Сбросить пароль</div>
@@ -261,7 +531,6 @@ export default function UsersPage() {
                                             <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 18, fontWeight: 700, letterSpacing: 2, color: 'var(--ink)', background: 'var(--bg-sunken)', padding: '4px 10px', borderRadius: 6 }}>
                                               {aPwd.msg?.replace('Новый пароль: ', '')}
                                             </div>
-                                            <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>Пуш-уведомление отправлено</div>
                                           </div>
                                         : aPwd?.s === 'err'
                                           ? <div style={{ fontSize: 12, color: 'var(--negative)' }}>{aPwd.msg}</div>
@@ -270,7 +539,6 @@ export default function UsersPage() {
                                               {aPwd?.s === 'loading' ? 'Генерация…' : 'Сгенерировать новый'}
                                             </button>}
                                     </div>
-
                                     {/* Send push */}
                                     <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '12px 14px', flex: 1, minWidth: 260 }}>
                                       <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 8 }}>📲 Отправить пуш</div>
@@ -302,6 +570,32 @@ export default function UsersPage() {
           </ChartCard>
         )}
       </div>
+
+      {/* Profile Drawer overlay */}
+      {profileId && (
+        <>
+          <div
+            onClick={() => setProfileId(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.3)', zIndex: 40, backdropFilter: 'blur(2px)' }}
+          />
+          <div style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: 480, maxWidth: '95vw',
+            background: 'var(--bg)', zIndex: 50, boxShadow: '-4px 0 32px rgba(0,0,0,.18)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          }}>
+            <ProfileDrawer
+              userId={profileId}
+              onClose={() => setProfileId(null)}
+              verifiedSet={verifiedSet}
+              onVerifyToggle={id => setVerifiedSet(prev => {
+                const next = new Set(prev)
+                if (next.has(id)) next.delete(id); else next.add(id)
+                return next
+              })}
+            />
+          </div>
+        </>
+      )}
     </div>
   )
 }
