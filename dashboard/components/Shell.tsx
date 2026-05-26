@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
@@ -10,6 +10,11 @@ const SESSION_KEY = 'jm_session'
 function isAuthed() {
   if (typeof window === 'undefined') return false
   return sessionStorage.getItem(SESSION_KEY) === '1'
+}
+
+function redirectToLogin() {
+  const base = window.location.pathname.includes('/JobMatch') ? '/JobMatch' : ''
+  window.location.replace(base + '/login/')
 }
 
 const NAV = [
@@ -23,7 +28,6 @@ const NAV = [
 export default function Shell({ children }: { children: React.ReactNode }) {
   const rawPath = usePathname()
   const path = rawPath.replace(/\/$/, '') || '/'
-  const router = useRouter()
   const [ready, setReady] = useState(false)
   const [authed, setAuthed] = useState(false)
 
@@ -37,7 +41,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       setAuthed(true)
       setReady(true)
     } else {
-      router.replace('/login')
+      redirectToLogin()
     }
   }, [path])
 
