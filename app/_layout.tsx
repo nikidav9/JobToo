@@ -6,6 +6,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
+import { Ionicons } from '@expo/vector-icons';
 import { AlertProvider } from '@/template';
 import { AppProvider, AppContext } from '@/contexts/AppContext';
 import { ToastLayer } from '@/components/ui/ToastLayer';
@@ -90,6 +92,8 @@ function NotificationHandler() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({ ...Ionicons.font });
+
   useEffect(() => {
     if (Platform.OS === 'web') return;
     setupAndroidChannels().catch(() => {});
