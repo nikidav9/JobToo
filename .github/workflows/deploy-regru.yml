@@ -38,5 +38,5 @@ jobs:
           username: ${{ secrets.REGRU_FTP_USER }}
           password: ${{ secrets.REGRU_FTP_PASSWORD }}
           local-dir: ./dist/
-          server-dir: /jobtoo.ru/
-          dangerous-clean-slate: false
+          server-dir: ./www/jobtoo.ru/
+          dangerous-clean-slate: true
