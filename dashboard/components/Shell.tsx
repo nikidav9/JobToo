@@ -12,6 +12,11 @@ function isAuthed() {
   return sessionStorage.getItem(SESSION_KEY) === '1'
 }
 
+function isLoginPage() {
+  if (typeof window === 'undefined') return false
+  return window.location.pathname.replace(/\/$/, '').endsWith('/login')
+}
+
 function redirectToLogin() {
   const base = window.location.pathname.includes('/JobMatch') ? '/JobMatch' : ''
   window.location.replace(base + '/login/')
@@ -32,20 +37,20 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState(false)
 
   useEffect(() => {
-    if (path === '/login') {
+    if (isLoginPage()) {
       setReady(true)
       return
     }
-    const ok = isAuthed()
-    if (ok) {
+    if (isAuthed()) {
       setAuthed(true)
       setReady(true)
     } else {
       redirectToLogin()
     }
-  }, [path])
+  }, [])
 
-  if (path === '/login') {
+  // Login page — no shell
+  if (isLoginPage() || path === '/login') {
     return <>{children}</>
   }
 
@@ -104,12 +109,6 @@ function IconUsers({ style }: { style?: React.CSSProperties }) {
 }
 function IconJobs({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="2" y="5" width="12" height="9" rx="1.5"/><path d="M6 5V3.5C6 3 6.4 2.5 7 2.5h2c.6 0 1 .5 1 1V5"/></svg>
-}
-function IconPulse({ style }: { style?: React.CSSProperties }) {
-  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"><path d="M2 8h2.5l1.5-4 2 8 1.5-4H14"/></svg>
-}
-function IconStar({ style }: { style?: React.CSSProperties }) {
-  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"><path d="M8 2.5l1.7 3.4 3.8.6-2.7 2.6.6 3.7L8 11.1l-3.4 1.8.6-3.7L2.5 6.5l3.8-.6L8 2.5z"/></svg>
 }
 function IconChat({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"><path d="M13 2H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2l3 3 3-3h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/></svg>
