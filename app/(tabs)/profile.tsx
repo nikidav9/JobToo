@@ -625,18 +625,17 @@ export default function ProfileScreen() {
               <Text style={styles.docRowArrow}>›</Text>
             </TouchableOpacity>
           ))}
+          <TouchableOpacity
+            style={styles.docRow}
+            onPress={() => setShowConfirmDelete(true)}
+            disabled={deletingAccount}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.docRowLabel, { color: '#EF4444' }]}>
+              {deletingAccount ? 'Удаление...' : 'Удалить аккаунт'}
+            </Text>
+          </TouchableOpacity>
         </View>
-
-        {/* Delete account button */}
-        <TouchableOpacity
-          style={styles.deleteAccountBtn}
-          onPress={() => setShowConfirmDelete(true)}
-          disabled={deletingAccount}
-        >
-          <Text style={styles.deleteAccountText}>
-            {deletingAccount ? 'Удаление...' : 'Удалить аккаунт'}
-          </Text>
-        </TouchableOpacity>
 
         <View style={{ height: 8 }} />
       </ScrollView>
