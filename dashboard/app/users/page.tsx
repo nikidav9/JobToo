@@ -86,6 +86,8 @@ export default function UsersPage() {
           <KpiCard label="Заблокировано" value={d.kpi.blocked} sparkColor={PALETTE.red} />
           <KpiCard label="Новых · 7 дней" value={d.kpi.newWeek} deltaTone="pos" delta={`+${d.kpi.newWeek}`} />
           <KpiCard label="Новых · 30 дней" value={d.kpi.newMonth} deltaTone="pos" delta={`+${d.kpi.newMonth}`} />
+          <KpiCard label="С пуш-токеном" value={d.kpi.withPushToken} sub={`${d.kpi.total ? Math.round(d.kpi.withPushToken / d.kpi.total * 100) : 0}% базы`} sparkColor={PALETTE.green} />
+          <KpiCard label="Без пуш-токена" value={d.kpi.withoutPushToken} sub="не получат пуши" sparkColor={PALETTE.red} />
         </div>
 
         {/* Charts */}
@@ -162,14 +164,14 @@ export default function UsersPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                    {['Пользователь', 'Роль', 'Метро', 'Компания', 'Статус', 'Дата', 'Действия'].map(h => (
+                    {['Пользователь', 'Роль', 'Метро', 'Компания', 'Статус', 'Пуш', 'Дата', 'Действия'].map(h => (
                       <th key={h} style={{ textAlign: 'left', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', fontWeight: 500, padding: '8px 12px 10px', background: 'var(--bg)', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.length === 0
-                    ? <tr><td colSpan={7} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Не найдено</td></tr>
+                    ? <tr><td colSpan={8} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Не найдено</td></tr>
                     : filteredUsers.map((u: any) => {
                         const isWorker = u.role === 'worker'
                         const ini = initials(u.name || '', u.phone || '')
@@ -215,6 +217,15 @@ export default function UsersPage() {
                                       <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--positive)', display: 'inline-block' }} />Активен
                                     </span>}
                               </td>
+                              <td style={{ padding: '10px 12px' }}>
+                                {u.hasPushToken
+                                  ? <span title="Есть Expo push token" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, fontSize: 11.5, fontWeight: 500, color: 'var(--positive)', background: 'rgba(46,125,84,.08)', border: '1px solid rgba(46,125,84,.2)' }}>
+                                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--positive)', display: 'inline-block' }} />📲
+                                    </span>
+                                  : <span title="Нет Expo push token" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, fontSize: 11.5, fontWeight: 500, color: 'var(--ink-4)', background: 'var(--bg-sunken)', border: '1px solid var(--line)' }}>
+                                      — нет
+                                    </span>}
+                              </td>
                               <td style={{ padding: '10px 12px', fontFamily: 'Geist Mono, monospace', fontSize: 11.5, color: 'var(--ink-3)' }}>{u.date || '—'}</td>
                               <td style={{ padding: '10px 12px' }} onClick={e => e.stopPropagation()}>
                                 <div style={{ display: 'flex', gap: 5 }}>
@@ -238,7 +249,7 @@ export default function UsersPage() {
                             {/* Expanded CRM panel */}
                             {expanded && (
                               <tr key={u.id + '_exp'} style={{ borderBottom: '1px solid var(--line)' }}>
-                                <td colSpan={7} style={{ padding: '0 12px 14px 60px', background: 'var(--bg-sunken)' }}>
+                                <td colSpan={8} style={{ padding: '0 12px 14px 60px', background: 'var(--bg-sunken)' }}>
                                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingTop: 10 }}>
 
                                     {/* Reset password */}

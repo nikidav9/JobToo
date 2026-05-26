@@ -250,6 +250,8 @@ export async function fetchUsers() {
     company: x.company ?? '—',
     blocked: x.is_blocked,
     date: x.created_at?.slice(0, 10),
+    id: x.id,
+    hasPushToken: !!x.push_token,
   }))
 
   return {
@@ -261,6 +263,8 @@ export async function fetchUsers() {
       newWeek: u.filter((x: any) => x.created_at > w7).length,
       newMonth: u.filter((x: any) => x.created_at > w30).length,
       workerPct: u.length > 0 ? ((workers.length / u.length) * 100).toFixed(0) : '0',
+      withPushToken: u.filter((x: any) => x.push_token).length,
+      withoutPushToken: u.filter((x: any) => !x.push_token).length,
     },
     growth90,
     cumulative,
