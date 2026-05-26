@@ -638,10 +638,6 @@ export default function ProfileScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={() => setShowConfirmLogout(true)}>
-          <Text style={styles.logoutBtnText}>Выйти из аккаунта</Text>
-        </TouchableOpacity>
-
         <View style={{ height: 8 }} />
       </ScrollView>
 
