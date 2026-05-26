@@ -5,21 +5,27 @@ import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
-const SESSION_KEY = 'jm_session'
+export const SESSION_KEY = 'jm_admin_auth'
 
-function isAuthed() {
+export function setAuth() {
+  try { localStorage.setItem(SESSION_KEY, '1') } catch {}
+}
+export function clearAuth() {
+  try { localStorage.removeItem(SESSION_KEY) } catch {}
+}
+export function isAuthed(): boolean {
   if (typeof window === 'undefined') return false
-  return sessionStorage.getItem(SESSION_KEY) === '1'
+  try { return localStorage.getItem(SESSION_KEY) === '1' } catch { return false }
 }
 
-function isLoginPage() {
+function getBase(): string {
+  if (typeof window === 'undefined') return ''
+  return window.location.pathname.startsWith('/JobMatch') ? '/JobMatch' : ''
+}
+
+function isOnLoginPage(): boolean {
   if (typeof window === 'undefined') return false
   return window.location.pathname.replace(/\/$/, '').endsWith('/login')
-}
-
-function redirectToLogin() {
-  const base = window.location.pathname.includes('/JobMatch') ? '/JobMatch' : ''
-  window.location.replace(base + '/login/')
 }
 
 const NAV = [
@@ -33,28 +39,29 @@ const NAV = [
 export default function Shell({ children }: { children: React.ReactNode }) {
   const rawPath = usePathname()
   const path = rawPath.replace(/\/$/, '') || '/'
-  const [ready, setReady] = useState(false)
-  const [authed, setAuthed] = useState(false)
+
+  // Synchronous auth check — avoids white-screen flash
+  const [authed, setAuthed] = useState<boolean | null>(null)
 
   useEffect(() => {
-    if (isLoginPage()) {
-      setReady(true)
+    if (isOnLoginPage()) {
+      setAuthed(true) // login page is always accessible
       return
     }
     if (isAuthed()) {
       setAuthed(true)
-      setReady(true)
     } else {
-      redirectToLogin()
+      window.location.replace(getBase() + '/login/')
     }
   }, [])
 
-  // Login page — no shell
-  if (isLoginPage() || path === '/login') {
+  // Login page — no shell chrome
+  if (path === '/login' || isOnLoginPage()) {
     return <>{children}</>
   }
 
-  if (!ready || !authed) {
+  // Waiting for auth check
+  if (authed === null) {
     return <div style={{ minHeight: '100vh', background: '#FAFAF7' }} />
   }
 
@@ -87,10 +94,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 background: active ? 'var(--accent-soft)' : 'transparent',
                 transition: 'background .12s',
               }}>
-                <Icon style={{
-                  width: 18, height: 18,
-                  color: active ? 'var(--accent)' : 'var(--ink-4)',
-                }} />
+                <Icon style={{ width: 18, height: 18, color: active ? 'var(--accent)' : 'var(--ink-4)' }} />
               </span>
               {label}
             </Link>
