@@ -40,3 +40,6 @@ jobs:
           local-dir: ./dist/
           server-dir: ./www/jobtoo.ru/
           dangerous-clean-slate: true
+          exclude: |
+            **/.git*
+            **/.git*/**
