@@ -1,0 +1,42 @@
+name: Deploy to Reg.ru (jobtoo.ru)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Build web + FTP deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Expo web
+        run: npx expo export --platform web
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
+
+      - name: Copy PHP proxy into build
+        run: |
+          mkdir -p dist/api
+          cp php-proxy/db.php dist/api/db.php
+
+      - name: Deploy to Reg.ru via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.REGRU_FTP_HOST }}
+          username: ${{ secrets.REGRU_FTP_USER }}
+          password: ${{ secrets.REGRU_FTP_PASSWORD }}
+          local-dir: ./dist/
+          server-dir: /jobtoo.ru/
+          dangerous-clean-slate: false
