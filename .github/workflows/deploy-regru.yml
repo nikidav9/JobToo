@@ -26,10 +26,33 @@ jobs:
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
 
-      - name: Copy PHP proxy into build
+      - name: Copy PHP proxy and replace favicon
         run: |
           mkdir -p dist/api
           cp php-proxy/db.php dist/api/db.php
+          python3 - <<'PYEOF'
+import struct, io, os
+from PIL import Image
+def make_ico(png, out, sizes=[(16,16),(32,32),(48,48),(64,64)]):
+    src = Image.open(png).convert('RGBA')
+    imgs = []
+    for s in sizes:
+        buf = io.BytesIO()
+        src.resize(s, Image.LANCZOS).save(buf, format='PNG')
+        imgs.append((s[0], s[1], buf.getvalue()))
+    n = len(imgs)
+    hdr = struct.pack('<HHH', 0, 1, n)
+    offset = 6 + n * 16
+    dirs = b''
+    for w, h, data in imgs:
+        dirs += struct.pack('<BBBBHHII', w if w<256 else 0, h if h<256 else 0, 0, 0, 1, 32, len(data), offset)
+        offset += len(data)
+    with open(out, 'wb') as f:
+        f.write(hdr + dirs)
+        for _, _, data in imgs: f.write(data)
+    print(f'favicon.ico → {os.path.getsize(out)} bytes')
+make_ico('assets/images/jt-logo.png', 'dist/favicon.ico')
+PYEOF
 
       - name: Deploy to Reg.ru via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
