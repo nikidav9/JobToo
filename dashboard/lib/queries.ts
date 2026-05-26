@@ -197,7 +197,7 @@ export async function fetchOverview() {
 export async function fetchUsers() {
   const { data: users } = await supabase
     .from('jm_users')
-    .select('id,role,first_name,last_name,phone,metro_station,metro_line_id,is_blocked,created_at,company')
+    .select('id,role,first_name,last_name,phone,metro_station,metro_line_id,is_blocked,created_at,company,push_token')
     .order('created_at', { ascending: false })
 
   const u = users ?? []
