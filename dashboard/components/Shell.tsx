@@ -4,19 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
-
-export const SESSION_KEY = 'jm_admin_auth'
-
-export function setAuth() {
-  try { localStorage.setItem(SESSION_KEY, '1') } catch {}
-}
-export function clearAuth() {
-  try { localStorage.removeItem(SESSION_KEY) } catch {}
-}
-export function isAuthed(): boolean {
-  if (typeof window === 'undefined') return false
-  try { return localStorage.getItem(SESSION_KEY) === '1' } catch { return false }
-}
+import { isAuthed } from '@/lib/auth'
 
 function getBase(): string {
   if (typeof window === 'undefined') return ''
@@ -39,13 +27,11 @@ const NAV = [
 export default function Shell({ children }: { children: React.ReactNode }) {
   const rawPath = usePathname()
   const path = rawPath.replace(/\/$/, '') || '/'
-
-  // Synchronous auth check — avoids white-screen flash
   const [authed, setAuthed] = useState<boolean | null>(null)
 
   useEffect(() => {
     if (isOnLoginPage()) {
-      setAuthed(true) // login page is always accessible
+      setAuthed(true)
       return
     }
     if (isAuthed()) {
@@ -55,12 +41,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Login page — no shell chrome
   if (path === '/login' || isOnLoginPage()) {
     return <>{children}</>
   }
 
-  // Waiting for auth check
   if (authed === null) {
     return <div style={{ minHeight: '100vh', background: '#FAFAF7' }} />
   }
