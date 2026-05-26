@@ -9,10 +9,8 @@ const DB_TIMEOUT = 12_000;
 // On Android/iOS the supabase-js client has connectivity issues.
 // All DB calls go through the web API endpoint instead.
 
-const IS_NATIVE = Platform.OS !== 'web';
-const API_BASE = IS_NATIVE
-  ? (process.env.EXPO_PUBLIC_API_URL || 'https://job-match-2d0wug3k7-nujus-projects.vercel.app')
-  : '';
+const IS_NATIVE = true; // always proxy through jobtoo.ru — Supabase is blocked in Russia from browsers
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://jobtoo.ru';
 
 async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
   const res = await fetch(`${API_BASE}/api/db.php`, {
