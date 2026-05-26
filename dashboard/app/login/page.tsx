@@ -1,17 +1,20 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { setAuth, isAuthed } from '@/components/AuthGuard'
+
+function getBasePath() {
+  if (typeof window === 'undefined') return ''
+  return window.location.pathname.includes('/JobMatch') ? '/JobMatch' : ''
+}
 
 export default function LoginPage() {
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
   useEffect(() => {
-    if (isAuthed()) router.replace('/')
+    if (isAuthed()) window.location.replace(getBasePath() + '/')
   }, [])
 
   function submit(e: React.FormEvent) {
@@ -21,7 +24,7 @@ export default function LoginPage() {
     setTimeout(() => {
       if (login === 'nikidav23' && password === 'Nikita02102001') {
         setAuth()
-        router.replace('/')
+        window.location.replace(getBasePath() + '/')
       } else {
         setError('Неверный логин или пароль')
         setLoading(false)

@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 
 const SESSION_KEY = 'jm_session'
 
@@ -17,23 +17,30 @@ export function isAuthed() {
   return sessionStorage.getItem(SESSION_KEY) === '1'
 }
 
+function getBasePath() {
+  if (typeof window === 'undefined') return ''
+  return window.location.pathname.includes('/JobMatch') ? '/JobMatch' : ''
+}
+
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
   const path = usePathname()
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    if (path === '/login') {
+    const isLogin = path === '/login'
+    if (isLogin) {
       setReady(true)
       return
     }
     if (!isAuthed()) {
-      router.replace('/login')
+      window.location.replace(getBasePath() + '/login/')
     } else {
       setReady(true)
     }
-  }, [path, router])
+  }, [path])
 
-  if (!ready && path !== '/login') return null
+  if (!ready && path !== '/login') return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg, #FAFAF7)' }} />
+  )
   return <>{children}</>
 }
