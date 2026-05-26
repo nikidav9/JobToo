@@ -470,7 +470,7 @@ export default function ProfileScreen() {
             <Text style={styles.logoOrange}>Too</Text>
           </Text>
           <View style={styles.headerActions}>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/chats')} style={styles.headerBtn}>
+            <TouchableOpacity onPress={() => setShowNotifications(true)} style={styles.headerBtn}>
               <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
               {unreadCount > 0 && (
                 <View style={styles.notifBadge}>
@@ -478,7 +478,7 @@ export default function ProfileScreen() {
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerBtn}>
+            <TouchableOpacity style={styles.headerBtn} onPress={() => setShowSettings(true)}>
               <Ionicons name="settings-outline" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
           </View>
