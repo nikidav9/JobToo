@@ -40,7 +40,7 @@ jobs:
           password: ${{ secrets.REGRU_FTP_PASSWORD }}
           local-dir: ./dist/
           server-dir: ./www/jobtoo.ru/
-          dangerous-clean-slate: true
+          dangerous-clean-slate: false
           exclude: |
             **/.git*
             **/.git*/**
