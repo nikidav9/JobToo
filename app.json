@@ -11,6 +11,11 @@
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.nikidav23.onspaceapp",
+      "buildNumber": "5",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
       "associatedDomains": [
         "applinks:job-match-2d0wug3k7-nujus-projects.vercel.app"
       ]
