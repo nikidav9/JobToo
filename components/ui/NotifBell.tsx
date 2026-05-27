@@ -21,23 +21,24 @@ export function NotifBell() {
   const [open, setOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(false);
+  const [debugLine, setDebugLine] = useState('');
 
   const count = app?.unreadNotifCount ?? 0;
   const userId = app?.currentUser?.id ?? null;
 
   const fetchNotifs = useCallback(async (uid: string) => {
     setLoading(true);
-    console.log('[NotifBell] fetchNotifs uid=', uid);
+    setDebugLine('');
     try {
       const rows = await dbGetNotifications(uid);
-      console.log('[NotifBell] rows=', rows.length, JSON.stringify(rows));
+      setDebugLine(`uid=${uid} rows=${rows.length}`);
       setNotifs(rows.map((n: any) => ({
         id: n.id, title: n.title, body: n.body,
         isRead: n.is_read, createdAt: n.created_at,
       })));
       app?.refreshNotifications?.();
     } catch (e: any) {
-      console.error('[NotifBell] error', e?.message ?? e);
+      setDebugLine(`uid=${uid} ERR: ${e?.message ?? String(e)}`);
     } finally {
       setLoading(false);
     }
@@ -93,6 +94,11 @@ export function NotifBell() {
             </View>
           </View>
 
+          {!!debugLine && (
+            <View style={{ backgroundColor: '#fff3cd', paddingHorizontal: 16, paddingVertical: 6 }}>
+              <Text selectable style={{ fontSize: 11, color: '#856404', fontFamily: 'monospace' }}>{debugLine}</Text>
+            </View>
+          )}
           <ScrollView contentContainerStyle={s.list}>
             {loading ? (
               <View style={s.empty}>
