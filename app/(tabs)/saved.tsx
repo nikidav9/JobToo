@@ -10,7 +10,7 @@ import { formatDate } from '@/services/storage';
 import { dbRemoveSaved } from '@/services/db';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
-import { NotificationBell } from '@/components/ui/NotificationBell';
+import { NotifBell } from '@/components/ui/NotifBell';
 import { Vacancy } from '@/constants/types';
 
 export default function SavedScreen() {
@@ -42,7 +42,7 @@ export default function SavedScreen() {
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <View style={styles.header}>
           <Text style={styles.title}>Избранное</Text>
-          <NotificationBell />
+          <NotifBell />
         </View>
         <View style={styles.empty}>
           <Text style={{ fontSize: 48 }}>❤️</Text>
@@ -60,7 +60,7 @@ export default function SavedScreen() {
         <View style={styles.countBadge}>
           <Text style={styles.countTxt}>{savedVacancies.length}</Text>
         </View>
-        <NotificationBell />
+        <NotifBell />
       </View>
 
       <FlatList

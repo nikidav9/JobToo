@@ -19,7 +19,6 @@ import {
 } from '@/services/notifications';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
-import { NotificationBell } from '@/components/ui/NotificationBell';
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function MatchStatus({ like, isWorker }: { like: Like; isWorker: boolean }) {
@@ -228,7 +227,6 @@ function WorkerMatches() {
       <View style={s.header}>
         <Text style={s.title}>Мои отклики</Text>
         <NotifBell />
-        <NotificationBell />
       </View>
 
       {/* Tab strip */}
@@ -570,7 +568,6 @@ function EmployerMatches() {
           </View>
         ) : null}
         <NotifBell />
-        <NotificationBell />
       </View>
 
       <View style={s.tabStrip}>

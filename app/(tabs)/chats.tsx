@@ -12,7 +12,6 @@ import { useApp } from '@/hooks/useApp';
 import { Chat } from '@/constants/types';
 import { nameColorFromString, getInitials } from '@/services/storage';
 import { dbDeleteChat } from '@/services/db';
-import { NotificationBell } from '@/components/ui/NotificationBell';
 import { NotifBell } from '@/components/ui/NotifBell';
 
 const { width: SW } = Dimensions.get('window');
@@ -177,7 +176,6 @@ export default function ChatsScreen() {
       <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
         <Text style={styles.title}>Сообщения</Text>
         <NotifBell />
-        <NotificationBell />
       </View>
 
       <View style={styles.searchWrap}>
