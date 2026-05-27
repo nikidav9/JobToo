@@ -42,3 +42,4 @@ app-example
 .expo/
 .vercel
 .expo/
+supabase/.temp/
