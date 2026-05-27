@@ -20,26 +20,18 @@ export async function resetPassword(userId: string): Promise<string> {
     .eq('id', userId)
   if (error) throw new Error(error.message)
 
-  // Send push notification if token exists
-  const { data } = await supabaseAdmin
-    .from('jm_users')
-    .select('push_token')
-    .eq('id', userId)
-    .maybeSingle()
-  if (data?.push_token) {
-    await sendPushToToken(data.push_token, '🔑 Новый пароль', `Ваш новый пароль: ${newPassword}`)
-  }
+  await supabaseAdmin.functions.invoke('push-notify', {
+    body: { userId, title: '🔑 Новый пароль', body: `Ваш новый пароль: ${newPassword}` },
+  }).catch(() => {})
   return newPassword
 }
 
 export async function sendPushToUser(userId: string, title: string, body: string) {
-  const { data } = await supabaseAdmin
-    .from('jm_users')
-    .select('push_token')
-    .eq('id', userId)
-    .maybeSingle()
-  if (!data?.push_token) throw new Error('У пользователя нет push-токена')
-  await sendPushToToken(data.push_token, title, body)
+  const { data, error } = await supabaseAdmin.functions.invoke('push-notify', {
+    body: { userId, title, body },
+  })
+  if (error) throw new Error(error.message)
+  if (data?.error) throw new Error(data.error)
 }
 
 // ─── Vacancies ────────────────────────────────────────────────────────────────
@@ -115,7 +107,7 @@ export async function resolveComplaintAndBlock(complaintId: string, targetUserId
     .eq('id', complaintId)
 }
 
-// ─── Broadcast push ──────────────────────────────────────────────────────────
+// ─── Broadcast push (via Supabase Edge Function to avoid browser CORS) ───────
 
 export async function broadcastPush(
   target: 'all' | 'workers' | 'employers' | 'metro',
@@ -123,26 +115,12 @@ export async function broadcastPush(
   body: string,
   metro?: string,
 ) {
-  let query = supabaseAdmin.from('jm_users').select('push_token').not('push_token', 'is', null)
-  if (target === 'workers') query = query.eq('role', 'worker')
-  else if (target === 'employers') query = query.eq('role', 'employer')
-  else if (target === 'metro' && metro) query = query.eq('metro_station', metro)
-
-  const { data, error } = await query
+  const { data, error } = await supabaseAdmin.functions.invoke('push-notify', {
+    body: { target, title, body, metro },
+  })
   if (error) throw new Error(error.message)
-
-  const tokens = (data ?? []).map((u: any) => u.push_token).filter(Boolean)
-  if (tokens.length === 0) throw new Error('Нет пользователей с push-токеном')
-
-  const messages = tokens.map((to: string) => ({
-    to, title, body, sound: 'default', channelId: 'default', priority: 'high',
-    data: { type: 'broadcast' },
-  }))
-
-  for (let i = 0; i < messages.length; i += 100) {
-    await sendExpoBatch(messages.slice(i, i + 100))
-  }
-  return tokens.length
+  if (data?.error) throw new Error(data.error)
+  return data?.count ?? 0
 }
 
 // ─── Vacancy editing ─────────────────────────────────────────────────────────
@@ -197,17 +175,3 @@ export async function setComplaintStatus(id: string, status: 'pending' | 'in_rev
   logActivity('Статус жалобы изменён', `ID: ${id} → ${status}`)
 }
 
-// ─── Push helpers ─────────────────────────────────────────────────────────────
-
-async function sendPushToToken(token: string, title: string, body: string) {
-  await sendExpoBatch([{ to: token, title, body, sound: 'default', channelId: 'default', priority: 'high', data: { type: 'admin' } }])
-}
-
-async function sendExpoBatch(messages: object[]) {
-  const res = await fetch('https://exp.host/--/api/v2/push/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(messages.length === 1 ? messages[0] : messages),
-  })
-  if (!res.ok) throw new Error(`Expo API error: ${res.status}`)
-}
