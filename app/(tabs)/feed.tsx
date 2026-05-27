@@ -624,7 +624,10 @@ function WorkerFeed() {
       })
       .sort((a, b) => scoreVacancy(b, currentUser) - scoreVacancy(a, currentUser));
     setCards(filtered);
-    if (!swipingRef.current) pan.setValue({ x: 0, y: 0 });
+    if (!swipingRef.current) {
+      pan.flattenOffset();
+      pan.setValue({ x: 0, y: 0 });
+    }
   }, [selectedDate, vacancies, likes, currentUser, filterStation]);
 
   const currentCard = cards[0];
@@ -847,7 +850,7 @@ function WorkerFeed() {
       {/* Card area */}
       <View style={styles.cardArea}>
         {!currentCard ? (
-          <View style={styles.emptyState}>
+          <View style={styles.emptyState} pointerEvents="none">
             <View style={styles.emptyCharContainer}>
               <Image
                 source={require('../../assets/images/char-seeker-empty.png')}
@@ -952,7 +955,6 @@ function WorkerFeed() {
               </View>
             </Animated.View>
 
-            {/* Action buttons outside card */}
             <View style={styles.actions}>
               <TouchableOpacity
                 style={[styles.actionBtn, styles.actionUndo, !dateHistory.length && { opacity: 0.3 }]}
