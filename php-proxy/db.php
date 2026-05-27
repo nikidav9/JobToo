@@ -397,6 +397,15 @@ try {
             $data = json_decode($resp ?: 'null', true); break;
         }
 
+        case 'dbGetNotifications':
+            $data = sb_select('jm_notifications', ['user_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;
+
+        case 'dbMarkNotifRead':
+            sb_update('jm_notifications', ['id' => 'eq.' . $args[0]], ['is_read' => true]); break;
+
+        case 'dbMarkAllNotifsRead':
+            sb_update('jm_notifications', ['user_id' => 'eq.' . $args[0]], ['is_read' => true]); break;
+
         default:
             throw new RuntimeException('Unknown function: ' . $fn);
     }
