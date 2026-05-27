@@ -121,12 +121,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const refreshNotifications = useCallback(async () => {
     const user = await getSessionUser();
     if (!user) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('jm_notifications')
       .select('id, title, body, is_read, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(50);
+    if (error) { console.warn('[notifications] query error', error); return; }
     setNotifications((data ?? []).map((n: any) => ({
       id: n.id, title: n.title, body: n.body,
       isRead: n.is_read, createdAt: n.created_at,
@@ -303,6 +304,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         .on('postgres_changes', { event: '*', schema: 'public', table: 'jm_perm_applications' }, () => refreshPermApplications(user))
         .subscribe(),
 
+      sb.channel('rt_notifications')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jm_notifications', filter: `user_id=eq.${user.id}` }, () => refreshNotifications())
+        .subscribe(),
+
       // Web-only channels (supabase-js handles these fine on web)
       ...(Platform.OS === 'web' ? [
         supabase.channel('rt_users')
@@ -337,6 +342,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshChats(user),
         refreshVacancies(),
         refreshLikes(user),
+        refreshNotifications(),
       ]).catch(() => {});
     };
 
