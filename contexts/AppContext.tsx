@@ -1,4 +1,12 @@
 import React, { createContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+}
 import { Platform, AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { getSupabaseClient } from '@/template';
@@ -44,6 +52,11 @@ export interface AppContextValue {
   likes: Like[];
   chats: Chat[];
   unreadCount: number;
+  notifications: AppNotification[];
+  unreadNotifCount: number;
+  refreshNotifications: () => Promise<void>;
+  markNotifRead: (id: string) => Promise<void>;
+  markAllNotifsRead: () => Promise<void>;
   permVacancies: PermVacancy[];
   permApplications: PermApplication[];
   savedWorkers: User[];
@@ -101,6 +114,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [savedWorkers] = useState<User[]>([]);
   const [permSavedWorkers] = useState<User[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+  const unreadNotifCount = notifications.filter(n => !n.isRead).length;
+
+  const refreshNotifications = useCallback(async () => {
+    const user = await getSessionUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from('jm_notifications')
+      .select('id, title, body, is_read, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    setNotifications((data ?? []).map((n: any) => ({
+      id: n.id, title: n.title, body: n.body,
+      isRead: n.is_read, createdAt: n.created_at,
+    })));
+  }, []);
+
+  const markNotifRead = useCallback(async (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    await supabase.from('jm_notifications').update({ is_read: true }).eq('id', id);
+  }, []);
+
+  const markAllNotifsRead = useCallback(async () => {
+    const user = await getSessionUser();
+    if (!user) return;
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    await supabase.from('jm_notifications').update({ is_read: true }).eq('user_id', user.id);
+  }, []);
   const [permSavedIds, setPermSavedIds] = useState<string[]>([]);
 
   const optimisticAddSaved = useCallback((vacancyId: string) => {
@@ -186,6 +229,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               refreshPermVacancies(sessionUser),
               refreshPermApplications(sessionUser),
               refreshPermSaved(sessionUser),
+              refreshNotifications(),
             ]).catch(() => {});
           }, 100);
 
@@ -514,6 +558,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshPermSaved,
         refreshAll,
         updateUser,
+        notifications,
+        unreadNotifCount,
+        refreshNotifications,
+        markNotifRead,
+        markAllNotifsRead,
       }}
     >
       {children}

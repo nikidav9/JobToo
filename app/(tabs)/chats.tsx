@@ -12,6 +12,7 @@ import { useApp } from '@/hooks/useApp';
 import { Chat } from '@/constants/types';
 import { nameColorFromString, getInitials } from '@/services/storage';
 import { dbDeleteChat } from '@/services/db';
+import { NotifBell } from '@/components/ui/NotifBell';
 
 const { width: SW } = Dimensions.get('window');
 const DELETE_THRESHOLD = -80;
@@ -172,8 +173,9 @@ export default function ChatsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
+      <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
         <Text style={styles.title}>Сообщения</Text>
+        <NotifBell />
       </View>
 
       <View style={styles.searchWrap}>

@@ -15,7 +15,6 @@ const NAV = [
   { href: '/moderation',  icon: IconShield,   label: 'Модерация' },
   { href: '/tickets',     icon: IconTicket,   label: 'Тикеты' },
   { href: '/broadcast',      icon: IconBell,     label: 'Рассылка' },
-  { href: '/notifications',  icon: IconInbox,    label: 'Уведомления' },
   { href: '/activity',       icon: IconActivity, label: 'Лог действий' },
 ]
 

@@ -146,6 +146,31 @@ export async function sendInAppToUser(userId: string, title: string, body: strin
   logActivity('In-app уведомление', `Адресат: ${userId}, заголовок: "${title}"`, userId)
 }
 
+export async function broadcastBoth(
+  target: 'all' | 'workers' | 'employers' | 'metro',
+  title: string,
+  body: string,
+  metro?: string,
+) {
+  const { data, error } = await supabaseAdmin.functions.invoke('push-notify', {
+    body: { target, title, body, metro, mode: 'both' },
+  })
+  if (error) throw new Error(error.message)
+  if (data?.error) throw new Error(data.error)
+  logActivity('Рассылка (push+inapp)', `Цель: ${target}, заголовок: "${title}", push: ${data?.pushCount ?? 0}, inapp: ${data?.inappCount ?? 0}`)
+  return { pushCount: (data?.pushCount ?? 0) as number, inappCount: (data?.inappCount ?? 0) as number }
+}
+
+export async function sendBothToUser(userId: string, title: string, body: string) {
+  const { data, error } = await supabaseAdmin.functions.invoke('push-notify', {
+    body: { userId, title, body, mode: 'both' },
+  })
+  if (error) throw new Error(error.message)
+  if (data?.error) throw new Error(data.error)
+  logActivity('Уведомление пользователю', `Адресат: ${userId}, заголовок: "${title}"`, userId)
+  return { pushCount: (data?.pushCount ?? 0) as number, inappCount: (data?.inappCount ?? 0) as number }
+}
+
 // ─── Vacancy editing ─────────────────────────────────────────────────────────
 
 export async function updateTempVacancy(id: string, fields: {

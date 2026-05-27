@@ -23,6 +23,7 @@ import { WorkTypeSelector } from '@/components/feature/WorkTypeSelector';
 import { WorkType } from '@/constants/types';
 import { WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
 import { METRO_LINES } from '@/constants/metro';
+import { NotifBell } from '@/components/ui/NotifBell';
 
 type EditSection = 'personal' | 'metro' | 'worktypes' | 'company' | 'bio' | null;
 
@@ -445,8 +446,11 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 }}>
         <Text style={styles.pageTitle}>Профиль</Text>
+        <NotifBell />
+      </View>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         <View style={styles.topCard}>
           {/* Avatar — tappable to change photo */}
