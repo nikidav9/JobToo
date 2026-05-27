@@ -365,9 +365,17 @@ export default function AdminScreen() {
           <Text style={styles.backTxt}>← Назад</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Администрирование</Text>
-        <TouchableOpacity onPress={loadAll} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Text style={styles.refreshBtn}>↻</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => router.push('/analytics' as any)}
+            style={{ backgroundColor: Colors.primaryLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}
+          >
+            <Text style={{ fontSize: 13, color: Colors.primary, fontWeight: '600' }}>📊 Аналитика</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={loadAll} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.refreshBtn}>↻</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Stats bar */}

@@ -1,0 +1,19 @@
+{
+  "name": "JobToo Аналитика",
+  "short_name": "JobToo",
+  "description": "Аналитический дашборд JobToo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAFAF7",
+  "theme_color": "#16140F",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

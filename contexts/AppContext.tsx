@@ -1,4 +1,12 @@
 import React, { createContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+}
 import { Platform, AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { getSupabaseClient } from '@/template';
@@ -25,6 +33,9 @@ import {
   dbGetPermVacanciesByEmployer,
   dbGetPermApplications,
   dbGetPermSaved,
+  dbGetNotifications,
+  dbMarkNotifRead,
+  dbMarkAllNotifsRead,
 } from '@/services/db';
 import { registerForPushNotifications } from '@/services/notifications';
 
@@ -44,6 +55,11 @@ export interface AppContextValue {
   likes: Like[];
   chats: Chat[];
   unreadCount: number;
+  notifications: AppNotification[];
+  unreadNotifCount: number;
+  refreshNotifications: () => Promise<void>;
+  markNotifRead: (id: string) => Promise<void>;
+  markAllNotifsRead: () => Promise<void>;
   permVacancies: PermVacancy[];
   permApplications: PermApplication[];
   savedWorkers: User[];
@@ -101,6 +117,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [savedWorkers] = useState<User[]>([]);
   const [permSavedWorkers] = useState<User[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+  const unreadNotifCount = notifications.filter(n => !n.isRead).length;
+
+  const refreshNotifications = useCallback(async () => {
+    const user = await getSessionUser();
+    if (!user) return;
+    try {
+      const rows = await dbGetNotifications(user.id);
+      setNotifications(rows.map((n: any) => ({
+        id: n.id, title: n.title, body: n.body,
+        isRead: n.is_read, createdAt: n.created_at,
+      })));
+    } catch (e) {
+      console.warn('[notifications] refreshNotifications error', e);
+    }
+  }, []);
+
+  const markNotifRead = useCallback(async (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    await dbMarkNotifRead(id).catch(() => {});
+  }, []);
+
+  const markAllNotifsRead = useCallback(async () => {
+    const user = await getSessionUser();
+    if (!user) return;
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    await dbMarkAllNotifsRead(user.id).catch(() => {});
+  }, []);
   const [permSavedIds, setPermSavedIds] = useState<string[]>([]);
 
   const optimisticAddSaved = useCallback((vacancyId: string) => {
@@ -191,8 +236,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               refreshPermVacancies(sessionUser),
               refreshPermApplications(sessionUser),
               refreshPermSaved(sessionUser),
+              refreshNotifications(),
             ]).catch(() => {});
           }, 100);
+
+          // Register/refresh push token on every app open — catches users
+          // who registered before push notifications were added.
+          setTimeout(() => {
+            if (cancelled) return;
+            registerForPushNotifications(sessionUser.id).catch(() => {});
+          }, 2000);
         }
       } catch (e) {
         console.warn('[AppContext] boot error', e);
@@ -252,6 +305,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     safeSub(supabase.channel('rt_perm_saved').on('postgres_changes', { event: '*', schema: 'public', table: 'jm_perm_saved' }, () => refreshPermSaved(user)));
     safeSub(supabase.channel('rt_ratings').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jm_ratings' }, () => refreshUsers()));
 
+    safeSub(supabase.channel('rt_notifications').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jm_notifications', filter: `user_id=eq.${user.id}` }, () => refreshNotifications()));
+
     return () => {
       subs.forEach(s => { try { s.unsubscribe(); } catch {} });
     };
@@ -271,6 +326,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshChats(user),
         refreshVacancies(),
         refreshLikes(user),
+        refreshNotifications(),
       ]).catch(() => {});
     };
 
@@ -492,6 +548,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshPermSaved,
         refreshAll,
         updateUser,
+        notifications,
+        unreadNotifCount,
+        refreshNotifications,
+        markNotifRead,
+        markAllNotifsRead,
       }}
     >
       {children}

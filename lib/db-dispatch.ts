@@ -669,6 +669,40 @@ export async function dispatch(supabase: SupabaseClient, fn: string, args: any[]
       return { bothRated: !!(lr?.worker_rated && lr?.employer_rated) };
     }
 
+    // ─── In-app notifications ─────────────────────────────────────────────────
+
+    case 'dbGetNotifications': {
+      const [userId] = args;
+      const { data, error } = await supabase
+        .from('jm_notifications')
+        .select('id, title, body, is_read, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    }
+
+    case 'dbMarkNotifRead': {
+      const [id] = args;
+      const { error } = await supabase
+        .from('jm_notifications')
+        .update({ is_read: true })
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+      return null;
+    }
+
+    case 'dbMarkAllNotifsRead': {
+      const [userId] = args;
+      const { error } = await supabase
+        .from('jm_notifications')
+        .update({ is_read: true })
+        .eq('user_id', userId);
+      if (error) throw new Error(error.message);
+      return null;
+    }
+
     // ─── Push tokens ─────────────────────────────────────────────────────────
 
     case 'dbSavePushToken': {
