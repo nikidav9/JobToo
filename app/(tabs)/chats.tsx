@@ -12,6 +12,7 @@ import { useApp } from '@/hooks/useApp';
 import { Chat } from '@/constants/types';
 import { nameColorFromString, getInitials } from '@/services/storage';
 import { dbDeleteChat } from '@/services/db';
+import { NotificationBell } from '@/components/ui/NotificationBell';
 
 const { width: SW } = Dimensions.get('window');
 const DELETE_THRESHOLD = -80;
@@ -174,6 +175,7 @@ export default function ChatsScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.title}>Сообщения</Text>
+        <NotificationBell />
       </View>
 
       <View style={styles.searchWrap}>
@@ -223,7 +225,7 @@ export default function ChatsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
-  header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   title: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
   searchWrap: { paddingHorizontal: 16, paddingBottom: 12 },
   searchInput: { backgroundColor: Colors.surface, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: Colors.textPrimary },
