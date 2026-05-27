@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import React, { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
+import * as Updates from 'expo-updates';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -91,11 +92,23 @@ function NotificationHandler() {
   return null;
 }
 
+async function checkAndApplyUpdate() {
+  if (__DEV__ || Platform.OS === 'web') return;
+  try {
+    const { isAvailable } = await Updates.checkForUpdateAsync();
+    if (isAvailable) {
+      await Updates.fetchUpdateAsync();
+      await Updates.reloadAsync();
+    }
+  } catch {}
+}
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({ ...Ionicons.font });
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
+    checkAndApplyUpdate();
     setupAndroidChannels().catch(() => {});
     requestNotificationPermissions().catch(() => {});
   }, []);
