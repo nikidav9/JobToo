@@ -7,7 +7,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
 import { dbGetNotifications, dbMarkNotifRead, dbMarkAllNotifsRead } from '@/services/db';
-import { getSessionUser } from '@/services/storage';
 
 interface Notif {
   id: string;
@@ -22,43 +21,36 @@ export function NotifBell() {
   const [open, setOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(false);
-  const [debugInfo, setDebugInfo] = useState('');
 
   const count = app?.unreadNotifCount ?? 0;
+  const userId = app?.currentUser?.id ?? null;
 
-  const fetchNotifs = useCallback(async () => {
-    const user = await getSessionUser();
-    if (!user) {
-      setDebugInfo('user: null (не авторизован)');
-      setLoading(false);
-      return;
-    }
+  const fetchNotifs = useCallback(async (uid: string) => {
     setLoading(true);
     try {
-      const rows = await dbGetNotifications(user.id);
-      setDebugInfo(`user: ${user.id} | rows: ${rows.length}`);
+      const rows = await dbGetNotifications(uid);
       setNotifs(rows.map((n: any) => ({
         id: n.id, title: n.title, body: n.body,
         isRead: n.is_read, createdAt: n.created_at,
       })));
       app?.refreshNotifications?.();
-    } catch (e: any) {
-      setDebugInfo(`ошибка: ${e?.message ?? String(e)}`);
+    } catch {
+      // keep current list on error
     } finally {
       setLoading(false);
     }
   }, [app]);
 
-  async function handleOpen() {
+  function handleOpen() {
+    if (!userId) return;
     setOpen(true);
-    fetchNotifs();
+    fetchNotifs(userId);
   }
 
   async function handleMarkAll() {
-    const user = await getSessionUser();
-    if (!user) return;
+    if (!userId) return;
     setNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
-    await dbMarkAllNotifsRead(user.id).catch(() => {});
+    await dbMarkAllNotifsRead(userId).catch(() => {});
     app?.markAllNotifsRead?.();
   }
 
@@ -109,7 +101,6 @@ export function NotifBell() {
                 <Text style={s.emptyIcon}>🔔</Text>
                 <Text style={s.emptyTitle}>Нет уведомлений</Text>
                 <Text style={s.emptySub}>Здесь будут появляться важные уведомления</Text>
-                {!!debugInfo && <Text style={{ fontSize: 10, color: 'red', marginTop: 12, textAlign: 'center' }}>{debugInfo}</Text>}
               </View>
             ) : (
               notifs.map(n => (
