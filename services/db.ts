@@ -886,3 +886,28 @@ export async function dbGetWorkerTokensByMetro(metroStation: string): Promise<{ 
   );
   return (data ?? []) as { id: string; push_token: string }[];
 }
+
+// ─── In-app notifications ──────────────────────────────────────────────────────
+
+export async function dbGetNotifications(userId: string): Promise<{ id: string; title: string; body: string; is_read: boolean; created_at: string }[]> {
+  if (IS_NATIVE) { return proxy('dbGetNotifications', [userId]); }
+  const { data, error } = await withTimeout(
+    supabase.from('jm_notifications')
+      .select('id, title, body, is_read, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+  );
+  if (error) throwOnError('dbGetNotifications', error);
+  return data ?? [];
+}
+
+export async function dbMarkNotifRead(id: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbMarkNotifRead', [id]); return; }
+  await withTimeout(supabase.from('jm_notifications').update({ is_read: true }).eq('id', id));
+}
+
+export async function dbMarkAllNotifsRead(userId: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbMarkAllNotifsRead', [userId]); return; }
+  await withTimeout(supabase.from('jm_notifications').update({ is_read: true }).eq('user_id', userId));
+}

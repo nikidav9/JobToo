@@ -33,6 +33,9 @@ import {
   dbGetPermVacanciesByEmployer,
   dbGetPermApplications,
   dbGetPermSaved,
+  dbGetNotifications,
+  dbMarkNotifRead,
+  dbMarkAllNotifsRead,
 } from '@/services/db';
 import { registerForPushNotifications } from '@/services/notifications';
 
@@ -121,29 +124,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const refreshNotifications = useCallback(async () => {
     const user = await getSessionUser();
     if (!user) return;
-    const { data, error } = await supabase
-      .from('jm_notifications')
-      .select('id, title, body, is_read, created_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
-    if (error) { console.warn('[notifications] query error', error); return; }
-    setNotifications((data ?? []).map((n: any) => ({
-      id: n.id, title: n.title, body: n.body,
-      isRead: n.is_read, createdAt: n.created_at,
-    })));
+    try {
+      const rows = await dbGetNotifications(user.id);
+      setNotifications(rows.map((n: any) => ({
+        id: n.id, title: n.title, body: n.body,
+        isRead: n.is_read, createdAt: n.created_at,
+      })));
+    } catch (e) {
+      console.warn('[notifications] refreshNotifications error', e);
+    }
   }, []);
 
   const markNotifRead = useCallback(async (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-    await supabase.from('jm_notifications').update({ is_read: true }).eq('id', id);
+    await dbMarkNotifRead(id).catch(() => {});
   }, []);
 
   const markAllNotifsRead = useCallback(async () => {
     const user = await getSessionUser();
     if (!user) return;
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    await supabase.from('jm_notifications').update({ is_read: true }).eq('user_id', user.id);
+    await dbMarkAllNotifsRead(user.id).catch(() => {});
   }, []);
   const [permSavedIds, setPermSavedIds] = useState<string[]>([]);
 
