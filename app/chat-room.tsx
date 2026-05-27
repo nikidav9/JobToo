@@ -36,8 +36,10 @@ export default function ChatRoom() {
   const chat = foundChat ?? chatRef.current ?? dbChat;
 
   // Declare state/refs before effects that reference them
+  const hasCachedRef = useRef(chatId ? msgCache.has(chatId) : false);
   const cached = chatId ? (msgCache.get(chatId) ?? chat?.messages ?? []) : (chat?.messages ?? []);
   const [messages, setMessages] = useState<Message[]>(cached);
+  const [loadingMessages, setLoadingMessages] = useState(!hasCachedRef.current && !!chatId);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [decidingLike, setDecidingLike] = useState(false);
@@ -65,6 +67,20 @@ export default function ChatRoom() {
   useEffect(() => {
     if (foundChat) setDbChat(null);
   }, [foundChat?.id]);
+
+  // Load all messages immediately on first open (context only has the last preview message)
+  useEffect(() => {
+    if (!chatId || hasCachedRef.current) return;
+    let mounted = true;
+    dbGetMessages(chatId).then(msgs => {
+      if (!mounted) return;
+      setMessages(msgs);
+      msgCache.set(chatId, msgs);
+      lastCountRef.current = msgs.length;
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 50);
+    }).catch(() => {}).finally(() => { if (mounted) setLoadingMessages(false); });
+    return () => { mounted = false; };
+  }, [chatId]);
 
   const isEmployer = currentUser?.role === 'employer';
 
@@ -497,15 +513,21 @@ export default function ChatRoom() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        <FlatList
-          ref={listRef}
-          data={messages}
-          keyExtractor={m => m.id}
-          renderItem={renderMessage}
-          contentContainerStyle={styles.msgList}
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-        />
+        {loadingMessages ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={m => m.id}
+            renderItem={renderMessage}
+            contentContainerStyle={styles.msgList}
+            showsVerticalScrollIndicator={false}
+            onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+          />
+        )}
 
         {/* Input bar */}
         <View style={styles.inputBar}>

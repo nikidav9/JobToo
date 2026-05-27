@@ -680,6 +680,16 @@ export async function dbClosePermVacancy(id: string): Promise<void> {
   if (error) throwOnError('dbClosePermVacancy', error);
 }
 
+export async function dbDeleteVacancy(id: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbDeleteVacancy', [id]); return; }
+  await withTimeout(supabase.from('jm_vacancies').delete().eq('id', id));
+}
+
+export async function dbDeletePermVacancy(id: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbDeletePermVacancy', [id]); return; }
+  await withTimeout(supabase.from('jm_perm_vacancies').delete().eq('id', id));
+}
+
 // ─── Permanent applications ───────────────────────────────────────────────────
 
 function rowToPermApp(r: any): PermApplication {

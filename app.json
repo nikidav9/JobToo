@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/jt-logo.png",
     "scheme": "onspaceapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,

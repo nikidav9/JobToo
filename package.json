@@ -10,7 +10,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "eas:update": "eas update --channel production --non-interactive",
+    "eas:build": "eas build --platform android --profile production --non-interactive"
   },
   "dependencies": {
     "@apollo/client": "^3.4.10",

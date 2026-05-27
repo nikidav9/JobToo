@@ -299,6 +299,12 @@ try {
         case 'dbClosePermVacancy':
             sb_update('jm_perm_vacancies', ['id' => 'eq.' . $args[0]], ['status' => 'closed']); break;
 
+        case 'dbDeleteVacancy':
+            sb_delete('jm_vacancies', ['id' => 'eq.' . $args[0]]); break;
+
+        case 'dbDeletePermVacancy':
+            sb_delete('jm_perm_vacancies', ['id' => 'eq.' . $args[0]]); break;
+
         // ── Permanent applications ─────────────────────────────────────────────
         case 'dbGetPermApplications': {
             $f = $args[1] === 'worker' ? 'worker_id' : 'employer_id';

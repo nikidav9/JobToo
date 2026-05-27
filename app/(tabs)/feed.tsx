@@ -24,6 +24,8 @@ import {
   dbAddPermSaved,
   dbRemovePermSaved,
   dbClosePermVacancy,
+  dbDeleteVacancy,
+  dbDeletePermVacancy,
   dbGetUserById,
   dbGetLikesByVacancy,
 } from '@/services/db';
@@ -1462,6 +1464,10 @@ function EmployerHome() {
   const didAutoClose = useRef(false);
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
   const [closingPermIds, setClosingPermIds] = useState<Set<string>>(new Set());
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [deletingPermIds, setDeletingPermIds] = useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmDeletePerm, setConfirmDeletePerm] = useState<string | null>(null);
 
   const onRefresh = async () => {
     if (refreshing) return;
@@ -1485,12 +1491,14 @@ function EmployerHome() {
   }, [vacancies]);
 
   const shown = myVacancies.filter(v => {
+    if (deletingIds.has(v.id)) return false;
     const isClosing = closingIds.has(v.id);
     if (tab === 'active') return !isClosing && v.status === 'open' && v.date >= todayISO;
     return isClosing || v.status === 'closed' || (v.status === 'open' && v.date < todayISO);
   });
 
   const shownPerm = myPermVacancies.filter(v => {
+    if (deletingPermIds.has(v.id)) return false;
     const isClosing = closingPermIds.has(v.id);
     if (tab === 'active') return !isClosing && v.status === 'open';
     return isClosing || v.status === 'closed';
@@ -1526,6 +1534,24 @@ function EmployerHome() {
     dbClosePermVacancy(id)
       .then(() => refreshPermVacancies().catch(() => {}))
       .catch(e => console.warn('[closePermVacancy]', e));
+  };
+
+  const deleteVacancy = (id: string) => {
+    setConfirmDelete(null);
+    setDeletingIds(prev => new Set([...prev, id]));
+    showToast('Вакансия удалена', 'success');
+    dbDeleteVacancy(id)
+      .then(() => refreshVacancies().catch(() => {}))
+      .catch(e => console.warn('[deleteVacancy]', e));
+  };
+
+  const deletePermVacancy = (id: string) => {
+    setConfirmDeletePerm(null);
+    setDeletingPermIds(prev => new Set([...prev, id]));
+    showToast('Вакансия удалена', 'success');
+    dbDeletePermVacancy(id)
+      .then(() => refreshPermVacancies().catch(() => {}))
+      .catch(e => console.warn('[deletePermVacancy]', e));
   };
 
   return (
@@ -1587,7 +1613,7 @@ function EmployerHome() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.editBtn, { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}
-                      onPress={() => setConfirmClose(v.id)}
+                      onPress={() => tab === 'closed' ? setConfirmDelete(v.id) : setConfirmClose(v.id)}
                       activeOpacity={0.7}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
@@ -1652,7 +1678,7 @@ function EmployerHome() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.editBtn, { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}
-                      onPress={() => closePermVacancy(v.id)}
+                      onPress={() => tab === 'closed' ? setConfirmDeletePerm(v.id) : closePermVacancy(v.id)}
                       activeOpacity={0.7}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
@@ -1703,6 +1729,32 @@ function EmployerHome() {
             <View style={styles.confirmBtns}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmClose(null)}><Text style={styles.cancelBtnText}>Отмена</Text></TouchableOpacity>
               <TouchableOpacity style={styles.confirmBtn} onPress={() => closeVacancy(confirmClose)}><Text style={styles.confirmBtnText}>Закрыть</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {confirmDelete ? (
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>Удалить вакансию?</Text>
+            <Text style={styles.confirmBody}>Вакансия будет полностью удалена из истории</Text>
+            <View style={styles.confirmBtns}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDelete(null)}><Text style={styles.cancelBtnText}>Отмена</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: '#EF4444' }]} onPress={() => deleteVacancy(confirmDelete)}><Text style={styles.confirmBtnText}>Удалить</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {confirmDeletePerm ? (
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>Удалить вакансию?</Text>
+            <Text style={styles.confirmBody}>Вакансия будет полностью удалена из истории</Text>
+            <View style={styles.confirmBtns}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDeletePerm(null)}><Text style={styles.cancelBtnText}>Отмена</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: '#EF4444' }]} onPress={() => deletePermVacancy(confirmDeletePerm)}><Text style={styles.confirmBtnText}>Удалить</Text></TouchableOpacity>
             </View>
           </View>
         </View>
