@@ -1,45 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, Modal, StyleSheet,
-  ScrollView, SafeAreaView, Platform,
+  ScrollView, SafeAreaView, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
+import { dbGetNotifications, dbMarkNotifRead, dbMarkAllNotifsRead } from '@/services/db';
+import { getSessionUser } from '@/services/storage';
+
+interface Notif {
+  id: string;
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+}
 
 export function NotifBell() {
   const app = useApp();
   const [open, setOpen] = useState(false);
+  const [notifs, setNotifs] = useState<Notif[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Badge count from AppContext (updated on boot / polling)
   const count = app?.unreadNotifCount ?? 0;
-  const notifs = app?.notifications ?? [];
+
+  const fetchNotifs = useCallback(async () => {
+    const user = await getSessionUser();
+    if (!user) return;
+    setLoading(true);
+    try {
+      const rows = await dbGetNotifications(user.id);
+      setNotifs(rows.map((n: any) => ({
+        id: n.id, title: n.title, body: n.body,
+        isRead: n.is_read, createdAt: n.created_at,
+      })));
+      // Sync count back to AppContext
+      app?.refreshNotifications?.();
+    } catch (e) {
+      console.warn('[NotifBell] fetch error', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [app]);
 
   async function handleOpen() {
     setOpen(true);
-    await app?.refreshNotifications();
+    fetchNotifs();
   }
 
   async function handleMarkAll() {
-    await app?.markAllNotifsRead();
+    const user = await getSessionUser();
+    if (!user) return;
+    setNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
+    await dbMarkAllNotifsRead(user.id).catch(() => {});
+    app?.markAllNotifsRead?.();
   }
 
   async function handleTap(id: string) {
-    await app?.markNotifRead(id);
+    setNotifs(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    await dbMarkNotifRead(id).catch(() => {});
+    app?.markNotifRead?.(id);
   }
+
+  const unread = notifs.filter(n => !n.isRead).length;
+  // Show badge from local state if available, else from context
+  const badge = open ? unread : count;
 
   return (
     <>
       <TouchableOpacity onPress={handleOpen} style={s.btn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Ionicons name="notifications-outline" size={22} color={Colors.textPrimary} />
-        {count > 0 && (
+        {badge > 0 && (
           <View style={s.badge}>
-            <Text style={s.badgeTxt}>{count > 9 ? '9+' : count}</Text>
+            <Text style={s.badgeTxt}>{badge > 9 ? '9+' : badge}</Text>
           </View>
         )}
       </TouchableOpacity>
 
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
         <SafeAreaView style={s.sheet}>
-          {/* Header */}
           <View style={s.header}>
             <Text style={s.title}>Уведомления</Text>
             <View style={s.headerRight}>
@@ -54,9 +95,12 @@ export function NotifBell() {
             </View>
           </View>
 
-          {/* List */}
           <ScrollView contentContainerStyle={s.list}>
-            {notifs.length === 0 ? (
+            {loading ? (
+              <View style={s.empty}>
+                <ActivityIndicator color={Colors.primary} size="large" />
+              </View>
+            ) : notifs.length === 0 ? (
               <View style={s.empty}>
                 <Text style={s.emptyIcon}>🔔</Text>
                 <Text style={s.emptyTitle}>Нет уведомлений</Text>
