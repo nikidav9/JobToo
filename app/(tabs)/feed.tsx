@@ -625,7 +625,10 @@ function WorkerFeed() {
       })
       .sort((a, b) => scoreVacancy(b, currentUser) - scoreVacancy(a, currentUser));
     setCards(filtered);
-    if (!swipingRef.current) pan.setValue({ x: 0, y: 0 });
+    if (!swipingRef.current) {
+      pan.flattenOffset();
+      pan.setValue({ x: 0, y: 0 });
+    }
   }, [selectedDate, vacancies, likes, currentUser, filterStation]);
 
   const currentCard = cards[0];
@@ -847,17 +850,29 @@ function WorkerFeed() {
 
       {/* Card area */}
       <View style={styles.cardArea}>
-        {currentCard && cards[2] ? <View style={styles.ghost2} /> : null}
-        {currentCard && cards[1] ? <View style={styles.ghost1} /> : null}
+        {!currentCard ? (
+          <View style={styles.emptyState} pointerEvents="none">
+            <View style={styles.emptyCharContainer}>
+              <Image
+                source={require('../../assets/images/char-seeker-empty.png')}
+                style={styles.emptyCharImg}
+                contentFit="cover"
+                contentPosition={{ top: '22%' }}
+              />
+            </View>
+            <Text style={styles.emptyTitle}>Новых вакансий пока нет</Text>
+            <Text style={styles.emptySubtitle}>Попробуй другую дату или дождись новых объявлений</Text>
+          </View>
+        ) : (
+          <>
+            {cards[2] ? <View style={styles.ghost2} /> : null}
+            {cards[1] ? <View style={styles.ghost1} /> : null}
 
-        {/* Animated.View stays mounted always — unmounting it disrupts Android gesture system */}
-        <Animated.View
-          style={[styles.cardAnimated, { transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }] }]}
-          {...panResponder.panHandlers}
-          pointerEvents={currentCard ? 'auto' : 'none'}
-        >
-          {currentCard ? (
-            <View style={styles.card}>
+            <Animated.View
+              style={[styles.cardAnimated, { transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }] }]}
+              {...panResponder.panHandlers}
+            >
+              <View style={styles.card}>
                 <Animated.View style={[styles.wantOverlay, { opacity: wantOpacity }]}>
                   <Text style={styles.wantText}>ХОЧУ ♥</Text>
                 </Animated.View>
@@ -939,65 +954,47 @@ function WorkerFeed() {
                   <Text style={styles.detailHintArrow}>→</Text>
                 </TouchableOpacity>
               </View>
-          ) : null}
-        </Animated.View>
+            </Animated.View>
 
-        {/* Action buttons — only when card exists */}
-        {currentCard ? (
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionUndo, !dateHistory.length && { opacity: 0.3 }]}
-              onPress={doUndo}
-              disabled={!dateHistory.length || swiping}
-              activeOpacity={0.7}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={styles.actionUndoIcon}>↩</Text>
-            </TouchableOpacity>
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionUndo, !dateHistory.length && { opacity: 0.3 }]}
+                onPress={doUndo}
+                disabled={!dateHistory.length || swiping}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.actionUndoIcon}>↩</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionSkip]}
-              onPress={() => doSkip(0.5)}
-              disabled={swiping}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.actionSkipIcon}>✕</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionSkip]}
+                onPress={() => doSkip(0.5)}
+                disabled={swiping}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.actionSkipIcon}>✕</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionSave]}
-              onPress={() => doMessageRef.current?.()}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.actionSaveIcon}>💬</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionSave]}
+                onPress={() => doMessageRef.current?.()}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.actionSaveIcon}>💬</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionWant]}
-              onPress={() => doWant(0.5)}
-              disabled={swiping}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.actionWantIcon}>✓</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
-        {/* Empty state — absolute overlay so Animated.View stays mounted */}
-        {!currentCard ? (
-          <View style={[StyleSheet.absoluteFill, styles.emptyState]}>
-            <View style={styles.emptyCharContainer}>
-              <Image
-                source={require('../../assets/images/char-seeker-empty.png')}
-                style={styles.emptyCharImg}
-                contentFit="cover"
-                contentPosition={{ top: '22%' }}
-              />
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionWant]}
+                onPress={() => doWant(0.5)}
+                disabled={swiping}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.actionWantIcon}>✓</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.emptyTitle}>Новых вакансий пока нет</Text>
-            <Text style={styles.emptySubtitle}>Попробуй другую дату или дождись новых объявлений</Text>
-          </View>
-        ) : null}
+          </>
+        )}
       </View>
 
       <MetroStationPicker
