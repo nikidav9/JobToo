@@ -1,12 +1,15 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, Modal, StyleSheet,
-  ScrollView, SafeAreaView, ActivityIndicator,
+  ScrollView, SafeAreaView, ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
-import { dbGetNotifications, dbMarkNotifRead, dbMarkAllNotifsRead } from '@/services/db';
+import {
+  dbGetNotifications, dbMarkNotifRead, dbMarkAllNotifsRead,
+  dbDeleteNotif, dbDeleteAllNotifs,
+} from '@/services/db';
 
 interface Notif {
   id: string;
@@ -60,8 +63,33 @@ export function NotifBell() {
     app?.markNotifRead?.(id);
   }
 
+  async function handleDelete(id: string) {
+    setNotifs(prev => prev.filter(n => n.id !== id));
+    await dbDeleteNotif(id).catch(() => {});
+    app?.refreshNotifications?.();
+  }
+
+  function handleDeleteAll() {
+    if (!userId) return;
+    Alert.alert(
+      'Удалить все уведомления?',
+      'Это действие нельзя отменить.',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: async () => {
+            setNotifs([]);
+            await dbDeleteAllNotifs(userId).catch(() => {});
+            app?.refreshNotifications?.();
+          },
+        },
+      ]
+    );
+  }
+
   const unread = notifs.filter(n => !n.isRead).length;
-  // Show badge from local state if available, else from context
   const badge = open ? unread : count;
 
   return (
@@ -80,6 +108,11 @@ export function NotifBell() {
           <View style={s.header}>
             <Text style={s.title}>Уведомления</Text>
             <View style={s.headerRight}>
+              {notifs.length > 0 && (
+                <TouchableOpacity onPress={handleDeleteAll} style={s.deleteAllBtn}>
+                  <Text style={s.deleteAllTxt}>Удалить все</Text>
+                </TouchableOpacity>
+              )}
               {notifs.some(n => !n.isRead) && (
                 <TouchableOpacity onPress={handleMarkAll} style={s.markAllBtn}>
                   <Text style={s.markAllTxt}>Прочитать все</Text>
@@ -104,26 +137,30 @@ export function NotifBell() {
               </View>
             ) : (
               notifs.map(n => (
-                <TouchableOpacity
-                  key={n.id}
-                  onPress={() => handleTap(n.id)}
-                  activeOpacity={0.7}
-                  style={[s.item, !n.isRead && s.itemUnread]}
-                >
-                  <View style={s.itemDot}>
-                    {!n.isRead && <View style={s.dot} />}
-                  </View>
-                  <View style={s.itemBody}>
-                    <Text style={[s.itemTitle, !n.isRead && s.itemTitleBold]}>{n.title}</Text>
-                    <Text style={s.itemText}>{n.body}</Text>
-                    <Text style={s.itemTime}>
-                      {new Date(n.createdAt).toLocaleString('ru', {
-                        day: '2-digit', month: '2-digit',
-                        hour: '2-digit', minute: '2-digit',
-                      })}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                <View key={n.id} style={[s.item, !n.isRead && s.itemUnread]}>
+                  <TouchableOpacity
+                    onPress={() => handleTap(n.id)}
+                    activeOpacity={0.7}
+                    style={s.itemContent}
+                  >
+                    <View style={s.itemDot}>
+                      {!n.isRead && <View style={s.dot} />}
+                    </View>
+                    <View style={s.itemBody}>
+                      <Text style={[s.itemTitle, !n.isRead && s.itemTitleBold]}>{n.title}</Text>
+                      <Text style={s.itemText}>{n.body}</Text>
+                      <Text style={s.itemTime}>
+                        {new Date(n.createdAt).toLocaleString('ru', {
+                          day: '2-digit', month: '2-digit',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDelete(n.id)} style={s.deleteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="trash-outline" size={18} color={Colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
               ))
             )}
           </ScrollView>
@@ -149,7 +186,9 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
   title: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  deleteAllBtn: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: '#FEE2E2' },
+  deleteAllTxt: { fontSize: 12, fontWeight: '600', color: '#DC2626' },
   markAllBtn: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: Colors.primaryLight },
   markAllTxt: { fontSize: 12, fontWeight: '600', color: Colors.primary },
   closeBtn: { padding: 4 },
@@ -162,11 +201,13 @@ const s = StyleSheet.create({
   emptySub: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', lineHeight: 20 },
 
   item: {
-    flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center',
+    paddingLeft: 20, paddingRight: 12, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
     backgroundColor: Colors.bg,
   },
   itemUnread: { backgroundColor: '#FFF8F5' },
+  itemContent: { flex: 1, flexDirection: 'row' },
   itemDot: { width: 20, alignItems: 'center', paddingTop: 5 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary },
   itemBody: { flex: 1 },
@@ -174,4 +215,5 @@ const s = StyleSheet.create({
   itemTitleBold: { fontWeight: '600' },
   itemText: { fontSize: 13, color: Colors.textSecondary, lineHeight: 18, marginBottom: 5 },
   itemTime: { fontSize: 11, color: Colors.textMuted },
+  deleteBtn: { padding: 6, marginLeft: 8 },
 });

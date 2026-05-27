@@ -911,3 +911,13 @@ export async function dbMarkAllNotifsRead(userId: string): Promise<void> {
   if (IS_NATIVE) { await proxy('dbMarkAllNotifsRead', [userId]); return; }
   await withTimeout(supabase.from('jm_notifications').update({ is_read: true }).eq('user_id', userId));
 }
+
+export async function dbDeleteNotif(id: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbDeleteNotif', [id]); return; }
+  await withTimeout(supabase.from('jm_notifications').delete().eq('id', id));
+}
+
+export async function dbDeleteAllNotifs(userId: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbDeleteAllNotifs', [userId]); return; }
+  await withTimeout(supabase.from('jm_notifications').delete().eq('user_id', userId));
+}

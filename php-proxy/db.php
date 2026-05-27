@@ -406,6 +406,12 @@ try {
         case 'dbMarkAllNotifsRead':
             sb_update('jm_notifications', ['user_id' => 'eq.' . $args[0]], ['is_read' => true]); break;
 
+        case 'dbDeleteNotif':
+            sb_delete('jm_notifications', ['id' => 'eq.' . $args[0]]); break;
+
+        case 'dbDeleteAllNotifs':
+            sb_delete('jm_notifications', ['user_id' => 'eq.' . $args[0]]); break;
+
         default:
             throw new RuntimeException('Unknown function: ' . $fn);
     }
