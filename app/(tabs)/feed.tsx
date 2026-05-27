@@ -581,6 +581,7 @@ function WorkerFeed() {
   const [history, setHistory] = useState<Record<string, Vacancy[]>>({});
   const [swiping, setSwiping] = useState(false);
   const [detailVacancy, setDetailVacancy] = useState<Vacancy | null>(null);
+  const [detailEmployer, setDetailEmployer] = useState<User | null>(null);
   const [filterStation, setFilterStation] = useState<string | null>(null);
   const [filterPicker, setFilterPicker] = useState(false);
 
@@ -778,7 +779,7 @@ function WorkerFeed() {
           snapBackRef.current?.();
         }
       },
-      onPanResponderTerminate: () => { snapBackRef.current?.(); },
+      onPanResponderTerminate: () => { swipingRef.current = false; setSwiping(false); snapBackRef.current?.(); },
     })
   ).current;
 
@@ -944,7 +945,7 @@ function WorkerFeed() {
                 <TouchableOpacity
                   style={styles.detailHintRow}
                   activeOpacity={0.7}
-                  onPress={() => setDetailVacancy(currentCard)}
+                  onPress={() => { setDetailVacancy(currentCard); setDetailEmployer(currentEmployer); }}
                 >
                   <Text style={styles.detailHintText}>Подробности и нормативы</Text>
                   <Text style={styles.detailHintArrow}>→</Text>
@@ -1005,7 +1006,8 @@ function WorkerFeed() {
       <VacancyDetailModal
         vacancy={detailVacancy}
         visible={!!detailVacancy}
-        onClose={() => setDetailVacancy(null)}
+        employer={detailEmployer}
+        onClose={() => { setDetailVacancy(null); setDetailEmployer(null); }}
         actions={
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <TouchableOpacity
@@ -1986,7 +1988,7 @@ const styles = StyleSheet.create({
   detailSkipTxt: { color: Colors.red, fontSize: 14, fontWeight: '600' },
   detailWantBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
   detailWantTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 80 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 180 },
   emptyCharContainer: { width: SW - 40, height: Math.round((SW - 40) * 1.216), marginBottom: 8 },
   emptyCharImg: { width: '100%', height: '100%' },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },

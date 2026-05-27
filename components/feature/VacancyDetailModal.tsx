@@ -1,25 +1,31 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View, Text, StyleSheet, Modal, ScrollView,
-  TouchableOpacity, SafeAreaView,
+  TouchableOpacity,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius, Shadow } from '@/constants/theme';
-import { Vacancy } from '@/constants/types';
+import { User, Vacancy } from '@/constants/types';
 import { Chip } from '@/components/ui/Chip';
-import { formatDate } from '@/services/storage';
+import { formatDate, nameColorFromString, getInitials } from '@/services/storage';
 
 interface Props {
   vacancy: Vacancy | null;
   visible: boolean;
   onClose: () => void;
+  employer?: User | null;
   /** Optional action buttons to render at the bottom */
   actions?: React.ReactNode;
 }
 
-export function VacancyDetailModal({ vacancy, visible, onClose, actions }: Props) {
+export function VacancyDetailModal({ vacancy, visible, onClose, employer, actions }: Props) {
   const insets = useSafeAreaInsets();
   if (!vacancy) return null;
+
+  const companyName = employer?.company || vacancy.company || (employer ? `${employer.firstName} ${employer.lastName}` : '');
+  const avatarColor = nameColorFromString(vacancy.employerId);
+  const initials = getInitials(companyName || '?');
 
   return (
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
@@ -40,11 +46,15 @@ export function VacancyDetailModal({ vacancy, visible, onClose, actions }: Props
           >
             {/* Company row */}
             <View style={styles.companyRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarTxt}>{(vacancy.company[0] ?? '?').toUpperCase()}</Text>
-              </View>
+              {employer?.avatarUrl ? (
+                <Image source={{ uri: employer.avatarUrl }} style={styles.avatarImg} contentFit="cover" transition={150} />
+              ) : (
+                <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+                  <Text style={styles.avatarTxt}>{initials}</Text>
+                </View>
+              )}
               <View style={{ flex: 1 }}>
-                <Text style={styles.company}>{vacancy.company}</Text>
+                <Text style={styles.company}>{companyName}</Text>
                 {vacancy.metroStation ? <Text style={styles.metro}>🚇 {vacancy.metroStation}</Text> : null}
               </View>
               {vacancy.isUrgent ? (
@@ -58,7 +68,6 @@ export function VacancyDetailModal({ vacancy, visible, onClose, actions }: Props
 
             {/* Chips: type, time, date */}
             <View style={styles.row}>
-              <Chip label="📦 Кладовщик" variant="work" />
               <Chip label={`⏰ ${vacancy.timeStart}–${vacancy.timeEnd}`} variant="time" />
               <Chip label={`📅 ${formatDate(vacancy.date)}`} variant="date" />
             </View>
@@ -122,9 +131,10 @@ const styles = StyleSheet.create({
   companyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 },
   avatar: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
-  avatarTxt: { fontSize: 16, fontWeight: '700', color: Colors.primary },
+  avatarImg: { width: 44, height: 44, borderRadius: 22 },
+  avatarTxt: { fontSize: 16, fontWeight: '700', color: '#fff' },
   company: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
   metro: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   urgentBadge: { backgroundColor: '#FEF2F2', borderRadius: 100, paddingHorizontal: 10, paddingVertical: 5 },
