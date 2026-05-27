@@ -22,24 +22,28 @@ export function NotifBell() {
   const [open, setOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('');
 
-  // Badge count from AppContext (updated on boot / polling)
   const count = app?.unreadNotifCount ?? 0;
 
   const fetchNotifs = useCallback(async () => {
     const user = await getSessionUser();
-    if (!user) return;
+    if (!user) {
+      setDebugInfo('user: null (не авторизован)');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const rows = await dbGetNotifications(user.id);
+      setDebugInfo(`user: ${user.id} | rows: ${rows.length}`);
       setNotifs(rows.map((n: any) => ({
         id: n.id, title: n.title, body: n.body,
         isRead: n.is_read, createdAt: n.created_at,
       })));
-      // Sync count back to AppContext
       app?.refreshNotifications?.();
-    } catch (e) {
-      console.warn('[NotifBell] fetch error', e);
+    } catch (e: any) {
+      setDebugInfo(`ошибка: ${e?.message ?? String(e)}`);
     } finally {
       setLoading(false);
     }
@@ -105,6 +109,7 @@ export function NotifBell() {
                 <Text style={s.emptyIcon}>🔔</Text>
                 <Text style={s.emptyTitle}>Нет уведомлений</Text>
                 <Text style={s.emptySub}>Здесь будут появляться важные уведомления</Text>
+                {!!debugInfo && <Text style={{ fontSize: 10, color: 'red', marginTop: 12, textAlign: 'center' }}>{debugInfo}</Text>}
               </View>
             ) : (
               notifs.map(n => (
