@@ -13,6 +13,7 @@ const LABELS: Record<string, string> = {
   '/moderation': 'Модерация',
   '/tickets': 'Тикеты',
   '/broadcast': 'Рассылка',
+  '/notifications': 'Уведомления',
   '/activity': 'Лог действий',
 }
 

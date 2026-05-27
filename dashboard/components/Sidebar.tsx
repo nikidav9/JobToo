@@ -14,8 +14,9 @@ const NAV = [
   { href: '/reviews',     icon: IconReview,   label: 'Отзывы' },
   { href: '/moderation',  icon: IconShield,   label: 'Модерация' },
   { href: '/tickets',     icon: IconTicket,   label: 'Тикеты' },
-  { href: '/broadcast',   icon: IconBell,     label: 'Рассылка' },
-  { href: '/activity',    icon: IconActivity, label: 'Лог действий' },
+  { href: '/broadcast',      icon: IconBell,     label: 'Рассылка' },
+  { href: '/notifications',  icon: IconInbox,    label: 'Уведомления' },
+  { href: '/activity',       icon: IconActivity, label: 'Лог действий' },
 ]
 
 export default function Sidebar() {
@@ -168,4 +169,7 @@ function IconTicket({ style }: { style?: React.CSSProperties }) {
 }
 function IconActivity({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M2 8h2.5l1-3 2 7 1.5-5H14"/><circle cx="2" cy="8" r=".5" fill="currentColor"/></svg>
+}
+function IconInbox({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M2 9h3l1 2h4l1-2h3"/><rect x="2" y="3" width="12" height="10" rx="1.5"/></svg>
 }

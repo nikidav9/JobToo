@@ -107,7 +107,7 @@ export async function resolveComplaintAndBlock(complaintId: string, targetUserId
     .eq('id', complaintId)
 }
 
-// ─── Broadcast push (via Supabase Edge Function to avoid browser CORS) ───────
+// ─── Broadcast push / in-app (via Supabase Edge Function) ────────────────────
 
 export async function broadcastPush(
   target: 'all' | 'workers' | 'employers' | 'metro',
@@ -116,11 +116,34 @@ export async function broadcastPush(
   metro?: string,
 ) {
   const { data, error } = await supabaseAdmin.functions.invoke('push-notify', {
-    body: { target, title, body, metro },
+    body: { target, title, body, metro, mode: 'push' },
   })
   if (error) throw new Error(error.message)
   if (data?.error) throw new Error(data.error)
-  return data?.count ?? 0
+  return (data?.pushCount ?? 0) as number
+}
+
+export async function broadcastInApp(
+  target: 'all' | 'workers' | 'employers',
+  title: string,
+  body: string,
+) {
+  const { data, error } = await supabaseAdmin.functions.invoke('push-notify', {
+    body: { target, title, body, mode: 'inapp' },
+  })
+  if (error) throw new Error(error.message)
+  if (data?.error) throw new Error(data.error)
+  logActivity('In-app уведомление', `Цель: ${target}, заголовок: "${title}", получателей: ${data?.inappCount ?? 0}`)
+  return (data?.inappCount ?? 0) as number
+}
+
+export async function sendInAppToUser(userId: string, title: string, body: string) {
+  const { data, error } = await supabaseAdmin.functions.invoke('push-notify', {
+    body: { userId, title, body, mode: 'inapp' },
+  })
+  if (error) throw new Error(error.message)
+  if (data?.error) throw new Error(data.error)
+  logActivity('In-app уведомление', `Адресат: ${userId}, заголовок: "${title}"`, userId)
 }
 
 // ─── Vacancy editing ─────────────────────────────────────────────────────────

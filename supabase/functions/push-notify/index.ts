@@ -12,65 +12,89 @@ serve(async (req) => {
   }
 
   try {
-    const { target, title, body, metro, userId } = await req.json()
+    const { target, title, body, metro, userId, mode } = await req.json()
+    // mode: 'push' (Expo push, default) | 'inapp' (jm_notifications) | 'both'
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
+    // ── Resolve target user IDs / push tokens ─────────────────────────────────
+    let userIds: string[] = []
     let tokens: string[] = []
 
     if (userId) {
-      // Single user push
+      // Single user
       const { data } = await supabase
         .from('jm_users')
-        .select('push_token')
+        .select('id, push_token')
         .eq('id', userId)
         .maybeSingle()
-      if (!data?.push_token) {
-        return new Response(
-          JSON.stringify({ error: 'У пользователя нет push-токена' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-        )
+      if (data) {
+        userIds = [data.id]
+        if (data.push_token) tokens = [data.push_token]
       }
-      tokens = [data.push_token]
     } else {
-      // Broadcast
-      let query = supabase.from('jm_users').select('push_token').not('push_token', 'is', null)
+      // Broadcast — filter by role/metro, and by whether they have push token
+      let query = supabase.from('jm_users').select('id, push_token')
       if (target === 'workers') query = query.eq('role', 'worker')
       else if (target === 'employers') query = query.eq('role', 'employer')
       else if (target === 'metro' && metro) query = query.eq('metro_station', metro)
 
+      // For inapp mode: only users WITHOUT push token
+      if (mode === 'inapp') query = query.is('push_token', null)
+      // For push mode: only users WITH push token
+      if (!mode || mode === 'push') query = query.not('push_token', 'is', null)
+
       const { data, error } = await query
       if (error) throw new Error(error.message)
+
+      userIds = (data ?? []).map((u: any) => u.id)
       tokens = (data ?? []).map((u: any) => u.push_token).filter(Boolean)
-      if (tokens.length === 0) {
-        return new Response(
-          JSON.stringify({ error: 'Нет пользователей с push-токеном' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-        )
+    }
+
+    if (userIds.length === 0 && tokens.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Нет подходящих пользователей' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    let pushCount = 0
+    let inappCount = 0
+
+    // ── Send Expo push notifications ──────────────────────────────────────────
+    if (tokens.length > 0 && mode !== 'inapp') {
+      const messages = tokens.map((to) => ({
+        to, title, body, sound: 'default', channelId: 'default', priority: 'high',
+        data: { type: 'broadcast' },
+      }))
+
+      for (let i = 0; i < messages.length; i += 100) {
+        const batch = messages.slice(i, i + 100)
+        const res = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(batch.length === 1 ? batch[0] : batch),
+        })
+        if (!res.ok) throw new Error(`Expo API error: ${res.status}`)
+        pushCount += batch.length
       }
     }
 
-    const messages = tokens.map((to) => ({
-      to, title, body, sound: 'default', channelId: 'default', priority: 'high',
-      data: { type: 'broadcast' },
-    }))
-
-    // Send in batches of 100
-    for (let i = 0; i < messages.length; i += 100) {
-      const batch = messages.slice(i, i + 100)
-      const res = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(batch.length === 1 ? batch[0] : batch),
-      })
-      if (!res.ok) throw new Error(`Expo API error: ${res.status}`)
+    // ── Save in-app notifications ─────────────────────────────────────────────
+    if (userIds.length > 0 && (mode === 'inapp' || mode === 'both')) {
+      const rows = userIds.map((uid) => ({ user_id: uid, title, body }))
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await supabase.from('jm_notifications').insert(rows.slice(i, i + 500))
+        if (error) throw new Error(error.message)
+        inappCount += rows.slice(i, i + 500).length
+      }
     }
 
     return new Response(
-      JSON.stringify({ count: tokens.length }),
+      JSON.stringify({ pushCount, inappCount }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (e: any) {
