@@ -1751,20 +1751,20 @@ export default function HomeScreen() {
 const pS = StyleSheet.create({
   // — search row —
   searchRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6,
   },
   searchBox: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: 14,
-    paddingHorizontal: 12, paddingVertical: 11, backgroundColor: Colors.bg,
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 7, backgroundColor: Colors.bg,
   },
-  searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary },
-  searchClear: { fontSize: 14, color: Colors.textMuted },
+  searchInput: { flex: 1, fontSize: 13, color: Colors.textPrimary },
+  searchClear: { fontSize: 13, color: Colors.textMuted },
   filtersBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: 14,
-    paddingHorizontal: 12, paddingVertical: 11, backgroundColor: Colors.bg,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 7, backgroundColor: Colors.bg,
   },
   filtersBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   filtersBtnTxt: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
