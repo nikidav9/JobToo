@@ -33,6 +33,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials } from '@/services/storage';
+import { NotificationBell } from '@/components/ui/NotificationBell';
 
 const { width: SW } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 80;
@@ -1530,13 +1531,7 @@ function EmployerHome() {
           <Text style={styles.logoB}>Job</Text>
           <Text style={styles.logoO}>Too</Text>
         </Text>
-        <TouchableOpacity
-          style={mode === 'shift' ? styles.addBtn : [styles.addBtn, { backgroundColor: '#7C3AED' }]}
-          onPress={() => router.push(mode === 'shift' ? '/create-vacancy' : '/create-perm-vacancy')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.addBtnText}>＋ {mode === 'shift' ? 'Смена' : 'Вакансия'}</Text>
-        </TouchableOpacity>
+        <NotificationBell />
       </View>
 
       <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
@@ -1728,6 +1723,7 @@ function WorkerHome() {
           <Text style={styles.logoB}>Job</Text>
           <Text style={styles.logoO}>Too</Text>
         </Text>
+        <NotificationBell />
       </View>
       <View style={styles.modeSwitcherRow}>
         <ModeSwitcher mode={mode} onChange={setMode} />
