@@ -94,9 +94,10 @@ function NotificationHandler() {
 
 async function checkAndApplyUpdate() {
   if (__DEV__ || Platform.OS === 'web') return;
+  Alert.alert('Native config', 'Channel: ' + (Updates.channel ?? 'none') + '\nRuntime: ' + (Updates.runtimeVersion ?? 'none') + '\nURL: ' + ((Updates as any).updateUrl ?? 'n/a'));
   try {
     const { isAvailable } = await Updates.checkForUpdateAsync();
-    Alert.alert('Update check', isAvailable ? 'Update found! Applying...' : 'No update available. Channel: ' + (Updates.channel ?? 'unknown') + ' Runtime: ' + Updates.runtimeVersion);
+    Alert.alert('Update check', isAvailable ? 'Update found! Applying...' : 'No update available.');
     if (isAvailable) {
       await Updates.fetchUpdateAsync();
       await Updates.reloadAsync();
