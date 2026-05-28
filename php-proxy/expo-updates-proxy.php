@@ -4,6 +4,8 @@
 // Deploy to: /var/www/html/api/expo-updates-proxy.php (accessible as https://jobtoo.ru/api/expo-updates-proxy.php)
 
 $expoUrl = 'https://u.expo.dev/5b26bb1e-9e73-4d94-8907-b27e3f66096f';
+$logFile = __DIR__ . '/expo-proxy.log';
+file_put_contents($logFile, date('Y-m-d H:i:s') . ' REQUEST from ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown') . ' headers: ' . json_encode(getallheaders()) . "\n", FILE_APPEND | LOCK_EX);
 
 // Forward all request headers except Host
 $forwardHeaders = [];
@@ -41,11 +43,14 @@ $curlError  = curl_error($ch);
 curl_close($ch);
 
 if ($response === false) {
+    file_put_contents($logFile, date('Y-m-d H:i:s') . ' CURL ERROR: ' . $curlError . "\n", FILE_APPEND | LOCK_EX);
     http_response_code(502);
     header('Content-Type: application/json');
     echo json_encode(['error' => 'proxy_error', 'message' => $curlError]);
     exit;
 }
+
+file_put_contents($logFile, date('Y-m-d H:i:s') . ' RESPONSE http=' . $httpCode . "\n", FILE_APPEND | LOCK_EX);
 
 $responseHeaders = substr($response, 0, $headerSize);
 $body            = substr($response, $headerSize);
