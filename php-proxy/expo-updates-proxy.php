@@ -13,9 +13,15 @@ if (isset($_GET['asset'])) {
         exit;
     }
     $fwdHeaders = [];
+    $hasAuth = false;
     foreach (getallheaders() as $k => $v) {
         if (strtolower($k) === 'host') continue;
+        if (strtolower($k) === 'authorization') $hasAuth = true;
         $fwdHeaders[] = "$k: $v";
+    }
+    // Nginx/PHP-FPM sometimes strips Authorization from getallheaders() — use $_SERVER fallback
+    if (!$hasAuth && isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        $fwdHeaders[] = "Authorization: " . $_SERVER['HTTP_AUTHORIZATION'];
     }
     $ch = curl_init($assetUrl);
     curl_setopt_array($ch, [
