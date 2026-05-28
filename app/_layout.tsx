@@ -1,6 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import React, { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import * as Updates from 'expo-updates';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -100,7 +100,9 @@ async function checkAndApplyUpdate() {
       await Updates.fetchUpdateAsync();
       await Updates.reloadAsync();
     }
-  } catch {}
+  } catch (e: any) {
+    Alert.alert('OTA error', String(e?.message ?? e));
+  }
 }
 
 export default function RootLayout() {
