@@ -1,6 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import React, { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import * as Updates from 'expo-updates';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -96,11 +96,14 @@ async function checkAndApplyUpdate() {
   if (__DEV__ || Platform.OS === 'web') return;
   try {
     const { isAvailable } = await Updates.checkForUpdateAsync();
+    Alert.alert('Update check', isAvailable ? 'Update found! Applying...' : 'No update available. Channel: ' + (Updates.channel ?? 'unknown') + ' Runtime: ' + Updates.runtimeVersion);
     if (isAvailable) {
       await Updates.fetchUpdateAsync();
       await Updates.reloadAsync();
     }
-  } catch {}
+  } catch (e: any) {
+    Alert.alert('Update error', String(e?.message ?? e));
+  }
 }
 
 export default function RootLayout() {
