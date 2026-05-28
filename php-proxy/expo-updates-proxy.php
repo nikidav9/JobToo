@@ -102,17 +102,6 @@ file_put_contents($logFile, date('Y-m-d H:i:s') . ' RESPONSE http=' . $httpCode 
 $responseHeaders = substr($response, 0, $headerSize);
 $body            = substr($response, $headerSize);
 
-// Rewrite all assets.eascdn.net URLs to go through this proxy.
-// This ensures bundle+assets are fetched via jobtoo.ru, not blocked CDN.
-$proxyBase = 'https://jobtoo.ru/api/expo-updates-proxy.php?asset=';
-$body = preg_replace_callback(
-    '/"(https:\/\/assets\.eascdn\.net\/[^"]+)"/',
-    function ($m) use ($proxyBase) {
-        return '"' . $proxyBase . urlencode($m[1]) . '"';
-    },
-    $body
-);
-
 http_response_code($httpCode);
 
 // Forward response headers — skip hop-by-hop and content-length (body size changed after URL rewriting)
