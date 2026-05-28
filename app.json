@@ -16,9 +16,6 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
-      "associatedDomains": [
-        "applinks:job-match-2d0wug3k7-nujus-projects.vercel.app"
-      ]
     },
     "android": {
       "googleServicesFile": "./google-services.json",
@@ -34,20 +31,6 @@
         "android.permission.READ_MEDIA_AUDIO",
         "android.permission.READ_MEDIA_VIDEO"
       ],
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "https",
-              "host": "job-match-2d0wug3k7-nujus-projects.vercel.app",
-              "pathPrefix": "/perm-vacancy-detail"
-            }
-          ],
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ]
     },
     "web": {
       "bundler": "metro",
