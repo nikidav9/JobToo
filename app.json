@@ -98,7 +98,7 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/5b26bb1e-9e73-4d94-8907-b27e3f66096f"
+      "url": "https://jobtoo.ru/api/expo-updates-proxy.php"
     }
   }
 }
