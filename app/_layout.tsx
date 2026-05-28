@@ -1,6 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import React, { useEffect, useRef } from 'react';
-import { Platform, Alert } from 'react-native';
+import { Platform } from 'react-native';
 import * as Updates from 'expo-updates';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -94,15 +94,6 @@ function NotificationHandler() {
 
 async function checkAndApplyUpdate() {
   if (__DEV__ || Platform.OS === 'web') return;
-  // Test direct HTTP connectivity to proxy
-  try {
-    const r = await fetch('https://jobtoo.ru/api/expo-updates-proxy.php', {
-      headers: { 'expo-runtime-version': '1.3.0', 'expo-channel-name': 'production', 'expo-platform': 'android' }
-    });
-    Alert.alert('Proxy test', 'jobtoo.ru status: ' + r.status + '\nChannel: ' + (Updates.channel ?? 'none') + '\nRuntime: ' + (Updates.runtimeVersion ?? 'none'));
-  } catch (e: any) {
-    Alert.alert('Proxy test FAIL', String(e?.message ?? e));
-  }
   try {
     const { isAvailable } = await Updates.checkForUpdateAsync();
     if (isAvailable) {

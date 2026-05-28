@@ -222,7 +222,7 @@ export default function RootScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.version}>JobToo v3.0</Text>
+        <Text style={styles.version}>JobToo v3.1</Text>
       </ScrollView>
     </SafeAreaView>
   );
