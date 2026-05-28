@@ -81,7 +81,10 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://jobtoo.ru/api/expo-updates-proxy.php"
+      "url": "https://jobtoo.ru/api/expo-updates-proxy.php",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
     }
   }
 }
