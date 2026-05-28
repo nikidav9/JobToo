@@ -4,7 +4,6 @@
 // Deploy to: /var/www/html/api/expo-updates-proxy.php
 
 // ── Asset proxy mode ─────────────────────────────────────────────────────────
-// Called when expo-updates fetches a bundle/asset via the rewritten URL.
 if (isset($_GET['asset'])) {
     $assetUrl = urldecode($_GET['asset']);
     if (!str_starts_with($assetUrl, 'https://assets.eascdn.net/')) {
@@ -12,17 +11,19 @@ if (isset($_GET['asset'])) {
         echo json_encode(['error' => 'invalid_asset_url']);
         exit;
     }
+
     $fwdHeaders = [];
-    $hasAuth = false;
+    // Auth token is embedded in the URL (?auth=...) because nginx strips
+    // the Authorization header before it reaches PHP-FPM.
+    if (isset($_GET['auth'])) {
+        $fwdHeaders[] = "Authorization: " . urldecode($_GET['auth']);
+    }
     foreach (getallheaders() as $k => $v) {
-        if (strtolower($k) === 'host') continue;
-        if (strtolower($k) === 'authorization') $hasAuth = true;
+        $kl = strtolower($k);
+        if ($kl === 'host' || $kl === 'authorization') continue;
         $fwdHeaders[] = "$k: $v";
     }
-    // Nginx/PHP-FPM sometimes strips Authorization from getallheaders() — use $_SERVER fallback
-    if (!$hasAuth && isset($_SERVER['HTTP_AUTHORIZATION'])) {
-        $fwdHeaders[] = "Authorization: " . $_SERVER['HTTP_AUTHORIZATION'];
-    }
+
     $ch = curl_init($assetUrl);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -33,10 +34,11 @@ if (isset($_GET['asset'])) {
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_MAXREDIRS      => 3,
     ]);
-    $resp       = curl_exec($ch);
-    $hSize      = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-    $httpCode   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $resp     = curl_exec($ch);
+    $hSize    = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+
     http_response_code($httpCode);
     $respHeaders = substr($resp, 0, $hSize);
     $body        = substr($resp, $hSize);
@@ -102,9 +104,74 @@ file_put_contents($logFile, date('Y-m-d H:i:s') . ' RESPONSE http=' . $httpCode 
 $responseHeaders = substr($response, 0, $headerSize);
 $body            = substr($response, $headerSize);
 
+// ── Build URL → auth-token map from the manifest ──────────────────────────────
+// Parse the multipart boundary from the response Content-Type header, then
+// extract assetRequestHeaders from the JSON manifest part.
+$assetAuthMap = [];
+foreach (explode("\r\n", $responseHeaders) as $rh) {
+    if (stripos($rh, 'content-type:') !== 0) continue;
+    if (!preg_match('/boundary="?([^";,\s]+)"?/i', $rh, $bm)) continue;
+    $parts = explode('--' . $bm[1], $body);
+    foreach ($parts as $part) {
+        if (!preg_match('/content-type:[^\r\n]*(?:application\/json|application\/expo\+json)/i', $part)) continue;
+        $sep = strpos($part, "\r\n\r\n");
+        if ($sep === false) continue;
+        $manifest = json_decode(trim(substr($part, $sep + 4)), true);
+        if (!$manifest) continue;
+        $assetRequestHeaders = $manifest['extensions']['assetRequestHeaders'] ?? [];
+        $allAssets = array_merge(
+            $manifest['assets'] ?? [],
+            isset($manifest['launchAsset']) ? [$manifest['launchAsset']] : []
+        );
+        foreach ($allAssets as $asset) {
+            $key = $asset['key'] ?? '';
+            $url = $asset['url'] ?? '';
+            if ($key && $url && isset($assetRequestHeaders[$key]['authorization'])) {
+                $assetAuthMap[$url] = $assetRequestHeaders[$key]['authorization'];
+            }
+        }
+        break;
+    }
+    break;
+}
+// Fallback: manifest returned as plain JSON (non-multipart)
+if (empty($assetAuthMap)) {
+    $manifest = json_decode(trim($body), true);
+    if ($manifest && isset($manifest['extensions']['assetRequestHeaders'])) {
+        $assetRequestHeaders = $manifest['extensions']['assetRequestHeaders'];
+        $allAssets = array_merge(
+            $manifest['assets'] ?? [],
+            isset($manifest['launchAsset']) ? [$manifest['launchAsset']] : []
+        );
+        foreach ($allAssets as $asset) {
+            $key = $asset['key'] ?? '';
+            $url = $asset['url'] ?? '';
+            if ($key && $url && isset($assetRequestHeaders[$key]['authorization'])) {
+                $assetAuthMap[$url] = $assetRequestHeaders[$key]['authorization'];
+            }
+        }
+    }
+}
+
+// ── Rewrite assets.eascdn.net URLs, embedding auth token in query string ──────
+// This avoids the nginx Authorization-header stripping issue:
+// the token travels as ?auth=... instead of a request header.
+$proxyBase = 'https://jobtoo.ru/api/expo-updates-proxy.php';
+$body = preg_replace_callback(
+    '/"(https:\/\/assets\.eascdn\.net\/[^"]+)"/',
+    function ($m) use ($proxyBase, $assetAuthMap) {
+        $url = $m[1];
+        $qs  = 'asset=' . urlencode($url);
+        if (isset($assetAuthMap[$url])) {
+            $qs .= '&auth=' . urlencode($assetAuthMap[$url]);
+        }
+        return '"' . $proxyBase . '?' . $qs . '"';
+    },
+    $body
+);
+
 http_response_code($httpCode);
 
-// Forward response headers — skip hop-by-hop and content-length (body size changed after URL rewriting)
 $skip = ['transfer-encoding', 'connection', 'keep-alive', 'content-length'];
 foreach (explode("\r\n", $responseHeaders) as $header) {
     if (empty($header)) continue;
