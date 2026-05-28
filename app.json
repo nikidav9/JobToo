@@ -62,7 +62,6 @@
     },
     "plugins": [
       "expo-router",
-      "expo-updates",
       [
         "expo-notifications",
         {
