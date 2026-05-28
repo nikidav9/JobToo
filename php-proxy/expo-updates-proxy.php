@@ -1,11 +1,11 @@
 <?php
 // Proxy expo-updates manifest and asset requests through jobtoo.ru
 // because u.expo.dev and assets.eascdn.net may be blocked in Russia.
-// Deploy to: /var/www/html/api/expo-updates-proxy.php
+// Deploy to: /www/jobtoo.ru/api/expo-updates-proxy.php
 
 $logFile = __DIR__ . '/expo-proxy.log';
 
-// ── Asset proxy mode ─────────────────────────────────────────────────────────
+// --- Asset proxy mode ---
 if (isset($_GET['asset'])) {
     $assetUrl = urldecode($_GET['asset']);
     $hasAuth  = isset($_GET['auth']) && $_GET['auth'] !== '';
@@ -70,7 +70,7 @@ if (isset($_GET['asset'])) {
     exit;
 }
 
-// ── Manifest proxy mode ───────────────────────────────────────────────────────
+// --- Manifest proxy mode ---
 $expoUrl = 'https://u.expo.dev/5b26bb1e-9e73-4d94-8907-b27e3f66096f';
 file_put_contents($logFile,
     date('Y-m-d H:i:s') . ' MANIFEST_REQ from=' . ($_SERVER['REMOTE_ADDR'] ?? '?') . "\n",
@@ -81,7 +81,7 @@ $forwardHeaders = [];
 foreach (getallheaders() as $key => $value) {
     $kl = strtolower($key);
     if ($kl === 'host') continue;
-    if ($kl === 'accept-encoding') continue; // prevent gzip so we can rewrite URLs in body
+    if ($kl === 'accept-encoding') continue;
     $forwardHeaders[] = "$key: $value";
 }
 
@@ -124,8 +124,8 @@ file_put_contents($logFile, date('Y-m-d H:i:s') . ' MANIFEST_RESP http=' . $http
 $responseHeaders = substr($response, 0, $headerSize);
 $body            = substr($response, $headerSize);
 
-// ── Build URL → auth-token map from the manifest ──────────────────────────────
-$assetAuthMap = [];
+// Build URL to auth-token map from the manifest
+$assetAuthMap  = [];
 $boundaryFound = false;
 
 foreach (explode("\r\n", $responseHeaders) as $rh) {
@@ -143,7 +143,7 @@ foreach (explode("\r\n", $responseHeaders) as $rh) {
         if ($sep === false) continue;
         $manifest = json_decode(trim(substr($part, $sep + 4)), true);
         if (!$manifest) {
-            file_put_contents($logFile, date('Y-m-d H:i:s') . ' JSON_DECODE_FAIL\n', FILE_APPEND | LOCK_EX);
+            file_put_contents($logFile, date('Y-m-d H:i:s') . " JSON_DECODE_FAIL\n", FILE_APPEND | LOCK_EX);
             continue;
         }
         $assetRequestHeaders = $manifest['extensions']['assetRequestHeaders'] ?? [];
@@ -188,8 +188,10 @@ file_put_contents($logFile,
     FILE_APPEND | LOCK_EX
 );
 
-// ── Rewrite assets.eascdn.net URLs, embedding auth token in query string ──────
-$proxyBase  = 'https://jobtoo.ru/api/expo-updates-proxy.php';
+// Rewrite assets.eascdn.net URLs, embedding auth token in query string.
+// Token goes in ?auth= instead of Authorization header because nginx
+// strips Authorization before it reaches PHP-FPM.
+$proxyBase    = 'https://jobtoo.ru/api/expo-updates-proxy.php';
 $rewriteCount = 0;
 $body = preg_replace_callback(
     '/"(https:\/\/assets\.eascdn\.net\/[^"]+)"/',
