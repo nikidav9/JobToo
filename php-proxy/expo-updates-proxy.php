@@ -137,28 +137,38 @@ foreach (explode("\r\n", $responseHeaders) as $rh) {
         date('Y-m-d H:i:s') . ' MULTIPART boundary=' . $bm[1] . ' parts=' . count($parts) . "\n",
         FILE_APPEND | LOCK_EX
     );
+    // EAS returns two JSON parts: name="manifest" (assets) and name="extensions" (assetRequestHeaders)
+    $keyToUrl = [];
+    $assetRequestHeaders = [];
     foreach ($parts as $part) {
-        if (!preg_match('/content-type:[^\r\n]*(?:application\/json|application\/expo\+json)/i', $part)) continue;
+        if (!preg_match('/content-type:[^\r\n]*application\/json/i', $part)) continue;
         $sep = strpos($part, "\r\n\r\n");
         if ($sep === false) continue;
-        $manifest = json_decode(trim(substr($part, $sep + 4)), true);
-        if (!$manifest) {
+        $json = json_decode(trim(substr($part, $sep + 4)), true);
+        if (!$json) {
             file_put_contents($logFile, date('Y-m-d H:i:s') . " JSON_DECODE_FAIL\n", FILE_APPEND | LOCK_EX);
             continue;
         }
-        $assetRequestHeaders = $manifest['extensions']['assetRequestHeaders'] ?? [];
-        $allAssets = array_merge(
-            $manifest['assets'] ?? [],
-            isset($manifest['launchAsset']) ? [$manifest['launchAsset']] : []
-        );
-        foreach ($allAssets as $asset) {
-            $key = $asset['key'] ?? '';
-            $url = $asset['url'] ?? '';
-            if ($key && $url && isset($assetRequestHeaders[$key]['authorization'])) {
-                $assetAuthMap[$url] = $assetRequestHeaders[$key]['authorization'];
+        if (preg_match('/name="manifest"/i', $part)) {
+            // Build key -> URL map from manifest part
+            $allAssets = array_merge(
+                $json['assets'] ?? [],
+                isset($json['launchAsset']) ? [$json['launchAsset']] : []
+            );
+            foreach ($allAssets as $asset) {
+                if (!empty($asset['key']) && !empty($asset['url'])) {
+                    $keyToUrl[$asset['key']] = $asset['url'];
+                }
             }
+        } elseif (preg_match('/name="extensions"/i', $part)) {
+            // Build key -> auth map from extensions part
+            $assetRequestHeaders = $json['assetRequestHeaders'] ?? [];
         }
-        break;
+    }
+    foreach ($assetRequestHeaders as $key => $headers) {
+        if (isset($keyToUrl[$key]) && isset($headers['authorization'])) {
+            $assetAuthMap[$keyToUrl[$key]] = $headers['authorization'];
+        }
     }
     break;
 }
