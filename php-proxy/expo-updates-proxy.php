@@ -79,7 +79,9 @@ file_put_contents($logFile,
 
 $forwardHeaders = [];
 foreach (getallheaders() as $key => $value) {
-    if (strtolower($key) === 'host') continue;
+    $kl = strtolower($key);
+    if ($kl === 'host') continue;
+    if ($kl === 'accept-encoding') continue; // prevent gzip so we can rewrite URLs in body
     $forwardHeaders[] = "$key: $value";
 }
 
