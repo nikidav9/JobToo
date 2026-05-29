@@ -4,7 +4,7 @@ const isProd = process.env.DEPLOY_TARGET === 'ghpages'
 const nextConfig = {
   output: 'export',
   trailingSlash: true,
-  basePath: isProd ? '/JobMatch' : '',
-  assetPrefix: isProd ? '/JobMatch/' : '',
+  basePath: isProd ? '/JobToo' : '',
+  assetPrefix: isProd ? '/JobToo/' : '',
 }
 module.exports = nextConfig
