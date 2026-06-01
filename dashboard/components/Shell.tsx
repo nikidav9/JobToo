@@ -8,7 +8,7 @@ import { isAuthed } from '@/lib/auth'
 
 function getBase(): string {
   if (typeof window === 'undefined') return ''
-  return window.location.pathname.startsWith('/JobMatch') ? '/JobMatch' : ''
+  return window.location.pathname.startsWith('/JobToo') ? '/JobToo' : ''
 }
 
 function isOnLoginPage(): boolean {

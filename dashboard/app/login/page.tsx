@@ -4,7 +4,7 @@ import { setAuth, isAuthed } from '@/components/AuthGuard'
 
 function getBasePath() {
   if (typeof window === 'undefined') return ''
-  return window.location.pathname.includes('/JobMatch') ? '/JobMatch' : ''
+  return window.location.pathname.includes('/JobToo') ? '/JobToo' : ''
 }
 
 export default function LoginPage() {
