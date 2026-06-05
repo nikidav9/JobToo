@@ -1170,7 +1170,7 @@ function WorkerPermMode() {
   ];
 
   const shareVacancy = async (v: PermVacancy) => {
-    const url = `https://job-match-2d0wug3k7-nujus-projects.vercel.app/perm-vacancy-detail?vacancyId=${v.id}`;
+    const url = `https://jobtoo.ru/perm-vacancy-detail?vacancyId=${v.id}`;
     try {
       // iOS: pass url only — system appends it cleanly, no duplicate text
       // Android: url param is ignored, pass as message
