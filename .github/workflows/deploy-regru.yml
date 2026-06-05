@@ -31,6 +31,7 @@ jobs:
           mkdir -p dist/api
           cp php-proxy/db.php dist/api/db.php
           cp assets/images/favicon.ico dist/favicon.ico
+          cp public/.htaccess dist/.htaccess
 
       - name: Deploy to Reg.ru via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
