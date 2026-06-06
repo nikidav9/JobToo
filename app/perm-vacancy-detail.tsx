@@ -393,6 +393,25 @@ export default function PermVacancyDetailScreen() {
       ) : null}
 
       {authModalJSX}
+
+      {isGuest && Platform.OS === 'web' && (
+        <View style={styles.guestBar}>
+          <TouchableOpacity
+            style={styles.guestBtnPrimary}
+            activeOpacity={0.85}
+            onPress={() => router.push({ pathname: '/login', params: { returnTo: `perm-vacancy-detail?vacancyId=${vacancyId}` } })}
+          >
+            <Text style={styles.guestBtnPrimaryTxt}>Войти</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.guestBtnSecondary}
+            activeOpacity={0.85}
+            onPress={() => router.push({ pathname: '/register-worker', params: { returnTo: `perm-vacancy-detail?vacancyId=${vacancyId}` } })}
+          >
+            <Text style={styles.guestBtnSecondaryTxt}>Зарегистрироваться</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -511,6 +530,23 @@ const styles = StyleSheet.create({
   },
   applyBtnDone: { backgroundColor: '#D1FAE5' },
   applyBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+  guestBar: {
+    flexDirection: 'row', gap: 10,
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderTopWidth: 1, borderTopColor: Colors.divider,
+    backgroundColor: Colors.bg,
+  },
+  guestBtnPrimary: {
+    flex: 1, backgroundColor: Colors.primary,
+    borderRadius: 10, paddingVertical: 13, alignItems: 'center',
+  },
+  guestBtnPrimaryTxt: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  guestBtnSecondary: {
+    flex: 1, backgroundColor: Colors.primaryLight,
+    borderRadius: 10, paddingVertical: 13, alignItems: 'center',
+  },
+  guestBtnSecondaryTxt: { color: Colors.primary, fontSize: 15, fontWeight: '600' },
 
   authOverlay: {
     flex: 1,
