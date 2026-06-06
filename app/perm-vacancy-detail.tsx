@@ -2,7 +2,7 @@
  * Permanent vacancy detail screen
  * Shows full info, employer contact (phone only after match), apply/save actions
  */
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Modal, Platform,
@@ -34,16 +34,10 @@ export default function PermVacancyDetailScreen() {
   const [applying, setApplying] = useState(false);
   const [authModalDismissed, setAuthModalDismissed] = useState(false);
 
-  // On web: try to open native app via custom scheme, fall back to web after 2s
-  useEffect(() => {
+  const openInApp = () => {
     if (Platform.OS !== 'web' || !vacancyId) return;
-    const appUrl = `onspaceapp://perm-vacancy-detail?vacancyId=${vacancyId}`;
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = appUrl;
-    document.body.appendChild(iframe);
-    return () => { document.body.removeChild(iframe); };
-  }, [vacancyId]);
+    window.location.href = `onspaceapp://perm-vacancy-detail?vacancyId=${vacancyId}`;
+  };
 
   const isGuest = !currentUser && !loading;
   const showAuthModal = isGuest && !authModalDismissed;
@@ -206,6 +200,12 @@ export default function PermVacancyDetailScreen() {
           </TouchableOpacity>
         ) : null}
       </View>
+
+      {Platform.OS === 'web' && vacancyId && (
+        <TouchableOpacity onPress={openInApp} style={styles.openAppBanner} activeOpacity={0.85}>
+          <Text style={styles.openAppBannerTxt}>📱 Открыть в приложении</Text>
+        </TouchableOpacity>
+      )}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -393,6 +393,14 @@ const styles = StyleSheet.create({
   backTxt: { fontSize: 15, color: Colors.textSecondary, fontWeight: '500' },
   saveHeaderBtn: { padding: 4 },
   saveHeaderIcon: { fontSize: 24 },
+
+  openAppBanner: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  openAppBannerTxt: { color: '#fff', fontSize: 15, fontWeight: '600' },
 
   body: { padding: 20, gap: 16 },
 
