@@ -104,7 +104,7 @@ export default function PermVacancyDetailScreen() {
           <Text style={styles.authEmoji}>👋</Text>
           <Text style={styles.authTitle}>Войдите, чтобы откликнуться</Text>
           <Text style={styles.authSub}>Зарегистрируйтесь или войдите — это бесплатно</Text>
-          <TouchableOpacity style={styles.authBtnPrimary} onPress={() => router.push('/login')} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.authBtnPrimary} onPress={() => router.push({ pathname: '/login', params: { returnTo: `perm-vacancy-detail?vacancyId=${vacancyId}` } })} activeOpacity={0.85}>
             <Text style={styles.authBtnPrimaryTxt}>Войти</Text>
           </TouchableOpacity>
           <View style={styles.authDivider}>
@@ -112,7 +112,7 @@ export default function PermVacancyDetailScreen() {
             <Text style={styles.authDividerTxt}>или</Text>
             <View style={styles.authDividerLine} />
           </View>
-          <TouchableOpacity style={styles.authBtnSecondary} onPress={() => router.push('/register-worker')} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.authBtnSecondary} onPress={() => router.push({ pathname: '/register-worker', params: { returnTo: `perm-vacancy-detail?vacancyId=${vacancyId}` } })} activeOpacity={0.85}>
             <Text style={styles.authBtnSecondaryTxt}>Ищу работу — Зарегистрироваться</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.authBtnSecondary, { marginTop: 8 }]} onPress={() => router.push('/register-employer')} activeOpacity={0.85}>

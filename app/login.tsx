@@ -4,7 +4,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   KeyboardAvoidingView, Platform, ActivityIndicator, Linking,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius } from '@/constants/theme';
 import { PhoneInput } from '@/components/feature/PhoneInput';
 import { AppInput } from '@/components/ui/AppInput';
@@ -19,6 +19,7 @@ const SUPPORT_EMAIL = 'zpouches@yandex.ru';
 
 export default function Login() {
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { loginUser, showToast } = useApp();
 
   const [phone, setPhone] = useState('+7 ');
@@ -54,7 +55,7 @@ export default function Login() {
     if (user) {
       showToast('Добро пожаловать! 👋', 'success');
       setLoading(false);
-      router.replace('/(tabs)');
+      router.replace(returnTo ? `/${returnTo}` : '/(tabs)');
       return;
     }
 

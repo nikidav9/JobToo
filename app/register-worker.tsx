@@ -4,7 +4,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   KeyboardAvoidingView, Platform, ActivityIndicator, Linking,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius } from '@/constants/theme';
 import { AppInput } from '@/components/ui/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
@@ -23,6 +23,7 @@ const SUPPORT_EMAIL = 'zpouches@yandex.ru';
 
 export default function RegisterWorker() {
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { registerUser, showToast } = useApp();
 
   const [step, setStep] = useState(1);
@@ -104,7 +105,7 @@ export default function RegisterWorker() {
       };
       await registerUser(user);
       showToast('Добро пожаловать! 👋', 'success');
-      router.replace('/(tabs)');
+      router.replace(returnTo ? `/${returnTo}` : '/(tabs)');
     } catch (e) {
       console.error('[RegisterWorker] finish error', e);
       showToast('Ошибка регистрации. Попробуйте ещё раз.', 'error');
