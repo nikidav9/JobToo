@@ -130,7 +130,7 @@ export default function PermVacancyDetailScreen() {
 
   const openAppBannerJSX = Platform.OS === 'web' && vacancyId ? (
     <TouchableOpacity onPress={openInApp} style={styles.openAppBanner} activeOpacity={0.85}>
-      <Text style={styles.openAppBannerTxt}>📱 Открыть в приложении</Text>
+      <Text style={styles.openAppBannerTxt}>Открыть в приложении</Text>
     </TouchableOpacity>
   ) : null;
 
