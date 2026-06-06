@@ -2,7 +2,7 @@
  * Permanent vacancy detail screen
  * Shows full info, employer contact (phone only after match), apply/save actions
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Modal, Platform,
@@ -17,6 +17,7 @@ import {
   dbApplyPermVacancy,
   dbAddPermSaved,
   dbRemovePermSaved,
+  dbGetPermVacancies,
 } from '@/services/db';
 import { METRO_LINES } from '@/constants/metro';
 
@@ -33,6 +34,7 @@ export default function PermVacancyDetailScreen() {
 
   const [applying, setApplying] = useState(false);
   const [authModalDismissed, setAuthModalDismissed] = useState(Platform.OS === 'web');
+  const [guestVacancy, setGuestVacancy] = useState<any>(null);
 
   const openInApp = () => {
     if (Platform.OS !== 'web' || !vacancyId) return;
@@ -50,7 +52,15 @@ export default function PermVacancyDetailScreen() {
     }
   };
 
-  const vacancy = permVacancies.find(v => v.id === vacancyId);
+  const vacancy = permVacancies.find(v => v.id === vacancyId) ?? guestVacancy;
+
+  useEffect(() => {
+    if (!vacancyId || vacancy || currentUser || loading) return;
+    dbGetPermVacancies().then(list => {
+      const found = list.find((v: any) => v.id === vacancyId);
+      if (found) setGuestVacancy(found);
+    }).catch(() => {});
+  }, [vacancyId, vacancy, currentUser, loading]);
   const employer = vacancy ? users.find(u => u.id === vacancy.employerId) : null;
 
   const employerDisplayName = vacancy?.company?.trim()
