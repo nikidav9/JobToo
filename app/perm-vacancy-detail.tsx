@@ -113,6 +113,12 @@ export default function PermVacancyDetailScreen() {
     </Modal>
   );
 
+  const openAppBannerJSX = Platform.OS === 'web' && vacancyId ? (
+    <TouchableOpacity onPress={openInApp} style={styles.openAppBanner} activeOpacity={0.85}>
+      <Text style={styles.openAppBannerTxt}>📱 Открыть в приложении</Text>
+    </TouchableOpacity>
+  ) : null;
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -121,6 +127,7 @@ export default function PermVacancyDetailScreen() {
             <Text style={styles.backTxt}>← Назад</Text>
           </TouchableOpacity>
         </View>
+        {openAppBannerJSX}
         <View style={styles.emptyCenter}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
@@ -138,6 +145,7 @@ export default function PermVacancyDetailScreen() {
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
         </View>
+        {openAppBannerJSX}
         <View style={styles.emptyCenter}>
           <Text style={{ fontSize: 48 }}>🔍</Text>
           <Text style={styles.emptyTitle}>Вакансия не найдена</Text>
@@ -201,11 +209,7 @@ export default function PermVacancyDetailScreen() {
         ) : null}
       </View>
 
-      {Platform.OS === 'web' && vacancyId && (
-        <TouchableOpacity onPress={openInApp} style={styles.openAppBanner} activeOpacity={0.85}>
-          <Text style={styles.openAppBannerTxt}>📱 Открыть в приложении</Text>
-        </TouchableOpacity>
-      )}
+      {openAppBannerJSX}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
