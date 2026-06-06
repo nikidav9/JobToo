@@ -2,10 +2,10 @@
  * Permanent vacancy detail screen
  * Shows full info, employer contact (phone only after match), apply/save actions
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Modal,
+  TouchableOpacity, ActivityIndicator, Modal, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -33,6 +33,17 @@ export default function PermVacancyDetailScreen() {
 
   const [applying, setApplying] = useState(false);
   const [authModalDismissed, setAuthModalDismissed] = useState(false);
+
+  // On web: try to open native app via custom scheme, fall back to web after 2s
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !vacancyId) return;
+    const appUrl = `onspaceapp://perm-vacancy-detail?vacancyId=${vacancyId}`;
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = appUrl;
+    document.body.appendChild(iframe);
+    return () => { document.body.removeChild(iframe); };
+  }, [vacancyId]);
 
   const isGuest = !currentUser && !loading;
   const showAuthModal = isGuest && !authModalDismissed;
