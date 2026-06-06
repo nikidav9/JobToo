@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import * as SplashScreen from 'expo-splash-screen';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
@@ -35,6 +36,10 @@ export default function PermVacancyDetailScreen() {
   const [applying, setApplying] = useState(false);
   const [authModalDismissed, setAuthModalDismissed] = useState(Platform.OS === 'web');
   const [guestVacancy, setGuestVacancy] = useState<any>(null);
+
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   const openInApp = () => {
     if (Platform.OS !== 'web' || !vacancyId) return;
