@@ -32,7 +32,7 @@ export default function PermVacancyDetailScreen() {
   } = useApp();
 
   const [applying, setApplying] = useState(false);
-  const [authModalDismissed, setAuthModalDismissed] = useState(false);
+  const [authModalDismissed, setAuthModalDismissed] = useState(Platform.OS === 'web');
 
   const openInApp = () => {
     if (Platform.OS !== 'web' || !vacancyId) return;
