@@ -1,10 +1,9 @@
 /** @type {import('next').NextConfig} */
-const isProd = process.env.DEPLOY_TARGET === 'ghpages'
+const isGhPages = process.env.DEPLOY_TARGET === 'ghpages'
 
 const nextConfig = {
-  output: 'export',
-  trailingSlash: true,
-  basePath: isProd ? '/JobToo' : '',
-  assetPrefix: isProd ? '/JobToo/' : '',
+  ...(isGhPages ? { output: 'export', trailingSlash: true } : {}),
+  basePath: isGhPages ? '/JobToo' : '',
+  assetPrefix: isGhPages ? '/JobToo/' : '',
 }
 module.exports = nextConfig
