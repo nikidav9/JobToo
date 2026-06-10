@@ -12,9 +12,6 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useApp } from '@/hooks/useApp';
 import { isPhoneComplete, extractPhoneDigits } from '@/services/storage';
 
-// Admin phone digits (without +7 prefix)
-const ADMIN_PHONE_DIGITS = '9933431523';
-const ADMIN_PASSWORD = '02102001';
 const SUPPORT_EMAIL = 'zpouches@yandex.ru';
 
 export default function Login() {
@@ -37,8 +34,6 @@ export default function Login() {
       return;
     }
 
-    const digits = extractPhoneDigits(phone).replace(/\D/g, '').slice(-10);
-
     setLoading(true);
 
     // Regular user check first — DB is the source of truth
@@ -56,13 +51,6 @@ export default function Login() {
       showToast('Добро пожаловать! 👋', 'success');
       setLoading(false);
       router.replace(returnTo ? `/${returnTo}` : '/(tabs)');
-      return;
-    }
-
-    // Admin check — only if no regular user found
-    if (digits === ADMIN_PHONE_DIGITS && password === ADMIN_PASSWORD) {
-      router.replace('/admin');
-      setLoading(false);
       return;
     }
 
