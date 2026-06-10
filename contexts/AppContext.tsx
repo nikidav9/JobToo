@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
+import * as bcrypt from 'bcryptjs';
 
 export interface AppNotification {
   id: string;
@@ -370,7 +371,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const loginUser = async (phone: string, password: string): Promise<User | null> => {
     const digits = extractPhoneDigits(phone);
     const found = await dbGetUserByPhone(digits);
-    if (!found || found.password !== password) return null;
+    const isHashed = found.password?.startsWith('$2');
+    const passwordOk = isHashed
+      ? await bcrypt.compare(password, found.password)
+      : found.password === password;
+    if (!found || !passwordOk) return null;
     _setCurrentUser(found);
     await saveSessionUser(found);
     registerForPushNotifications(found.id).catch(() => {});
