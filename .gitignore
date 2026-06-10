@@ -42,3 +42,8 @@ app-example
 .expo/
 .vercel
 .expo/
+
+# Dashboard build artifacts
+dashboard/node_modules/
+dashboard/out/
+dashboard/.next/
