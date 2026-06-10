@@ -5,11 +5,17 @@ define('SB_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, X-App-Secret');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405); echo json_encode(['error' => 'Method not allowed']); exit;
+}
+
+$secret = getenv('APP_SECRET') ?: 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6';
+$provided = $_SERVER['HTTP_X_APP_SECRET'] ?? '';
+if (!hash_equals($secret, $provided)) {
+    http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
 }
 
 $body = json_decode(file_get_contents('php://input'), true);
