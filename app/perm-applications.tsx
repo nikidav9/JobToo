@@ -20,6 +20,10 @@ import {
   dbInsertMessage,
   dbIncrementUnread,
 } from '@/services/db';
+import {
+  notifyWorkerPermApplicationApproved,
+  notifyWorkerPermApplicationRejected,
+} from '@/services/notifications';
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   pending:  { label: '⏳ На рассмотрении', color: '#92400E', bg: '#FFF7ED' },
@@ -48,8 +52,15 @@ export default function PermApplicationsScreen() {
     setActionLoading(app.id);
     try {
       await dbSetPermApplicationStatus(app.id, 'approved');
-      // Open chat automatically
       const worker = users.find(u => u.id === app.workerId);
+      if (worker && vacancy) {
+        notifyWorkerPermApplicationApproved(
+          app.workerId,
+          vacancy.company,
+          vacancy.title,
+        ).catch(() => {});
+      }
+      // Open chat automatically
       const chatId = await dbCreateChat(
         app.workerId,
         currentUser.id,
@@ -76,6 +87,13 @@ export default function PermApplicationsScreen() {
     setActionLoading(app.id + '_r');
     try {
       await dbSetPermApplicationStatus(app.id, 'rejected');
+      if (vacancy) {
+        notifyWorkerPermApplicationRejected(
+          app.workerId,
+          vacancy.company,
+          vacancy.title,
+        ).catch(() => {});
+      }
       await refreshPermApplications();
       showToast('Отклонено', 'success');
     } catch (e) {

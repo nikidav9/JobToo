@@ -326,3 +326,44 @@ export async function notifyWorkersNearVacancy(params: {
     // Never crash the app due to a notification failure
   }
 }
+
+// ─── Permanent vacancy notifications ─────────────────────────────────────────
+
+export async function notifyEmployerNewPermApplicant(
+  employerId: string,
+  workerName: string,
+  vacancyTitle: string,
+): Promise<void> {
+  await pushTo(
+    employerId,
+    '📥 Новая заявка!',
+    `${workerName} откликнулся на вакансию «${vacancyTitle}». Посмотрите кандидата!`,
+    'new_perm_applicant', 'matches',
+  );
+}
+
+export async function notifyWorkerPermApplicationApproved(
+  workerId: string,
+  companyName: string,
+  vacancyTitle: string,
+): Promise<void> {
+  await pushTo(
+    workerId,
+    '✅ Заявка одобрена!',
+    `${companyName} одобрили вашу заявку на «${vacancyTitle}». Свяжитесь с работодателем!`,
+    'perm_approved', 'matches',
+  );
+}
+
+export async function notifyWorkerPermApplicationRejected(
+  workerId: string,
+  companyName: string,
+  vacancyTitle: string,
+): Promise<void> {
+  await pushTo(
+    workerId,
+    '❌ Заявка отклонена',
+    `${companyName} отклонили вашу заявку на «${vacancyTitle}».`,
+    'perm_rejected', 'matches',
+  );
+}

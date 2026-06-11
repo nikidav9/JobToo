@@ -21,6 +21,7 @@ import {
   dbGetPermVacancies,
 } from '@/services/db';
 import { METRO_LINES } from '@/constants/metro';
+import { notifyEmployerNewPermApplicant } from '@/services/notifications';
 
 export default function PermVacancyDetailScreen() {
   const router = useRouter();
@@ -176,6 +177,11 @@ export default function PermVacancyDetailScreen() {
     try {
       await dbApplyPermVacancy(vacancy.id, currentUser.id, vacancy.employerId);
       await refreshPermApplications();
+      notifyEmployerNewPermApplicant(
+        vacancy.employerId,
+        `${currentUser.firstName} ${currentUser.lastName}`,
+        vacancy.title,
+      ).catch(() => {});
       showToast('Отклик отправлен! 📨', 'success');
     } catch {
       showToast('Ошибка при отклике', 'error');
