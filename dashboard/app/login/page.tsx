@@ -17,19 +17,27 @@ export default function LoginPage() {
     if (isAuthed()) window.location.replace(getBasePath() + '/')
   }, [])
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
-    setTimeout(() => {
-      if (login === 'nikidav23' && password === 'Nikita02102001') {
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login, password }),
+      })
+      if (res.ok) {
         setAuth()
         window.location.replace(getBasePath() + '/')
       } else {
         setError('Неверный логин или пароль')
-        setLoading(false)
       }
-    }, 400)
+    } catch {
+      setError('Ошибка соединения. Попробуйте ещё раз.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
