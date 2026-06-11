@@ -54,11 +54,14 @@ export default function ChatRoom() {
     if (!chatId || foundChat) return;
     let isMounted = true;
     dbGetChatById(chatId).then(c => {
-      if (isMounted && c) {
-        setDbChat(c);
-        setMessages(c.messages);
-        lastCountRef.current = c.messages.length;
+      if (!isMounted || !c) return;
+      if (c.workerId !== currentUser?.id && c.employerId !== currentUser?.id) {
+        router.back();
+        return;
       }
+      setDbChat(c);
+      setMessages(c.messages);
+      lastCountRef.current = c.messages.length;
     }).catch(() => {});
     return () => { isMounted = false; };
   }, [chatId]);

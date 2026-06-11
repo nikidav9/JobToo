@@ -232,6 +232,11 @@ export default function CreateVacancy() {
 
     try {
       if (isEdit && existing) {
+        if (existing.employerId !== currentUser.id) {
+          showToast('Нет прав для редактирования этой вакансии', 'error');
+          setSaving(false);
+          return;
+        }
         const vac: Vacancy = {
           ...base,
           id: existing.id,
