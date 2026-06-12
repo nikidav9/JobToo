@@ -36,6 +36,43 @@ import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials } from '@/services/storage';
 import { NotifBell } from '@/components/ui/NotifBell';
+import { registerWebPush } from '@/lib/webPush';
+
+// ─── Web push permission banner (iOS PWA requires user gesture) ───────────────
+function WebPushBanner({ userId }: { userId: string }) {
+  const [visible, setVisible] = useState(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+    if (!('Notification' in window)) return false;
+    return (window as any).Notification.permission === 'default';
+  });
+
+  if (!visible) return null;
+
+  const handlePress = async () => {
+    setVisible(false);
+    await registerWebPush(userId);
+  };
+
+  return (
+    <TouchableOpacity style={wpStyles.banner} onPress={handlePress} activeOpacity={0.85}>
+      <Text style={wpStyles.icon}>🔔</Text>
+      <Text style={wpStyles.text}>Включить push-уведомления</Text>
+      <Text style={wpStyles.arrow}>›</Text>
+    </TouchableOpacity>
+  );
+}
+
+const wpStyles = StyleSheet.create({
+  banner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginBottom: 8,
+    backgroundColor: '#EEF2FF', borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 10,
+  },
+  icon: { fontSize: 18 },
+  text: { flex: 1, fontSize: 14, fontWeight: '600', color: '#4338CA' },
+  arrow: { fontSize: 18, color: '#4338CA' },
+});
 
 const { width: SW } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 80;
@@ -1563,6 +1600,7 @@ function EmployerHome() {
         </Text>
         <NotifBell />
       </View>
+      <WebPushBanner userId={currentUser.id} />
 
       <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
         <ModeSwitcher mode={mode} onChange={setMode} />
@@ -1781,6 +1819,7 @@ function WorkerHome() {
         </Text>
         <NotifBell />
       </View>
+      <WebPushBanner userId={currentUser.id} />
       <View style={styles.modeSwitcherRow}>
         <ModeSwitcher mode={mode} onChange={setMode} />
       </View>
