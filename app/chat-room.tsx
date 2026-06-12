@@ -11,7 +11,7 @@ import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { Message, Chat } from '@/constants/types';
 import { nameColorFromString, getInitials, formatDate, uid, nowISO } from '@/services/storage';
-import { dbGetMessages, dbInsertMessage, dbMarkRead, dbIncrementUnread, dbGetLikeByVacancyWorker, dbUpsertLike, dbCheckAndCreateMatch, dbGetLikes, dbGetChatById } from '@/services/db';
+import { dbGetMessages, dbInsertMessage, dbMarkRead, dbIncrementUnread, dbGetLikeByVacancyWorker, dbUpsertLike, dbCheckAndCreateMatch, dbGetLikes, dbGetChatById, dbGetUserById } from '@/services/db';
 import { notifyWorkerGotMatch, notifyWorkerNewMessage, notifyEmployerNewMessage } from '@/services/notifications';
 import { useIsFocused } from '@react-navigation/native';
 import { getSupabaseClient } from '@/template';
@@ -90,12 +90,20 @@ export default function ChatRoom() {
   const otherId = chat
     ? (currentUser?.role === 'worker' ? chat.employerId : chat.workerId)
     : '';
-  const other = users.find(u => u.id === otherId);
+  const contextOther = users.find(u => u.id === otherId);
+  const [fetchedOther, setFetchedOther] = useState<import('@/constants/types').User | null>(null);
+  const other = contextOther ?? fetchedOther;
+
+  useEffect(() => {
+    if (!otherId || contextOther) return;
+    dbGetUserById(otherId).then(u => setFetchedOther(u)).catch(() => {});
+  }, [otherId, contextOther]);
+
   const vacancy = vacancies.find(v => v.id === chat?.vacancyId);
   const otherName = other
-    ? `${other.firstName} ${other.lastName}`
+    ? `${other.firstName} ${other.lastName}`.trim()
     : (chat?.companyName ?? '');
-  const otherColor = nameColorFromString(otherName);
+  const otherColor = nameColorFromString(otherId || otherName);
   const otherAvatarUrl = other?.avatarUrl;
 
   // Fetch like status (for employer decision bar)
