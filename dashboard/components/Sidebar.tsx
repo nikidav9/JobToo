@@ -84,7 +84,26 @@ export default function Sidebar() {
         Отчёты
       </div>
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 1, padding: '0 8px' }}>
-        {['Воронка', 'Когорты', 'Гео'].map(label => (
+        {[{ href: '/funnel', label: 'Воронка' }].map(({ href, label }) => {
+          const active = path === href
+          return (
+            <Link key={href} href={href} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '7px 10px', borderRadius: 6,
+              color: active ? 'var(--bg)' : 'var(--ink-2)',
+              background: active ? 'var(--ink)' : 'transparent',
+              fontSize: 13, fontWeight: 450, textDecoration: 'none',
+              transition: 'background .12s, color .12s',
+            }}
+            onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--bg-sunken)'; (e.currentTarget as HTMLElement).style.color = active ? 'var(--bg)' : 'var(--ink)' }}
+            onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--ink-2)' } }}
+            >
+              <IconFunnel style={{ width: 16, height: 16, flexShrink: 0, color: active ? 'var(--bg)' : 'var(--ink-3)' }} />
+              <span>{label}</span>
+            </Link>
+          )
+        })}
+        {['Когорты', 'Гео'].map(label => (
           <div key={label} style={{
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '7px 10px', borderRadius: 6,
@@ -171,4 +190,7 @@ function IconActivity({ style }: { style?: React.CSSProperties }) {
 }
 function IconInbox({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M2 9h3l1 2h4l1-2h3"/><rect x="2" y="3" width="12" height="10" rx="1.5"/></svg>
+}
+function IconFunnel({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M2 2h12l-4.5 5.5V13l-3-1.5V7.5L2 2z"/></svg>
 }

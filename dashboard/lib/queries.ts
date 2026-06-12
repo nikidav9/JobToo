@@ -914,6 +914,141 @@ export async function fetchCohorts() {
   return { table, weeklyBar }
 }
 
+// ─── funnel ──────────────────────────────────────────────────────────────────
+
+export async function fetchFunnel() {
+  const [
+    { data: users },
+    { data: likes },
+    { data: permApps },
+  ] = await Promise.all([
+    supabase.from('jm_users').select('id,role,created_at'),
+    supabase.from('jm_likes').select('id,worker_id,is_match,worker_liked,worker_confirmed,employer_confirmed,shift_completed,created_at'),
+    supabase.from('jm_perm_applications').select('id,worker_id,status,created_at'),
+  ])
+
+  const u = users ?? []
+  const lk = likes ?? []
+  const ap = permApps ?? []
+
+  const workers = u.filter((x: any) => x.role === 'worker')
+
+  const likedLk = lk.filter((l: any) => l.worker_liked)
+  const matchedLk = lk.filter((l: any) => l.is_match)
+  const confirmedLk = lk.filter((l: any) => l.worker_confirmed && l.employer_confirmed)
+  const completedLk = lk.filter((l: any) => l.shift_completed)
+
+  const workersWhoLiked = new Set(likedLk.map((l: any) => l.worker_id)).size
+  const workersWithMatch = new Set(matchedLk.map((l: any) => l.worker_id)).size
+  const workersWithShiftSet = new Set(completedLk.map((l: any) => l.worker_id))
+
+  // Activation: first like within 7 days of registration
+  const workerRegMap: Record<string, string> = {}
+  for (const usr of workers) workerRegMap[(usr as any).id] = (usr as any).created_at
+  const firstLike: Record<string, string> = {}
+  for (const l of likedLk) {
+    const wid = (l as any).worker_id
+    if (!firstLike[wid] || (l as any).created_at < firstLike[wid]) firstLike[wid] = (l as any).created_at
+  }
+  let activated7d = 0
+  for (const wid of Object.keys(firstLike)) {
+    const reg = workerRegMap[wid]
+    if (!reg) continue
+    if (new Date(firstLike[wid]).getTime() - new Date(reg).getTime() <= 7 * 86400_000) activated7d++
+  }
+
+  // Shifts per worker
+  const shiftsByWorker: Record<string, number> = {}
+  for (const l of completedLk) {
+    const wid = (l as any).worker_id
+    shiftsByWorker[wid] = (shiftsByWorker[wid] ?? 0) + 1
+  }
+  const shiftCounts = Object.values(shiftsByWorker)
+  const workersWithShift = shiftCounts.length
+  const avgShiftsPerWorker = workersWithShift > 0
+    ? (shiftCounts.reduce((a, b) => a + b, 0) / workersWithShift).toFixed(1) : '0'
+  const returningWorkers = shiftCounts.filter(c => c > 1).length
+
+  // Likes per worker distribution
+  const likesByWorker: Record<string, number> = {}
+  for (const l of likedLk) {
+    const wid = (l as any).worker_id
+    likesByWorker[wid] = (likesByWorker[wid] ?? 0) + 1
+  }
+  const likeCounts = Object.values(likesByWorker)
+  const activityBuckets = [
+    { name: '0 лайков', value: Math.max(0, workers.length - Object.keys(likesByWorker).length) },
+    { name: '1', value: likeCounts.filter(c => c === 1).length },
+    { name: '2–5', value: likeCounts.filter(c => c >= 2 && c <= 5).length },
+    { name: '6–10', value: likeCounts.filter(c => c >= 6 && c <= 10).length },
+    { name: '11+', value: likeCounts.filter(c => c > 10).length },
+  ]
+
+  const shiftBuckets = [
+    { name: '1 смена', value: shiftCounts.filter(c => c === 1).length },
+    { name: '2–3', value: shiftCounts.filter(c => c >= 2 && c <= 3).length },
+    { name: '4–7', value: shiftCounts.filter(c => c >= 4 && c <= 7).length },
+    { name: '8+', value: shiftCounts.filter(c => c >= 8).length },
+  ]
+
+  // 30-day daily trend
+  const days30 = dayRange(30)
+  const likeByDay = groupByDate(likedLk, 'created_at')
+  const matchByDay = groupByDate(matchedLk, 'created_at')
+  const completedByDay = groupByDate(completedLk, 'created_at')
+  const daily30 = days30.map(d => ({
+    date: toDayLabel(d),
+    likes: likeByDay[d] ?? 0,
+    matches: matchByDay[d] ?? 0,
+    completed: completedByDay[d] ?? 0,
+  }))
+
+  const mainFunnel = [
+    { name: 'Зарегистрировались', value: workers.length, fill: PALETTE.blue },
+    { name: 'Лайкнули (уник.)', value: workersWhoLiked, fill: PALETTE.cyan },
+    { name: 'Получили матч', value: workersWithMatch, fill: PALETTE.purple },
+    { name: 'Завершили смену', value: workersWithShiftSet.size, fill: PALETTE.green },
+  ]
+
+  const eventFunnel = [
+    { name: 'Лайки воркеров', value: likedLk.length, fill: PALETTE.blue },
+    { name: 'Совпадения', value: matchedLk.length, fill: PALETTE.purple },
+    { name: 'Подтверждено', value: confirmedLk.length, fill: PALETTE.orange },
+    { name: 'Смены завершены', value: completedLk.length, fill: PALETTE.green },
+  ]
+
+  const permFunnel = [
+    { name: 'Подано заявок', value: ap.length, fill: PALETTE.blue },
+    { name: 'Одобрено', value: ap.filter((a: any) => a.status === 'approved').length, fill: PALETTE.green },
+    { name: 'Отклонено', value: ap.filter((a: any) => a.status === 'rejected').length, fill: PALETTE.red },
+  ]
+
+  return {
+    kpi: {
+      workers: workers.length,
+      activatedWorkers: workersWhoLiked,
+      activationRate: workers.length > 0 ? ((workersWhoLiked / workers.length) * 100).toFixed(1) : '0',
+      activation7d: workers.length > 0 ? ((activated7d / workers.length) * 100).toFixed(1) : '0',
+      totalLikes: likedLk.length,
+      totalMatches: matchedLk.length,
+      matchRate: likedLk.length > 0 ? ((matchedLk.length / likedLk.length) * 100).toFixed(1) : '0',
+      completedCount: completedLk.length,
+      completionRate: matchedLk.length > 0 ? ((completedLk.length / matchedLk.length) * 100).toFixed(1) : '0',
+      avgShiftsPerWorker,
+      returningWorkers,
+      returningRate: workersWithShift > 0 ? ((returningWorkers / workersWithShift) * 100).toFixed(1) : '0',
+      permApplications: ap.length,
+      permApproved: ap.filter((a: any) => a.status === 'approved').length,
+    },
+    mainFunnel,
+    eventFunnel,
+    daily30,
+    activityBuckets,
+    shiftBuckets,
+    permFunnel,
+  }
+}
+
 // ─── chats ───────────────────────────────────────────────────────────────────
 
 export async function fetchChats() {
