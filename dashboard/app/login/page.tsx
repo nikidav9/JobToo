@@ -28,7 +28,7 @@ export default function LoginPage() {
         body: JSON.stringify({ login, password }),
       })
       if (res.ok) {
-        setAuth()
+        setAuth(password)
         window.location.replace(getBasePath() + '/')
       } else {
         setError('Неверный логин или пароль')

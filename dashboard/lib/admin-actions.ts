@@ -13,17 +13,18 @@ export async function blockUser(userId: string, block: boolean, userName?: strin
 }
 
 export async function resetPassword(userId: string): Promise<string> {
-  const newPassword = Math.random().toString(36).slice(2, 8).toUpperCase()
-  const { error } = await supabaseAdmin
-    .from('jm_users')
-    .update({ password: newPassword })
-    .eq('id', userId)
-  if (error) throw new Error(error.message)
-
-  await supabaseAdmin.functions.invoke('push-notify', {
-    body: { userId, title: '🔑 Новый пароль', body: `Ваш новый пароль: ${newPassword}` },
-  }).catch(() => {})
-  return newPassword
+  const { getStoredPassword } = await import('@/lib/auth')
+  const res = await fetch('/api/admin/reset-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-dashboard-secret': getStoredPassword(),
+    },
+    body: JSON.stringify({ userId }),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) throw new Error(data.error ?? 'Ошибка сброса пароля')
+  return data.password as string
 }
 
 export async function sendPushToUser(userId: string, title: string, body: string) {
