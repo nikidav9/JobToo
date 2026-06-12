@@ -146,7 +146,8 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
                   ['Метро', user.metro_station || '—'],
                   ['Компания', user.company || '—'],
                   ['Регистрация', user.created_at?.slice(0, 10) || '—'],
-                  ['Push-токен', user.push_token ? '✓ Есть' : '✗ Нет'],
+                  ['Push-токен', user.push_token ? '✓ Expo (Android/APK)' : '✗ Нет'],
+                  ['iPhone Web Push', data.hasWebPush ? `✓ Подключён · ${data.webPushDate}` : '✗ Нет'],
                 ].map(([k, v]) => (
                   <div key={k as string} style={{ display: 'flex', gap: 8 }}>
                     <span style={{ color: 'var(--ink-3)', minWidth: 100 }}>{k}</span>
@@ -318,7 +319,8 @@ export default function UsersPage() {
       Метро: u.metro || '',
       Компания: u.company || '',
       Статус: u.blocked ? 'Заблокирован' : 'Активен',
-      'Пуш-токен': u.hasPushToken ? 'Есть' : 'Нет',
+      'Expo Push': u.hasPushToken ? 'Есть' : 'Нет',
+      'iPhone Web Push': u.hasWebPush ? `Есть (${u.webPushDate})` : 'Нет',
       Верифицирован: verifiedSet.has(u.id) ? 'Да' : 'Нет',
       Дата: u.date || '',
     }))
@@ -340,6 +342,8 @@ export default function UsersPage() {
           <KpiCard label="Новых · 30 дней" value={d.kpi.newMonth} deltaTone="pos" delta={`+${d.kpi.newMonth}`} />
           <KpiCard label="С пуш-токеном" value={d.kpi.withPushToken} sub={`${d.kpi.total ? Math.round(d.kpi.withPushToken / d.kpi.total * 100) : 0}% базы`} sparkColor={PALETTE.green} />
           <KpiCard label="Без пуш-токена" value={d.kpi.withoutPushToken} sub="не получат пуши" sparkColor={PALETTE.red} />
+          <KpiCard label="📱 iPhone Web Push" value={d.kpi.withWebPush} sub={`+${d.kpi.webPushNewWeek} за 7 дн`} sparkColor="#A855F7" />
+          <KpiCard label="Только Web Push" value={d.kpi.webPushOnlyCount} sub="без Expo-токена" sparkColor="#7C3AED" />
         </div>
 
         {/* Charts */}
@@ -480,13 +484,21 @@ export default function UsersPage() {
                                     </span>}
                               </td>
                               <td style={{ padding: '10px 12px' }}>
-                                {u.hasPushToken
-                                  ? <span title="Есть Expo push token" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, fontSize: 11.5, fontWeight: 500, color: 'var(--positive)', background: 'rgba(46,125,84,.08)', border: '1px solid rgba(46,125,84,.2)' }}>
-                                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--positive)', display: 'inline-block' }} />📲
-                                    </span>
-                                  : <span title="Нет Expo push token" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, fontSize: 11.5, fontWeight: 500, color: 'var(--ink-4)', background: 'var(--bg-sunken)', border: '1px solid var(--line)' }}>
-                                      — нет
-                                    </span>}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                  {u.hasPushToken
+                                    ? <span title="Expo push token (Android/iOS APK)" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, fontSize: 11, fontWeight: 500, color: 'var(--positive)', background: 'rgba(46,125,84,.08)', border: '1px solid rgba(46,125,84,.2)' }}>
+                                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--positive)', display: 'inline-block' }} />📲 Expo
+                                      </span>
+                                    : null}
+                                  {u.hasWebPush
+                                    ? <span title={`Web Push (iPhone Safari PWA) · подключён ${u.webPushDate}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, fontSize: 11, fontWeight: 500, color: '#7C3AED', background: 'rgba(168,85,247,.08)', border: '1px solid rgba(168,85,247,.25)' }}>
+                                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#A855F7', display: 'inline-block' }} />📱 iPhone
+                                      </span>
+                                    : null}
+                                  {!u.hasPushToken && !u.hasWebPush
+                                    ? <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>— нет</span>
+                                    : null}
+                                </div>
                               </td>
                               <td style={{ padding: '10px 12px' }}>
                                 {isVerified

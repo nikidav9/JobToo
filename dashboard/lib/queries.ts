@@ -195,12 +195,19 @@ export async function fetchOverview() {
 // ─── users ───────────────────────────────────────────────────────────────────
 
 export async function fetchUsers() {
-  const { data: users } = await supabase
-    .from('jm_users')
-    .select('id,role,first_name,last_name,phone,metro_station,metro_line_id,is_blocked,created_at,company,push_token')
-    .order('created_at', { ascending: false })
+  const [{ data: users }, { data: webPushRows }] = await Promise.all([
+    supabase
+      .from('jm_users')
+      .select('id,role,first_name,last_name,phone,metro_station,metro_line_id,is_blocked,created_at,company,push_token')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('jm_web_push_subscriptions')
+      .select('user_id,updated_at'),
+  ])
 
   const u = users ?? []
+  const webPushMap = new Map((webPushRows ?? []).map((r: any) => [r.user_id, r.updated_at as string]))
+
   const workers = u.filter((x: any) => x.role === 'worker')
   const employers = u.filter((x: any) => x.role === 'employer')
 
@@ -252,7 +259,16 @@ export async function fetchUsers() {
     date: x.created_at?.slice(0, 10),
     id: x.id,
     hasPushToken: !!x.push_token,
+    hasWebPush: webPushMap.has(x.id),
+    webPushDate: webPushMap.get(x.id)?.slice(0, 10) ?? null,
+    hadPushTokenBefore: !!x.push_token && webPushMap.has(x.id),
   }))
+
+  const withWebPush = webPushMap.size
+  const webPushNewWeek = (webPushRows ?? []).filter((r: any) => r.updated_at > w7).length
+  const webPushNewMonth = (webPushRows ?? []).filter((r: any) => r.updated_at > w30).length
+  // Users who had NO push token but added web push (new channel for them)
+  const webPushOnlyCount = u.filter((x: any) => !x.push_token && webPushMap.has(x.id)).length
 
   return {
     kpi: {
@@ -265,6 +281,10 @@ export async function fetchUsers() {
       workerPct: u.length > 0 ? ((workers.length / u.length) * 100).toFixed(0) : '0',
       withPushToken: u.filter((x: any) => x.push_token).length,
       withoutPushToken: u.filter((x: any) => !x.push_token).length,
+      withWebPush,
+      webPushNewWeek,
+      webPushNewMonth,
+      webPushOnlyCount,
     },
     growth90,
     cumulative,
@@ -767,6 +787,7 @@ export async function fetchUserProfile(userId: string) {
     { data: vacancies },
     { data: permVacancies },
     { data: permApps },
+    { data: webPushSub },
   ] = await Promise.all([
     supabase.from('jm_users').select('*').eq('id', userId).maybeSingle(),
     supabase.from('jm_chats').select('id,vac_title,company_name,created_at,worker_id,employer_id,vacancy_id')
@@ -784,6 +805,7 @@ export async function fetchUserProfile(userId: string) {
       .eq('employer_id', userId).order('created_at', { ascending: false }).limit(20),
     supabase.from('jm_perm_applications').select('id,vacancy_id,status,created_at')
       .eq('worker_id', userId).order('created_at', { ascending: false }).limit(20),
+    supabase.from('jm_web_push_subscriptions').select('updated_at').eq('user_id', userId).maybeSingle(),
   ])
 
   const avgRating = ratingsReceived && ratingsReceived.length > 0
@@ -802,6 +824,8 @@ export async function fetchUserProfile(userId: string) {
     avgRating,
     totalLikes: (likes ?? []).length,
     totalMatches: (likes ?? []).filter((l: any) => l.is_match).length,
+    hasWebPush: !!webPushSub,
+    webPushDate: (webPushSub as any)?.updated_at?.slice(0, 10) ?? null,
   }
 }
 
