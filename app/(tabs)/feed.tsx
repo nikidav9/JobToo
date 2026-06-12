@@ -1270,8 +1270,8 @@ function WorkerPermMode() {
       : null;
 
     const employer = users.find((u: User) => u.id === v.employerId);
-    const displayCompany = v.company?.trim()
-      || employer?.company?.trim()
+    const displayCompany = employer?.company?.trim()
+      || v.company?.trim()
       || (employer ? `${employer.firstName} ${employer.lastName}`.trim() : '')
       || 'Работодатель';
 
