@@ -1265,13 +1265,11 @@ function WorkerPermMode() {
       ? METRO_LINES.find(l => l.stations.includes(v.metroStation!)) ?? null
       : null;
 
-    // Company name: use v.company, fall back to employer first+last name
     const employer = users.find((u: User) => u.id === v.employerId);
     const displayCompany = v.company?.trim()
-      ? v.company
-      : employer
-        ? `${employer.firstName} ${employer.lastName}`.trim()
-        : 'Работодатель';
+      || employer?.company?.trim()
+      || (employer ? `${employer.firstName} ${employer.lastName}`.trim() : '')
+      || 'Работодатель';
 
     const avatarColor = nameColorFromString(displayCompany);
     const avatarInitials = getInitials(displayCompany);
@@ -1502,6 +1500,7 @@ function WorkerPermMode() {
         <FlatList
           data={shownVacancies}
           keyExtractor={v => v.id}
+          extraData={users}
           contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: tabBarHeight + 16 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
