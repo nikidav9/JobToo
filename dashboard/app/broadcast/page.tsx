@@ -1,11 +1,11 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import PageHeader from '@/components/PageHeader'
-import { broadcastBoth, sendBothToUser, sendInAppToUser } from '@/lib/admin-actions'
+import { broadcastBoth, broadcastWebPush, sendBothToUser, sendInAppToUser } from '@/lib/admin-actions'
 import { supabaseAdmin } from '@/lib/supabase'
 import { logActivity } from '@/lib/activity-log'
 
-type Target = 'all' | 'workers' | 'employers' | 'metro'
+type Target = 'all' | 'workers' | 'employers' | 'metro' | 'webpush'
 type St = 'idle' | 'loading' | 'ok' | 'err'
 
 interface UserRow {
@@ -34,6 +34,7 @@ const TARGETS: { value: Target; label: string; desc: string }[] = [
   { value: 'workers',   label: '👷 Работники',          desc: 'Только работники' },
   { value: 'employers', label: '🏢 Работодатели',       desc: 'Только работодатели' },
   { value: 'metro',     label: '🚇 По метро',           desc: 'Пользователи конкретной станции' },
+  { value: 'webpush',   label: '📱 iPhone Web Push',    desc: 'Только подписчики PWA (Safari/iOS)' },
 ]
 
 interface Trigger {
@@ -112,9 +113,11 @@ export default function BroadcastPage() {
   const [userSt, setUserSt] = useState<St>('idle')
   const [search, setSearch] = useState('')
 
+  const [webPushCount, setWebPushCount] = useState(0)
+
   const load = useCallback(async () => {
     setDataLoading(true)
-    const [{ data: u }, { data: n }] = await Promise.all([
+    const [{ data: u }, { data: n }, { count: wpCount }] = await Promise.all([
       supabaseAdmin.from('jm_users')
         .select('id, first_name, last_name, phone, role, metro_station, created_at, push_token')
         .order('created_at', { ascending: false }),
@@ -122,9 +125,11 @@ export default function BroadcastPage() {
         .select('id, user_id, title, body, is_read, created_at, jm_users(first_name, last_name, phone)')
         .order('created_at', { ascending: false })
         .limit(100),
+      supabaseAdmin.from('jm_web_push_subscriptions').select('*', { count: 'exact', head: true }),
     ])
     setUsers(u ?? [])
     setNotifs((n ?? []) as any)
+    setWebPushCount(wpCount ?? 0)
     setDataLoading(false)
   }, [])
 
@@ -137,9 +142,14 @@ export default function BroadcastPage() {
     if (!title.trim() || !body.trim()) return
     setSt('loading'); setResult('')
     try {
-      const { pushCount, inappCount } = await broadcastBoth(target, title, body, metro || undefined)
-      logActivity('Рассылка', `Цель: ${target}, push: ${pushCount}, inapp: ${inappCount}`)
-      setSt('ok'); setResult(`✓ Push: ${pushCount}, уведомлений в приложении: ${inappCount}`)
+      if (target === 'webpush') {
+        const { sent, failed } = await broadcastWebPush(title, body)
+        setSt('ok'); setResult(`✓ Web Push отправлено: ${sent}${failed > 0 ? `, ошибок: ${failed}` : ''}`)
+      } else {
+        const { pushCount, inappCount } = await broadcastBoth(target, title, body, metro || undefined)
+        logActivity('Рассылка', `Цель: ${target}, push: ${pushCount}, inapp: ${inappCount}`)
+        setSt('ok'); setResult(`✓ Push: ${pushCount}, уведомлений в приложении: ${inappCount}`)
+      }
       load()
     } catch (e: any) {
       setSt('err'); setResult('✗ ' + e.message)
@@ -226,7 +236,7 @@ export default function BroadcastPage() {
             { label: 'Всего пользователей', value: users.length, color: 'var(--ink)' },
             { label: 'С push-токеном', value: withPush, color: 'var(--positive)', hint: 'Push + In-app' },
             { label: 'Без push-токена', value: withoutPush, color: 'var(--info)', hint: 'Только In-app' },
-            { label: 'In-app отправлено', value: notifs.length, color: 'var(--violet)' },
+            { label: '📱 iPhone Web Push', value: webPushCount, color: 'var(--violet)', hint: 'PWA подписчики' },
           ].map(k => (
             <div key={k.label} style={{ flex: '1 1 140px', background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 16px', boxShadow: 'var(--shadow-sm)' }}>
               <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-3)', marginBottom: 4 }}>{k.label}</div>

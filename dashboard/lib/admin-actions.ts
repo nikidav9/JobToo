@@ -161,6 +161,21 @@ export async function broadcastBoth(
   return { pushCount: (data?.pushCount ?? 0) as number, inappCount: (data?.inappCount ?? 0) as number }
 }
 
+export async function broadcastWebPush(title: string, body: string): Promise<{ sent: number; failed: number }> {
+  const res = await fetch('/api/webpush/broadcast', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-app-secret': process.env.NEXT_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6',
+    },
+    body: JSON.stringify({ title, body }),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) throw new Error(data.error ?? 'Ошибка web push рассылки')
+  logActivity('Web Push рассылка (iPhone)', `Заголовок: "${title}", отправлено: ${data.sent}`)
+  return { sent: data.sent as number, failed: data.failed as number }
+}
+
 export async function sendBothToUser(userId: string, title: string, body: string) {
   const { data, error } = await supabaseAdmin.functions.invoke('push-notify', {
     body: { userId, title, body, mode: 'both' },

@@ -1,0 +1,62 @@
+import { NextResponse } from 'next/server'
+import webpush from 'web-push'
+import { createClient } from '@supabase/supabase-js'
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, x-app-secret',
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS })
+}
+
+export async function POST(req: Request) {
+  const secret = req.headers.get('x-app-secret')
+  if (secret !== process.env.EXPO_PUBLIC_APP_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS })
+  }
+
+  const { title, body } = await req.json()
+  if (!title || !body) {
+    return NextResponse.json({ error: 'title and body required' }, { status: 400, headers: CORS })
+  }
+
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || 'mailto:admin@jobtoo.ru',
+    process.env.VAPID_PUBLIC_KEY || 'BMps5FNvS_ODiL0Rf2d76P8cy_xLh2C7EVXb9mHABkZLQz58mwUzTVzkle_5R0ACYR0IGD-zuS4cuYEhuvCMYE4',
+    process.env.VAPID_PRIVATE_KEY || 'cH1PAj57qEc7EoaxILsIeAxPyAWWxLO0dUQnIictJgw',
+  )
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  )
+
+  const { data: subs } = await supabase
+    .from('jm_web_push_subscriptions')
+    .select('user_id, endpoint, p256dh, auth')
+
+  if (!subs || subs.length === 0) {
+    return NextResponse.json({ ok: true, sent: 0, failed: 0 }, { headers: CORS })
+  }
+
+  let sent = 0
+  let failed = 0
+  const payload = JSON.stringify({ title, body })
+
+  await Promise.all(subs.map(async (sub: any) => {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        payload,
+      )
+      sent++
+    } catch {
+      failed++
+    }
+  }))
+
+  return NextResponse.json({ ok: true, sent, failed }, { headers: CORS })
+}

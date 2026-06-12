@@ -29,7 +29,6 @@ const NAV = [
   { href: '/tickets', label: 'Тикеты', icon: IconTicket },
   { href: '/broadcast', label: 'Рассылка', icon: IconBell },
   { href: '/funnel', label: 'Воронка', icon: IconFunnel },
-  { href: '/activity', label: 'Лог', icon: IconActivity },
 ]
 
 export default function Shell({ children }: { children: React.ReactNode }) {
