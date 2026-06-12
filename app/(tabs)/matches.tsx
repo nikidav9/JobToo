@@ -104,7 +104,7 @@ function ConfirmBanner({ onConfirm, loading }: { onConfirm: () => void; loading:
 // ─────────────────────────────────────────────────
 function WorkerMatches() {
   const router = useRouter();
-  const { currentUser, likes, vacancies, users, refreshAll, showToast } = useApp();
+  const { currentUser, likes, vacancies, users, chats, refreshAll, showToast } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const [detailVacancy, setDetailVacancy] = useState<Vacancy | null>(null);
   const [tab, setTab] = useState<'active' | 'rejected' | 'completed'>('active');
@@ -183,7 +183,11 @@ function WorkerMatches() {
           <View style={s.actionRow}>
             <TouchableOpacity
               style={s.chatBtn}
-              onPress={() => router.push({ pathname: '/(tabs)/chats' })}
+              onPress={() => {
+                const c = chats.find(c => c.vacancyId === like.vacancyId && c.workerId === currentUser.id);
+                if (c) router.push({ pathname: '/chat-room', params: { chatId: c.id } });
+                else router.push({ pathname: '/(tabs)/chats' });
+              }}
               activeOpacity={0.8}
             >
               <Text style={s.chatBtnTxt}>💬 Чат</Text>
@@ -289,7 +293,7 @@ function WorkerMatches() {
 // ─────────────────────────────────────────────────
 function EmployerMatches() {
   const router = useRouter();
-  const { currentUser, likes, vacancies, users, refreshAll, showToast } = useApp();
+  const { currentUser, likes, vacancies, users, chats, refreshAll, showToast } = useApp();
   const [actionLoading, setLoading] = useState<string | null>(null);
   const [tab, setTab] = useState<'pending' | 'matched' | 'completed'>('pending');
   const [refreshing, setRefreshing] = useState(false);
@@ -466,7 +470,11 @@ function EmployerMatches() {
           <View style={s.actionRow}>
             <TouchableOpacity
               style={s.chatBtn}
-              onPress={() => router.push({ pathname: '/(tabs)/chats' })}
+              onPress={() => {
+                const c = chats.find(c => c.vacancyId === like.vacancyId && c.workerId === like.workerId);
+                if (c) router.push({ pathname: '/chat-room', params: { chatId: c.id } });
+                else router.push({ pathname: '/(tabs)/chats' });
+              }}
               activeOpacity={0.8}
             >
               <Text style={s.chatBtnTxt}>💬 Чат</Text>
