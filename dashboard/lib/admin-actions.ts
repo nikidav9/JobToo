@@ -3,6 +3,52 @@ import { logActivity } from './activity-log'
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
+export async function deleteUser(userId: string, role: string, userName?: string) {
+  // 1. Find chats involving this user
+  const { data: chats } = await supabaseAdmin
+    .from('jm_chats')
+    .select('id')
+    .or(`worker_id.eq.${userId},employer_id.eq.${userId}`)
+  const chatIds = (chats ?? []).map((c: any) => c.id)
+
+  // 2. Delete messages in those chats
+  if (chatIds.length > 0) {
+    await supabaseAdmin.from('jm_messages').delete().in('chat_id', chatIds)
+  }
+
+  // 3. Delete chats
+  await supabaseAdmin.from('jm_chats').delete().or(`worker_id.eq.${userId},employer_id.eq.${userId}`)
+
+  if (role === 'worker') {
+    await supabaseAdmin.from('jm_likes').delete().eq('worker_id', userId)
+    await supabaseAdmin.from('jm_perm_applications').delete().eq('worker_id', userId)
+  } else {
+    // Get vacancy IDs to cascade
+    const [{ data: tempVacs }, { data: permVacs }] = await Promise.all([
+      supabaseAdmin.from('jm_vacancies').select('id').eq('employer_id', userId),
+      supabaseAdmin.from('jm_perm_vacancies').select('id').eq('employer_id', userId),
+    ])
+    const tempIds = (tempVacs ?? []).map((v: any) => v.id)
+    const permIds = (permVacs ?? []).map((v: any) => v.id)
+
+    if (tempIds.length > 0) await supabaseAdmin.from('jm_likes').delete().in('vacancy_id', tempIds)
+    if (permIds.length > 0) await supabaseAdmin.from('jm_perm_applications').delete().in('vacancy_id', permIds)
+
+    await supabaseAdmin.from('jm_vacancies').delete().eq('employer_id', userId)
+    await supabaseAdmin.from('jm_perm_vacancies').delete().eq('employer_id', userId)
+  }
+
+  // Delete shared data
+  await supabaseAdmin.from('jm_ratings').delete().or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
+  await supabaseAdmin.from('jm_notifications').delete().eq('user_id', userId)
+  await supabaseAdmin.from('jm_web_push_subscriptions').delete().eq('user_id', userId)
+
+  const { error } = await supabaseAdmin.from('jm_users').delete().eq('id', userId)
+  if (error) throw new Error(error.message)
+
+  logActivity('Удалён пользователь', `ID: ${userId}, роль: ${role}`, userId, userName)
+}
+
 export async function blockUser(userId: string, block: boolean, userName?: string) {
   const { error } = await supabaseAdmin
     .from('jm_users')

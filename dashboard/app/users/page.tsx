@@ -5,7 +5,7 @@ import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
-import { blockUser, resetPassword, sendPushToUser } from '@/lib/admin-actions'
+import { blockUser, resetPassword, sendPushToUser, deleteUser } from '@/lib/admin-actions'
 import { downloadCSV } from '@/lib/csv-export'
 import { getVerifiedUsers, setUserVerified } from '@/lib/verification'
 import {
@@ -269,6 +269,7 @@ export default function UsersPage() {
   const [actions, setActions] = useState<Record<string, { s: ActionState; msg?: string }>>({})
   const [pushText, setPushText] = useState<Record<string, string>>({})
   const [verifiedSet, setVerifiedSet] = useState<Set<string>>(new Set())
+  const [confirmDelete, setConfirmDelete] = useState<Record<string, boolean>>({})
 
   useEffect(() => { setVerifiedSet(getVerifiedUsers()) }, [])
 
@@ -309,6 +310,21 @@ export default function UsersPage() {
       setA(u.id + '_push', 'ok', 'Пуш отправлен')
       setPushText(prev => ({ ...prev, [u.id]: '' }))
     } catch (e: any) { setA(u.id + '_push', 'err', e.message) }
+  }
+
+  async function handleDelete(u: any) {
+    if (!confirmDelete[u.id]) {
+      setConfirmDelete(prev => ({ ...prev, [u.id]: true }))
+      setTimeout(() => setConfirmDelete(prev => ({ ...prev, [u.id]: false })), 4000)
+      return
+    }
+    setConfirmDelete(prev => ({ ...prev, [u.id]: false }))
+    setA(u.id + '_del', 'loading')
+    try {
+      await deleteUser(u.id, u.role, u.name)
+      setA(u.id + '_del', 'ok', 'Удалён')
+      setTimeout(refresh, 800)
+    } catch (e: any) { setA(u.id + '_del', 'err', e.message) }
   }
 
   function handleExportCSV() {
@@ -443,7 +459,9 @@ export default function UsersPage() {
                         const aBlock = actions[u.id]
                         const aPwd = actions[u.id + '_pwd']
                         const aPush = actions[u.id + '_push']
+                        const aDel = actions[u.id + '_del']
                         const isVerified = verifiedSet.has(u.id)
+                        const isConfirmDel = confirmDelete[u.id]
 
                         return (
                           <>
@@ -524,6 +542,19 @@ export default function UsersPage() {
                                     style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-sunken)', color: 'var(--ink-3)', fontSize: 11.5, cursor: 'pointer' }}>
                                     {expanded ? '▲' : '▼'}
                                   </button>
+                                  {/* Delete */}
+                                  {aDel?.s === 'ok'
+                                    ? <span style={{ fontSize: 11, color: 'var(--negative)', fontWeight: 500 }}>Удалён</span>
+                                    : aDel?.s === 'err'
+                                    ? <span style={{ fontSize: 11, color: 'var(--negative)' }}>✗</span>
+                                    : isConfirmDel
+                                    ? <button onClick={() => handleDelete(u)} style={{ padding: '3px 9px', borderRadius: 6, border: '1px solid rgba(179,60,42,.4)', background: 'rgba(179,60,42,.12)', color: 'var(--negative)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', animation: 'pulse 0.5s ease' }}>
+                                        Удалить?
+                                      </button>
+                                    : <button onClick={() => handleDelete(u)} disabled={aDel?.s === 'loading'} title="Удалить пользователя и все его данные"
+                                        style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-sunken)', color: 'var(--ink-4)', fontSize: 11.5, cursor: 'pointer' }}>
+                                        {aDel?.s === 'loading' ? '…' : '🗑'}
+                                      </button>}
                                 </div>
                               </td>
                             </tr>
