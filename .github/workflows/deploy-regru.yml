@@ -26,6 +26,8 @@ jobs:
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
           EXPO_PUBLIC_APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+          EXPO_PUBLIC_APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+          EXPO_PUBLIC_DASHBOARD_URL: ${{ secrets.EXPO_PUBLIC_DASHBOARD_URL }}
 
       - name: Copy PHP proxy and replace favicon
         run: |

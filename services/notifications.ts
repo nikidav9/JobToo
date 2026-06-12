@@ -2,7 +2,10 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { dbSavePushToken, dbGetPushToken, dbGetWorkerTokensByMetro } from '@/services/db';
+import { dbSavePushToken, dbGetPushToken, dbGetWorkerTokensByMetro, dbGetWebPushSubscription } from '@/services/db';
+
+const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6';
+const DASHBOARD_URL = process.env.EXPO_PUBLIC_DASHBOARD_URL || '';
 
 // Show alerts and play sound for foreground notifications
 Notifications.setNotificationHandler({
@@ -170,6 +173,36 @@ async function sendExpoPush(messages: ExpoPushMessage[]): Promise<void> {
   });
 }
 
+// ─── Web Push helper ──────────────────────────────────────────────────────────
+
+async function sendWebPushTo(
+  recipientUserId: string,
+  title: string,
+  body: string,
+  data: Record<string, unknown> = {},
+): Promise<void> {
+  if (!DASHBOARD_URL) return;
+  try {
+    const sub = await dbGetWebPushSubscription(recipientUserId);
+    if (!sub) return;
+    await fetch(`${DASHBOARD_URL}/api/webpush/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-app-secret': APP_SECRET,
+      },
+      body: JSON.stringify({
+        subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        title,
+        body,
+        data,
+      }),
+    });
+  } catch {
+    // Never crash due to web push failure
+  }
+}
+
 // ─── Internal helper ──────────────────────────────────────────────────────────
 
 async function pushTo(
@@ -180,6 +213,8 @@ async function pushTo(
   channelId = 'default',
   data: Record<string, unknown> = {},
 ): Promise<void> {
+  // Fire-and-forget web push alongside Expo push
+  sendWebPushTo(recipientUserId, title, body, { type, ...data }).catch(() => {});
   try {
     const token = await dbGetPushToken(recipientUserId);
     if (!token) return;
