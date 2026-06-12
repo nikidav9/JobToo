@@ -388,6 +388,21 @@ try {
                 'push_token' => 'not.is.null',
             ], 'id,push_token'); break;
 
+        // ── Web push subscriptions ─────────────────────────────────────────────
+        case 'dbGetWebPushSubscription': {
+            $r = sb_single('jm_web_push_subscriptions', ['user_id' => 'eq.' . $args[0]], 'endpoint,p256dh,auth');
+            $data = ($r && isset($r['endpoint'])) ? $r : null; break;
+        }
+
+        case 'dbSaveWebPushSubscription':
+            sb_upsert('jm_web_push_subscriptions', [
+                'user_id'    => $args[0],
+                'endpoint'   => $args[1],
+                'p256dh'     => $args[2],
+                'auth'       => $args[3],
+                'updated_at' => gmdate('Y-m-d\TH:i:s\Z'),
+            ], 'user_id'); break;
+
         // ── Push notifications ─────────────────────────────────────────────────
         case 'sendPushNotification': {
             [$to, $title, $nbody, $nd] = [$args[0], $args[1], $args[2], $args[3] ?? []];
