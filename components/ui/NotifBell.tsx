@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, Modal, StyleSheet,
-  ScrollView, SafeAreaView, ActivityIndicator, Alert,
+  ScrollView, SafeAreaView, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/hooks/useApp';
@@ -24,6 +24,7 @@ export function NotifBell() {
   const [open, setOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   const count = app?.unreadNotifCount ?? 0;
   const userId = app?.currentUser?.id ?? null;
@@ -69,24 +70,13 @@ export function NotifBell() {
     app?.refreshNotifications?.();
   }
 
-  function handleDeleteAll() {
+  async function handleDeleteAll() {
     if (!userId) return;
-    Alert.alert(
-      'Удалить все уведомления?',
-      'Это действие нельзя отменить.',
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Удалить',
-          style: 'destructive',
-          onPress: async () => {
-            setNotifs([]);
-            await dbDeleteAllNotifs(userId).catch(() => {});
-            app?.refreshNotifications?.();
-          },
-        },
-      ]
-    );
+    if (!confirmDeleteAll) { setConfirmDeleteAll(true); return; }
+    setConfirmDeleteAll(false);
+    setNotifs([]);
+    await dbDeleteAllNotifs(userId).catch(() => {});
+    app?.refreshNotifications?.();
   }
 
   const unread = notifs.filter(n => !n.isRead).length;
@@ -109,9 +99,20 @@ export function NotifBell() {
             <Text style={s.title}>Уведомления</Text>
             <View style={s.headerRight}>
               {notifs.length > 0 && (
-                <TouchableOpacity onPress={handleDeleteAll} style={s.deleteAllBtn}>
-                  <Text style={s.deleteAllTxt}>Удалить все</Text>
-                </TouchableOpacity>
+                confirmDeleteAll ? (
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    <TouchableOpacity onPress={handleDeleteAll} style={s.deleteAllBtn}>
+                      <Text style={s.deleteAllTxt}>Подтвердить</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setConfirmDeleteAll(false)} style={s.cancelBtn}>
+                      <Text style={s.cancelTxt}>Отмена</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity onPress={handleDeleteAll} style={s.deleteAllBtn}>
+                    <Text style={s.deleteAllTxt}>Удалить все</Text>
+                  </TouchableOpacity>
+                )
               )}
               {notifs.some(n => !n.isRead) && (
                 <TouchableOpacity onPress={handleMarkAll} style={s.markAllBtn}>
@@ -189,6 +190,8 @@ const s = StyleSheet.create({
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   deleteAllBtn: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: '#FEE2E2' },
   deleteAllTxt: { fontSize: 12, fontWeight: '600', color: '#DC2626' },
+  cancelBtn: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: Colors.divider },
+  cancelTxt: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
   markAllBtn: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: Colors.primaryLight },
   markAllTxt: { fontSize: 12, fontWeight: '600', color: Colors.primary },
   closeBtn: { padding: 4 },
