@@ -13,8 +13,8 @@ import { useApp } from '@/hooks/useApp';
 import { uid, nowISO, isPhoneComplete, extractPhoneDigits } from '@/services/storage';
 import { dbCheckPhoneExists, dbWarmup } from '@/services/db';
 
-// Steps: 1-Phone, 2-Password, 3-Name, 4-Company, 5-Legal
-const TOTAL = 5;
+// Steps: 1-Phone, 2-Password, 3-Name+Company, 4-Legal
+const TOTAL = 4;
 const SUPPORT_EMAIL = 'zpouches@yandex.ru';
 const COMPANY_OPTIONS = ['Лавка', 'Самокат'] as const;
 type CompanyOption = typeof COMPANY_OPTIONS[number];
@@ -184,23 +184,13 @@ export default function RegisterEmployer() {
             </View>
           )}
 
-          {/* Step 3: Name */}
+          {/* Step 3: Name + Company */}
           {step === 3 && (
             <View style={styles.stepContent}>
               <Text style={styles.title}>Как тебя зовут?</Text>
               <AppInput value={lastName} onChangeText={setLastName} placeholder="Иванов" label="Фамилия" autoFocus />
               <AppInput value={firstName} onChangeText={setFirstName} placeholder="Дмитрий" label="Имя" />
-              <View style={{ marginTop: 12 }}>
-                <PrimaryButton label="Продолжить →" onPress={next} disabled={!lastName.trim() || !firstName.trim()} />
-              </View>
-            </View>
-          )}
-
-          {/* Step 4: Company selection */}
-          {step === 4 && (
-            <View style={styles.stepContent}>
-              <Text style={styles.title}>Выбери компанию</Text>
-              <Text style={styles.subtitle}>Укажи, в какой компании ты работаешь</Text>
+              <Text style={[styles.subtitle, { marginTop: 8 }]}>Название компании</Text>
               {COMPANY_OPTIONS.map(opt => (
                 <TouchableOpacity
                   key={opt}
@@ -214,14 +204,14 @@ export default function RegisterEmployer() {
                   <Text style={[styles.companyLabel, company === opt && styles.companyLabelActive]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
-              <View style={{ marginTop: 8 }}>
-                <PrimaryButton label="Продолжить →" onPress={next} disabled={!company} />
+              <View style={{ marginTop: 4 }}>
+                <PrimaryButton label="Продолжить →" onPress={next} disabled={!lastName.trim() || !firstName.trim() || !company} />
               </View>
             </View>
           )}
 
-          {/* Step 5: Legal consent */}
-          {step === 5 && (
+          {/* Step 4: Legal consent */}
+          {step === 4 && (
             <View style={styles.stepContent}>
               <Text style={styles.title}>Согласие</Text>
               <Text style={styles.subtitle}>Для завершения регистрации</Text>
