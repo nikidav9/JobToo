@@ -343,7 +343,6 @@ export default function UsersPage() {
           <KpiCard label="С пуш-токеном" value={d.kpi.withPushToken} sub={`${d.kpi.total ? Math.round(d.kpi.withPushToken / d.kpi.total * 100) : 0}% базы`} sparkColor={PALETTE.green} />
           <KpiCard label="Без пуш-токена" value={d.kpi.withoutPushToken} sub="не получат пуши" sparkColor={PALETTE.red} />
           <KpiCard label="📱 iPhone Web Push" value={d.kpi.withWebPush} sub={`+${d.kpi.webPushNewWeek} за 7 дн`} sparkColor="#A855F7" />
-          <KpiCard label="Только Web Push" value={d.kpi.webPushOnlyCount} sub="без Expo-токена" sparkColor="#7C3AED" />
         </div>
 
         {/* Charts */}
