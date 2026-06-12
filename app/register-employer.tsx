@@ -13,9 +13,11 @@ import { useApp } from '@/hooks/useApp';
 import { uid, nowISO, isPhoneComplete, extractPhoneDigits } from '@/services/storage';
 import { dbCheckPhoneExists, dbWarmup } from '@/services/db';
 
-// Steps: 1-Phone, 2-Password, 3-Name, 4-Legal
-const TOTAL = 4;
+// Steps: 1-Phone, 2-Password, 3-Name, 4-Company, 5-Legal
+const TOTAL = 5;
 const SUPPORT_EMAIL = 'zpouches@yandex.ru';
+const COMPANY_OPTIONS = ['Лавка', 'Самокат'] as const;
+type CompanyOption = typeof COMPANY_OPTIONS[number];
 
 export default function RegisterEmployer() {
   const router = useRouter();
@@ -27,6 +29,7 @@ export default function RegisterEmployer() {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [lastName, setLastName] = useState('');
   const [firstName, setFirstName] = useState('');
+  const [company, setCompany] = useState<CompanyOption | ''>('');
   const [agreed, setAgreed] = useState(false);
   const [checking, setChecking] = useState(false);
   const [phoneError, setPhoneError] = useState('');
@@ -84,7 +87,7 @@ export default function RegisterEmployer() {
         password,
         lastName,
         firstName,
-        company: '', // явная пустая компания для физлиц
+        company: company || '',
         createdAt: nowISO(),
       };
       await registerUser(user);
@@ -193,8 +196,32 @@ export default function RegisterEmployer() {
             </View>
           )}
 
-          {/* Step 4: Legal consent */}
+          {/* Step 4: Company selection */}
           {step === 4 && (
+            <View style={styles.stepContent}>
+              <Text style={styles.title}>Выбери компанию</Text>
+              <Text style={styles.subtitle}>Укажи, в какой компании ты работаешь</Text>
+              {COMPANY_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.companyOption, company === opt && styles.companyOptionActive]}
+                  onPress={() => setCompany(opt)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.companyRadio, company === opt && styles.companyRadioActive]}>
+                    {company === opt ? <View style={styles.companyRadioDot} /> : null}
+                  </View>
+                  <Text style={[styles.companyLabel, company === opt && styles.companyLabelActive]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+              <View style={{ marginTop: 8 }}>
+                <PrimaryButton label="Продолжить →" onPress={next} disabled={!company} />
+              </View>
+            </View>
+          )}
+
+          {/* Step 5: Legal consent */}
+          {step === 5 && (
             <View style={styles.stepContent}>
               <Text style={styles.title}>Согласие</Text>
               <Text style={styles.subtitle}>Для завершения регистрации</Text>
@@ -261,4 +288,18 @@ const styles = StyleSheet.create({
   checkmark: { color: '#fff', fontWeight: '700', fontSize: 14 },
   checkLabel: { fontSize: 14, color: Colors.textPrimary, lineHeight: 22, flex: 1 },
   link: { color: Colors.primary, fontWeight: '600', textDecorationLine: 'underline' },
+  companyOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    padding: 16, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.inputBorder,
+    backgroundColor: Colors.surface,
+  },
+  companyOptionActive: { borderColor: Colors.primary, backgroundColor: '#F0EEFF' },
+  companyRadio: {
+    width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: Colors.inputBorder,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  companyRadioActive: { borderColor: Colors.primary },
+  companyRadioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary },
+  companyLabel: { fontSize: 16, color: Colors.textPrimary, fontWeight: '500' },
+  companyLabelActive: { color: Colors.primary, fontWeight: '700' },
 });

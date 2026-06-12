@@ -42,6 +42,8 @@ import { registerForPushNotifications } from '@/services/notifications';
 
 // Polling interval for native (Realtime is primary, polling is fallback)
 const NATIVE_POLL_INTERVAL = 15_000;
+// Polling interval for web (Supabase realtime may be blocked in Russia)
+const WEB_POLL_INTERVAL = 30_000;
 
 export interface ToastMessage { message: string; type: 'success' | 'error' | 'info' }
 
@@ -313,6 +315,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => {
       subs.forEach(s => { try { s.unsubscribe(); } catch {} });
     };
+  }, [currentUser?.id]);
+
+  // ─── Polling fallback for web (Supabase realtime may be blocked in Russia) ──
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (!currentUser) return;
+
+    const user = currentUser;
+    const poll = () => {
+      Promise.all([
+        refreshChats(user),
+        refreshLikes(user),
+        refreshNotifications(),
+      ]).catch(() => {});
+    };
+    const interval = setInterval(poll, WEB_POLL_INTERVAL);
+    return () => clearInterval(interval);
   }, [currentUser?.id]);
 
   // ─── Polling fallback for native (fires when app comes to foreground) ──────

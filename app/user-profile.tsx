@@ -10,7 +10,7 @@ import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { METRO_LINES } from '@/constants/metro';
 import { nameColorFromString, getInitials } from '@/services/storage';
-import { dbGetRatingsForUser, UserRating } from '@/services/db';
+import { dbGetRatingsForUser, dbGetUserById, UserRating } from '@/services/db';
 import { getSupabaseClient } from '@/template';
 
 function StarRow({ rating, count }: { rating: number; count: number }) {
@@ -66,8 +66,20 @@ export default function UserProfileScreen() {
   const [tab, setTab] = useState<Tab>('info');
   const [ratings, setRatings] = useState<UserRating[]>([]);
   const [loadingRatings, setLoadingRatings] = useState(false);
+  const [fetchedUser, setFetchedUser] = useState<import('@/constants/types').User | null>(null);
+  const [fetchingUser, setFetchingUser] = useState(false);
 
-  const user = users.find(u => u.id === userId);
+  const contextUser = users.find(u => u.id === userId);
+  const user = contextUser ?? fetchedUser;
+
+  useEffect(() => {
+    if (!userId || contextUser) return;
+    setFetchingUser(true);
+    dbGetUserById(userId)
+      .then(u => setFetchedUser(u))
+      .catch(() => {})
+      .finally(() => setFetchingUser(false));
+  }, [userId, contextUser]);
 
   const fetchRatings = (id: string) => {
     setLoadingRatings(true);
@@ -112,7 +124,11 @@ export default function UserProfileScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.center}>
-          <Text style={styles.errorText}>Пользователь не найден</Text>
+          {fetchingUser ? (
+            <ActivityIndicator size="large" color="#6C63FF" />
+          ) : (
+            <Text style={styles.errorText}>Пользователь не найден</Text>
+          )}
         </View>
       </SafeAreaView>
     );

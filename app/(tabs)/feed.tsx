@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { Like, User, Vacancy, PermVacancy } from '@/constants/types';
@@ -529,7 +529,6 @@ function WorkerListModal({
                       style={wS.cardTop}
                       onPress={() => {
                         if (!worker) return;
-                        onClose();
                         router.push({ pathname: '/user-profile', params: { userId: worker.id } });
                       }}
                       activeOpacity={0.8}
@@ -821,6 +820,11 @@ function WorkerFeed() {
         1,
       );
       refreshChats().catch(() => {});
+      notifyEmployerNewApplicant(
+        currentCard.employerId,
+        `${currentUser.firstName} ${currentUser.lastName}`,
+        currentCard.title,
+      ).catch(() => {});
       router.push({ pathname: '/chat-room', params: { chatId } });
     } catch (e) {
       showToast('Ошибка при открытии чата', 'error');
@@ -1528,7 +1532,7 @@ function getTodayISO() {
 
 function EmployerHome() {
   const router = useRouter();
-  const { currentUser, vacancies, likes, permVacancies, permApplications, refreshVacancies, refreshPermVacancies, refreshPermApplications, refreshAll, showToast } = useApp();
+  const { currentUser, vacancies, likes, permVacancies, permApplications, refreshVacancies, refreshPermVacancies, refreshPermApplications, refreshLikes, refreshAll, showToast } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
   const [mode, setMode] = useState<AppMode>('shift');
   const [tab, setTab] = useState<'active' | 'closed'>('active');
@@ -1549,6 +1553,12 @@ function EmployerHome() {
     await refreshAll();
     setRefreshing(false);
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      if (currentUser) refreshLikes(currentUser).catch(() => {});
+    }, [currentUser?.id]),
+  );
 
   const todayISO = getTodayISO();
   const myVacancies = vacancies.filter(v => v.employerId === currentUser?.id);

@@ -886,6 +886,21 @@ export async function dbGetPushToken(userId: string): Promise<string | null> {
   return data?.push_token ?? null;
 }
 
+export async function dbSetEmployerCompany(userId: string, company: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbSetEmployerCompany', [userId, company]); return; }
+  await withTimeout(supabase.from('jm_users').update({ company }).eq('id', userId).eq('role', 'employer'));
+}
+
+export async function dbGetWebPushSubscription(userId: string): Promise<{ endpoint: string; p256dh: string; auth: string } | null> {
+  if (IS_NATIVE) {
+    return proxy<{ endpoint: string; p256dh: string; auth: string } | null>('dbGetWebPushSubscription', [userId]);
+  }
+  const { data } = await withTimeout(
+    supabase.from('jm_web_push_subscriptions').select('endpoint, p256dh, auth').eq('user_id', userId).maybeSingle()
+  );
+  return data ?? null;
+}
+
 export async function dbGetWorkerTokensByMetro(metroStation: string): Promise<{ id: string; push_token: string }[]> {
   if (IS_NATIVE) { return proxy<{ id: string; push_token: string }[]>('dbGetWorkerTokensByMetro', [metroStation]); }
   const { data } = await withTimeout(
