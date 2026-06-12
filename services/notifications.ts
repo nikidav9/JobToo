@@ -6,6 +6,9 @@ import { dbSavePushToken, dbGetPushToken, dbGetWorkerTokensByMetro, dbGetWebPush
 
 const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6';
 const DASHBOARD_URL = process.env.EXPO_PUBLIC_DASHBOARD_URL || '';
+const PROXY_URL = process.env.EXPO_PUBLIC_API_URL
+  ? `${process.env.EXPO_PUBLIC_API_URL}/api/db.php`
+  : 'https://jobtoo.ru/api/db.php';
 
 // Show alerts and play sound for foreground notifications
 Notifications.setNotificationHandler({
@@ -127,9 +130,9 @@ async function sendExpoPush(messages: ExpoPushMessage[]): Promise<void> {
     // exp.host blocks cross-origin requests from browsers — route through server proxy
     const tokens = messages.map(m => m.to);
     const first = messages[0];
-    await fetch('/api/db', {
+    await fetch(PROXY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
       body: JSON.stringify({
         fn: 'sendPushNotification',
         args: [
