@@ -13,9 +13,10 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: Request) {
-  // Protect with dashboard login credentials
-  const secret = req.headers.get('x-dashboard-secret')
-  if (!secret || secret !== process.env.DASHBOARD_PASSWORD) {
+  // Protect with app secret (same as other API routes)
+  const secret = req.headers.get('x-app-secret') || req.headers.get('x-dashboard-secret')
+  const validSecret = process.env.EXPO_PUBLIC_APP_SECRET || process.env.DASHBOARD_PASSWORD
+  if (!secret || secret !== validSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS })
   }
 

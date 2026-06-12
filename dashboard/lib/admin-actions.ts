@@ -13,12 +13,11 @@ export async function blockUser(userId: string, block: boolean, userName?: strin
 }
 
 export async function resetPassword(userId: string): Promise<string> {
-  const { getStoredPassword } = await import('@/lib/auth')
   const res = await fetch('/api/admin/reset-password', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-dashboard-secret': getStoredPassword(),
+      'x-app-secret': process.env.NEXT_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6',
     },
     body: JSON.stringify({ userId }),
   })
