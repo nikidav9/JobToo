@@ -24,7 +24,7 @@ import { WorkTypeSelector } from '@/components/feature/WorkTypeSelector';
 import { WorkType } from '@/constants/types';
 import { WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
 
-const COMPANY_OPTIONS = ['Лавка', 'Самокат'] as const;
+const COMPANY_OPTIONS = ['Лавка'] as const;
 type CompanyOption = typeof COMPANY_OPTIONS[number];
 import { METRO_LINES } from '@/constants/metro';
 import { NotifBell } from '@/components/ui/NotifBell';

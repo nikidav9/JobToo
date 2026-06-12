@@ -16,7 +16,7 @@ import { dbCheckPhoneExists, dbWarmup } from '@/services/db';
 // Steps: 1-Phone, 2-Password, 3-Name+Company, 4-Legal
 const TOTAL = 4;
 const SUPPORT_EMAIL = 'zpouches@yandex.ru';
-const COMPANY_OPTIONS = ['Лавка', 'Самокат'] as const;
+const COMPANY_OPTIONS = ['Лавка'] as const;
 type CompanyOption = typeof COMPANY_OPTIONS[number];
 
 export default function RegisterEmployer() {
