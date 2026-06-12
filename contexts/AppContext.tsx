@@ -327,6 +327,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       Promise.all([
         refreshChats(user),
         refreshLikes(user),
+        refreshVacancies(),
+        refreshPermVacancies(user),
         refreshNotifications(),
       ]).catch(() => {});
     };
