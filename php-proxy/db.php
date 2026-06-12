@@ -397,6 +397,27 @@ try {
             $data = json_decode($resp ?: 'null', true); break;
         }
 
+        case 'dbGetNotifications':
+            $data = sb_select('jm_notifications', ['user_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;
+
+        case 'dbMarkNotifRead':
+            sb_update('jm_notifications', ['id' => 'eq.' . $args[0]], ['is_read' => true]); break;
+
+        case 'dbMarkAllNotifsRead':
+            sb_update('jm_notifications', ['user_id' => 'eq.' . $args[0]], ['is_read' => true]); break;
+
+        case 'dbDeleteNotif':
+            sb_delete('jm_notifications', ['id' => 'eq.' . $args[0]]); break;
+
+        case 'dbDeleteAllNotifs':
+            sb_delete('jm_notifications', ['user_id' => 'eq.' . $args[0]]); break;
+
+        // ── Web Push ───────────────────────────────────────────────────────────
+        case 'dbGetWebPushSubscription': {
+            $r = sb_single('jm_web_push_subscriptions', ['user_id' => 'eq.' . $args[0]], 'endpoint,p256dh,auth');
+            $data = $r ?: null; break;
+        }
+
         default:
             throw new RuntimeException('Unknown function: ' . $fn);
     }

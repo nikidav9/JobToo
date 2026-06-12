@@ -886,3 +886,51 @@ export async function dbGetWorkerTokensByMetro(metroStation: string): Promise<{ 
   );
   return (data ?? []) as { id: string; push_token: string }[];
 }
+
+// ─── Web Push subscriptions ───────────────────────────────────────────────────
+
+type WebPushSub = { endpoint: string; p256dh: string; auth: string };
+
+export async function dbGetWebPushSubscription(userId: string): Promise<WebPushSub | null> {
+  if (IS_NATIVE) { return proxy<WebPushSub | null>('dbGetWebPushSubscription', [userId]); }
+  const { data } = await withTimeout(
+    supabase.from('jm_web_push_subscriptions').select('endpoint,p256dh,auth').eq('user_id', userId).maybeSingle()
+  );
+  return data ?? null;
+}
+
+// ─── In-app notifications ──────────────────────────────────────────────────────
+
+export async function dbGetNotifications(userId: string): Promise<{ id: string; title: string; body: string; is_read: boolean; created_at: string }[]> {
+  if (IS_NATIVE) { return proxy('dbGetNotifications', [userId]); }
+  const { data, error } = await withTimeout(
+    supabase.from('jm_notifications')
+      .select('id, title, body, is_read, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+  );
+  if (error) throwOnError('dbGetNotifications', error);
+  return data ?? [];
+}
+
+export async function dbMarkNotifRead(id: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbMarkNotifRead', [id]); return; }
+  await withTimeout(supabase.from('jm_notifications').update({ is_read: true }).eq('id', id));
+}
+
+export async function dbMarkAllNotifsRead(userId: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbMarkAllNotifsRead', [userId]); return; }
+  await withTimeout(supabase.from('jm_notifications').update({ is_read: true }).eq('user_id', userId));
+}
+
+export async function dbDeleteNotif(id: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbDeleteNotif', [id]); return; }
+  await withTimeout(supabase.from('jm_notifications').delete().eq('id', id));
+}
+
+export async function dbDeleteAllNotifs(userId: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbDeleteAllNotifs', [userId]); return; }
+  await withTimeout(supabase.from('jm_notifications').delete().eq('user_id', userId));
+}
+

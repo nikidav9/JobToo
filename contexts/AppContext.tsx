@@ -28,6 +28,7 @@ import {
   dbGetPermSaved,
 } from '@/services/db';
 import { registerForPushNotifications } from '@/services/notifications';
+import { registerWebPush } from '@/lib/webPush';
 
 // Polling interval for native (Realtime is primary, polling is fallback)
 const NATIVE_POLL_INTERVAL = 15_000;
@@ -298,6 +299,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     await saveSessionUser(u);
     // Задержка нужна чтобы система успела обработать разрешения на уведомления
     setTimeout(() => { registerForPushNotifications(u.id).catch(() => {}); }, 2000);
+    registerWebPush(u.id).catch(() => {});
     setTimeout(() => {
       Promise.all([
         refreshUsers(),
@@ -323,6 +325,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     _setCurrentUser(found);
     await saveSessionUser(found);
     registerForPushNotifications(found.id).catch(() => {});
+    registerWebPush(found.id).catch(() => {});
     setTimeout(() => {
       Promise.all([
         refreshUsers(),
