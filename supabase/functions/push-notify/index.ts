@@ -42,9 +42,7 @@ serve(async (req) => {
       else if (target === 'employers') query = query.eq('role', 'employer')
       else if (target === 'metro' && metro) query = query.eq('metro_station', metro)
 
-      // For inapp mode: only users WITHOUT push token
-      if (mode === 'inapp') query = query.is('push_token', null)
-      // For push mode: only users WITH push token
+      // For push-only mode filter to users WITH token; inapp/both need all users
       if (!mode || mode === 'push') query = query.not('push_token', 'is', null)
 
       const { data, error } = await query

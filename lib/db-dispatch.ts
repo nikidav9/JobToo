@@ -671,6 +671,15 @@ export async function dispatch(supabase: SupabaseClient, fn: string, args: any[]
 
     // ─── In-app notifications ─────────────────────────────────────────────────
 
+    case 'dbSaveNotification': {
+      const [userId, title, body] = args;
+      const { error } = await supabase
+        .from('jm_notifications')
+        .insert({ user_id: userId, title, body });
+      if (error) throw new Error(error.message);
+      return null;
+    }
+
     case 'dbGetNotifications': {
       const [userId] = args;
       const { data, error } = await supabase

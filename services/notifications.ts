@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { dbSavePushToken, dbGetPushToken, dbGetWorkerTokensByMetro, dbGetWebPushSubscription } from '@/services/db';
+import { dbSavePushToken, dbGetPushToken, dbGetWorkerTokensByMetro, dbGetWebPushSubscription, dbSaveNotification } from '@/services/db';
 
 const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6';
 const DASHBOARD_URL = process.env.EXPO_PUBLIC_DASHBOARD_URL || '';
@@ -213,6 +213,8 @@ async function pushTo(
   channelId = 'default',
   data: Record<string, unknown> = {},
 ): Promise<void> {
+  // Save in-app notification so the bell always shows it
+  dbSaveNotification(recipientUserId, title, body).catch(() => {});
   // Fire-and-forget web push alongside Expo push
   sendWebPushTo(recipientUserId, title, body, { type, ...data }).catch(() => {});
   try {
