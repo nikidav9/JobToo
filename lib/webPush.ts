@@ -11,36 +11,57 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 const WP_FLAG = 'webpush_registered';
+const WP_DEBUG = 'webpush_debug';
 
 export function isWebPushRegistered(): boolean {
   if (typeof localStorage === 'undefined') return false;
   return localStorage.getItem(WP_FLAG) === '1';
 }
 
+export function getWebPushDebug(): string {
+  if (typeof localStorage === 'undefined') return '';
+  return localStorage.getItem(WP_DEBUG) || '';
+}
+
+function wpDebug(msg: string) {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(WP_DEBUG, msg);
+  console.warn('[webpush]', msg);
+}
+
 export async function registerWebPush(userId: string): Promise<boolean> {
   if (Platform.OS !== 'web') return false;
   if (typeof window === 'undefined') return false;
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('[webpush] PushManager not available (not standalone PWA on iOS?)');
+
+  if (!('serviceWorker' in navigator)) {
+    wpDebug('Ошибка: serviceWorker не поддерживается');
+    return false;
+  }
+  if (!('PushManager' in window)) {
+    wpDebug('Ошибка: PushManager недоступен. Откройте приложение через ярлык Safari (не браузер)');
     return false;
   }
 
   try {
+    wpDebug('Регистрируем sw.js...');
     const reg = await navigator.serviceWorker.register('/sw.js');
+    wpDebug('Ждём готовности SW...');
     await navigator.serviceWorker.ready;
 
+    wpDebug('Запрашиваем разрешение...');
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
-      console.warn('[webpush] Permission not granted:', permission);
+      wpDebug(`Разрешение: ${permission}. Зайдите в Настройки → Safari → Уведомления`);
       return false;
     }
 
+    wpDebug('Создаём push-подписку...');
     const existing = await reg.pushManager.getSubscription();
     const sub = existing ?? await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
     });
 
+    wpDebug('Сохраняем в базу...');
     const subJson = sub.toJSON();
     const { error } = await supabase.from('jm_web_push_subscriptions').upsert({
       user_id: userId,
@@ -51,15 +72,16 @@ export async function registerWebPush(userId: string): Promise<boolean> {
     }, { onConflict: 'user_id' });
 
     if (error) {
-      console.error('[webpush] Supabase upsert error:', error.message);
+      wpDebug(`Ошибка Supabase: ${error.message}`);
       return false;
     }
 
     localStorage.setItem(WP_FLAG, '1');
+    localStorage.setItem(WP_DEBUG, 'OK — подписка сохранена!');
     console.info('[webpush] Subscription saved for user:', userId);
     return true;
-  } catch (e) {
-    console.error('[webpush] Registration error:', e);
+  } catch (e: any) {
+    wpDebug(`Исключение: ${e?.message ?? String(e)}`);
     return false;
   }
 }

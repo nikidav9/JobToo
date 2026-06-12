@@ -36,7 +36,7 @@ import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials } from '@/services/storage';
 import { NotifBell } from '@/components/ui/NotifBell';
-import { registerWebPush, isWebPushRegistered } from '@/lib/webPush';
+import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
 
 // ─── Web push permission banner (iOS PWA requires user gesture) ───────────────
 type WPState = 'ask' | 'retry' | 'denied' | 'hidden';
@@ -53,6 +53,8 @@ function getWPState(): WPState {
 
 function WebPushBanner({ userId }: { userId: string }) {
   const [state, setState] = useState<WPState>(() => getWPState());
+  const [debugMsg, setDebugMsg] = useState<string>('');
+  const [loading, setLoading] = useState(false);
 
   if (state === 'hidden') return null;
 
@@ -66,21 +68,31 @@ function WebPushBanner({ userId }: { userId: string }) {
   }
 
   const handlePress = async () => {
-    setState('hidden');
+    if (loading) return;
+    setLoading(true);
+    setDebugMsg('...');
     const ok = await registerWebPush(userId);
-    if (!ok) {
+    setLoading(false);
+    if (ok) {
+      setState('hidden');
+    } else {
+      const msg = getWebPushDebug();
+      setDebugMsg(msg);
       const perm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
       if (perm === 'denied') setState('denied');
     }
   };
 
   return (
-    <TouchableOpacity style={wpStyles.banner} onPress={handlePress} activeOpacity={0.85}>
-      <Text style={wpStyles.icon}>🔔</Text>
-      <Text style={wpStyles.text}>
-        {state === 'retry' ? 'Завершить настройку уведомлений' : 'Включить push-уведомления'}
-      </Text>
-      <Text style={wpStyles.arrow}>›</Text>
+    <TouchableOpacity style={wpStyles.banner} onPress={handlePress} activeOpacity={0.85} disabled={loading}>
+      <Text style={wpStyles.icon}>{loading ? '⏳' : '🔔'}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={wpStyles.text}>
+          {state === 'retry' ? 'Завершить настройку уведомлений' : 'Включить push-уведомления'}
+        </Text>
+        {debugMsg ? <Text style={wpStyles.debugText}>{debugMsg}</Text> : null}
+      </View>
+      {!loading && <Text style={wpStyles.arrow}>›</Text>}
     </TouchableOpacity>
   );
 }
@@ -94,8 +106,9 @@ const wpStyles = StyleSheet.create({
   },
   bannerDenied: { backgroundColor: '#FEF3C7' },
   icon: { fontSize: 18 },
-  text: { flex: 1, fontSize: 14, fontWeight: '600', color: '#4338CA' },
+  text: { fontSize: 14, fontWeight: '600', color: '#4338CA' },
   textDenied: { color: '#92400E', fontWeight: '500', fontSize: 12 },
+  debugText: { fontSize: 11, color: '#6B7280', marginTop: 2 },
   arrow: { fontSize: 18, color: '#4338CA' },
 });
 
