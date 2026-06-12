@@ -1,12 +1,6 @@
 import { NextResponse } from 'next/server'
 import webpush from 'web-push'
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || 'mailto:admin@jobtoo.ru',
-  process.env.VAPID_PUBLIC_KEY || 'BMps5FNvS_ODiL0Rf2d76P8cy_xLh2C7EVXb9mHABkZLQz58mwUzTVzkle_5R0ACYR0IGD-zuS4cuYEhuvCMYE4',
-  process.env.VAPID_PRIVATE_KEY || 'cH1PAj57qEc7EoaxILsIeAxPyAWWxLO0dUQnIictJgw',
-)
-
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -18,6 +12,12 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: Request) {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || 'mailto:admin@jobtoo.ru',
+    process.env.VAPID_PUBLIC_KEY || 'BMps5FNvS_ODiL0Rf2d76P8cy_xLh2C7EVXb9mHABkZLQz58mwUzTVzkle_5R0ACYR0IGD-zuS4cuYEhuvCMYE4',
+    process.env.VAPID_PRIVATE_KEY || 'cH1PAj57qEc7EoaxILsIeAxPyAWWxLO0dUQnIictJgw',
+  )
+
   const secret = req.headers.get('x-app-secret')
   if (secret !== process.env.EXPO_PUBLIC_APP_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS })
