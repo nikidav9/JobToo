@@ -23,6 +23,9 @@ import { MetroPicker } from '@/components/feature/MetroPicker';
 import { WorkTypeSelector } from '@/components/feature/WorkTypeSelector';
 import { WorkType } from '@/constants/types';
 import { WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
+
+const COMPANY_OPTIONS = ['Лавка', 'Самокат'] as const;
+type CompanyOption = typeof COMPANY_OPTIONS[number];
 import { METRO_LINES } from '@/constants/metro';
 import { NotifBell } from '@/components/ui/NotifBell';
 
@@ -251,7 +254,7 @@ export default function ProfileScreen() {
   const [editMetroLineName, setEditMetroLineName] = useState('');
   const [editMetroStation, setEditMetroStation] = useState('');
   const [editWorkTypes, setEditWorkTypes] = useState<WorkType[]>([]);
-  const [editCompany, setEditCompany] = useState('');
+  const [editCompany, setEditCompany] = useState<CompanyOption | ''>('');
   const [editBio, setEditBio] = useState('');
 
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
@@ -269,7 +272,8 @@ export default function ProfileScreen() {
     setEditMetroStation(currentUser.metroStation ?? '');
     setEditMetroLineName(line?.name ?? '');
     setEditWorkTypes((currentUser.workTypes ?? []) as WorkType[]);
-    setEditCompany(currentUser.company ?? '');
+    const savedCompany = currentUser.company ?? '';
+    setEditCompany(COMPANY_OPTIONS.includes(savedCompany as CompanyOption) ? savedCompany as CompanyOption : '');
     setEditBio(currentUser.bio ?? '');
   };
 
@@ -729,7 +733,20 @@ export default function ProfileScreen() {
             )}
             {editSection === 'company' && (
               <View style={{ gap: 12 }}>
-                <AppInput label="Название компании" value={editCompany} onChangeText={setEditCompany} placeholder="ООО МегаСклад" />
+                <Text style={{ fontSize: 13, fontWeight: '500', color: Colors.textSecondary }}>Название компании</Text>
+                {COMPANY_OPTIONS.map(opt => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[pStyles.companyOption, editCompany === opt && pStyles.companyOptionActive]}
+                    onPress={() => setEditCompany(opt)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[pStyles.companyRadio, editCompany === opt && pStyles.companyRadioActive]}>
+                      {editCompany === opt ? <View style={pStyles.companyRadioDot} /> : null}
+                    </View>
+                    <Text style={[pStyles.companyLabel, editCompany === opt && pStyles.companyLabelActive]}>{opt}</Text>
+                  </TouchableOpacity>
+                ))}
                 <AppInput label="О компании" value={editBio} onChangeText={setEditBio} placeholder="Расскажите о компании..." multiline numberOfLines={4} />
               </View>
             )}
@@ -1037,3 +1054,20 @@ export function ErrorBoundary({ error, retry }: { error: Error; retry: () => voi
     </SafeAreaView>
   );
 }
+
+const pStyles = StyleSheet.create({
+  companyOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    padding: 16, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.inputBorder,
+    backgroundColor: Colors.surface,
+  },
+  companyOptionActive: { borderColor: Colors.primary, backgroundColor: '#F0EEFF' },
+  companyRadio: {
+    width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: Colors.inputBorder,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  companyRadioActive: { borderColor: Colors.primary },
+  companyRadioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary },
+  companyLabel: { fontSize: 16, color: Colors.textPrimary, fontWeight: '500' },
+  companyLabelActive: { color: Colors.primary, fontWeight: '700' },
+});
