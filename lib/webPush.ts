@@ -10,17 +10,30 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
 
-export async function registerWebPush(userId: string): Promise<void> {
-  if (Platform.OS !== 'web') return;
-  if (typeof window === 'undefined') return;
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+const WP_FLAG = 'webpush_registered';
+
+export function isWebPushRegistered(): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  return localStorage.getItem(WP_FLAG) === '1';
+}
+
+export async function registerWebPush(userId: string): Promise<boolean> {
+  if (Platform.OS !== 'web') return false;
+  if (typeof window === 'undefined') return false;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('[webpush] PushManager not available (not standalone PWA on iOS?)');
+    return false;
+  }
 
   try {
     const reg = await navigator.serviceWorker.register('/sw.js');
     await navigator.serviceWorker.ready;
 
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return;
+    if (permission !== 'granted') {
+      console.warn('[webpush] Permission not granted:', permission);
+      return false;
+    }
 
     const existing = await reg.pushManager.getSubscription();
     const sub = existing ?? await reg.pushManager.subscribe({
@@ -29,14 +42,24 @@ export async function registerWebPush(userId: string): Promise<void> {
     });
 
     const subJson = sub.toJSON();
-    await supabase.from('jm_web_push_subscriptions').upsert({
+    const { error } = await supabase.from('jm_web_push_subscriptions').upsert({
       user_id: userId,
       endpoint: subJson.endpoint,
       p256dh: (subJson.keys as any)?.p256dh,
       auth: (subJson.keys as any)?.auth,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' });
-  } catch {
-    // Never crash due to push setup failure
+
+    if (error) {
+      console.error('[webpush] Supabase upsert error:', error.message);
+      return false;
+    }
+
+    localStorage.setItem(WP_FLAG, '1');
+    console.info('[webpush] Subscription saved for user:', userId);
+    return true;
+  } catch (e) {
+    console.error('[webpush] Registration error:', e);
+    return false;
   }
 }

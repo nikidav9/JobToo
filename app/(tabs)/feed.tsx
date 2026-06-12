@@ -36,27 +36,50 @@ import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials } from '@/services/storage';
 import { NotifBell } from '@/components/ui/NotifBell';
-import { registerWebPush } from '@/lib/webPush';
+import { registerWebPush, isWebPushRegistered } from '@/lib/webPush';
 
 // ─── Web push permission banner (iOS PWA requires user gesture) ───────────────
-function WebPushBanner({ userId }: { userId: string }) {
-  const [visible, setVisible] = useState(() => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
-    if (!('Notification' in window)) return false;
-    return (window as any).Notification.permission === 'default';
-  });
+type WPState = 'ask' | 'retry' | 'denied' | 'hidden';
 
-  if (!visible) return null;
+function getWPState(): WPState {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return 'hidden';
+  if (!('Notification' in window)) return 'hidden';
+  const perm = (window as any).Notification.permission as NotificationPermission;
+  if (perm === 'denied') return 'denied';
+  if (perm === 'granted' && isWebPushRegistered()) return 'hidden';
+  if (perm === 'granted') return 'retry';
+  return 'ask';
+}
+
+function WebPushBanner({ userId }: { userId: string }) {
+  const [state, setState] = useState<WPState>(() => getWPState());
+
+  if (state === 'hidden') return null;
+
+  if (state === 'denied') {
+    return (
+      <TouchableOpacity style={[wpStyles.banner, wpStyles.bannerDenied]} activeOpacity={1}>
+        <Text style={wpStyles.icon}>⚙️</Text>
+        <Text style={[wpStyles.text, wpStyles.textDenied]}>Разрешите уведомления: Настройки → Safari → Уведомления</Text>
+      </TouchableOpacity>
+    );
+  }
 
   const handlePress = async () => {
-    setVisible(false);
-    await registerWebPush(userId);
+    setState('hidden');
+    const ok = await registerWebPush(userId);
+    if (!ok) {
+      const perm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
+      if (perm === 'denied') setState('denied');
+    }
   };
 
   return (
     <TouchableOpacity style={wpStyles.banner} onPress={handlePress} activeOpacity={0.85}>
       <Text style={wpStyles.icon}>🔔</Text>
-      <Text style={wpStyles.text}>Включить push-уведомления</Text>
+      <Text style={wpStyles.text}>
+        {state === 'retry' ? 'Завершить настройку уведомлений' : 'Включить push-уведомления'}
+      </Text>
       <Text style={wpStyles.arrow}>›</Text>
     </TouchableOpacity>
   );
@@ -69,8 +92,10 @@ const wpStyles = StyleSheet.create({
     backgroundColor: '#EEF2FF', borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 10,
   },
+  bannerDenied: { backgroundColor: '#FEF3C7' },
   icon: { fontSize: 18 },
   text: { flex: 1, fontSize: 14, fontWeight: '600', color: '#4338CA' },
+  textDenied: { color: '#92400E', fontWeight: '500', fontSize: 12 },
   arrow: { fontSize: 18, color: '#4338CA' },
 });
 
