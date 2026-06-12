@@ -224,6 +224,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
           // Refresh push token on every cold start — FCM token can change after APK reinstall
           setTimeout(() => { registerForPushNotifications(sessionUser.id).catch(() => {}); }, 2000);
+          // Register web push for already-logged-in users (web/PWA)
+          registerWebPush(sessionUser.id).catch(() => {});
 
           // Refresh from Supabase in background — don't block loading
           setTimeout(() => {
