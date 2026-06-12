@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -22,11 +22,38 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'company required' }, { status: 400, headers: CORS })
   }
 
-  const { data, error } = await supabaseAdmin
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) {
+    return NextResponse.json({ error: 'Supabase not configured' }, { status: 500, headers: CORS })
+  }
+
+  const supabase = createClient(url, key)
+
+  const validCompanies = ['Лавка', 'Самокат']
+
+  // Fetch employers whose company is not already a valid choice
+  const { data: targets, error: fetchErr } = await supabase
+    .from('jm_users')
+    .select('id, company')
+    .eq('role', 'employer')
+
+  if (fetchErr) {
+    return NextResponse.json({ error: fetchErr.message }, { status: 500, headers: CORS })
+  }
+
+  const ids = (targets ?? [])
+    .filter(u => !validCompanies.includes(u.company))
+    .map(u => u.id)
+
+  if (ids.length === 0) {
+    return NextResponse.json({ ok: true, updated: 0 }, { headers: CORS })
+  }
+
+  const { data, error } = await supabase
     .from('jm_users')
     .update({ company })
-    .eq('role', 'employer')
-    .or('company.is.null,company.eq.')
+    .in('id', ids)
     .select('id')
 
   if (error) {
