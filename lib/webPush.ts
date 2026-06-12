@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
-const VAPID_PUBLIC_KEY = 'JzY-tWPqlyhIrdZqG2NrmUIJCyAzexhCz5z8GHSOJNga5SLWZ2eGpNtn3bZCt0ep0NQ4xz8AsP_07LF3vETG7w';
+const VAPID_PUBLIC_KEY = 'BMps5FNvS_ODiL0Rf2d76P8cy_xLh2C7EVXb9mHABkZLQz58mwUzTVzkle_5R0ACYR0IGD-zuS4cuYEhuvCMYE4';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
