@@ -1,4 +1,11 @@
 Options -MultiViews
+
+# Prevent index.html from being cached so PWA always gets fresh version with analytics
+<FilesMatch "^index\.html$">
+  Header set Cache-Control "no-store, no-cache, must-revalidate"
+  Header set Pragma "no-cache"
+</FilesMatch>
+
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
