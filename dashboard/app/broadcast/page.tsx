@@ -41,7 +41,7 @@ interface Trigger {
   id: string
   label: string
   desc: string
-  target: Target
+  target: 'all' | 'workers' | 'employers' | 'metro'
   title: string
   body: string
 }
@@ -117,7 +117,7 @@ export default function BroadcastPage() {
 
   const load = useCallback(async () => {
     setDataLoading(true)
-    const [{ data: u }, { data: n }, { count: wpCount }] = await Promise.all([
+    const [{ data: u }, { data: n }, { data: wpSubs }] = await Promise.all([
       supabaseAdmin.from('jm_users')
         .select('id, first_name, last_name, phone, role, metro_station, created_at, push_token')
         .order('created_at', { ascending: false }),
@@ -125,11 +125,11 @@ export default function BroadcastPage() {
         .select('id, user_id, title, body, is_read, created_at, jm_users(first_name, last_name, phone)')
         .order('created_at', { ascending: false })
         .limit(100),
-      supabaseAdmin.from('jm_web_push_subscriptions').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('jm_web_push_subscriptions').select('user_id'),
     ])
     setUsers(u ?? [])
     setNotifs((n ?? []) as any)
-    setWebPushCount(wpCount ?? 0)
+    setWebPushCount((wpSubs ?? []).length)
     setDataLoading(false)
   }, [])
 
