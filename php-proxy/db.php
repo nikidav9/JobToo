@@ -409,6 +409,9 @@ try {
             $data = json_decode($resp ?: 'null', true); break;
         }
 
+        case 'dbSaveNotification':
+            sb_insert('jm_notifications', ['user_id' => $args[0], 'title' => $args[1], 'body' => $args[2]]); break;
+
         case 'dbGetNotifications':
             $data = sb_select('jm_notifications', ['user_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;
 
