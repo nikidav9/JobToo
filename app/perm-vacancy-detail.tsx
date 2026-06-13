@@ -13,7 +13,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { getInitials, nameColorFromString } from '@/services/storage';
+import { getInitials, nameColorFromString, normalizeCompany } from '@/services/storage';
 import {
   dbApplyPermVacancy,
   dbAddPermSaved,
@@ -69,11 +69,7 @@ export default function PermVacancyDetailScreen() {
   }, [vacancyId, vacancy, currentUser, loading]);
   const employer = vacancy ? users.find(u => u.id === vacancy.employerId) : null;
 
-  const employerDisplayName = vacancy?.company?.trim()
-    ? vacancy.company
-    : employer
-      ? `${employer.firstName ?? ''} ${employer.lastName ?? ''}`.trim() || 'Работодатель'
-      : 'Работодатель';
+  const employerDisplayName = normalizeCompany();
 
   const employerColor = employer ? nameColorFromString(employer.id) : Colors.primary;
   const employerInitials = getInitials(employerDisplayName);

@@ -34,7 +34,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
-import { nameColorFromString, getInitials } from '@/services/storage';
+import { nameColorFromString, getInitials, normalizeCompany } from '@/services/storage';
 import { NotifBell } from '@/components/ui/NotifBell';
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
 
@@ -973,12 +973,12 @@ function WorkerFeed() {
                         <Image source={{ uri: currentEmployer.avatarUrl }} style={styles.avatarImg} contentFit="cover" transition={150} />
                       ) : (
                         <View style={[styles.avatar, { backgroundColor: nameColorFromString(currentCard.employerId) }]}>
-                          <Text style={styles.avatarText}>{getInitials(currentEmployer?.company || currentCard.company || (currentEmployer ? `${currentEmployer.firstName} ${currentEmployer.lastName}` : '?'))}</Text>
+                          <Text style={styles.avatarText}>{getInitials(normalizeCompany())}</Text>
                         </View>
                       )}
                       <View style={{ flex: 1 }}>
                         <Text style={styles.companyName} numberOfLines={1}>
-                          {currentEmployer?.company || currentCard.company || (currentEmployer ? `${currentEmployer.firstName} ${currentEmployer.lastName}` : '—')}
+                          {normalizeCompany()}
                         </Text>
                         <Text style={styles.metroHint}>🚇 {currentCard.metroStation}</Text>
                       </View>
@@ -1270,10 +1270,7 @@ function WorkerPermMode() {
       : null;
 
     const employer = users.find((u: User) => u.id === v.employerId);
-    const displayCompany = employer?.company?.trim()
-      || v.company?.trim()
-      || (employer ? `${employer.firstName} ${employer.lastName}`.trim() : '')
-      || 'Работодатель';
+    const displayCompany = normalizeCompany();
 
     const avatarColor = nameColorFromString(displayCompany);
     const avatarInitials = getInitials(displayCompany);
@@ -1750,7 +1747,7 @@ function EmployerHome() {
                 <View style={styles.vacTop}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.vacTitle} numberOfLines={1}>{v.title}</Text>
-                    <Text style={pS.permCompany}>{v.company}</Text>
+                    <Text style={pS.permCompany}>{normalizeCompany()}</Text>
                   </View>
                   <View style={styles.vacTopRight}>
                     <TouchableOpacity

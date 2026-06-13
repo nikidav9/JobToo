@@ -36,6 +36,10 @@ export function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+export function normalizeCompany(_raw?: string | null): string {
+  return 'Лавка';
+}
+
 export function nameColorFromString(str: string): string {
   const colors = ['#FF6B1A', '#2563EB', '#16A34A', '#7C3AED', '#DC2626', '#0CACCA'];
   let hash = 0;
