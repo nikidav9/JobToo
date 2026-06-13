@@ -29,27 +29,6 @@
       "blockedPermissions": [
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.ACTIVITY_RECOGNITION",
-        "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.ACTIVITY_RECOGNITION",
-        "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.ACTIVITY_RECOGNITION",
-        "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.ACTIVITY_RECOGNITION",
-        "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.ACTIVITY_RECOGNITION",
-        "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.ACTIVITY_RECOGNITION",
-        "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.ACTIVITY_RECOGNITION",
-        "android.permission.READ_MEDIA_AUDIO",
         "android.permission.READ_MEDIA_VIDEO"
       ]
     },
@@ -102,7 +81,7 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://jobtoo.ru/api/expo-updates-proxy.php",
+      "url": "https://u.expo.dev/5b26bb1e-9e73-4d94-8907-b27e3f66096f",
       "requestHeaders": {
         "expo-channel-name": "production"
       }
