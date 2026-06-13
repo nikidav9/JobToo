@@ -374,9 +374,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (Platform.OS === 'web') return;
     if (!currentUser) return;
 
-    const client = getSupabaseClient();
-    let ch: ReturnType<typeof client.channel> | null = null;
+    let ch: any = null;
     try {
+      const client = getSupabaseClient();
       ch = client
         .channel(`rt_notif_native_${currentUser.id}`)
         .on('postgres_changes', {
