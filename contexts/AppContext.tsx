@@ -369,6 +369,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   }, [currentUser?.id]);
 
+  // ─── Native realtime: instant notification badge update ───────────────────
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    if (!currentUser) return;
+
+    const client = getSupabaseClient();
+    let ch: ReturnType<typeof client.channel> | null = null;
+    try {
+      ch = client
+        .channel(`rt_notif_native_${currentUser.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'jm_notifications',
+          filter: `user_id=eq.${currentUser.id}`,
+        }, () => refreshNotifications());
+      ch.subscribe();
+    } catch (e) {
+      console.warn('[AppContext] native notif realtime failed:', e);
+    }
+
+    return () => {
+      try { ch?.unsubscribe(); } catch {}
+    };
+  }, [currentUser?.id]);
+
   // ─── Auth actions ──────────────────────────────────────────────────────────
 
   const registerUser = async (u: User) => {
