@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Star, Users } from 'lucide-react-native';
+import { Star } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
 import * as SplashScreen from 'expo-splash-screen';
 import { useApp } from '@/hooks/useApp';
@@ -245,14 +245,25 @@ export default function RootScreen() {
 
         {/* ── Счётчик пользователей ── */}
         <View style={styles.userCountRow}>
-          <Users size={r(15)} color={Colors.primary} />
-          {userCountReady && userCount != null ? (
-            <Text style={styles.userCountTxt}>
-              Уже <Text style={styles.userCountNum}>{userCount.toLocaleString('ru')}</Text> {pluralUsers(userCount)} в приложении
-            </Text>
-          ) : (
-            <Text style={styles.userCountTxt}>Загружаем данные...</Text>
-          )}
+          {/* Overlapping avatar circles */}
+          <View style={styles.avatarsStack}>
+            {[
+              { color: '#FF6B1A', letter: 'А' },
+              { color: '#2563EB', letter: 'М' },
+              { color: '#16A34A', letter: 'К' },
+              { color: '#7C3AED', letter: 'Д' },
+            ].map((a, i) => (
+              <View key={i} style={[styles.avatarCircle, { backgroundColor: a.color, left: i * r(18) }]}>
+                <Text style={styles.avatarLetter}>{a.letter}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={styles.userCountTxt}>
+            {userCountReady && userCount != null
+              ? <>Более <Text style={styles.userCountNum}>{userCount.toLocaleString('ru')}</Text> {pluralUsers(userCount)} уже с нами!</>
+              : 'Уже тысячи с нами!'
+            }
+          </Text>
         </View>
 
         {/* Спейсер — прижимает логин и версию к низу экрана */}
@@ -372,8 +383,20 @@ const styles = StyleSheet.create({
   version: { textAlign: 'center', fontSize: r(12), color: '#6B7280' },
   userCountRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: r(6), marginTop: r(16), marginBottom: r(4),
+    marginTop: r(18), marginBottom: r(4), gap: r(8),
   },
+  avatarsStack: {
+    position: 'relative',
+    width: r(18) * 3 + r(26),
+    height: r(26),
+  },
+  avatarCircle: {
+    position: 'absolute',
+    width: r(26), height: r(26), borderRadius: r(13),
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#fff',
+  },
+  avatarLetter: { fontSize: r(10), fontWeight: '700', color: '#fff' },
   userCountTxt: { fontSize: r(13), color: Colors.textSecondary },
   userCountNum: { fontWeight: '700', color: Colors.primary },
 });
