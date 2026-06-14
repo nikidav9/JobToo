@@ -38,14 +38,6 @@ const WORK_RIGHT = r(52);
 // Зазор между карточками: 12px + overflow 4px = 16px × 1.474
 const CARD2_MT = r(18);
 
-function pluralUsers(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 19) return 'пользователей';
-  if (mod10 === 1) return 'пользователь';
-  if (mod10 >= 2 && mod10 <= 4) return 'пользователя';
-  return 'пользователей';
-}
 
 export default function RootScreen() {
   const router = useRouter();
@@ -259,7 +251,7 @@ export default function RootScreen() {
           </View>
           <Text style={styles.userCountTxt}>
             {userCountReady && userCount != null
-              ? <>Более <Text style={styles.userCountNum}>{userCount.toLocaleString('ru')}</Text> {pluralUsers(userCount)} уже с нами!</>
+              ? <>Более <Text style={styles.userCountNum}>{userCount.toLocaleString('ru')}</Text> пользователей уже с нами!</>
               : 'Уже тысячи с нами!'
             }
           </Text>
