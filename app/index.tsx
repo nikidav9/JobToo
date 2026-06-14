@@ -385,8 +385,10 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: r(10), marginBottom: r(2),
     paddingVertical: r(5), paddingHorizontal: r(10),
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FFFFFF',
     borderRadius: r(20),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     gap: r(7),
   },
   avatarsStack: {
