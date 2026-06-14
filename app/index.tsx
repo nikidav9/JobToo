@@ -252,7 +252,7 @@ export default function RootScreen() {
               { color: '#16A34A', letter: 'К' },
               { color: '#7C3AED', letter: 'Д' },
             ].map((a, i) => (
-              <View key={i} style={[styles.avatarCircle, { backgroundColor: a.color, left: i * r(18) }]}>
+              <View key={i} style={[styles.avatarCircle, { backgroundColor: a.color, left: i * r(20) }]}>
                 <Text style={styles.avatarLetter}>{a.letter}</Text>
               </View>
             ))}
@@ -384,23 +384,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     alignSelf: 'center',
     marginTop: r(18), marginBottom: r(4),
-    paddingVertical: r(8), paddingHorizontal: r(14),
-    backgroundColor: '#F5F5F5',
+    paddingVertical: r(10), paddingHorizontal: r(16),
+    backgroundColor: '#FFF3ED',
+    borderWidth: 1,
+    borderColor: '#FFD4B8',
     borderRadius: r(24),
     gap: r(10),
   },
   avatarsStack: {
     position: 'relative',
-    width: r(18) * 3 + r(26),
-    height: r(26),
+    width: r(20) * 3 + r(30),
+    height: r(30),
   },
   avatarCircle: {
     position: 'absolute',
-    width: r(26), height: r(26), borderRadius: r(13),
+    width: r(30), height: r(30), borderRadius: r(15),
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: '#fff',
   },
-  avatarLetter: { fontSize: r(10), fontWeight: '700', color: '#fff' },
+  avatarLetter: { fontSize: r(12), fontWeight: '700', color: '#fff' },
   userCountTxt: { fontSize: r(13), color: Colors.textSecondary },
   userCountNum: { fontWeight: '700', color: Colors.primary },
 });
