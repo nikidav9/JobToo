@@ -1,6 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import React, { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import * as Updates from 'expo-updates';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -105,12 +105,23 @@ async function checkAndApplyUpdate() {
   }
 }
 
-export default function RootLayout() {
-  const [fontsLoaded] = useFonts({ ...Ionicons.font });
-
+function useOTAUpdates() {
   useEffect(() => {
     if (Platform.OS === 'web') return;
     checkAndApplyUpdate();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkAndApplyUpdate();
+    });
+    return () => sub.remove();
+  }, []);
+}
+
+export default function RootLayout() {
+  const [fontsLoaded] = useFonts({ ...Ionicons.font });
+  useOTAUpdates();
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
     setupAndroidChannels().catch(() => {});
     requestNotificationPermissions().catch(() => {});
   }, []);
