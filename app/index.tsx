@@ -41,7 +41,7 @@ const CARD2_MT = r(18);
 function pluralUsers(n: number): string {
   const mod10 = n % 10;
   const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 14) return 'пользователей';
+  if (mod100 >= 11 && mod100 <= 19) return 'пользователей';
   if (mod10 === 1) return 'пользователь';
   if (mod10 >= 2 && mod10 <= 4) return 'пользователя';
   return 'пользователей';
@@ -244,8 +244,7 @@ export default function RootScreen() {
         </View>
 
         {/* ── Счётчик пользователей ── */}
-        <View style={styles.userCountRow}>
-          {/* Overlapping avatar circles */}
+        <View style={styles.userCountCard}>
           <View style={styles.avatarsStack}>
             {[
               { color: '#FF6B1A', letter: 'А' },
@@ -381,9 +380,14 @@ const styles = StyleSheet.create({
   loginLink: { fontSize: r(15), fontWeight: '900', color: Colors.primary },
 
   version: { textAlign: 'center', fontSize: r(12), color: '#6B7280' },
-  userCountRow: {
+  userCountCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    marginTop: r(18), marginBottom: r(4), gap: r(8),
+    alignSelf: 'center',
+    marginTop: r(18), marginBottom: r(4),
+    paddingVertical: r(8), paddingHorizontal: r(14),
+    backgroundColor: '#F5F5F5',
+    borderRadius: r(24),
+    gap: r(10),
   },
   avatarsStack: {
     position: 'relative',
