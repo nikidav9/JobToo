@@ -5,11 +5,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Star } from 'lucide-react-native';
+import { Star, Users } from 'lucide-react-native';
 import { Asset } from 'expo-asset';
 import * as SplashScreen from 'expo-splash-screen';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
+import { supabase } from '@/lib/supabase';
 
 const TRACK_W = 140;
 
@@ -34,6 +35,15 @@ const WORK_RIGHT = r(52);
 // Зазор между карточками: 12px + overflow 4px = 16px × 1.474
 const CARD2_MT = r(18);
 
+function pluralUsers(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return 'пользователей';
+  if (mod10 === 1) return 'пользователь';
+  if (mod10 >= 2 && mod10 <= 4) return 'пользователя';
+  return 'пользователей';
+}
+
 export default function RootScreen() {
   const router = useRouter();
   const { currentUser, loading } = useApp();
@@ -43,6 +53,7 @@ export default function RootScreen() {
   // true if loading was already false when this component mounted (post-logout navigation)
   const skipSplash = useRef(!loading);
   const [ready, setReady] = useState(false);
+  const [userCount, setUserCount] = useState<number | null>(null);
   // Always holds latest currentUser — avoids stale closure inside animation callback
   const currentUserRef = useRef(currentUser);
   currentUserRef.current = currentUser;
@@ -52,6 +63,12 @@ export default function RootScreen() {
       require('../assets/images/char-employer-crop.png'),
       require('../assets/images/char-worker-crop.png'),
     ]);
+  }, []);
+
+  useEffect(() => {
+    supabase.from('jm_users').select('id', { count: 'exact', head: true })
+      .then(({ count }) => { if (count != null) setUserCount(count); })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -211,6 +228,16 @@ export default function RootScreen() {
           </View>
         </View>
 
+        {/* ── Счётчик пользователей ── */}
+        {userCount != null && (
+          <View style={styles.userCountRow}>
+            <Users size={r(15)} color={Colors.primary} />
+            <Text style={styles.userCountTxt}>
+              Уже <Text style={styles.userCountNum}>{userCount.toLocaleString('ru')}</Text> {pluralUsers(userCount)} в приложении
+            </Text>
+          </View>
+        )}
+
         {/* Спейсер — прижимает логин и версию к низу экрана */}
         <View style={{ flex: 1, minHeight: r(12) }} />
 
@@ -326,4 +353,10 @@ const styles = StyleSheet.create({
   loginLink: { fontSize: r(15), fontWeight: '900', color: Colors.primary },
 
   version: { textAlign: 'center', fontSize: r(12), color: '#6B7280' },
+  userCountRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: r(6), marginTop: r(16), marginBottom: r(4),
+  },
+  userCountTxt: { fontSize: r(13), color: Colors.textSecondary },
+  userCountNum: { fontWeight: '700', color: Colors.primary },
 });
