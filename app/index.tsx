@@ -11,6 +11,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const USER_COUNT_KEY = 'cached_user_count';
 
 const TRACK_W = 140;
 
@@ -54,6 +57,7 @@ export default function RootScreen() {
   const skipSplash = useRef(!loading);
   const [ready, setReady] = useState(false);
   const [userCount, setUserCount] = useState<number | null>(null);
+  const [userCountReady, setUserCountReady] = useState(false);
   // Always holds latest currentUser — avoids stale closure inside animation callback
   const currentUserRef = useRef(currentUser);
   currentUserRef.current = currentUser;
@@ -66,8 +70,19 @@ export default function RootScreen() {
   }, []);
 
   useEffect(() => {
+    // Показываем кэшированное значение сразу
+    AsyncStorage.getItem(USER_COUNT_KEY).then(cached => {
+      if (cached) { setUserCount(Number(cached)); setUserCountReady(true); }
+    }).catch(() => {});
+    // Затем обновляем свежими данными
     supabase.from('jm_users').select('id', { count: 'exact', head: true })
-      .then(({ count }) => { if (count != null) setUserCount(count); })
+      .then(({ count }) => {
+        if (count != null) {
+          setUserCount(count);
+          setUserCountReady(true);
+          AsyncStorage.setItem(USER_COUNT_KEY, String(count)).catch(() => {});
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -229,14 +244,16 @@ export default function RootScreen() {
         </View>
 
         {/* ── Счётчик пользователей ── */}
-        {userCount != null && (
-          <View style={styles.userCountRow}>
-            <Users size={r(15)} color={Colors.primary} />
+        <View style={styles.userCountRow}>
+          <Users size={r(15)} color={Colors.primary} />
+          {userCountReady && userCount != null ? (
             <Text style={styles.userCountTxt}>
               Уже <Text style={styles.userCountNum}>{userCount.toLocaleString('ru')}</Text> {pluralUsers(userCount)} в приложении
             </Text>
-          </View>
-        )}
+          ) : (
+            <Text style={styles.userCountTxt}>Загружаем данные...</Text>
+          )}
+        </View>
 
         {/* Спейсер — прижимает логин и версию к низу экрана */}
         <View style={{ flex: 1, minHeight: r(12) }} />
