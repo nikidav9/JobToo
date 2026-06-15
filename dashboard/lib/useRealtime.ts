@@ -19,12 +19,17 @@ export function useRealtime<T>(
 
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
-    const result = await fetcher()
-    setData(result)
-    setLastUpdated(new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
-    setLoading(false)
-    setPulse(true)
-    setTimeout(() => setPulse(false), 1500)
+    try {
+      const result = await fetcher()
+      setData(result)
+      setLastUpdated(new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+      setPulse(true)
+      setTimeout(() => setPulse(false), 1500)
+    } catch (e) {
+      console.error('[useRealtime] fetch error:', e)
+    } finally {
+      setLoading(false)
+    }
   }, [fetcher])
 
   useEffect(() => {
