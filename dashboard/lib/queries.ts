@@ -267,7 +267,6 @@ export async function fetchUsers() {
   const withWebPush = webPushMap.size
   const webPushNewWeek = (webPushRows ?? []).filter((r: any) => r.updated_at > w7).length
   const webPushNewMonth = (webPushRows ?? []).filter((r: any) => r.updated_at > w30).length
-  // Users who had NO push token but added web push (new channel for them)
   const webPushOnlyCount = u.filter((x: any) => !x.push_token && webPushMap.has(x.id)).length
 
   return {
@@ -321,7 +320,6 @@ export async function fetchVacancies() {
 
   type AppInfo = { id: string; workerId: string; name: string; phone: string; status: string; date: string }
 
-  // ── perm applications ────────────────────────────────────────────────────
   const appsByVac: Record<string, AppInfo[]> = {}
   const appByVac: Record<string, { total: number; pending: number; approved: number; rejected: number }> = {}
 
@@ -353,14 +351,12 @@ export async function fetchVacancies() {
     applicants: appsByVac[v.id] ?? [],
   })).sort((a: any, b: any) => b.apps.total - a.apps.total)
 
-  // ── temp vacancy applicants from likes ───────────────────────────────────
   const likesByVac: Record<string, AppInfo[]> = {}
   const likeCountByVac: Record<string, { total: number; matched: number; pending: number; rejected: number }> = {}
 
   for (const l of lk) {
     const vid = (l as any).vacancy_id
     const wid = (l as any).worker_id
-    // only workers who showed interest (liked the vacancy)
     if (!vid || !(l as any).worker_liked) continue
     if (!likesByVac[vid]) likesByVac[vid] = []
     if (!likeCountByVac[vid]) likeCountByVac[vid] = { total: 0, matched: 0, pending: 0, rejected: 0 }
@@ -405,7 +401,6 @@ export async function fetchVacancies() {
     perm: pByDay[d] ?? 0,
   }))
 
-  // work type
   const wtMap: Record<string, number> = {}
   for (const v of t) {
     const wt = (v as any).work_type ?? 'other'
@@ -415,7 +410,6 @@ export async function fetchVacancies() {
     .map(([k, v]) => ({ name: WORK_TYPE_LABELS[k] ?? k, temp: v, value: v }))
     .sort((a, b) => b.value - a.value)
 
-  // employer leaderboard
   const empMap: Record<string, { name: string; temp: number; perm: number }> = {}
   for (const v of t) {
     const eid = (v as any).employer_id
@@ -438,7 +432,6 @@ export async function fetchVacancies() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 10)
 
-  // salary buckets (perm)
   const salaryBuckets: Record<string, number> = {
     '< 30k': 0, '30–50k': 0, '50–80k': 0, '80–120k': 0, '> 120k': 0,
   }
@@ -509,7 +502,6 @@ export async function fetchMatching() {
     matches: matchByDay[d] ?? 0,
   }))
 
-  // match rate by work type
   const wtLikes: Record<string, number> = {}
   const wtMatches: Record<string, number> = {}
   for (const l of lk) {
@@ -572,7 +564,6 @@ export async function fetchEngagement() {
     messages: msgByDay[d] ?? 0,
   }))
 
-  // msgs per chat distribution
   const chatMsgCount: Record<string, number> = {}
   for (const m of ms) {
     const cid = (m as any).chat_id
@@ -633,7 +624,6 @@ export async function fetchQuality() {
     ? employerRatings.reduce((s: number, r: any) => s + Number(r.rating), 0) / employerRatings.length
     : 0
 
-  // rating distribution
   const rMap: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
   for (const r of rt) rMap[Math.round(Number((r as any).rating))]++
   const ratingDist = [1, 2, 3, 4, 5].map(v => ({
@@ -643,7 +633,6 @@ export async function fetchQuality() {
     employers: employerRatings.filter((r: any) => Math.round(Number(r.rating)) === v).length,
   }))
 
-  // rating over time (30d)
   const days30 = dayRange(30)
   const rtByDay: Record<string, number[]> = {}
   for (const r of rt) {
@@ -659,7 +648,6 @@ export async function fetchQuality() {
     count: rtByDay[d]?.length ?? 0,
   }))
 
-  // complaints
   const workerComplaints = cp.filter((x: any) => x.complaint_type === 'worker')
   const employerComplaints = cp.filter((x: any) => x.complaint_type === 'employer')
 
@@ -669,7 +657,6 @@ export async function fetchQuality() {
     count: cpByDay[d] ?? 0,
   }))
 
-  // applications
   const appStatus = [
     { name: 'Ожидает', value: ap.filter((x: any) => x.status === 'pending').length, fill: PALETTE.amber },
     { name: 'Одобрено', value: ap.filter((x: any) => x.status === 'approved').length, fill: PALETTE.green },
@@ -847,7 +834,6 @@ export async function fetchCohorts() {
     return d.getTime()
   }
 
-  // Build activity map: userId -> Set of week timestamps
   const activityWeeks: Record<string, Set<number>> = {}
   for (const l of likes ?? []) {
     if (!l.worker_id || !l.created_at) continue
@@ -861,7 +847,6 @@ export async function fetchCohorts() {
     activityWeeks[sid].add(weekStart(new Date((m as any).created_at)))
   }
 
-  // Last 12 weeks
   const now = new Date()
   const weeks: number[] = []
   for (let i = 11; i >= 0; i--) {
@@ -870,7 +855,6 @@ export async function fetchCohorts() {
     weeks.push(weekStart(d))
   }
 
-  // Group users by registration week
   const cohortUsers: Record<number, string[]> = {}
   for (const user of u) {
     if (!user.created_at) continue
@@ -879,13 +863,11 @@ export async function fetchCohorts() {
     cohortUsers[wk].push(user.id)
   }
 
-  // Build cohort table rows
   const table = weeks.map((wk, wi) => {
     const members = cohortUsers[wk] ?? []
     const size = members.length
     const label = format(new Date(wk), 'dd.MM')
 
-    // Retention for subsequent weeks (up to 4 weeks out)
     const cols: (number | null)[] = []
     for (let delta = 0; delta <= 4; delta++) {
       const targetWk = weeks[wi + delta]
@@ -896,7 +878,6 @@ export async function fetchCohorts() {
       cols.push(Math.round(active / size * 100))
     }
 
-    // activation: % who had any activity within 7 days of registering
     const activated = size > 0
       ? members.filter(id => activityWeeks[id]?.has(wk) || activityWeeks[id]?.has(weeks[wi + 1] ?? 0)).length
       : 0
@@ -904,7 +885,6 @@ export async function fetchCohorts() {
     return { label, size, cols, activationRate: size > 0 ? Math.round(activated / size * 100) : 0 }
   })
 
-  // Weekly new users bar
   const weeklyBar = weeks.map((wk, i) => ({
     label: format(new Date(wk), 'dd.MM'),
     workers: u.filter(u => u.role === 'worker' && weekStart(new Date(u.created_at)) === wk).length,
@@ -942,7 +922,6 @@ export async function fetchFunnel() {
   const workersWithMatch = new Set(matchedLk.map((l: any) => l.worker_id)).size
   const workersWithShiftSet = new Set(completedLk.map((l: any) => l.worker_id))
 
-  // Activation: first like within 7 days of registration
   const workerRegMap: Record<string, string> = {}
   for (const usr of workers) workerRegMap[(usr as any).id] = (usr as any).created_at
   const firstLike: Record<string, string> = {}
@@ -957,7 +936,6 @@ export async function fetchFunnel() {
     if (new Date(firstLike[wid]).getTime() - new Date(reg).getTime() <= 7 * 86400_000) activated7d++
   }
 
-  // Shifts per worker
   const shiftsByWorker: Record<string, number> = {}
   for (const l of completedLk) {
     const wid = (l as any).worker_id
@@ -969,7 +947,6 @@ export async function fetchFunnel() {
     ? (shiftCounts.reduce((a, b) => a + b, 0) / workersWithShift).toFixed(1) : '0'
   const returningWorkers = shiftCounts.filter(c => c > 1).length
 
-  // Likes per worker distribution
   const likesByWorker: Record<string, number> = {}
   for (const l of likedLk) {
     const wid = (l as any).worker_id
@@ -991,7 +968,6 @@ export async function fetchFunnel() {
     { name: '8+', value: shiftCounts.filter(c => c >= 8).length },
   ]
 
-  // 30-day daily trend
   const days30 = dayRange(30)
   const likeByDay = groupByDate(likedLk, 'created_at')
   const matchByDay = groupByDate(matchedLk, 'created_at')
@@ -1070,7 +1046,6 @@ export async function fetchChats() {
   const ms = messages ?? []
   const us = users ?? []
 
-  // Fetch vacancy details for all unique vacancy IDs
   const vacIds = Array.from(new Set(ch.map((c: any) => c.vacancy_id).filter(Boolean))) as string[]
   const [{ data: tempVacs }, { data: permVacs }] = vacIds.length > 0
     ? await Promise.all([
@@ -1158,4 +1133,62 @@ export async function fetchChats() {
   })
 
   return chatList
+}
+
+// ─── geo ─────────────────────────────────────────────────────────────────────
+
+export async function fetchGeo() {
+  const [{ data: users }, { data: vacancies }, { data: permVacancies }] = await Promise.all([
+    supabase.from('jm_users').select('id,role,metro_station'),
+    supabase.from('jm_vacancies').select('id,metro_station,status'),
+    supabase.from('jm_perm_vacancies').select('id,metro_station,status'),
+  ])
+
+  const u = users ?? []
+  const tv = vacancies ?? []
+  const pv = permVacancies ?? []
+
+  const userMetroMap: Record<string, { workers: number; employers: number }> = {}
+  for (const user of u) {
+    const s = (user as any).metro_station
+    if (!s) continue
+    if (!userMetroMap[s]) userMetroMap[s] = { workers: 0, employers: 0 }
+    if ((user as any).role === 'worker') userMetroMap[s].workers++
+    else userMetroMap[s].employers++
+  }
+
+  const userMetroTop = Object.entries(userMetroMap)
+    .map(([station, counts]) => ({ station, ...counts, total: counts.workers + counts.employers }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 15)
+
+  const vacMetroMap: Record<string, number> = {}
+  for (const v of [...tv, ...pv]) {
+    const s = (v as any).metro_station
+    if (!s) continue
+    vacMetroMap[s] = (vacMetroMap[s] ?? 0) + 1
+  }
+
+  const vacMetroTop = Object.entries(vacMetroMap)
+    .map(([station, value]) => ({ station, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 15)
+
+  const withMetro = u.filter((x: any) => x.metro_station).length
+  const withoutMetro = u.filter((x: any) => !x.metro_station).length
+  const vacsWithMetro = [...tv, ...pv].filter((x: any) => x.metro_station).length
+
+  return {
+    kpi: {
+      totalUsers: u.length,
+      withMetro,
+      withoutMetro,
+      metroFill: u.length > 0 ? ((withMetro / u.length) * 100).toFixed(0) : '0',
+      uniqueStations: Object.keys(userMetroMap).length,
+      totalVacancies: tv.length + pv.length,
+      vacsWithMetro,
+    },
+    userMetroTop,
+    vacMetroTop,
+  }
 }
