@@ -15,12 +15,13 @@ const AXIS = { fontSize: 10, fill: '#9A9690', fontFamily: 'Geist Mono, monospace
 
 export default function QualityPage() {
   const fetcher = useCallback(() => fetchQuality(), [])
-  const { data: d, loading, lastUpdated, pulse, refresh } = useRealtime(fetcher, {
+  const { data: d, loading, error, lastUpdated, pulse, refresh } = useRealtime(fetcher, {
     tables: ['jm_ratings', 'jm_complaints', 'jm_perm_applications'],
     intervalSec: 60,
   })
 
-  if (loading || !d) return <Loader />
+  if (loading) return <Loader />
+  if (error || !d) return <ErrorState message={error ?? 'Нет данных'} onRetry={refresh} />
 
   const ratingNum = Number(d.kpi.avgRating)
   const ratingColor = ratingNum >= 4 ? PALETTE.green : ratingNum >= 3 ? PALETTE.amber : PALETTE.red
@@ -182,6 +183,19 @@ function Loader() {
       {Array.from({ length: 3 }).map((_, i) => (
         <div key={i} style={{ height: 120, background: 'var(--bg-sunken)', borderRadius: 10 }} />
       ))}
+    </div>
+  )
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div style={{ padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+      <div style={{ fontSize: 32 }}>⚠️</div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>Не удалось загрузить данные</div>
+      <div style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace', maxWidth: 400, textAlign: 'center' }}>{message}</div>
+      <button onClick={onRetry} style={{ marginTop: 8, padding: '8px 20px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 13, cursor: 'pointer' }}>
+        Повторить
+      </button>
     </div>
   )
 }
