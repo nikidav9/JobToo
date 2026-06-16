@@ -190,6 +190,29 @@ export async function sendInAppToUser(userId: string, title: string, body: strin
   if (error) throw new Error(error.message)
   if (data?.error) throw new Error(data.error)
   logActivity('In-app уведомление', `Адресат: ${userId}, заголовок: "${title}"`, userId)
+  await trySendWebPushToUser(userId, title, body)
+}
+
+async function trySendWebPushToUser(userId: string, title: string, body: string) {
+  try {
+    const { data: sub } = await supabaseAdmin
+      .from('jm_web_push_subscriptions')
+      .select('endpoint, p256dh, auth')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (!sub) return
+    await fetch('/api/webpush/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-app-secret': process.env.NEXT_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6',
+      },
+      body: JSON.stringify({
+        subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        title, body,
+      }),
+    })
+  } catch { /* never crash due to web push failure */ }
 }
 
 export async function broadcastBoth(
@@ -229,6 +252,7 @@ export async function sendBothToUser(userId: string, title: string, body: string
   if (error) throw new Error(error.message)
   if (data?.error) throw new Error(data.error)
   logActivity('Уведомление пользователю', `Адресат: ${userId}, заголовок: "${title}"`, userId)
+  await trySendWebPushToUser(userId, title, body)
   return { pushCount: (data?.pushCount ?? 0) as number, inappCount: (data?.inappCount ?? 0) as number }
 }
 
@@ -283,4 +307,3 @@ export async function setComplaintStatus(id: string, status: 'pending' | 'in_rev
   if (error) throw new Error(error.message)
   logActivity('Статус жалобы изменён', `ID: ${id} → ${status}`)
 }
-
