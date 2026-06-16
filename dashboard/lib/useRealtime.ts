@@ -17,6 +17,7 @@ export function useRealtime<T>(
   const [lastUpdated, setLastUpdated] = useState('')
   const [pulse, setPulse] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const instanceId = useRef(Math.random().toString(36).slice(2, 8))
 
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -38,14 +39,20 @@ export function useRealtime<T>(
   useEffect(() => {
     refresh()
     timerRef.current = setInterval(() => refresh(true), intervalSec * 1000)
-    const channels = tables.map(table =>
-      supabase
-        .channel(`realtime:${table}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
-          refresh(true)
-        })
-        .subscribe()
-    )
+    const channels: ReturnType<typeof supabase.channel>[] = []
+    try {
+      tables.forEach(table => {
+        const ch = supabase
+          .channel(`realtime:${table}:${instanceId.current}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+            refresh(true)
+          })
+          .subscribe()
+        channels.push(ch)
+      })
+    } catch (e) {
+      console.warn('[useRealtime] realtime subscription failed:', e)
+    }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
       channels.forEach(ch => supabase.removeChannel(ch))
