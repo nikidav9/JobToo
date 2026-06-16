@@ -140,6 +140,7 @@ export default function CohortsPage() {
             </table>
           </div>
 
+          {/* Color legend */}
           <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: 'var(--ink-3)', marginRight: 4 }}>Удержание:</span>
             {[

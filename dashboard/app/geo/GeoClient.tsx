@@ -1,7 +1,6 @@
 'use client'
 import { useCallback } from 'react'
-import { fetchGeo } from '@/lib/geo'
-import { PALETTE } from '@/lib/queries'
+import { fetchGeo, PALETTE } from '@/lib/queries'
 import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
