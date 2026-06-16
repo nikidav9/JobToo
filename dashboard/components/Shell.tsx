@@ -29,6 +29,8 @@ const NAV = [
   { href: '/tickets', label: 'Тикеты', icon: IconTicket },
   { href: '/broadcast', label: 'Рассылка', icon: IconBell },
   { href: '/funnel', label: 'Воронка', icon: IconFunnel },
+  { href: '/cohorts', label: 'Когорты', icon: IconCohort },
+  { href: '/geo', label: 'Гео', icon: IconGeo },
 ]
 
 export default function Shell({ children }: { children: React.ReactNode }) {
@@ -132,6 +134,12 @@ function IconBell({ style }: { style?: React.CSSProperties }) {
 }
 function IconFunnel({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"><path d="M2 2h12l-4.5 5.5V13l-3-1.5V7.5L2 2z"/></svg>
+}
+function IconCohort({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="2" y="2" width="3" height="3" rx=".5"/><rect x="7" y="2" width="3" height="3" rx=".5"/><rect x="12" y="2" width="2" height="3" rx=".5"/><rect x="2" y="7" width="3" height="3" rx=".5"/><rect x="7" y="7" width="3" height="3" rx=".5"/><rect x="2" y="12" width="3" height="2" rx=".5"/></svg>
+}
+function IconGeo({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"><path d="M8 1.5a4 4 0 0 1 4 4c0 3-4 9-4 9s-4-6-4-9a4 4 0 0 1 4-4z"/><circle cx="8" cy="5.5" r="1.5"/></svg>
 }
 function IconActivity({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"><path d="M2 8h2.5l1-3 2 7 1.5-5H14"/><circle cx="2" cy="8" r=".5" fill="currentColor"/></svg>
