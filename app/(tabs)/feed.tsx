@@ -1008,16 +1008,21 @@ function WorkerFeed() {
                   <View style={styles.cardMiddle}>
                     <View style={styles.slotsRow}>
                       <View style={styles.slotInfo}>
-                        <Text style={styles.slotLabel}>Мест осталось</Text>
-                        <Text style={styles.slotValue}>{Math.max(0, currentCard.workersNeeded - currentCard.workersFound)}</Text>
-                      </View>
-                      <View style={styles.slotInfo}>
-                        <Text style={styles.slotLabel}>Всего мест</Text>
+                        <Ionicons name="people-outline" size={18} color={Colors.textMuted} />
                         <Text style={styles.slotValue}>{currentCard.workersNeeded}</Text>
+                        <Text style={styles.slotLabel}>Мест всего</Text>
                       </View>
+                      <View style={styles.slotDivider} />
                       <View style={styles.slotInfo}>
-                        <Text style={styles.slotLabel}>Занято</Text>
+                        <Ionicons name="checkmark-circle-outline" size={18} color={Colors.primary} />
                         <Text style={[styles.slotValue, { color: Colors.primary }]}>{currentCard.workersFound}</Text>
+                        <Text style={styles.slotLabel}>Набрано</Text>
+                      </View>
+                      <View style={styles.slotDivider} />
+                      <View style={styles.slotInfo}>
+                        <Ionicons name="hourglass-outline" size={18} color={Colors.textMuted} />
+                        <Text style={styles.slotValue}>{Math.max(0, currentCard.workersNeeded - currentCard.workersFound)}</Text>
+                        <Text style={styles.slotLabel}>Осталось</Text>
                       </View>
                     </View>
                     <View style={styles.progressTrack}>
@@ -1045,7 +1050,7 @@ function WorkerFeed() {
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.actionUndoIcon}>↩</Text>
+                <Ionicons name="arrow-undo" size={22} color={Colors.textMuted} />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1054,7 +1059,7 @@ function WorkerFeed() {
                 disabled={swiping}
                 activeOpacity={0.7}
               >
-                <Text style={styles.actionSkipIcon}>✕</Text>
+                <Ionicons name="close" size={32} color={Colors.red} />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1062,7 +1067,7 @@ function WorkerFeed() {
                 onPress={() => doMessageRef.current?.()}
                 activeOpacity={0.7}
               >
-                <Text style={styles.actionSaveIcon}>💬</Text>
+                <Ionicons name="chatbubble-outline" size={22} color={Colors.textSecondary} />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1071,7 +1076,7 @@ function WorkerFeed() {
                 disabled={swiping}
                 activeOpacity={0.7}
               >
-                <Text style={styles.actionWantIcon}>✓</Text>
+                <Ionicons name="heart" size={28} color="#fff" />
               </TouchableOpacity>
             </View>
           </>
@@ -2094,10 +2099,11 @@ const styles = StyleSheet.create({
   addressChipText: { flex: 1, fontSize: 14, fontWeight: '600', color: '#92400E', lineHeight: 20 },
   cardDivider: { height: 1, backgroundColor: Colors.divider, marginHorizontal: 14 },
   cardMiddle: { padding: 10, paddingHorizontal: 14, gap: 8 },
-  slotsRow: { flexDirection: 'row' },
-  slotInfo: { flex: 1, alignItems: 'center' },
-  slotLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '500', textTransform: 'uppercase', marginBottom: 3 },
-  slotValue: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
+  slotsRow: { flexDirection: 'row', alignItems: 'center' },
+  slotInfo: { flex: 1, alignItems: 'center', gap: 3 },
+  slotDivider: { width: 1, height: 36, backgroundColor: Colors.divider },
+  slotLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '500', textTransform: 'uppercase' },
+  slotValue: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
   progressTrack: { height: 5, backgroundColor: Colors.divider, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 3 },
   detailHintRow: {
@@ -2114,13 +2120,9 @@ const styles = StyleSheet.create({
   },
   actionBtn: { borderRadius: 100, alignItems: 'center', justifyContent: 'center', ...Shadow.card },
   actionUndo: { width: 52, height: 52, backgroundColor: Colors.bg, borderWidth: 1.5, borderColor: Colors.inputBorder },
-  actionUndoIcon: { fontSize: 22, color: Colors.textMuted },
   actionSkip: { width: 64, height: 64, backgroundColor: '#FEF2F2', borderWidth: 2, borderColor: Colors.red },
-  actionSkipIcon: { fontSize: 26, color: Colors.red, fontWeight: '800' },
   actionSave: { width: 52, height: 52, backgroundColor: Colors.bg, borderWidth: 1.5, borderColor: Colors.inputBorder },
-  actionSaveIcon: { fontSize: 22 },
   actionWant: { width: 64, height: 64, backgroundColor: Colors.primary },
-  actionWantIcon: { fontSize: 26, color: '#fff', fontWeight: '800' },
   detailSkipBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.red, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
   detailSkipTxt: { color: Colors.red, fontSize: 14, fontWeight: '600' },
   detailWantBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
