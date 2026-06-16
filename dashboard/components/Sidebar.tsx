@@ -102,16 +102,25 @@ export default function Sidebar() {
             </Link>
           )
         })}
-        {['Когорты', 'Гео'].map(label => (
-          <div key={label} style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '7px 10px', borderRadius: 6,
-            color: 'var(--ink-3)', fontSize: 13, fontWeight: 450, cursor: 'default',
-          }}>
-            <span style={{ width: 16, textAlign: 'center', color: 'var(--ink-4)', fontSize: 10 }}>•</span>
-            <span>{label}</span>
-          </div>
-        ))}
+        {[{ href: '/cohorts', label: 'Когорты', icon: IconCohort }, { href: '/geo', label: 'Гео', icon: IconGeo }].map(({ href, label, icon: Icon }) => {
+          const active = path === href
+          return (
+            <Link key={href} href={href} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '7px 10px', borderRadius: 6,
+              color: active ? 'var(--bg)' : 'var(--ink-2)',
+              background: active ? 'var(--ink)' : 'transparent',
+              fontSize: 13, fontWeight: 450, textDecoration: 'none',
+              transition: 'background .12s, color .12s',
+            }}
+            onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--bg-sunken)'; (e.currentTarget as HTMLElement).style.color = active ? 'var(--bg)' : 'var(--ink)' }}
+            onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--ink-2)' } }}
+            >
+              <Icon style={{ width: 16, height: 16, flexShrink: 0, color: active ? 'var(--bg)' : 'var(--ink-3)' }} />
+              <span>{label}</span>
+            </Link>
+          )
+        })}
       </nav>
 
       {/* Footer */}
@@ -192,4 +201,10 @@ function IconInbox({ style }: { style?: React.CSSProperties }) {
 }
 function IconFunnel({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M2 2h12l-4.5 5.5V13l-3-1.5V7.5L2 2z"/></svg>
+}
+function IconCohort({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><rect x="2" y="2" width="3" height="3" rx=".5"/><rect x="7" y="2" width="3" height="3" rx=".5"/><rect x="12" y="2" width="2" height="3" rx=".5"/><rect x="2" y="7" width="3" height="3" rx=".5"/><rect x="7" y="7" width="3" height="3" rx=".5"/><rect x="2" y="12" width="3" height="2" rx=".5"/></svg>
+}
+function IconGeo({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M8 1.5a4 4 0 0 1 4 4c0 3-4 9-4 9s-4-6-4-9a4 4 0 0 1 4-4z"/><circle cx="8" cy="5.5" r="1.5"/></svg>
 }
