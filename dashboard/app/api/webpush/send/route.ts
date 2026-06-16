@@ -19,7 +19,8 @@ export async function POST(req: Request) {
   )
 
   const secret = req.headers.get('x-app-secret')
-  if (secret !== process.env.EXPO_PUBLIC_APP_SECRET) {
+  const expectedSecret = process.env.EXPO_PUBLIC_APP_SECRET || process.env.NEXT_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6'
+  if (secret !== expectedSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS })
   }
 
