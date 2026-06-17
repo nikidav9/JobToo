@@ -1,12 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 
 type ChipVariant = 'work' | 'time' | 'metro' | 'exp' | 'salary' | 'urgent' | 'date';
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 interface ChipProps {
   label: string;
   variant?: ChipVariant;
+  icon?: IoniconName;
 }
 
 const VARIANT_STYLES: Record<ChipVariant, { bg: string; text: string; fontWeight?: string }> = {
@@ -19,10 +22,13 @@ const VARIANT_STYLES: Record<ChipVariant, { bg: string; text: string; fontWeight
   date:   { bg: '#F5F3FF', text: '#7C3AED' },
 };
 
-export function Chip({ label, variant = 'work' }: ChipProps) {
+export function Chip({ label, variant = 'work', icon }: ChipProps) {
   const s = VARIANT_STYLES[variant];
   return (
     <View style={[styles.chip, { backgroundColor: s.bg }]}>
+      {icon ? (
+        <Ionicons name={icon} size={13} color={s.text} style={{ marginRight: 4 }} />
+      ) : null}
       <Text style={[styles.chipText, { color: s.text, fontWeight: (s.fontWeight as any) ?? '600' }]}>
         {label}
       </Text>
@@ -35,6 +41,8 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     paddingHorizontal: 12,
     paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   chipText: {
     fontSize: 13,

@@ -991,24 +991,30 @@ function WorkerFeed() {
                         <Text style={styles.companyName} numberOfLines={1}>
                           {normalizeCompany()}
                         </Text>
-                        <Text style={styles.metroHint}>🚇 {currentCard.metroStation}</Text>
+                        <View style={styles.metroHintRow}>
+                          <Ionicons name="subway-outline" size={12} color={Colors.textMuted} />
+                          <Text style={styles.metroHint}>{currentCard.metroStation}</Text>
+                        </View>
                       </View>
                       {currentCard.isUrgent ? (
-                        <View style={styles.urgentTag}><Text style={styles.urgentTagTxt}>🔥 Срочно</Text></View>
+                        <View style={styles.urgentTag}>
+                          <Ionicons name="flash" size={11} color="#92400E" />
+                          <Text style={styles.urgentTagTxt}>Срочно</Text>
+                        </View>
                       ) : null}
                     </View>
 
                     <Text style={styles.jobTitle} numberOfLines={2}>{currentCard.title}</Text>
 
                     <View style={styles.chipsRow}>
-                      <Chip label={`⏰ ${currentCard.timeStart}–${currentCard.timeEnd}`} variant="time" />
-                      <Chip label={`📅 ${formatDate(currentCard.date)}`} variant="date" />
-                      {currentCard.noExperienceNeeded ? <Chip label="🎓 Без опыта" variant="exp" /> : null}
+                      <Chip label={`${currentCard.timeStart}–${currentCard.timeEnd}`} variant="time" icon="time-outline" />
+                      <Chip label={formatDate(currentCard.date)} variant="date" icon="calendar-outline" />
+                      {currentCard.noExperienceNeeded ? <Chip label="Без опыта" variant="exp" icon="school-outline" /> : null}
                     </View>
 
                     {currentCard.address ? (
                       <View style={styles.addressChip}>
-                        <Text style={styles.addressChipIcon}>📍</Text>
+                        <Ionicons name="location-outline" size={15} color="#92400E" style={{ marginTop: 1 }} />
                         <Text style={styles.addressChipText} numberOfLines={2}>{currentCard.address}</Text>
                       </View>
                     ) : null}
@@ -1019,14 +1025,17 @@ function WorkerFeed() {
                   <View style={styles.cardMiddle}>
                     <View style={styles.slotsRow}>
                       <View style={styles.slotInfo}>
+                        <Ionicons name="people-outline" size={20} color={Colors.blue} />
                         <Text style={[styles.slotValue, { color: Colors.blue }]}>{vacancyStats.applicants}</Text>
                         <Text style={styles.slotLabel}>Отклики</Text>
                       </View>
                       <View style={[styles.slotInfo, styles.slotInfoBordered]}>
+                        <Ionicons name="close-circle-outline" size={20} color={Colors.red} />
                         <Text style={[styles.slotValue, { color: Colors.red }]}>{vacancyStats.rejected}</Text>
                         <Text style={styles.slotLabel}>Отклонено</Text>
                       </View>
                       <View style={styles.slotInfo}>
+                        <Ionicons name="checkmark-circle-outline" size={20} color={Colors.green} />
                         <Text style={[styles.slotValue, { color: Colors.green }]}>{currentCard.workersFound}</Text>
                         <Text style={styles.slotLabel}>Набрано</Text>
                       </View>
@@ -2097,9 +2106,10 @@ const styles = StyleSheet.create({
   avatarImg: { width: 44, height: 44, borderRadius: 22, flexShrink: 0 },
   avatarText: { fontSize: 17, fontWeight: '700', color: '#fff' },
   companyName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
-  metroHint: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  urgentTag: { backgroundColor: '#FEF3C7', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, flexShrink: 0 },
+  metroHint: { fontSize: 12, color: Colors.textMuted },
+  urgentTag: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FEF3C7', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, flexShrink: 0 },
   urgentTagTxt: { fontSize: 11, fontWeight: '700', color: '#92400E' },
+  metroHintRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   jobTitle: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary, lineHeight: 28 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   addressChip: {
