@@ -4,6 +4,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { User, Vacancy } from '@/constants/types';
@@ -36,7 +37,7 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
 
           {/* Close */}
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Text style={styles.closeTxt}>✕</Text>
+            <Ionicons name="close" size={18} color={Colors.textMuted} />
           </TouchableOpacity>
 
           <ScrollView
@@ -55,27 +56,37 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
               )}
               <View style={{ flex: 1 }}>
                 <Text style={styles.company}>{companyName}</Text>
-                {vacancy.metroStation ? <Text style={styles.metro}>🚇 {vacancy.metroStation}</Text> : null}
+                {vacancy.metroStation ? (
+                  <View style={styles.metroRow}>
+                    <Ionicons name="subway-outline" size={12} color={Colors.textMuted} />
+                    <Text style={styles.metro}>{vacancy.metroStation}</Text>
+                  </View>
+                ) : null}
               </View>
               {vacancy.isUrgent ? (
                 <View style={styles.urgentBadge}>
-                  <Text style={styles.urgentTxt}>🔥 Срочно</Text>
+                  <Ionicons name="flash" size={12} color="#DC2626" />
+                  <Text style={styles.urgentTxt}>Срочно</Text>
                 </View>
               ) : null}
             </View>
 
             <Text style={styles.jobTitle}>{vacancy.title}</Text>
 
-            {/* Chips: type, time, date */}
+            {/* Chips: time, date */}
             <View style={styles.row}>
-              <Chip label={`⏰ ${vacancy.timeStart}–${vacancy.timeEnd}`} variant="time" />
-              <Chip label={`📅 ${formatDate(vacancy.date)}`} variant="date" />
+              <Chip label={`${vacancy.timeStart}–${vacancy.timeEnd}`} variant="time" icon="time-outline" />
+              <Chip label={formatDate(vacancy.date)} variant="date" icon="calendar-outline" />
             </View>
 
             {/* Experience */}
             <Text style={styles.secLabel}>Опыт</Text>
             <View style={styles.row}>
-              <Chip label={vacancy.noExperienceNeeded ? '🎓 Не требуется' : '🎓 Желателен'} variant={vacancy.noExperienceNeeded ? 'exp' : 'work'} />
+              <Chip
+                label={vacancy.noExperienceNeeded ? 'Не требуется' : 'Желателен'}
+                variant={vacancy.noExperienceNeeded ? 'exp' : 'work'}
+                icon="school-outline"
+              />
             </View>
 
             {/* Norms */}
@@ -91,9 +102,17 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: `${Math.min(100, (vacancy.workersFound / vacancy.workersNeeded) * 100)}%` }]} />
               </View>
-              <Text style={styles.progressLabel}>
-                Набрано {vacancy.workersFound} из {vacancy.workersNeeded} · ⚡ Осталось {Math.max(0, vacancy.workersNeeded - vacancy.workersFound)} мест
-              </Text>
+              <View style={styles.progressLabelRow}>
+                <Ionicons name="people-outline" size={13} color={Colors.textMuted} />
+                <Text style={styles.progressLabel}>
+                  Набрано {vacancy.workersFound} из {vacancy.workersNeeded}
+                </Text>
+                <Text style={styles.progressDot}>·</Text>
+                <Ionicons name="flash-outline" size={13} color={Colors.primary} />
+                <Text style={[styles.progressLabel, { color: Colors.primary }]}>
+                  Осталось {Math.max(0, vacancy.workersNeeded - vacancy.workersFound)} мест
+                </Text>
+              </View>
             </View>
 
             {actions ? <View style={styles.actionsWrap}>{actions}</View> : null}
@@ -126,7 +145,6 @@ const styles = StyleSheet.create({
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center',
   },
-  closeTxt: { fontSize: 15, color: Colors.textMuted, fontWeight: '600' },
   body: { padding: 20, paddingTop: 8, gap: 10, paddingBottom: 24 },
   companyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 },
   avatar: {
@@ -136,8 +154,9 @@ const styles = StyleSheet.create({
   avatarImg: { width: 44, height: 44, borderRadius: 22 },
   avatarTxt: { fontSize: 16, fontWeight: '700', color: '#fff' },
   company: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
-  metro: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  urgentBadge: { backgroundColor: '#FEF2F2', borderRadius: 100, paddingHorizontal: 10, paddingVertical: 5 },
+  metroRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  metro: { fontSize: 12, color: Colors.textMuted },
+  urgentBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FEF2F2', borderRadius: 100, paddingHorizontal: 10, paddingVertical: 5 },
   urgentTxt: { fontSize: 12, color: '#DC2626', fontWeight: '600' },
   jobTitle: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary, lineHeight: 28 },
   secLabel: { fontSize: 13, color: Colors.textMuted, fontWeight: '500', marginTop: 4 },
@@ -146,6 +165,8 @@ const styles = StyleSheet.create({
   progressWrap: { marginTop: 8, gap: 6 },
   progressTrack: { height: 4, backgroundColor: Colors.divider, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 2 },
+  progressLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   progressLabel: { fontSize: 12, color: Colors.textMuted },
+  progressDot: { fontSize: 12, color: Colors.textMuted },
   actionsWrap: { marginTop: 8, gap: 10 },
 });
