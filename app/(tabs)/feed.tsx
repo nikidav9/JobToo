@@ -660,6 +660,7 @@ function WorkerFeed() {
   const [detailEmployer, setDetailEmployer] = useState<User | null>(null);
   const [filterStation, setFilterStation] = useState<string | null>(null);
   const [filterPicker, setFilterPicker] = useState(false);
+  const [vacancyStats, setVacancyStats] = useState<{ applicants: number; rejected: number }>({ applicants: 0, rejected: 0 });
 
   const pan = useRef(new Animated.ValueXY()).current;
   const pendingLikeIds = useRef<Set<string>>(new Set());
@@ -710,6 +711,16 @@ function WorkerFeed() {
   const currentCard = cards[0];
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;
   const dateHistory = history[selectedDate] ?? [];
+
+  useEffect(() => {
+    if (!currentCard) { setVacancyStats({ applicants: 0, rejected: 0 }); return; }
+    dbGetLikesByVacancy(currentCard.id).then(lks => {
+      setVacancyStats({
+        applicants: lks.filter(l => l.workerLiked && !l.isMatch && l.employerLiked !== false).length,
+        rejected: lks.filter(l => l.employerLiked === false || (l.workerLiked === false && l.workerSkipped === true)).length,
+      });
+    }).catch(() => {});
+  }, [currentCard?.id]);
 
   const animateCard = useCallback((dir: 'left' | 'right', velocity: number, cb: () => void) => {
     const targetX = dir === 'right' ? SW * 1.5 : -SW * 1.5;
@@ -1008,16 +1019,16 @@ function WorkerFeed() {
                   <View style={styles.cardMiddle}>
                     <View style={styles.slotsRow}>
                       <View style={styles.slotInfo}>
-                        <Text style={styles.slotLabel}>Мест осталось</Text>
-                        <Text style={styles.slotValue}>{Math.max(0, currentCard.workersNeeded - currentCard.workersFound)}</Text>
+                        <Text style={[styles.slotValue, { color: Colors.blue }]}>{vacancyStats.applicants}</Text>
+                        <Text style={styles.slotLabel}>Отклики</Text>
+                      </View>
+                      <View style={[styles.slotInfo, styles.slotInfoBordered]}>
+                        <Text style={[styles.slotValue, { color: Colors.red }]}>{vacancyStats.rejected}</Text>
+                        <Text style={styles.slotLabel}>Отклонено</Text>
                       </View>
                       <View style={styles.slotInfo}>
-                        <Text style={styles.slotLabel}>Всего мест</Text>
-                        <Text style={styles.slotValue}>{currentCard.workersNeeded}</Text>
-                      </View>
-                      <View style={styles.slotInfo}>
-                        <Text style={styles.slotLabel}>Занято</Text>
-                        <Text style={[styles.slotValue, { color: Colors.primary }]}>{currentCard.workersFound}</Text>
+                        <Text style={[styles.slotValue, { color: Colors.green }]}>{currentCard.workersFound}</Text>
+                        <Text style={styles.slotLabel}>Набрано</Text>
                       </View>
                     </View>
                     <View style={styles.progressTrack}>
@@ -1045,7 +1056,7 @@ function WorkerFeed() {
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.actionUndoIcon}>↩</Text>
+                <Ionicons name="arrow-undo" size={22} color={Colors.textMuted} />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1054,7 +1065,7 @@ function WorkerFeed() {
                 disabled={swiping}
                 activeOpacity={0.7}
               >
-                <Text style={styles.actionSkipIcon}>✕</Text>
+                <Ionicons name="close" size={28} color={Colors.red} />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1062,7 +1073,7 @@ function WorkerFeed() {
                 onPress={() => doMessageRef.current?.()}
                 activeOpacity={0.7}
               >
-                <Text style={styles.actionSaveIcon}>💬</Text>
+                <Ionicons name="chatbubble-outline" size={22} color={Colors.textSecondary} />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1071,7 +1082,7 @@ function WorkerFeed() {
                 disabled={swiping}
                 activeOpacity={0.7}
               >
-                <Text style={styles.actionWantIcon}>✓</Text>
+                <Ionicons name="heart" size={26} color="#fff" />
               </TouchableOpacity>
             </View>
           </>
@@ -1098,14 +1109,20 @@ function WorkerFeed() {
               onPress={() => { setDetailVacancy(null); doSkip(0.5); }}
               activeOpacity={0.8}
             >
-              <Text style={styles.detailSkipTxt}>✕ Не подходит</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="close" size={16} color={Colors.red} />
+                <Text style={styles.detailSkipTxt}>Не подходит</Text>
+              </View>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.detailWantBtn}
               onPress={() => { setDetailVacancy(null); doWant(0.5); }}
               activeOpacity={0.8}
             >
-              <Text style={styles.detailWantTxt}>♥ Хочу!</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="heart" size={16} color="#fff" />
+                <Text style={styles.detailWantTxt}>Хочу!</Text>
+              </View>
             </TouchableOpacity>
           </View>
         }
@@ -2095,9 +2112,10 @@ const styles = StyleSheet.create({
   cardDivider: { height: 1, backgroundColor: Colors.divider, marginHorizontal: 14 },
   cardMiddle: { padding: 10, paddingHorizontal: 14, gap: 8 },
   slotsRow: { flexDirection: 'row' },
-  slotInfo: { flex: 1, alignItems: 'center' },
-  slotLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '500', textTransform: 'uppercase', marginBottom: 3 },
-  slotValue: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
+  slotInfo: { flex: 1, alignItems: 'center', paddingVertical: 2 },
+  slotInfoBordered: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: Colors.divider },
+  slotLabel: { fontSize: 11, color: Colors.textMuted, fontWeight: '500', marginTop: 2 },
+  slotValue: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
   progressTrack: { height: 5, backgroundColor: Colors.divider, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 3 },
   detailHintRow: {
@@ -2114,13 +2132,9 @@ const styles = StyleSheet.create({
   },
   actionBtn: { borderRadius: 100, alignItems: 'center', justifyContent: 'center', ...Shadow.card },
   actionUndo: { width: 52, height: 52, backgroundColor: Colors.bg, borderWidth: 1.5, borderColor: Colors.inputBorder },
-  actionUndoIcon: { fontSize: 22, color: Colors.textMuted },
   actionSkip: { width: 64, height: 64, backgroundColor: '#FEF2F2', borderWidth: 2, borderColor: Colors.red },
-  actionSkipIcon: { fontSize: 26, color: Colors.red, fontWeight: '800' },
   actionSave: { width: 52, height: 52, backgroundColor: Colors.bg, borderWidth: 1.5, borderColor: Colors.inputBorder },
-  actionSaveIcon: { fontSize: 22 },
   actionWant: { width: 64, height: 64, backgroundColor: Colors.primary },
-  actionWantIcon: { fontSize: 26, color: '#fff', fontWeight: '800' },
   detailSkipBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.red, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
   detailSkipTxt: { color: Colors.red, fontSize: 14, fontWeight: '600' },
   detailWantBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
