@@ -5,7 +5,7 @@ import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
-import { blockUser, resetPassword, sendPushToUser, deleteUser } from '@/lib/admin-actions'
+import { blockUser, resetPassword, sendBothToUser, deleteUser } from '@/lib/admin-actions'
 import { downloadCSV } from '@/lib/csv-export'
 import { getVerifiedUsers, setUserVerified } from '@/lib/verification'
 import {
@@ -24,8 +24,6 @@ function initials(name: string, phone: string) {
 }
 
 type ActionState = 'idle' | 'loading' | 'ok' | 'err'
-
-// ─── User Profile Drawer ───────────────────────────────────────────────────
 
 function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
   userId: string
@@ -66,7 +64,6 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Header */}
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', background: 'var(--bg-elev)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
           <div style={{
@@ -86,7 +83,7 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
             </div>
             <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 3, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <span style={{ fontFamily: 'Geist Mono, monospace' }}>{user.phone || '—'}</span>
-              {user.metro_station && <span>🚇 {user.metro_station}</span>}
+              {user.metro_station && <span>😇 {user.metro_station}</span>}
               {user.company && <span>🏢 {user.company}</span>}
               <span style={{ color: 'var(--ink-4)' }}>с {user.created_at?.slice(0, 10)}</span>
             </div>
@@ -96,8 +93,6 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
             style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink-3)', padding: 4, fontSize: 18 }}
           >✕</button>
         </div>
-
-        {/* Verify toggle */}
         <div style={{ marginTop: 10, display: 'flex', gap: 6 }}>
           <button
             onClick={() => { setUserVerified(userId, !isVerified); onVerifyToggle(userId) }}
@@ -112,8 +107,6 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
           </button>
         </div>
       </div>
-
-      {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--line)', background: 'var(--bg-elev)', overflowX: 'auto' }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id as any)} style={{
@@ -124,8 +117,6 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
           }}>{t.label}</button>
         ))}
       </div>
-
-      {/* Content */}
       <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
         {tab === 'overview' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -158,7 +149,6 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
             </div>
           </div>
         )}
-
         {tab === 'likes' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {likes.length === 0 && <Empty text="Нет лайков" />}
@@ -178,7 +168,6 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
             ))}
           </div>
         )}
-
         {tab === 'reviews' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {ratingsReceived.length === 0 && <Empty text="Нет отзывов" />}
@@ -193,7 +182,6 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
             ))}
           </div>
         )}
-
         {tab === 'vacancies' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {vacancies.length === 0 && permVacancies.length === 0 && <Empty text="Нет вакансий" />}
@@ -223,7 +211,6 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
             ))}
           </div>
         )}
-
         {tab === 'chats' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {chats.length === 0 && <Empty text="Нет чатов" />}
@@ -254,8 +241,6 @@ function StatBox({ label, value }: { label: string; value: any }) {
 function Empty({ text }: { text: string }) {
   return <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>{text}</div>
 }
-
-// ─── Main Page ─────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
   const fetcher = useCallback(() => fetchUsers(), [])
@@ -306,8 +291,8 @@ export default function UsersPage() {
     if (!text) return
     setA(u.id + '_push', 'loading')
     try {
-      await sendPushToUser(u.id, '📢 Сообщение от администратора', text)
-      setA(u.id + '_push', 'ok', 'Пуш отправлен')
+      await sendBothToUser(u.id, '📢 Сообщение от администратора', text)
+      setA(u.id + '_push', 'ok', 'Отправлено')
       setPushText(prev => ({ ...prev, [u.id]: '' }))
     } catch (e: any) { setA(u.id + '_push', 'err', e.message) }
   }
@@ -329,16 +314,16 @@ export default function UsersPage() {
 
   function handleExportCSV() {
     const rows = filteredUsers.map((u: any) => ({
-      Имя: u.name || '',
-      Телефон: u.phone || '',
-      Роль: u.role === 'worker' ? 'Работник' : 'Работодатель',
-      Метро: u.metro || '',
-      Компания: u.company || '',
-      Статус: u.blocked ? 'Заблокирован' : 'Активен',
+      'Имя': u.name || '',
+      'Телефон': u.phone || '',
+      'Роль': u.role === 'worker' ? 'Работник' : 'Работодатель',
+      'Метро': u.metro || '',
+      'Компания': u.company || '',
+      'Статус': u.blocked ? 'Заблокирован' : 'Активен',
       'Expo Push': u.hasPushToken ? 'Есть' : 'Нет',
       'iPhone Web Push': u.hasWebPush ? `Есть (${u.webPushDate})` : 'Нет',
-      Верифицирован: verifiedSet.has(u.id) ? 'Да' : 'Нет',
-      Дата: u.date || '',
+      'Верифицирован': verifiedSet.has(u.id) ? 'Да' : 'Нет',
+      'Дата': u.date || '',
     }))
     downloadCSV(rows, `users_${new Date().toISOString().slice(0, 10)}.csv`)
   }
@@ -347,8 +332,6 @@ export default function UsersPage() {
     <div style={{ position: 'relative' }}>
       <PageHeader title="Пользователи" intervalSec={30} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
       <div className="page-content">
-
-        {/* KPI */}
         <div className="g-6">
           <KpiCard label="Всего" value={d.kpi.total} />
           <KpiCard label="Работники" value={d.kpi.workers} sub={`${workerPct}% базы`} sparkColor={PALETTE.orange} />
@@ -360,8 +343,6 @@ export default function UsersPage() {
           <KpiCard label="Без пуш-токена" value={d.kpi.withoutPushToken} sub="не получат пуши" sparkColor={PALETTE.red} />
           <KpiCard label="📱 iPhone Web Push" value={d.kpi.withWebPush} sub={`+${d.kpi.webPushNewWeek} за 7 дн`} sparkColor="#A855F7" />
         </div>
-
-        {/* Charts */}
         <div className="g-14">
           <ChartCard title="Новые регистрации" sub="Работники vs работодатели · 90 дней">
             <ResponsiveContainer width="100%" height={220}>
@@ -392,8 +373,6 @@ export default function UsersPage() {
             </ResponsiveContainer>
           </ChartCard>
         </div>
-
-        {/* Metro bar */}
         <ChartCard title="Топ станций метро" sub="Работники и работодатели">
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={d.metroTop.slice(0, 10)} layout="vertical" margin={{ left: 0, right: 24, top: 0, bottom: 0 }}>
@@ -407,8 +386,6 @@ export default function UsersPage() {
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-
-        {/* Users CRM table */}
         {d.recent.length > 0 && (
           <ChartCard
             title="Все пользователи"
@@ -439,7 +416,6 @@ export default function UsersPage() {
                 Экспорт CSV
               </button>
             </div>
-
             <div className="table-scroll">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                 <thead>
@@ -462,7 +438,6 @@ export default function UsersPage() {
                         const aDel = actions[u.id + '_del']
                         const isVerified = verifiedSet.has(u.id)
                         const isConfirmDel = confirmDelete[u.id]
-
                         return (
                           <>
                             <tr key={u.id}
@@ -525,24 +500,20 @@ export default function UsersPage() {
                               <td style={{ padding: '10px 12px', fontFamily: 'Geist Mono, monospace', fontSize: 11.5, color: 'var(--ink-3)' }}>{u.date || '—'}</td>
                               <td style={{ padding: '10px 12px' }} onClick={e => e.stopPropagation()}>
                                 <div style={{ display: 'flex', gap: 5 }}>
-                                  {/* Profile button */}
                                   <button onClick={() => setProfileId(u.id)}
                                     style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-sunken)', color: 'var(--ink-2)', fontSize: 11.5, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                                     👤
                                   </button>
-                                  {/* Block */}
                                   {aBlock?.s === 'ok'
                                     ? <span style={{ fontSize: 11.5, color: 'var(--positive)', fontWeight: 500 }}>{aBlock.msg}</span>
                                     : <button onClick={() => handleBlock(u)} disabled={aBlock?.s === 'loading'}
                                         style={{ padding: '3px 9px', borderRadius: 6, border: '1px solid var(--line)', background: u.blocked ? 'rgba(46,125,84,.08)' : 'rgba(179,60,42,.08)', color: u.blocked ? 'var(--positive)' : 'var(--negative)', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                                         {aBlock?.s === 'loading' ? '…' : u.blocked ? 'Разблок.' : 'Блок.'}
                                       </button>}
-                                  {/* Expand toggle */}
                                   <button onClick={() => setExpandedId(expanded ? null : u.id)}
                                     style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-sunken)', color: 'var(--ink-3)', fontSize: 11.5, cursor: 'pointer' }}>
                                     {expanded ? '▲' : '▼'}
                                   </button>
-                                  {/* Delete */}
                                   {aDel?.s === 'ok'
                                     ? <span style={{ fontSize: 11, color: 'var(--negative)', fontWeight: 500 }}>Удалён</span>
                                     : aDel?.s === 'err'
@@ -558,13 +529,10 @@ export default function UsersPage() {
                                 </div>
                               </td>
                             </tr>
-
-                            {/* Expanded CRM panel */}
                             {expanded && (
                               <tr key={u.id + '_exp'} style={{ borderBottom: '1px solid var(--line)' }}>
                                 <td colSpan={9} style={{ padding: '0 12px 14px 60px', background: 'var(--bg-sunken)' }}>
                                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingTop: 10 }}>
-                                    {/* Reset password */}
                                     <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '12px 14px', minWidth: 200 }}>
                                       <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 8 }}>🔑 Сбросить пароль</div>
                                       {aPwd?.s === 'ok'
@@ -581,7 +549,6 @@ export default function UsersPage() {
                                               {aPwd?.s === 'loading' ? 'Генерация…' : 'Сгенерировать новый'}
                                             </button>}
                                     </div>
-                                    {/* Send push */}
                                     <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '12px 14px', flex: 1, minWidth: 260 }}>
                                       <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 8 }}>📲 Отправить пуш</div>
                                       <div style={{ display: 'flex', gap: 6 }}>
@@ -612,8 +579,6 @@ export default function UsersPage() {
           </ChartCard>
         )}
       </div>
-
-      {/* Profile Drawer overlay */}
       {profileId && (
         <>
           <div
