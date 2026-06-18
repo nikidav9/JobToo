@@ -611,7 +611,8 @@ export default function ProfileScreen() {
               <Ionicons name="document-text" size={18} color="#fff" />
             </View>
             <Text style={styles.docsSectionTitle}>Документы</Text>
-            <TouchableOpacity onPress={() => setShowConfirmLogout(true)}>
+            <TouchableOpacity style={styles.logoutLinkRow} onPress={() => setShowConfirmLogout(true)}>
+              <Ionicons name="log-out-outline" size={15} color={Colors.red} />
               <Text style={styles.logoutLink}>Выйти из аккаунта</Text>
             </TouchableOpacity>
           </View>
@@ -994,7 +995,8 @@ const styles = StyleSheet.create({
   docsCard: { backgroundColor: Colors.bg, borderRadius: 16, ...Shadow.card, overflow: 'hidden' },
   docsHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, paddingBottom: 12 },
   docsSectionTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
-  logoutLink: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
+  logoutLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  logoutLink: { fontSize: 13, fontWeight: '600', color: Colors.red },
   docRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: 1, borderTopColor: Colors.divider },
   docRowLabel: { fontSize: 14, color: Colors.textPrimary, fontWeight: '500' },
   docRowArrow: { fontSize: 20, color: Colors.textMuted },
