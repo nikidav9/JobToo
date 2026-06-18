@@ -146,10 +146,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user) return;
     try {
       const rows = await dbGetNotifications(user.id);
-      setNotifications(rows.map((n: any) => ({
+      const mapped = rows.map((n: any) => ({
         id: n.id, title: n.title, body: n.body,
         isRead: n.is_read, createdAt: n.created_at,
-      })));
+      }));
+      setNotifications(mapped);
+      saveCache(CACHE_KEYS.notifications(user.id), mapped).catch(() => {});
     } catch (e) {
       console.warn('[notifications] refreshNotifications error', e);
     }
@@ -226,13 +228,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           _setCurrentUser(sessionUser);
 
           // Restore cached data instantly
-          const [cachedVac, cachedLikes, cachedChats, cachedPermVac, cachedPermApps, cachedStats] = await Promise.all([
+          const [cachedVac, cachedLikes, cachedChats, cachedPermVac, cachedPermApps, cachedStats, cachedNotifs] = await Promise.all([
             loadCache<Vacancy[]>(CACHE_KEYS.vacancies),
             loadCache<Like[]>(CACHE_KEYS.likes(sessionUser.id)),
             loadCache<Chat[]>(CACHE_KEYS.chats(sessionUser.id)),
             loadCache<PermVacancy[]>(CACHE_KEYS.permVac(sessionUser.id)),
             loadCache<PermApplication[]>(CACHE_KEYS.permApps(sessionUser.id)),
             loadCache<Record<string, VacancyStats>>(CACHE_KEYS.allVacancyStats),
+            loadCache<AppNotification[]>(CACHE_KEYS.notifications(sessionUser.id)),
           ]);
 
           if (cancelled) return;
@@ -242,6 +245,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (cachedPermVac) setPermVacancies(cachedPermVac);
           if (cachedPermApps) setPermApplications(cachedPermApps);
           if (cachedStats) setVacancyStatsMap(cachedStats);
+          if (cachedNotifs) setNotifications(cachedNotifs);
 
           // Quick retry for stats + notifications in case initial fetch is slow
           setTimeout(() => {

@@ -128,6 +128,7 @@ export const CACHE_KEYS = {
   permApps:        (uid: string) => `jm_c1_papps_${uid}`,
   vacancyStats:    (vacId: string) => `jm_c1_vstats_${vacId}`,
   allVacancyStats: 'jm_c1_all_vstats',
+  notifications:   (uid: string) => `jm_c1_notifs_${uid}`,
 };
 
 export async function loadCache<T>(key: string): Promise<T | null> {
