@@ -10,7 +10,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { Like, User, Vacancy, PermVacancy } from '@/constants/types';
-import { getTodayDates, formatDate, scoreVacancy, loadCache, saveCache, CACHE_KEYS } from '@/services/storage';
+import { getTodayDates, formatDate, scoreVacancy } from '@/services/storage';
 import { METRO_LINES } from '@/constants/metro';
 import {
   dbUpsertLike,
@@ -640,7 +640,7 @@ function WorkerFeed() {
   const {
     currentUser, users, vacancies, likes, chats,
     refreshAll, refreshLikes, refreshChats,
-    showToast, vacanciesLoading,
+    showToast, vacanciesLoading, vacancyStatsMap,
   } = useApp();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -660,7 +660,6 @@ function WorkerFeed() {
   const [detailEmployer, setDetailEmployer] = useState<User | null>(null);
   const [filterStation, setFilterStation] = useState<string | null>(null);
   const [filterPicker, setFilterPicker] = useState(false);
-  const [vacancyStats, setVacancyStats] = useState<{ applicants: number; rejected: number }>({ applicants: 0, rejected: 0 });
 
   const pan = useRef(new Animated.ValueXY()).current;
   const pendingLikeIds = useRef<Set<string>>(new Set());
@@ -711,35 +710,9 @@ function WorkerFeed() {
   const currentCard = cards[0];
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;
   const dateHistory = history[selectedDate] ?? [];
-
-  const fetchVacancyStats = useCallback((vacId: string) => {
-    let cancelled = false;
-    dbGetLikesByVacancy(vacId).then(lks => {
-      if (cancelled) return;
-      const fresh = {
-        applicants: lks.filter(l => l.workerLiked && !l.isMatch && l.employerLiked !== false).length,
-        rejected: lks.filter(l => l.employerLiked === false || (l.workerLiked === false && l.workerSkipped === true)).length,
-      };
-      setVacancyStats(fresh);
-      saveCache(CACHE_KEYS.vacancyStats(vacId), fresh);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
-
-  // При смене карточки: мгновенно показать кэш, потом подгрузить свежее
-  useEffect(() => {
-    setVacancyStats({ applicants: 0, rejected: 0 });
-    if (!currentCard) return;
-    loadCache<{ applicants: number; rejected: number }>(CACHE_KEYS.vacancyStats(currentCard.id))
-      .then(cached => { if (cached) setVacancyStats(cached); });
-    return fetchVacancyStats(currentCard.id);
-  }, [currentCard?.id, fetchVacancyStats]);
-
-  // При возврате на экран обновить данные текущей карточки
-  useFocusEffect(useCallback(() => {
-    if (!currentCard) return;
-    return fetchVacancyStats(currentCard.id);
-  }, [currentCard?.id, fetchVacancyStats]));
+  const vacancyStats = currentCard
+    ? (vacancyStatsMap[currentCard.id] ?? { applicants: 0, rejected: 0 })
+    : { applicants: 0, rejected: 0 };
 
   const animateCard = useCallback((dir: 'left' | 'right', velocity: number, cb: () => void) => {
     const targetX = dir === 'right' ? SW * 1.5 : -SW * 1.5;

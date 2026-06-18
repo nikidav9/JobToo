@@ -121,12 +121,13 @@ export function extractPhoneDigits(formatted: string): string {
 // ─── AsyncStorage cache (stale-while-revalidate) ──────────────────────────────
 
 export const CACHE_KEYS = {
-  vacancies:    'jm_c1_vac',
-  likes:        (uid: string) => `jm_c1_likes_${uid}`,
-  chats:        (uid: string) => `jm_c1_chats_${uid}`,
-  permVac:      (uid: string) => `jm_c1_pvac_${uid}`,
-  permApps:     (uid: string) => `jm_c1_papps_${uid}`,
-  vacancyStats: (vacId: string) => `jm_c1_vstats_${vacId}`,
+  vacancies:       'jm_c1_vac',
+  likes:           (uid: string) => `jm_c1_likes_${uid}`,
+  chats:           (uid: string) => `jm_c1_chats_${uid}`,
+  permVac:         (uid: string) => `jm_c1_pvac_${uid}`,
+  permApps:        (uid: string) => `jm_c1_papps_${uid}`,
+  vacancyStats:    (vacId: string) => `jm_c1_vstats_${vacId}`,
+  allVacancyStats: 'jm_c1_all_vstats',
 };
 
 export async function loadCache<T>(key: string): Promise<T | null> {

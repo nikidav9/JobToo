@@ -47,6 +47,19 @@ const WEB_POLL_INTERVAL = 30_000;
 
 export interface ToastMessage { message: string; type: 'success' | 'error' | 'info' }
 
+export interface VacancyStats { applicants: number; rejected: number }
+
+function computeVacancyStatsMap(likes: Like[]): Record<string, VacancyStats> {
+  const map: Record<string, VacancyStats> = {};
+  for (const l of likes) {
+    if (!l.vacancyId) continue;
+    if (!map[l.vacancyId]) map[l.vacancyId] = { applicants: 0, rejected: 0 };
+    if (l.workerLiked && !l.isMatch && l.employerLiked !== false) map[l.vacancyId].applicants++;
+    if (l.employerLiked === false || (l.workerLiked === false && l.workerSkipped === true)) map[l.vacancyId].rejected++;
+  }
+  return map;
+}
+
 export interface AppContextValue {
   currentUser: User | null;
   loading: boolean;
@@ -94,6 +107,8 @@ export interface AppContextValue {
   refreshPermApplications: (u?: User) => Promise<void>;
   refreshPermSaved: (u?: User) => Promise<void>;
   updateUser: (u: User) => Promise<void>;
+  vacancyStatsMap: Record<string, VacancyStats>;
+  refreshVacancyStats: () => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextValue | null>(null);
@@ -121,6 +136,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [permSavedWorkers] = useState<User[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [vacancyStatsMap, setVacancyStatsMap] = useState<Record<string, VacancyStats>>({});
 
   const unreadNotifCount = notifications.filter(n => !n.isRead).length;
 
@@ -209,12 +225,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           _setCurrentUser(sessionUser);
 
           // Restore cached data instantly
-          const [cachedVac, cachedLikes, cachedChats, cachedPermVac, cachedPermApps] = await Promise.all([
+          const [cachedVac, cachedLikes, cachedChats, cachedPermVac, cachedPermApps, cachedStats] = await Promise.all([
             loadCache<Vacancy[]>(CACHE_KEYS.vacancies),
             loadCache<Like[]>(CACHE_KEYS.likes(sessionUser.id)),
             loadCache<Chat[]>(CACHE_KEYS.chats(sessionUser.id)),
             loadCache<PermVacancy[]>(CACHE_KEYS.permVac(sessionUser.id)),
             loadCache<PermApplication[]>(CACHE_KEYS.permApps(sessionUser.id)),
+            loadCache<Record<string, VacancyStats>>(CACHE_KEYS.allVacancyStats),
           ]);
 
           if (cancelled) return;
@@ -223,6 +240,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (cachedChats) setChats(cachedChats);
           if (cachedPermVac) setPermVacancies(cachedPermVac);
           if (cachedPermApps) setPermApplications(cachedPermApps);
+          if (cachedStats) setVacancyStatsMap(cachedStats);
 
           // Refresh push token on every cold start — FCM token can change after APK reinstall
           setTimeout(() => { registerForPushNotifications(sessionUser.id).catch(() => {}); }, 2000);
@@ -242,6 +260,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               refreshPermApplications(sessionUser),
               refreshPermSaved(sessionUser),
               refreshNotifications(),
+              refreshVacancyStats(),
             ]).catch(() => {});
           }, 100);
 
@@ -330,6 +349,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshVacancies(),
         refreshPermVacancies(user),
         refreshNotifications(),
+        refreshVacancyStats(),
       ]).catch(() => {});
     };
     const interval = setInterval(poll, WEB_POLL_INTERVAL);
@@ -351,6 +371,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshVacancies(),
         refreshLikes(user),
         refreshNotifications(),
+        refreshVacancyStats(),
       ]).catch(() => {});
     };
 
@@ -517,6 +538,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       refreshLikes(user),
       refreshPermVacancies(user),
       refreshChats(user),
+      refreshVacancyStats(),
     ]);
   }, [currentUser]);
 
@@ -550,6 +572,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user) return;
     const ids = await dbGetPermSaved(user.id);
     setPermSavedIds(ids);
+  };
+
+  const refreshVacancyStats = async () => {
+    try {
+      const allLikes = await dbGetLikes();
+      const map = computeVacancyStatsMap(allLikes);
+      setVacancyStatsMap(map);
+      saveCache(CACHE_KEYS.allVacancyStats, map).catch(() => {});
+    } catch {}
   };
 
   const unreadCount = chats.reduce((sum, c) => {
@@ -602,6 +633,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshPermSaved,
         refreshAll,
         updateUser,
+        vacancyStatsMap,
+        refreshVacancyStats,
         notifications,
         unreadNotifCount,
         refreshNotifications,
