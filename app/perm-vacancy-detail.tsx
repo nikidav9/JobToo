@@ -8,6 +8,7 @@ import {
   TouchableOpacity, ActivityIndicator, Modal, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -101,9 +102,9 @@ export default function PermVacancyDetailScreen() {
             onPress={() => setAuthModalDismissed(true)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={styles.authCloseTxt}>✕</Text>
+            <Ionicons name="close" size={18} color={Colors.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.authEmoji}>👋</Text>
+          <Ionicons name="hand-left-outline" size={36} color={Colors.primary} style={{ marginBottom: 10, marginTop: 4 }} />
           <Text style={styles.authTitle}>Войдите, чтобы откликнуться</Text>
           <Text style={styles.authSub}>Зарегистрируйтесь или войдите — это бесплатно</Text>
           <TouchableOpacity style={styles.authBtnPrimary} onPress={() => router.push({ pathname: '/login', params: { returnTo: `perm-vacancy-detail?vacancyId=${vacancyId}` } })} activeOpacity={0.85}>
@@ -159,7 +160,7 @@ export default function PermVacancyDetailScreen() {
         </View>
         {openAppBannerJSX}
         <View style={styles.emptyCenter}>
-          <Text style={{ fontSize: 48 }}>🔍</Text>
+          <Ionicons name="search-outline" size={48} color={Colors.textMuted} />
           <Text style={styles.emptyTitle}>Вакансия не найдена</Text>
         </View>
         {authModalJSX}
@@ -199,10 +200,10 @@ export default function PermVacancyDetailScreen() {
     }
   };
 
-  const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
-    pending:  { label: '⏳ На рассмотрении', color: '#92400E', bg: '#FFF7ED' },
-    approved: { label: '✅ Вы приглашены!',  color: Colors.green, bg: '#D1FAE5' },
-    rejected: { label: '✕ Отказ',           color: Colors.red,   bg: '#FEE2E2' },
+  const STATUS_MAP: Record<string, { label: string; icon: string; color: string; bg: string }> = {
+    pending:  { label: 'На рассмотрении', icon: 'time-outline',             color: '#92400E', bg: '#FFF7ED' },
+    approved: { label: 'Вы приглашены!',  icon: 'checkmark-circle-outline', color: Colors.green, bg: '#D1FAE5' },
+    rejected: { label: 'Отказ',           icon: 'close-circle-outline',     color: Colors.red,   bg: '#FEE2E2' },
   };
 
   const appStatus = myApp ? STATUS_MAP[myApp.status] : null;
@@ -221,7 +222,7 @@ export default function PermVacancyDetailScreen() {
             style={styles.saveHeaderBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={styles.saveHeaderIcon}>{isSaved ? '❤️' : '🤍'}</Text>
+            <Ionicons name={isSaved ? 'heart' : 'heart-outline'} size={24} color={isSaved ? Colors.red : Colors.textMuted} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -234,14 +235,16 @@ export default function PermVacancyDetailScreen() {
       >
         {/* Application status badge */}
         {appStatus ? (
-          <View style={[styles.statusBadge, { backgroundColor: appStatus.bg }]}>
+          <View style={[styles.statusBadge, { backgroundColor: appStatus.bg, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+            <Ionicons name={appStatus.icon as any} size={14} color={appStatus.color} />
             <Text style={[styles.statusTxt, { color: appStatus.color }]}>{appStatus.label}</Text>
           </View>
         ) : null}
 
         {/* Permanent badge */}
-        <View style={styles.permBadge}>
-          <Text style={styles.permBadgeTxt}>💼 Постоянная работа</Text>
+        <View style={[styles.permBadge, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+          <Ionicons name="briefcase-outline" size={12} color="#7C3AED" />
+          <Text style={styles.permBadgeTxt}>Постоянная работа</Text>
         </View>
 
         {/* Title + company */}
@@ -251,12 +254,12 @@ export default function PermVacancyDetailScreen() {
         {/* Key info cards */}
         <View style={styles.infoGrid}>
           <View style={styles.infoCard}>
-            <Text style={styles.infoCardIcon}>💰</Text>
+            <Ionicons name="cash-outline" size={22} color={Colors.primary} />
             <Text style={styles.infoCardLabel}>Зарплата</Text>
             <Text style={styles.infoCardValue}>{vacancy.salary.toLocaleString('ru-RU')} ₽/мес</Text>
           </View>
           <View style={styles.infoCard}>
-            <Text style={styles.infoCardIcon}>🗓</Text>
+            <Ionicons name="calendar-outline" size={22} color={Colors.primary} />
             <Text style={styles.infoCardLabel}>График</Text>
             <Text style={styles.infoCardValue}>{vacancy.schedule}</Text>
           </View>
@@ -265,13 +268,16 @@ export default function PermVacancyDetailScreen() {
         {/* Location */}
         {(vacancy.metroStation || vacancy.address) ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📍 Расположение</Text>
+            <View style={styles.sectionTitleRow}>
+            <Ionicons name="location-outline" size={16} color={Colors.textPrimary} />
+            <Text style={styles.sectionTitle}>Расположение</Text>
+          </View>
             {vacancy.metroStation ? (
               <View style={styles.locationRow}>
                 {metroLine ? (
                   <View style={[styles.metroDot, { backgroundColor: metroLine.color }]} />
                 ) : (
-                  <Text style={styles.locationIcon}>🚇</Text>
+                  <Ionicons name="subway-outline" size={16} color={Colors.textMuted} style={{ marginTop: 1 }} />
                 )}
                 <View style={{ flex: 1 }}>
                   {metroLine ? (
@@ -283,7 +289,7 @@ export default function PermVacancyDetailScreen() {
             ) : null}
             {vacancy.address ? (
               <View style={styles.locationRow}>
-                <Text style={styles.locationIcon}>📍</Text>
+                <Ionicons name="location-outline" size={16} color={Colors.textMuted} style={{ marginTop: 1 }} />
                 <Text style={[styles.locationValue, { flex: 1 }]}>{vacancy.address}</Text>
               </View>
             ) : null}
@@ -293,14 +299,20 @@ export default function PermVacancyDetailScreen() {
         {/* Description */}
         {vacancy.description ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📋 Описание вакансии</Text>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="document-text-outline" size={16} color={Colors.textPrimary} />
+              <Text style={styles.sectionTitle}>Описание вакансии</Text>
+            </View>
             <Text style={styles.descText}>{vacancy.description}</Text>
           </View>
         ) : null}
 
         {/* Employer info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🏢 Работодатель</Text>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="business-outline" size={16} color={Colors.textPrimary} />
+            <Text style={styles.sectionTitle}>Работодатель</Text>
+          </View>
           <View style={styles.employerCard}>
             {employer?.avatarUrl ? (
               <Image
@@ -317,12 +329,18 @@ export default function PermVacancyDetailScreen() {
             <View style={{ flex: 1, gap: 3 }}>
               <Text style={styles.employerName}>{employerDisplayName}</Text>
               {employer?.metroStation ? (
-                <Text style={styles.employerMeta}>🚇 {employer.metroStation}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="subway-outline" size={12} color={Colors.textMuted} />
+                  <Text style={styles.employerMeta}>{employer.metroStation}</Text>
+                </View>
               ) : null}
               {(employer?.avgRating ?? 0) > 0 ? (
-                <Text style={styles.employerMeta}>
-                  ⭐ {(employer?.avgRating ?? 0).toFixed(1)} ({employer?.ratingCount} отз.)
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="star" size={12} color="#F59E0B" />
+                  <Text style={styles.employerMeta}>
+                    {(employer?.avgRating ?? 0).toFixed(1)} ({employer?.ratingCount} отз.)
+                  </Text>
+                </View>
               ) : null}
             </View>
             {employer ? (
@@ -340,16 +358,22 @@ export default function PermVacancyDetailScreen() {
           {isApproved && employer ? (
             <View style={styles.phoneReveal}>
               <View style={styles.phoneRevealLeft}>
-                <Text style={styles.phoneRevealLabel}>📞 Телефон работодателя</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <Ionicons name="call-outline" size={14} color={Colors.green} />
+                  <Text style={styles.phoneRevealLabel}>Телефон работодателя</Text>
+                </View>
                 <Text style={styles.phoneRevealNumber}>{employer.phone}</Text>
               </View>
               <View style={styles.phoneUnlocked}>
-                <Text style={styles.phoneUnlockedTxt}>✅ Открыт</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                  <Text style={styles.phoneUnlockedTxt}>Открыт</Text>
+                </View>
               </View>
             </View>
           ) : (
             <View style={styles.phoneLocked}>
-              <Text style={styles.phoneLockedIcon}>🔒</Text>
+              <Ionicons name="lock-closed-outline" size={22} color={Colors.textMuted} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.phoneLockedTitle}>Телефон скрыт</Text>
                 <Text style={styles.phoneLockedSub}>
@@ -374,9 +398,12 @@ export default function PermVacancyDetailScreen() {
             onPress={toggleSave}
             activeOpacity={0.8}
           >
-            <Text style={[styles.saveBtnTxt, isSaved && { color: Colors.red }]}>
-              {isSaved ? '❤️ Сохранено' : '🤍 Сохранить'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name={isSaved ? 'heart' : 'heart-outline'} size={16} color={isSaved ? Colors.red : Colors.textSecondary} />
+              <Text style={[styles.saveBtnTxt, isSaved && { color: Colors.red }]}>
+                {isSaved ? 'Сохранено' : 'Сохранить'}
+              </Text>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
@@ -390,10 +417,13 @@ export default function PermVacancyDetailScreen() {
           >
             {applying ? (
               <ActivityIndicator size="small" color="#fff" />
+            ) : isApplied ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="checkmark" size={16} color={Colors.green} />
+                <Text style={[styles.applyBtnTxt, { color: Colors.green }]}>Отклик отправлен</Text>
+              </View>
             ) : (
-              <Text style={[styles.applyBtnTxt, isApplied && { color: Colors.green }]}>
-                {isApplied ? '✓ Отклик отправлен' : 'Откликнуться'}
-              </Text>
+              <Text style={styles.applyBtnTxt}>Откликнуться</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -469,6 +499,7 @@ const styles = StyleSheet.create({
   infoCardValue: { fontSize: 15, fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
 
   section: { gap: 10 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
 
   locationRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: Colors.surface, borderRadius: 12, padding: 12 },
