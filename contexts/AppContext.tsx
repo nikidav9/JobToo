@@ -28,6 +28,7 @@ import {
   dbGetVacancies,
   dbGetLikes,
   dbGetLikesForUser,
+  dbGetVacancyStatsMap,
   dbGetChats,
   dbGetSaved,
   dbGetPermVacancies,
@@ -41,9 +42,9 @@ import {
 import { registerForPushNotifications } from '@/services/notifications';
 
 // Polling interval for native (Realtime is primary, polling is fallback)
-const NATIVE_POLL_INTERVAL = 15_000;
+const NATIVE_POLL_INTERVAL = 8_000;
 // Polling interval for web (Supabase realtime may be blocked in Russia)
-const WEB_POLL_INTERVAL = 30_000;
+const WEB_POLL_INTERVAL = 10_000;
 
 export interface ToastMessage { message: string; type: 'success' | 'error' | 'info' }
 
@@ -241,6 +242,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (cachedPermVac) setPermVacancies(cachedPermVac);
           if (cachedPermApps) setPermApplications(cachedPermApps);
           if (cachedStats) setVacancyStatsMap(cachedStats);
+
+          // Quick retry for stats + notifications in case initial fetch is slow
+          setTimeout(() => {
+            if (cancelled) return;
+            Promise.all([refreshVacancyStats(), refreshNotifications()]).catch(() => {});
+          }, 5000);
 
           // Refresh push token on every cold start — FCM token can change after APK reinstall
           setTimeout(() => { registerForPushNotifications(sessionUser.id).catch(() => {}); }, 2000);
@@ -576,8 +583,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const refreshVacancyStats = async () => {
     try {
-      const allLikes = await dbGetLikes();
-      const map = computeVacancyStatsMap(allLikes);
+      const map = await dbGetVacancyStatsMap();
       setVacancyStatsMap(map);
       saveCache(CACHE_KEYS.allVacancyStats, map).catch(() => {});
     } catch {}

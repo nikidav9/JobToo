@@ -137,6 +137,24 @@ try {
         case 'dbGetLikesByVacancy':
             $data = sb_select('jm_likes', ['vacancy_id' => 'eq.' . $args[0]]); break;
 
+        case 'dbGetVacancyStatsMap': {
+            $rows = sb_select('jm_likes', [], 'vacancy_id,worker_liked,employer_liked,worker_skipped,is_match');
+            $map = [];
+            foreach ($rows as $r) {
+                $vid = $r['vacancy_id'];
+                if (!$vid) continue;
+                if (!isset($map[$vid])) $map[$vid] = ['applicants' => 0, 'rejected' => 0];
+                if ($r['worker_liked'] === true && $r['is_match'] === false && $r['employer_liked'] !== false) {
+                    $map[$vid]['applicants']++;
+                }
+                if ($r['employer_liked'] === false || ($r['worker_liked'] === false && $r['worker_skipped'] === true)) {
+                    $map[$vid]['rejected']++;
+                }
+            }
+            $data = $map;
+            break;
+        }
+
         case 'dbGetLikeByVacancyWorker':
             $data = sb_single('jm_likes', ['vacancy_id' => 'eq.' . $args[0], 'worker_id' => 'eq.' . $args[1]]); break;
 

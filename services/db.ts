@@ -267,6 +267,22 @@ export async function dbGetLikesForUser(userId: string, role: 'worker' | 'employ
   return (data ?? []).map(rowToLike);
 }
 
+export async function dbGetVacancyStatsMap(): Promise<Record<string, { applicants: number; rejected: number }>> {
+  if (IS_NATIVE) return proxy<Record<string, { applicants: number; rejected: number }>>('dbGetVacancyStatsMap');
+  const { data, error } = await withTimeout(
+    supabase.from('jm_likes').select('vacancy_id,worker_liked,employer_liked,worker_skipped,is_match')
+  );
+  if (error) throwOnError('dbGetVacancyStatsMap', error);
+  const map: Record<string, { applicants: number; rejected: number }> = {};
+  for (const r of data ?? []) {
+    if (!r.vacancy_id) continue;
+    if (!map[r.vacancy_id]) map[r.vacancy_id] = { applicants: 0, rejected: 0 };
+    if (r.worker_liked && !r.is_match && r.employer_liked !== false) map[r.vacancy_id].applicants++;
+    if (r.employer_liked === false || (r.worker_liked === false && r.worker_skipped === true)) map[r.vacancy_id].rejected++;
+  }
+  return map;
+}
+
 export async function dbGetLikesByVacancy(vacancyId: string): Promise<Like[]> {
   if (IS_NATIVE) { const d = await proxy<any[]>('dbGetLikesByVacancy', [vacancyId]); return d.map(rowToLike); }
   const { data, error } = await withTimeout(

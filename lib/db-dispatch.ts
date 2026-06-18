@@ -113,6 +113,21 @@ export async function dispatch(supabase: SupabaseClient, fn: string, args: any[]
       return data ?? [];
     }
 
+    case 'dbGetVacancyStatsMap': {
+      const { data, error } = await supabase
+        .from('jm_likes')
+        .select('vacancy_id,worker_liked,employer_liked,worker_skipped,is_match');
+      if (error) throw new Error(error.message);
+      const map: Record<string, { applicants: number; rejected: number }> = {};
+      for (const r of data ?? []) {
+        if (!r.vacancy_id) continue;
+        if (!map[r.vacancy_id]) map[r.vacancy_id] = { applicants: 0, rejected: 0 };
+        if (r.worker_liked && !r.is_match && r.employer_liked !== false) map[r.vacancy_id].applicants++;
+        if (r.employer_liked === false || (r.worker_liked === false && r.worker_skipped === true)) map[r.vacancy_id].rejected++;
+      }
+      return map;
+    }
+
     case 'dbGetLikeByVacancyWorker': {
       const [vacancyId, workerId] = args;
       const { data } = await supabase
