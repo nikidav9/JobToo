@@ -10,7 +10,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { Like, User, Vacancy, PermVacancy } from '@/constants/types';
-import { getTodayDates, formatDate, scoreVacancy } from '@/services/storage';
+import { getTodayDates, formatDate, scoreVacancy, loadCache, saveCache, CACHE_KEYS } from '@/services/storage';
 import { METRO_LINES } from '@/constants/metro';
 import {
   dbUpsertLike,
@@ -712,19 +712,34 @@ function WorkerFeed() {
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;
   const dateHistory = history[selectedDate] ?? [];
 
+  const fetchVacancyStats = useCallback((vacId: string) => {
+    let cancelled = false;
+    dbGetLikesByVacancy(vacId).then(lks => {
+      if (cancelled) return;
+      const fresh = {
+        applicants: lks.filter(l => l.workerLiked && !l.isMatch && l.employerLiked !== false).length,
+        rejected: lks.filter(l => l.employerLiked === false || (l.workerLiked === false && l.workerSkipped === true)).length,
+      };
+      setVacancyStats(fresh);
+      saveCache(CACHE_KEYS.vacancyStats(vacId), fresh);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // При смене карточки: мгновенно показать кэш, потом подгрузить свежее
   useEffect(() => {
     setVacancyStats({ applicants: 0, rejected: 0 });
     if (!currentCard) return;
-    let cancelled = false;
-    dbGetLikesByVacancy(currentCard.id).then(lks => {
-      if (cancelled) return;
-      setVacancyStats({
-        applicants: lks.filter(l => l.workerLiked && !l.isMatch && l.employerLiked !== false).length,
-        rejected: lks.filter(l => l.employerLiked === false || (l.workerLiked === false && l.workerSkipped === true)).length,
-      });
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [currentCard?.id]);
+    loadCache<{ applicants: number; rejected: number }>(CACHE_KEYS.vacancyStats(currentCard.id))
+      .then(cached => { if (cached) setVacancyStats(cached); });
+    return fetchVacancyStats(currentCard.id);
+  }, [currentCard?.id, fetchVacancyStats]);
+
+  // При возврате на экран обновить данные текущей карточки
+  useFocusEffect(useCallback(() => {
+    if (!currentCard) return;
+    return fetchVacancyStats(currentCard.id);
+  }, [currentCard?.id, fetchVacancyStats]));
 
   const animateCard = useCallback((dir: 'left' | 'right', velocity: number, cb: () => void) => {
     const targetX = dir === 'right' ? SW * 1.5 : -SW * 1.5;
