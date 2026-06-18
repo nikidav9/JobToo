@@ -713,13 +713,17 @@ function WorkerFeed() {
   const dateHistory = history[selectedDate] ?? [];
 
   useEffect(() => {
-    if (!currentCard) { setVacancyStats({ applicants: 0, rejected: 0 }); return; }
+    setVacancyStats({ applicants: 0, rejected: 0 });
+    if (!currentCard) return;
+    let cancelled = false;
     dbGetLikesByVacancy(currentCard.id).then(lks => {
+      if (cancelled) return;
       setVacancyStats({
         applicants: lks.filter(l => l.workerLiked && !l.isMatch && l.employerLiked !== false).length,
         rejected: lks.filter(l => l.employerLiked === false || (l.workerLiked === false && l.workerSkipped === true)).length,
       });
     }).catch(() => {});
+    return () => { cancelled = true; };
   }, [currentCard?.id]);
 
   const animateCard = useCallback((dir: 'left' | 'right', velocity: number, cb: () => void) => {
