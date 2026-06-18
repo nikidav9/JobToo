@@ -276,7 +276,7 @@ function WorkerMatches() {
 
   const emptyIcon: Record<typeof tab, React.ComponentProps<typeof Ionicons>['name']> = {
     active: 'clipboard-outline',
-    rejected: 'sad-outline',
+    rejected: 'happy-outline',
     completed: 'flag-outline',
   };
 
