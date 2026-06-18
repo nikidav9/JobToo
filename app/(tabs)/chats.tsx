@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
@@ -103,7 +104,7 @@ function ChatRow({ item, currentUser, users, onPress, onDelete }: {
       {/* Delete button revealed on left swipe */}
       <View style={styles.deleteAction}>
         <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-          <Text style={styles.deleteBtnTxt}>🗑</Text>
+          <Ionicons name="trash-outline" size={22} color="#fff" />
           <Text style={styles.deleteBtnLabel}>Удалить</Text>
         </TouchableOpacity>
       </View>
@@ -179,18 +180,21 @@ export default function ChatsScreen() {
       </View>
 
       <View style={styles.searchWrap}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="🔍 Поиск по чатам..."
-          placeholderTextColor={Colors.textMuted}
-          value={search}
-          onChangeText={setSearch}
-        />
+        <View style={styles.searchInner}>
+          <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Поиск по чатам..."
+            placeholderTextColor={Colors.textMuted}
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
       </View>
 
       {filtered.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={{ fontSize: 48 }}>💬</Text>
+          <Ionicons name="chatbubble-ellipses-outline" size={56} color={Colors.textMuted} />
           <Text style={styles.emptyTitle}>Нет сообщений</Text>
           <Text style={styles.emptySubtitle}>Чаты появятся после мэтча</Text>
         </View>
@@ -228,7 +232,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   title: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
   searchWrap: { paddingHorizontal: 16, paddingBottom: 12 },
-  searchInput: { backgroundColor: Colors.surface, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: Colors.textPrimary },
+  searchInner: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginTop: 12 },
   emptySubtitle: { fontSize: 14, color: Colors.textMuted, marginTop: 6 },
@@ -239,8 +244,7 @@ const styles = StyleSheet.create({
     width: 120, alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.red,
   },
-  deleteBtn: { alignItems: 'center', gap: 2 },
-  deleteBtnTxt: { fontSize: 20 },
+  deleteBtn: { alignItems: 'center', gap: 4 },
   deleteBtnLabel: { fontSize: 11, color: '#fff', fontWeight: '600' },
 
   chatRowAnimated: { backgroundColor: Colors.bg },

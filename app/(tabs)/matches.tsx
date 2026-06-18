@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
@@ -23,24 +24,59 @@ import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function MatchStatus({ like, isWorker }: { like: Like; isWorker: boolean }) {
   if (like.shiftCompleted) {
-    return <View style={[s.statusBadge, { backgroundColor: '#D1FAE5' }]}><Text style={[s.statusTxt, { color: Colors.green }]}>✅ Смена завершена</Text></View>;
+    return (
+      <View style={[s.statusBadge, { backgroundColor: '#D1FAE5' }]}>
+        <Ionicons name="checkmark-circle" size={14} color={Colors.green} />
+        <Text style={[s.statusTxt, { color: Colors.green }]}>Смена завершена</Text>
+      </View>
+    );
   }
   if (like.isMatch) {
     if (isWorker) {
       if (like.shiftCompleted && !like.workerRated)
-        return <View style={[s.statusBadge, { backgroundColor: '#FFF7ED' }]}><Text style={[s.statusTxt, { color: '#92400E' }]}>⭐ Оставьте отзыв о работодателе!</Text></View>;
+        return (
+          <View style={[s.statusBadge, { backgroundColor: '#FFF7ED' }]}>
+            <Ionicons name="star" size={14} color="#92400E" />
+            <Text style={[s.statusTxt, { color: '#92400E' }]}>Оставьте отзыв о работодателе!</Text>
+          </View>
+        );
     } else {
       if (!like.employerConfirmed)
-        return <View style={[s.statusBadge, { backgroundColor: Colors.primaryLight }]}><Text style={[s.statusTxt, { color: Colors.primary }]}>⏰ Подтвердите смену</Text></View>;
+        return (
+          <View style={[s.statusBadge, { backgroundColor: Colors.primaryLight }]}>
+            <Ionicons name="time-outline" size={14} color={Colors.primary} />
+            <Text style={[s.statusTxt, { color: Colors.primary }]}>Подтвердите смену</Text>
+          </View>
+        );
       if (like.employerConfirmed && !like.employerRated)
-        return <View style={[s.statusBadge, { backgroundColor: '#FFF7ED' }]}><Text style={[s.statusTxt, { color: '#92400E' }]}>⭐ Оцените работника!</Text></View>;
+        return (
+          <View style={[s.statusBadge, { backgroundColor: '#FFF7ED' }]}>
+            <Ionicons name="star" size={14} color="#92400E" />
+            <Text style={[s.statusTxt, { color: '#92400E' }]}>Оцените работника!</Text>
+          </View>
+        );
     }
-    return <View style={[s.statusBadge, { backgroundColor: Colors.primaryLight }]}><Text style={[s.statusTxt, { color: Colors.primary }]}>🎉 Мэтч!</Text></View>;
+    return (
+      <View style={[s.statusBadge, { backgroundColor: Colors.primaryLight }]}>
+        <Ionicons name="heart" size={14} color={Colors.primary} />
+        <Text style={[s.statusTxt, { color: Colors.primary }]}>Мэтч!</Text>
+      </View>
+    );
   }
   if (like.employerLiked === false) {
-    return <View style={[s.statusBadge, { backgroundColor: '#FEE2E2' }]}><Text style={[s.statusTxt, { color: Colors.red }]}>✕ Отказ</Text></View>;
+    return (
+      <View style={[s.statusBadge, { backgroundColor: '#FEE2E2' }]}>
+        <Ionicons name="close-circle" size={14} color={Colors.red} />
+        <Text style={[s.statusTxt, { color: Colors.red }]}>Отказ</Text>
+      </View>
+    );
   }
-  return <View style={[s.statusBadge, { backgroundColor: Colors.surface }]}><Text style={[s.statusTxt, { color: Colors.textMuted }]}>⏳ На рассмотрении</Text></View>;
+  return (
+    <View style={[s.statusBadge, { backgroundColor: Colors.surface }]}>
+      <Ionicons name="time-outline" size={14} color={Colors.textMuted} />
+      <Text style={[s.statusTxt, { color: Colors.textMuted }]}>На рассмотрении</Text>
+    </View>
+  );
 }
 
 // ─── Confirm shift banner (employer only) with confirmation dialog ─────────────
@@ -50,7 +86,7 @@ function ConfirmBanner({ onConfirm, loading }: { onConfirm: () => void; loading:
   return (
     <>
       <View style={s.confirmBanner}>
-        <Text style={s.confirmBannerIcon}>⏰</Text>
+        <Ionicons name="time-outline" size={22} color="#92400E" />
         <View style={{ flex: 1 }}>
           <Text style={s.confirmBannerTitle}>Подтвердите смену</Text>
           <Text style={s.confirmBannerSub}>Нажмите кнопку, чтобы завершить смену</Text>
@@ -63,12 +99,11 @@ function ConfirmBanner({ onConfirm, loading }: { onConfirm: () => void; loading:
         >
           {loading
             ? <ActivityIndicator size="small" color="#fff" />
-            : <Text style={s.confirmBannerBtnTxt}>✔</Text>
+            : <Ionicons name="checkmark" size={18} color="#fff" />
           }
         </TouchableOpacity>
       </View>
 
-      {/* Confirmation dialog */}
       {showDialog ? (
         <View style={s.dialogOverlay}>
           <View style={s.dialogCard}>
@@ -137,7 +172,6 @@ function WorkerMatches() {
     const employer = users.find(u => u.id === like.employerId);
     const isMatch = like.isMatch;
     const isCompleted = like.shiftCompleted;
-    // Worker can rate if shift is completed and they haven't rated yet
     const canRate = isCompleted && !like.workerRated;
 
     return (
@@ -146,15 +180,19 @@ function WorkerMatches() {
 
         <TouchableOpacity activeOpacity={0.8} onPress={() => setDetailVacancy(vac)}>
           <Text style={s.jobTitle}>{vac.title}</Text>
-          <Text style={s.subText}>{vac.company} · 🚇 {vac.metroStation}</Text>
+          <View style={s.metroRow}>
+            <Text style={s.subText}>{vac.company}</Text>
+            <Text style={s.subText}> · </Text>
+            <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
+            <Text style={s.subText}> {vac.metroStation}</Text>
+          </View>
         </TouchableOpacity>
 
         <View style={s.chipsRow}>
-          <Chip label={`📅 ${formatDate(vac.date)}`} variant="date" />
-          <Chip label={`⏰ ${vac.timeStart}–${vac.timeEnd}`} variant="time" />
+          <Chip label={formatDate(vac.date)} variant="date" icon="calendar-outline" />
+          <Chip label={`${vac.timeStart}–${vac.timeEnd}`} variant="time" icon="time-outline" />
         </View>
 
-        {/* Employer info */}
         {employer ? (
           <TouchableOpacity
             style={s.profileRow}
@@ -171,14 +209,16 @@ function WorkerMatches() {
             <View style={{ flex: 1 }}>
               <Text style={s.profileName}>{employer.company ?? `${employer.firstName} ${employer.lastName}`}</Text>
               {(employer.avgRating ?? 0) > 0 ? (
-                <Text style={s.profileSub}>⭐ {(employer.avgRating ?? 0).toFixed(1)} ({employer.ratingCount} отз.)</Text>
+                <View style={s.ratingRow}>
+                  <Ionicons name="star" size={12} color="#FBBF24" />
+                  <Text style={s.profileSub}> {(employer.avgRating ?? 0).toFixed(1)} ({employer.ratingCount} отз.)</Text>
+                </View>
               ) : null}
             </View>
             <Text style={s.profileArrow}>Профиль ›</Text>
           </TouchableOpacity>
         ) : null}
 
-        {/* Actions */}
         {isMatch ? (
           <View style={s.actionRow}>
             <TouchableOpacity
@@ -190,7 +230,8 @@ function WorkerMatches() {
               }}
               activeOpacity={0.8}
             >
-              <Text style={s.chatBtnTxt}>💬 Чат</Text>
+              <Ionicons name="chatbubble-outline" size={15} color="#fff" />
+              <Text style={s.chatBtnTxt}>Чат</Text>
             </TouchableOpacity>
             {canRate && employer && vac ? (
               <TouchableOpacity
@@ -207,12 +248,19 @@ function WorkerMatches() {
                 })}
                 activeOpacity={0.8}
               >
-                <Text style={s.rateBtnTxt}>⭐ Оставить отзыв</Text>
+                <Ionicons name="star-outline" size={15} color="#fff" />
+                <Text style={s.rateBtnTxt}>Оставить отзыв</Text>
               </TouchableOpacity>
             ) : isCompleted && like.workerRated ? (
-              <View style={s.waitBtn}><Text style={s.waitBtnTxt}>✓ Отзыв оставлен</Text></View>
+              <View style={s.waitBtn}>
+                <Ionicons name="checkmark" size={14} color={Colors.textMuted} />
+                <Text style={s.waitBtnTxt}>Отзыв оставлен</Text>
+              </View>
             ) : !isCompleted ? (
-              <View style={s.waitBtn}><Text style={s.waitBtnTxt}>⏳ Ждём подтверждения</Text></View>
+              <View style={s.waitBtn}>
+                <Ionicons name="time-outline" size={14} color={Colors.textMuted} />
+                <Text style={s.waitBtnTxt}>Ждём подтверждения</Text>
+              </View>
             ) : null}
           </View>
         ) : null}
@@ -226,6 +274,12 @@ function WorkerMatches() {
     { key: 'completed', label: 'Завершено', count: completedItems.length },
   ] as const;
 
+  const emptyIcon: Record<typeof tab, React.ComponentProps<typeof Ionicons>['name']> = {
+    active: 'clipboard-outline',
+    rejected: 'sad-outline',
+    completed: 'flag-outline',
+  };
+
   return (
     <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
       <View style={s.header}>
@@ -233,7 +287,6 @@ function WorkerMatches() {
         <NotifBell />
       </View>
 
-      {/* Tab strip */}
       <View style={s.tabStrip}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={s.tabItem} onPress={() => setTab(t.key)} activeOpacity={0.8}>
@@ -247,9 +300,7 @@ function WorkerMatches() {
 
       {shownItems.length === 0 ? (
         <View style={s.empty}>
-          <Text style={{ fontSize: 48 }}>
-            {tab === 'active' ? '📋' : tab === 'rejected' ? '😔' : '🏁'}
-          </Text>
+          <Ionicons name={emptyIcon[tab]} size={56} color={Colors.textMuted} />
           <Text style={s.emptyTitle}>
             {tab === 'active' ? 'Нет активных заявок' : tab === 'rejected' ? 'Нет отказов' : 'Нет завершённых смен'}
           </Text>
@@ -327,27 +378,23 @@ function EmployerMatches() {
       const worker = getWorker(like.workerId);
       const workerName = worker ? `${worker.firstName} ${worker.lastName}` : 'Работник';
 
-      // Step 1: set employerLiked=true in DB
       await dbUpsertLike(like.vacancyId, like.workerId, currentUser.id, { employerLiked: true });
 
-      // Step 2: check/create match — upsert is already committed, check immediately
       let result: { matched: boolean; chatId?: string } = { matched: false };
       result = await dbCheckAndCreateMatch(like.vacancyId, like.workerId);
       if (!result.matched && !result.chatId) {
-        // Small delay then one retry (in case of Supabase connection pool lag)
         await new Promise(r => setTimeout(r, 400));
         result = await dbCheckAndCreateMatch(like.vacancyId, like.workerId);
       }
 
-      // Step 3: refresh context in background — navigate immediately
       refreshAll().catch(() => {});
 
       if (result.matched || result.chatId) {
         notifyWorkerGotMatch(like.workerId, vac?.company ?? currentUser.company ?? '', vac?.title ?? '').catch(() => {});
-        showToast(`🎉 Мэтч с ${workerName}!`, 'success');
+        showToast(`Мэтч с ${workerName}!`, 'success');
         router.push({ pathname: '/chat-room', params: { chatId: result.chatId } });
       } else {
-        showToast(`✅ Подтверждено — ждём создания чата`, 'info');
+        showToast('Подтверждено — ждём создания чата', 'info');
         router.push({ pathname: '/(tabs)/chats' });
       }
     } catch {
@@ -371,7 +418,6 @@ function EmployerMatches() {
     }
   };
 
-  // Only employer can confirm the shift — marks as completed and navigates to rate screen
   const confirmShift = async (like: Like) => {
     const key = like.id + '_shift';
     setLoading(key);
@@ -383,14 +429,12 @@ function EmployerMatches() {
       const workerName = worker ? `${worker.firstName} ${worker.lastName}` : 'Работник';
       const company = currentUser.company ?? `${currentUser.firstName} ${currentUser.lastName}`;
 
-      // Notify worker that employer confirmed → they can now rate
       if (worker && vac) {
         notifyWorkerShiftConfirmedByEmployer(worker.id, company, vac.title).catch(() => {});
       }
 
-      showToast('Смена подтверждена! Оцените работника 🌟', 'success');
+      showToast('Смена подтверждена! Оцените работника', 'success');
 
-      // Navigate employer to rate the worker — rating starts at 0 (no auto-stars)
       if (worker && vac) {
         router.push({
           pathname: '/rate',
@@ -427,7 +471,6 @@ function EmployerMatches() {
         <View style={[s.card, like.shiftCompleted ? s.completedCard : s.matchedCard]}>
           <MatchStatus like={like} isWorker={false} />
 
-          {/* Confirm banner — only when shift not yet completed */}
           {!like.shiftCompleted && !like.employerConfirmed ? (
             <ConfirmBanner onConfirm={() => confirmShift(like)} loading={isShiftLoading} />
           ) : null}
@@ -449,12 +492,16 @@ function EmployerMatches() {
             <View style={{ flex: 1 }}>
               <Text style={s.workerName}>{workerName}</Text>
               {worker?.metroStation ? (
-                <Text style={s.profileSub}>🚇 {worker.metroStation}</Text>
+                <View style={s.metroRow}>
+                  <Ionicons name="subway-outline" size={12} color={Colors.textMuted} />
+                  <Text style={s.profileSub}> {worker.metroStation}</Text>
+                </View>
               ) : null}
               {(worker?.avgRating ?? 0) > 0 ? (
-                <Text style={s.profileSub}>
-                  ⭐ {(worker?.avgRating ?? 0).toFixed(1)} ({worker?.ratingCount} отз.)
-                </Text>
+                <View style={s.ratingRow}>
+                  <Ionicons name="star" size={12} color="#FBBF24" />
+                  <Text style={s.profileSub}> {(worker?.avgRating ?? 0).toFixed(1)} ({worker?.ratingCount} отз.)</Text>
+                </View>
               ) : null}
             </View>
             {worker?.phone ? (
@@ -477,7 +524,8 @@ function EmployerMatches() {
               }}
               activeOpacity={0.8}
             >
-              <Text style={s.chatBtnTxt}>💬 Чат</Text>
+              <Ionicons name="chatbubble-outline" size={15} color="#fff" />
+              <Text style={s.chatBtnTxt}>Чат</Text>
             </TouchableOpacity>
             {like.shiftCompleted && !like.employerRated && worker && vac ? (
               <TouchableOpacity
@@ -494,17 +542,20 @@ function EmployerMatches() {
                 })}
                 activeOpacity={0.8}
               >
-                <Text style={s.rateBtnTxt}>⭐ Оценить</Text>
+                <Ionicons name="star-outline" size={15} color="#fff" />
+                <Text style={s.rateBtnTxt}>Оценить</Text>
               </TouchableOpacity>
             ) : like.shiftCompleted && like.employerRated ? (
-              <View style={s.waitBtn}><Text style={s.waitBtnTxt}>✓ Оценка оставлена</Text></View>
+              <View style={s.waitBtn}>
+                <Ionicons name="checkmark" size={14} color={Colors.textMuted} />
+                <Text style={s.waitBtnTxt}>Оценка оставлена</Text>
+              </View>
             ) : null}
           </View>
         </View>
       );
     }
 
-    // Pending applicant card
     const displayName = worker
       ? `${worker.firstName} ${worker.lastName}`.trim() || 'Работник'
       : 'Работник';
@@ -529,7 +580,12 @@ function EmployerMatches() {
           <View style={{ flex: 1 }}>
             <Text style={s.workerName}>{displayName}</Text>
             {worker?.age ? <Text style={s.profileSub}>{worker.age} лет</Text> : null}
-            {worker?.metroStation ? <Text style={s.profileSub}>🚇 {worker.metroStation}</Text> : null}
+            {worker?.metroStation ? (
+              <View style={s.metroRow}>
+                <Ionicons name="subway-outline" size={12} color={Colors.textMuted} />
+                <Text style={s.profileSub}> {worker.metroStation}</Text>
+              </View>
+            ) : null}
             {!worker ? <Text style={s.profileSub}>Загрузка...</Text> : null}
           </View>
           <View style={{ alignItems: 'flex-end', gap: 4 }}>
@@ -549,7 +605,12 @@ function EmployerMatches() {
           >
             {isDLoading
               ? <ActivityIndicator size="small" color={Colors.red} />
-              : <Text style={s.rejectBtnTxt}>✕ Не подходит</Text>}
+              : (
+                <>
+                  <Ionicons name="close" size={15} color={Colors.red} />
+                  <Text style={s.rejectBtnTxt}>Не подходит</Text>
+                </>
+              )}
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.acceptBtn, isLoading && { opacity: 0.5 }]}
@@ -559,11 +620,22 @@ function EmployerMatches() {
           >
             {isLoading
               ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={s.acceptBtnTxt}>✅ Подходит!</Text>}
+              : (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={15} color="#fff" />
+                  <Text style={s.acceptBtnTxt}>Подходит!</Text>
+                </>
+              )}
           </TouchableOpacity>
         </View>
       </View>
     );
+  };
+
+  const emptyIcon: Record<typeof tab, React.ComponentProps<typeof Ionicons>['name']> = {
+    pending: 'inbox-outline',
+    matched: 'people-outline',
+    completed: 'flag-outline',
   };
 
   return (
@@ -572,7 +644,8 @@ function EmployerMatches() {
         <Text style={s.title}>Мэтчи</Text>
         {needsConfirm > 0 ? (
           <View style={s.urgentBadge}>
-            <Text style={s.urgentBadgeTxt}>⏰ {needsConfirm} ждут</Text>
+            <Ionicons name="time-outline" size={13} color="#92400E" />
+            <Text style={s.urgentBadgeTxt}>{needsConfirm} ждут</Text>
           </View>
         ) : null}
         <NotifBell />
@@ -600,7 +673,7 @@ function EmployerMatches() {
 
       {shown.length === 0 ? (
         <View style={s.empty}>
-          <Text style={{ fontSize: 48 }}>{tab === 'pending' ? '📥' : tab === 'matched' ? '🤝' : '🏁'}</Text>
+          <Ionicons name={emptyIcon[tab]} size={56} color={Colors.textMuted} />
           <Text style={s.emptyTitle}>
             {tab === 'pending' ? 'Нет откликов' : tab === 'matched' ? 'Нет активных мэтчей' : 'Нет завершённых смен'}
           </Text>
@@ -648,6 +721,7 @@ const s = StyleSheet.create({
   },
   title: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary, flex: 1 },
   urgentBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: '#FEF3C7', borderRadius: 100,
     paddingHorizontal: 10, paddingVertical: 4,
     borderWidth: 1, borderColor: '#F59E0B',
@@ -665,12 +739,16 @@ const s = StyleSheet.create({
   card: { backgroundColor: Colors.bg, borderRadius: Radius.lg, padding: 16, ...Shadow.card, gap: 10 },
   matchedCard: { borderWidth: 1.5, borderColor: Colors.green },
   completedCard: { borderWidth: 1.5, borderColor: Colors.blue, opacity: 0.8 },
-  statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start' },
+  statusBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start',
+  },
   statusTxt: { fontSize: 13, fontWeight: '700' },
   jobTitle: { fontSize: 17, fontWeight: '800', color: Colors.textPrimary, lineHeight: 22 },
   subText: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },
+  metroRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  // Profile row (worker sees employer)
   profileRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: Colors.surface, borderRadius: 12, padding: 10,
@@ -681,7 +759,6 @@ const s = StyleSheet.create({
   profileName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
   profileSub: { fontSize: 12, color: Colors.textMuted, marginTop: 1 },
   profileArrow: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
-  // Worker row (employer sees worker)
   workerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: { width: 44, height: 44, borderRadius: 22 },
   avatarTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
@@ -697,54 +774,49 @@ const s = StyleSheet.create({
   },
   hiddenPhoneTxt: { color: Colors.textMuted, fontSize: 13 },
   vacLabel: { fontSize: 13, color: Colors.textMuted },
-  // Action row
   actionRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   rejectBtn: {
-    flex: 1, borderWidth: 1.5, borderColor: Colors.red,
-    borderRadius: 100, paddingVertical: 11, alignItems: 'center',
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    borderWidth: 1.5, borderColor: Colors.red,
+    borderRadius: 100, paddingVertical: 11,
   },
   rejectBtnTxt: { color: Colors.red, fontSize: 14, fontWeight: '600' },
   acceptBtn: {
-    flex: 1, backgroundColor: Colors.primary,
-    borderRadius: 100, paddingVertical: 11, alignItems: 'center',
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    backgroundColor: Colors.primary,
+    borderRadius: 100, paddingVertical: 11,
   },
   acceptBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
   chatBtn: {
-    flex: 1, backgroundColor: Colors.blue,
-    borderRadius: 100, paddingVertical: 11, alignItems: 'center',
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: Colors.blue,
+    borderRadius: 100, paddingVertical: 11,
   },
   chatBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  confirmBtn: {
-    flex: 2, backgroundColor: Colors.green,
-    borderRadius: 100, paddingVertical: 11, alignItems: 'center',
-  },
-  confirmBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
   rateBtn: {
-    flex: 2, backgroundColor: '#FBBF24',
-    borderRadius: 100, paddingVertical: 11, alignItems: 'center',
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    backgroundColor: '#FBBF24',
+    borderRadius: 100, paddingVertical: 11,
   },
   rateBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
   waitBtn: {
-    flex: 2, backgroundColor: Colors.surface,
-    borderRadius: 100, paddingVertical: 11, alignItems: 'center',
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    backgroundColor: Colors.surface,
+    borderRadius: 100, paddingVertical: 11,
     borderWidth: 1, borderColor: Colors.inputBorder,
   },
   waitBtnTxt: { color: Colors.textMuted, fontSize: 13, fontWeight: '500' },
-  // Confirm banner
   confirmBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: '#FEF3C7', borderRadius: 12, padding: 12,
     borderWidth: 1, borderColor: '#F59E0B',
   },
-  confirmBannerIcon: { fontSize: 22 },
   confirmBannerTitle: { fontSize: 13, fontWeight: '700', color: '#92400E' },
   confirmBannerSub: { fontSize: 11, color: '#B45309', marginTop: 2 },
   confirmBannerBtn: {
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: Colors.green, alignItems: 'center', justifyContent: 'center',
   },
-  confirmBannerBtnTxt: { fontSize: 16, color: '#fff', fontWeight: '700' },
-  // Confirmation dialog
   dialogOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100,
@@ -767,7 +839,6 @@ const s = StyleSheet.create({
     borderRadius: 100, paddingVertical: 12, alignItems: 'center',
   },
   dialogConfirmTxt: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  // Empty
   empty: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 32, paddingBottom: 80,
