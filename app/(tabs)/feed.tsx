@@ -29,6 +29,7 @@ import {
   dbGetUserById,
   dbGetLikesByVacancy,
   dbRecordVacancyView,
+  dbRecordPermVacancyView,
 } from '@/services/db';
 import { notifyEmployerNewApplicant, notifyEmployerGotMatch, notifyWorkerGotMatch } from '@/services/notifications';
 import { Image } from 'expo-image';
@@ -1158,7 +1159,7 @@ function WorkerPermMode() {
     permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved,
     refreshPermVacancies, refreshPermApplications, refreshPermSaved,
     chats, refreshChats,
-    showToast,
+    showToast, permVacancyViewsMap,
   } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
 
@@ -1170,6 +1171,18 @@ function WorkerPermMode() {
   const [minSalary, setMinSalary] = useState(0);
   const [applying, setApplying] = useState<string | null>(null);
   const [chatLoading, setChatLoading] = useState<string | null>(null);
+
+  const viewedPermIds = useRef(new Set<string>());
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 });
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: Array<{ item: PermVacancy }> }) => {
+    if (!currentUser?.id) return;
+    viewableItems.forEach(({ item }) => {
+      if (item?.id && !viewedPermIds.current.has(item.id)) {
+        viewedPermIds.current.add(item.id);
+        dbRecordPermVacancyView(item.id, currentUser.id).catch(() => {});
+      }
+    });
+  }, [currentUser?.id]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -1385,6 +1398,12 @@ function WorkerPermMode() {
           <Text style={pS.desc} numberOfLines={2}>{v.description}</Text>
         ) : null}
 
+        {/* Views */}
+        <View style={pS.viewsRow}>
+          <Ionicons name="eye-outline" size={13} color={Colors.textMuted} />
+          <Text style={pS.viewsTxt}>{permVacancyViewsMap[v.id] ?? 0} просмотрели</Text>
+        </View>
+
         {/* Actions */}
         {tab !== 'rejected' ? (
           <View style={pS.actionRow}>
@@ -1530,6 +1549,8 @@ function WorkerPermMode() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
           renderItem={renderPerm}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig.current}
         />
       )}
 
@@ -2020,6 +2041,10 @@ const pS = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.bg,
   },
+
+  // views row
+  viewsRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
+  viewsTxt: { fontSize: 12, color: Colors.textMuted },
 
   // rejected info
   rejectedInfo: {

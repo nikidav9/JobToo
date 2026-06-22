@@ -39,6 +39,8 @@ export function useApp() {
       optimisticRemovePermSaved: () => {},
       vacancyStatsMap: {},
       refreshVacancyStats: async () => {},
+      permVacancyViewsMap: {},
+      refreshPermVacancyViews: async () => {},
     } as any;
   }
   return ctx;

@@ -29,6 +29,7 @@ import {
   dbGetLikes,
   dbGetLikesForUser,
   dbGetVacancyStatsMap,
+  dbGetPermVacancyViewsMap,
   dbGetChats,
   dbGetSaved,
   dbGetPermVacancies,
@@ -110,6 +111,8 @@ export interface AppContextValue {
   updateUser: (u: User) => Promise<void>;
   vacancyStatsMap: Record<string, VacancyStats>;
   refreshVacancyStats: () => Promise<void>;
+  permVacancyViewsMap: Record<string, number>;
+  refreshPermVacancyViews: () => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextValue | null>(null);
@@ -138,6 +141,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [vacancyStatsMap, setVacancyStatsMap] = useState<Record<string, VacancyStats>>({});
+  const [permVacancyViewsMap, setPermVacancyViewsMap] = useState<Record<string, number>>({});
 
   const unreadNotifCount = notifications.filter(n => !n.isRead).length;
 
@@ -274,6 +278,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               refreshPermSaved(sessionUser),
               refreshNotifications(),
               refreshVacancyStats(),
+              refreshPermVacancyViews(),
             ]).catch(() => {});
           }, 100);
 
@@ -556,6 +561,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       refreshPermVacancies(user),
       refreshChats(user),
       refreshVacancyStats(),
+      refreshPermVacancyViews(),
     ]);
   }, [currentUser]);
 
@@ -596,6 +602,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const map = await dbGetVacancyStatsMap();
       setVacancyStatsMap(map);
       saveCache(CACHE_KEYS.allVacancyStats, map).catch(() => {});
+    } catch {}
+  };
+
+  const refreshPermVacancyViews = async () => {
+    try {
+      const map = await dbGetPermVacancyViewsMap();
+      setPermVacancyViewsMap(map);
     } catch {}
   };
 
@@ -651,6 +664,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateUser,
         vacancyStatsMap,
         refreshVacancyStats,
+        permVacancyViewsMap,
+        refreshPermVacancyViews,
         notifications,
         unreadNotifCount,
         refreshNotifications,

@@ -299,6 +299,27 @@ export async function dbRecordVacancyView(vacancyId: string, workerId: string): 
   );
 }
 
+export async function dbGetPermVacancyViewsMap(): Promise<Record<string, number>> {
+  if (IS_NATIVE) return proxy<Record<string, number>>('dbGetPermVacancyViewsMap');
+  const { data } = await withTimeout(supabase.from('jm_perm_vacancy_views').select('vacancy_id'));
+  const map: Record<string, number> = {};
+  for (const r of data ?? []) {
+    if (!r.vacancy_id) continue;
+    map[r.vacancy_id] = (map[r.vacancy_id] ?? 0) + 1;
+  }
+  return map;
+}
+
+export async function dbRecordPermVacancyView(vacancyId: string, workerId: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbRecordPermVacancyView', [vacancyId, workerId]); return; }
+  await withTimeout(
+    supabase.from('jm_perm_vacancy_views').upsert(
+      { vacancy_id: vacancyId, worker_id: workerId },
+      { onConflict: 'vacancy_id,worker_id', ignoreDuplicates: true }
+    )
+  );
+}
+
 export async function dbGetLikesByVacancy(vacancyId: string): Promise<Like[]> {
   if (IS_NATIVE) { const d = await proxy<any[]>('dbGetLikesByVacancy', [vacancyId]); return d.map(rowToLike); }
   const { data, error } = await withTimeout(

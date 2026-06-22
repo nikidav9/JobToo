@@ -170,6 +170,26 @@ try {
             break;
         }
 
+        case 'dbGetPermVacancyViewsMap': {
+            $rows = sb_select('jm_perm_vacancy_views', [], 'vacancy_id');
+            $map = [];
+            foreach ($rows as $r) {
+                $vid = $r['vacancy_id'];
+                if (!$vid) continue;
+                $map[$vid] = ($map[$vid] ?? 0) + 1;
+            }
+            $data = $map;
+            break;
+        }
+
+        case 'dbRecordPermVacancyView': {
+            [$vid, $wid] = [$args[0], $args[1]];
+            sb('POST', 'jm_perm_vacancy_views', ['on_conflict' => 'vacancy_id,worker_id'],
+                ['vacancy_id' => $vid, 'worker_id' => $wid, 'viewed_at' => now_iso()],
+                ['Prefer: resolution=ignore-duplicates,return=minimal']);
+            break;
+        }
+
         case 'dbGetLikeByVacancyWorker':
             $data = sb_single('jm_likes', ['vacancy_id' => 'eq.' . $args[0], 'worker_id' => 'eq.' . $args[1]]); break;
 

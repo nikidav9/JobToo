@@ -143,6 +143,25 @@ export async function dispatch(supabase: SupabaseClient, fn: string, args: any[]
       return null;
     }
 
+    case 'dbGetPermVacancyViewsMap': {
+      const { data } = await supabase.from('jm_perm_vacancy_views').select('vacancy_id');
+      const map: Record<string, number> = {};
+      for (const r of data ?? []) {
+        if (!r.vacancy_id) continue;
+        map[r.vacancy_id] = (map[r.vacancy_id] ?? 0) + 1;
+      }
+      return map;
+    }
+
+    case 'dbRecordPermVacancyView': {
+      const [vacancyId, workerId] = args;
+      await supabase.from('jm_perm_vacancy_views').upsert(
+        { vacancy_id: vacancyId, worker_id: workerId },
+        { onConflict: 'vacancy_id,worker_id', ignoreDuplicates: true }
+      );
+      return null;
+    }
+
     case 'dbGetLikeByVacancyWorker': {
       const [vacancyId, workerId] = args;
       const { data } = await supabase
