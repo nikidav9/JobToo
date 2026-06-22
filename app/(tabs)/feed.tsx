@@ -1174,15 +1174,18 @@ function WorkerPermMode() {
 
   const viewedPermIds = useRef(new Set<string>());
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 });
-  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: Array<{ item: PermVacancy }> }) => {
-    if (!currentUser?.id) return;
-    viewableItems.forEach(({ item }) => {
+  const currentUserRef = useRef(currentUser);
+  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    const uid = currentUserRef.current?.id;
+    if (!uid) return;
+    viewableItems.forEach(({ item }: any) => {
       if (item?.id && !viewedPermIds.current.has(item.id)) {
         viewedPermIds.current.add(item.id);
-        dbRecordPermVacancyView(item.id, currentUser.id).catch(() => {});
+        dbRecordPermVacancyView(item.id, uid).catch(() => {});
       }
     });
-  }, [currentUser?.id]);
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -1549,7 +1552,7 @@ function WorkerPermMode() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
           renderItem={renderPerm}
-          onViewableItemsChanged={onViewableItemsChanged}
+          onViewableItemsChanged={onViewableItemsChanged.current}
           viewabilityConfig={viewabilityConfig.current}
         />
       )}
