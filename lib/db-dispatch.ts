@@ -114,18 +114,33 @@ export async function dispatch(supabase: SupabaseClient, fn: string, args: any[]
     }
 
     case 'dbGetVacancyStatsMap': {
-      const { data, error } = await supabase
-        .from('jm_likes')
-        .select('vacancy_id,worker_liked,employer_liked,worker_skipped,is_match');
+      const [{ data, error }, { data: viewData }] = await Promise.all([
+        supabase.from('jm_likes').select('vacancy_id,worker_liked,employer_liked,worker_skipped,is_match'),
+        supabase.from('jm_vacancy_views').select('vacancy_id'),
+      ]);
       if (error) throw new Error(error.message);
-      const map: Record<string, { applicants: number; rejected: number }> = {};
+      const map: Record<string, { applicants: number; rejected: number; views: number }> = {};
       for (const r of data ?? []) {
         if (!r.vacancy_id) continue;
-        if (!map[r.vacancy_id]) map[r.vacancy_id] = { applicants: 0, rejected: 0 };
+        if (!map[r.vacancy_id]) map[r.vacancy_id] = { applicants: 0, rejected: 0, views: 0 };
         if (r.worker_liked && !r.is_match && r.employer_liked !== false) map[r.vacancy_id].applicants++;
         if (r.employer_liked === false || (r.worker_liked === false && r.worker_skipped === true)) map[r.vacancy_id].rejected++;
       }
+      for (const v of viewData ?? []) {
+        if (!v.vacancy_id) continue;
+        if (!map[v.vacancy_id]) map[v.vacancy_id] = { applicants: 0, rejected: 0, views: 0 };
+        map[v.vacancy_id].views++;
+      }
       return map;
+    }
+
+    case 'dbRecordVacancyView': {
+      const [vacancyId, workerId] = args;
+      await supabase.from('jm_vacancy_views').upsert(
+        { vacancy_id: vacancyId, worker_id: workerId },
+        { onConflict: 'vacancy_id,worker_id', ignoreDuplicates: true }
+      );
+      return null;
     }
 
     case 'dbGetLikeByVacancyWorker': {

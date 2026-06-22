@@ -267,20 +267,36 @@ export async function dbGetLikesForUser(userId: string, role: 'worker' | 'employ
   return (data ?? []).map(rowToLike);
 }
 
-export async function dbGetVacancyStatsMap(): Promise<Record<string, { applicants: number; rejected: number }>> {
-  if (IS_NATIVE) return proxy<Record<string, { applicants: number; rejected: number }>>('dbGetVacancyStatsMap');
-  const { data, error } = await withTimeout(
-    supabase.from('jm_likes').select('vacancy_id,worker_liked,employer_liked,worker_skipped,is_match')
-  );
+export async function dbGetVacancyStatsMap(): Promise<Record<string, { applicants: number; rejected: number; views: number }>> {
+  if (IS_NATIVE) return proxy<Record<string, { applicants: number; rejected: number; views: number }>>('dbGetVacancyStatsMap');
+  const [{ data, error }, { data: viewData }] = await Promise.all([
+    withTimeout(supabase.from('jm_likes').select('vacancy_id,worker_liked,employer_liked,worker_skipped,is_match')),
+    withTimeout(supabase.from('jm_vacancy_views').select('vacancy_id')),
+  ]);
   if (error) throwOnError('dbGetVacancyStatsMap', error);
-  const map: Record<string, { applicants: number; rejected: number }> = {};
+  const map: Record<string, { applicants: number; rejected: number; views: number }> = {};
   for (const r of data ?? []) {
     if (!r.vacancy_id) continue;
-    if (!map[r.vacancy_id]) map[r.vacancy_id] = { applicants: 0, rejected: 0 };
+    if (!map[r.vacancy_id]) map[r.vacancy_id] = { applicants: 0, rejected: 0, views: 0 };
     if (r.worker_liked && !r.is_match && r.employer_liked !== false) map[r.vacancy_id].applicants++;
     if (r.employer_liked === false || (r.worker_liked === false && r.worker_skipped === true)) map[r.vacancy_id].rejected++;
   }
+  for (const v of viewData ?? []) {
+    if (!v.vacancy_id) continue;
+    if (!map[v.vacancy_id]) map[v.vacancy_id] = { applicants: 0, rejected: 0, views: 0 };
+    map[v.vacancy_id].views++;
+  }
   return map;
+}
+
+export async function dbRecordVacancyView(vacancyId: string, workerId: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbRecordVacancyView', [vacancyId, workerId]); return; }
+  await withTimeout(
+    supabase.from('jm_vacancy_views').upsert(
+      { vacancy_id: vacancyId, worker_id: workerId },
+      { onConflict: 'vacancy_id,worker_id', ignoreDuplicates: true }
+    )
+  );
 }
 
 export async function dbGetLikesByVacancy(vacancyId: string): Promise<Like[]> {

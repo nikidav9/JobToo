@@ -48,13 +48,13 @@ const WEB_POLL_INTERVAL = 10_000;
 
 export interface ToastMessage { message: string; type: 'success' | 'error' | 'info' }
 
-export interface VacancyStats { applicants: number; rejected: number }
+export interface VacancyStats { applicants: number; rejected: number; views: number }
 
 function computeVacancyStatsMap(likes: Like[]): Record<string, VacancyStats> {
   const map: Record<string, VacancyStats> = {};
   for (const l of likes) {
     if (!l.vacancyId) continue;
-    if (!map[l.vacancyId]) map[l.vacancyId] = { applicants: 0, rejected: 0 };
+    if (!map[l.vacancyId]) map[l.vacancyId] = { applicants: 0, rejected: 0, views: 0 };
     if (l.workerLiked && !l.isMatch && l.employerLiked !== false) map[l.vacancyId].applicants++;
     if (l.employerLiked === false || (l.workerLiked === false && l.workerSkipped === true)) map[l.vacancyId].rejected++;
   }

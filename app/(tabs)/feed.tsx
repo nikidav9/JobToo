@@ -28,6 +28,7 @@ import {
   dbDeletePermVacancy,
   dbGetUserById,
   dbGetLikesByVacancy,
+  dbRecordVacancyView,
 } from '@/services/db';
 import { notifyEmployerNewApplicant, notifyEmployerGotMatch, notifyWorkerGotMatch } from '@/services/notifications';
 import { Image } from 'expo-image';
@@ -711,8 +712,16 @@ function WorkerFeed() {
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;
   const dateHistory = history[selectedDate] ?? [];
   const vacancyStats = currentCard
-    ? (vacancyStatsMap[currentCard.id] ?? { applicants: 0, rejected: 0 })
-    : { applicants: 0, rejected: 0 };
+    ? (vacancyStatsMap[currentCard.id] ?? { applicants: 0, rejected: 0, views: 0 })
+    : { applicants: 0, rejected: 0, views: 0 };
+
+  useEffect(() => {
+    if (!currentCard?.id || !currentUser?.id) return;
+    const t = setTimeout(() => {
+      dbRecordVacancyView(currentCard.id, currentUser.id).catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [currentCard?.id, currentUser?.id]);
 
   const animateCard = useCallback((dir: 'left' | 'right', velocity: number, cb: () => void) => {
     const targetX = dir === 'right' ? SW * 1.5 : -SW * 1.5;
@@ -1027,13 +1036,10 @@ function WorkerFeed() {
                         <Text style={styles.slotLabel}>Отклонено</Text>
                       </View>
                       <View style={styles.slotInfo}>
-                        <Ionicons name="checkmark-circle-outline" size={20} color={Colors.green} />
-                        <Text style={[styles.slotValue, { color: Colors.green }]}>{currentCard.workersFound}</Text>
-                        <Text style={styles.slotLabel}>Набрано</Text>
+                        <Ionicons name="eye-outline" size={20} color={Colors.green} />
+                        <Text style={[styles.slotValue, { color: Colors.green }]}>{vacancyStats.views}</Text>
+                        <Text style={styles.slotLabel}>Просмотрели</Text>
                       </View>
-                    </View>
-                    <View style={styles.progressTrack}>
-                      <View style={[styles.progressFill, { width: `${Math.min(100, (currentCard.workersFound / currentCard.workersNeeded) * 100)}%` }]} />
                     </View>
                   </View>
                 </ScrollView>

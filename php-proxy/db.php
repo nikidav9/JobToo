@@ -139,11 +139,12 @@ try {
 
         case 'dbGetVacancyStatsMap': {
             $rows = sb_select('jm_likes', [], 'vacancy_id,worker_liked,employer_liked,worker_skipped,is_match');
+            $viewRows = sb_select('jm_vacancy_views', [], 'vacancy_id');
             $map = [];
             foreach ($rows as $r) {
                 $vid = $r['vacancy_id'];
                 if (!$vid) continue;
-                if (!isset($map[$vid])) $map[$vid] = ['applicants' => 0, 'rejected' => 0];
+                if (!isset($map[$vid])) $map[$vid] = ['applicants' => 0, 'rejected' => 0, 'views' => 0];
                 if ($r['worker_liked'] === true && $r['is_match'] === false && $r['employer_liked'] !== false) {
                     $map[$vid]['applicants']++;
                 }
@@ -151,7 +152,21 @@ try {
                     $map[$vid]['rejected']++;
                 }
             }
+            foreach ($viewRows as $v) {
+                $vid = $v['vacancy_id'];
+                if (!$vid) continue;
+                if (!isset($map[$vid])) $map[$vid] = ['applicants' => 0, 'rejected' => 0, 'views' => 0];
+                $map[$vid]['views']++;
+            }
             $data = $map;
+            break;
+        }
+
+        case 'dbRecordVacancyView': {
+            [$vid, $wid] = [$args[0], $args[1]];
+            sb('POST', 'jm_vacancy_views', ['on_conflict' => 'vacancy_id,worker_id'],
+                ['vacancy_id' => $vid, 'worker_id' => $wid, 'viewed_at' => now_iso()],
+                ['Prefer: resolution=ignore-duplicates,return=minimal']);
             break;
         }
 
