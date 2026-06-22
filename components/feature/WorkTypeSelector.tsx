@@ -3,11 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { WorkType } from '@/constants/types';
 
-export const WORK_TYPE_META: Record<WorkType, { emoji: string; label: string; desc: string }> = {
-  stocker:          { emoji: '📦', label: 'Кладовщик',     desc: 'Хранение, приёмка и учёт товаров на складе' },
-  cook:             { emoji: '👨‍🍳', label: 'Повар',          desc: 'Приготовление блюд на кухне' },
-  shift_supervisor: { emoji: '📋', label: 'Старший смены', desc: 'Управление процессами и персоналом смены' },
-  picker:           { emoji: '🛒', label: 'Сборщик',       desc: 'Комплектация и сборка заказов' },
+export const WORK_TYPE_META: Record<WorkType, { label: string; desc: string }> = {
+  stocker:          { label: 'Кладовщик',     desc: 'Хранение, приёмка и учёт товаров на складе' },
+  cook:             { label: 'Повар',          desc: 'Приготовление блюд на кухне' },
+  shift_supervisor: { label: 'Старший смены', desc: 'Управление процессами и персоналом смены' },
+  picker:           { label: 'Сборщик',       desc: 'Комплектация и сборка заказов' },
 };
 
 const WORK_TYPES = (Object.keys(WORK_TYPE_META) as WorkType[]).map(type => ({
@@ -33,7 +33,6 @@ export function WorkTypeSelector({ selected, onToggle }: Props) {
             onPress={() => onToggle(wt.type)}
             activeOpacity={0.8}
           >
-            <Text style={styles.emoji}>{wt.emoji}</Text>
             <View style={styles.info}>
               <Text style={styles.title}>{wt.label}</Text>
               <Text style={styles.desc}>{wt.desc}</Text>
@@ -69,7 +68,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  emoji: { fontSize: 32 },
   info: { flex: 1 },
   title: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
   desc: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },

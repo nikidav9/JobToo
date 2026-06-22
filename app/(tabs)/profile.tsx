@@ -541,7 +541,7 @@ export default function ProfileScreen() {
               title="Специализация"
               onEdit={() => openEdit('worktypes')}
               rows={[]}
-              chips={(currentUser.workTypes ?? []).map(t => `${WORK_TYPE_META[t]?.emoji ?? ''} ${WORK_TYPE_META[t]?.label ?? t}`)}
+              chips={(currentUser.workTypes ?? []).map(t => WORK_TYPE_META[t]?.label ?? t)}
             />
             <SectionCard
               iconName="document-text"
