@@ -1159,7 +1159,7 @@ function WorkerPermMode() {
     permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved,
     refreshPermVacancies, refreshPermApplications, refreshPermSaved,
     chats, refreshChats,
-    showToast, permVacancyViewsMap,
+    showToast, permVacancyViewsMap, refreshPermVacancyViews,
   } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
 
@@ -1189,7 +1189,7 @@ function WorkerPermMode() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refreshPermVacancies(), refreshPermApplications(), refreshPermSaved()]);
+    await Promise.all([refreshPermVacancies(), refreshPermApplications(), refreshPermSaved(), refreshPermVacancyViews()]);
     setRefreshing(false);
   };
 

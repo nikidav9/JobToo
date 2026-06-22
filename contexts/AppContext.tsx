@@ -368,6 +368,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshPermVacancies(user),
         refreshNotifications(),
         refreshVacancyStats(),
+        refreshPermVacancyViews(),
       ]).catch(() => {});
     };
     // Immediate poll on mount so new data appears right after login
@@ -392,6 +393,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshLikes(user),
         refreshNotifications(),
         refreshVacancyStats(),
+        refreshPermVacancyViews(),
       ]).catch(() => {});
     };
 
