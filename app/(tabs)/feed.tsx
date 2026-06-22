@@ -1547,7 +1547,7 @@ function WorkerPermMode() {
         <FlatList
           data={shownVacancies}
           keyExtractor={v => v.id}
-          extraData={users}
+          extraData={{ users, permVacancyViewsMap }}
           contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: tabBarHeight + 16 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
