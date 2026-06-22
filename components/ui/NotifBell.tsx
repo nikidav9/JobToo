@@ -132,7 +132,7 @@ export function NotifBell() {
               </View>
             ) : notifs.length === 0 ? (
               <View style={s.empty}>
-                <Text style={s.emptyIcon}>🔔</Text>
+                <Ionicons name="notifications-outline" size={56} color={Colors.textMuted} style={{ marginBottom: 16 }} />
                 <Text style={s.emptyTitle}>Нет уведомлений</Text>
                 <Text style={s.emptySub}>Здесь будут появляться важные уведомления</Text>
               </View>

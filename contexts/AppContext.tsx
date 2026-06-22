@@ -213,6 +213,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let cancelled = false;
 
     const boot = async () => {
+      // Vacancies are public — start fetching immediately, before session/delay
+      refreshVacancies(true).catch(() => {});
+
       try {
         // On Android, AsyncStorage may return null on cold start if read too early.
         // On web, localStorage is synchronous so no delay needed.
@@ -258,11 +261,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           // Register web push for already-logged-in users (web/PWA)
           registerWebPush(sessionUser.id).catch(() => {});
 
-          // Refresh from Supabase in background — don't block loading
+          // Refresh user-specific data in background — vacancies already started above
           setTimeout(() => {
             if (cancelled) return;
             Promise.all([
-              refreshVacancies(true),
               refreshUsers(),
               refreshLikes(sessionUser),
               refreshChats(sessionUser),
@@ -363,6 +365,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshVacancyStats(),
       ]).catch(() => {});
     };
+    // Immediate poll on mount so new data appears right after login
+    poll();
     const interval = setInterval(poll, WEB_POLL_INTERVAL);
     return () => clearInterval(interval);
   }, [currentUser?.id]);
@@ -386,6 +390,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       ]).catch(() => {});
     };
 
+    // Immediate poll on mount so new data appears right after login
+    poll();
     // Poll on interval
     const interval = setInterval(poll, NATIVE_POLL_INTERVAL);
 
