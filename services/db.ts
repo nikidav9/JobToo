@@ -296,6 +296,14 @@ export async function dbGetVacancyStatsMap(): Promise<Record<string, { applicant
   return map;
 }
 
+export async function dbGetVacancyViewers(vacancyId: string): Promise<string[]> {
+  if (IS_NATIVE) return proxy<string[]>('dbGetVacancyViewers', [vacancyId]);
+  const { data } = await withTimeout(
+    supabase.from('jm_vacancy_views').select('worker_id').eq('vacancy_id', vacancyId).order('viewed_at', { ascending: false })
+  );
+  return [...new Set((data ?? []).map((r: any) => r.worker_id))];
+}
+
 export async function dbRecordVacancyView(vacancyId: string, workerId: string): Promise<void> {
   if (IS_NATIVE) { await proxy('dbRecordVacancyView', [vacancyId, workerId]); return; }
   await withTimeout(

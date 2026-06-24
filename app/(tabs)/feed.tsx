@@ -30,6 +30,7 @@ import {
   dbGetLikesByVacancy,
   dbRecordVacancyView,
   dbRecordPermVacancyView,
+  dbGetVacancyViewers,
 } from '@/services/db';
 import { notifyEmployerNewApplicant, notifyEmployerGotMatch, notifyWorkerGotMatch } from '@/services/notifications';
 import { Image } from 'expo-image';
@@ -270,6 +271,112 @@ const ms = StyleSheet.create({
   btnTxt: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
   btnTxtActive: { color: '#FFFFFF', fontWeight: '700' },
 });
+
+// ─────────────────────────────────────────────────
+// Vacancy Viewers Modal
+// ─────────────────────────────────────────────────
+function VacancyViewersModal({ vacancyId, onClose }: { vacancyId: string; onClose: () => void }) {
+  const router = useRouter();
+  const { currentUser, vacancies, users, chats, showToast, refreshChats } = useApp();
+  const [loading, setLoading] = useState(true);
+  const [viewers, setViewers] = useState<User[]>([]);
+  const [chatLoading, setChatLoading] = useState<string | null>(null);
+
+  const vacancy = vacancies.find(v => v.id === vacancyId);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const ids = await dbGetVacancyViewers(vacancyId);
+        const fetched = await Promise.all(ids.map(id => dbGetUserById(id)));
+        setViewers(fetched.filter(Boolean) as User[]);
+      } catch {
+        showToast('Ошибка загрузки', 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [vacancyId]);
+
+  const openChat = async (worker: User) => {
+    if (!currentUser) return;
+    setChatLoading(worker.id);
+    try {
+      const existing = chats.find(c => c.vacancyId === vacancyId && c.workerId === worker.id);
+      if (existing) {
+        onClose();
+        router.push({ pathname: '/chat-room', params: { chatId: existing.id } });
+        return;
+      }
+      const vacTitle = vacancy?.title ?? 'Смена';
+      const companyName = vacancy?.company ?? currentUser.company ?? '';
+      const greeting = `Здравствуйте, ${worker.firstName}! Вы смотрели вакансию «${vacTitle}». Хотелось бы предложить вам эту работу.`;
+      const chatId = await dbCreateChat(worker.id, currentUser.id, vacancyId, vacTitle, companyName, greeting, 1, 0);
+      refreshChats().catch(() => {});
+      onClose();
+      router.push({ pathname: '/chat-room', params: { chatId } });
+    } catch {
+      showToast('Ошибка при открытии чата', 'error');
+    } finally {
+      setChatLoading(null);
+    }
+  };
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={wS.modalContainer}>
+        <View style={wS.modalHeader}>
+          <Text style={wS.modalTitle}>👁 Просмотрели вакансию</Text>
+          <TouchableOpacity onPress={onClose} style={wS.closeBtn}>
+            <Ionicons name="close" size={22} color={Colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 40 }} color={Colors.primary} />
+        ) : viewers.length === 0 ? (
+          <View style={wS.empty}>
+            <Text style={{ fontSize: 36 }}>👀</Text>
+            <Text style={wS.emptyTxt}>Ещё никто не просмотрел</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={viewers}
+            keyExtractor={w => w.id}
+            contentContainerStyle={{ padding: 16, gap: 12 }}
+            renderItem={({ item: w }) => {
+              const color = nameColorFromString(w.id);
+              const initials = getInitials(w.firstName, w.lastName);
+              return (
+                <View style={[wS.card, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
+                  <View style={[wS.avatar, { backgroundColor: color, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={wS.avatarTxt}>{initials}</Text>
+                  </View>
+                  <View style={wS.cardInfo}>
+                    <Text style={wS.cardName}>{w.firstName} {w.lastName}</Text>
+                    {w.metroStation ? <Text style={wS.cardMeta}>м. {w.metroStation}</Text> : null}
+                  </View>
+                  <TouchableOpacity
+                    style={[wS.chatBtn, { flex: 0, paddingHorizontal: 16 }]}
+                    onPress={() => openChat(w)}
+                    disabled={chatLoading === w.id}
+                    activeOpacity={0.8}
+                  >
+                    {chatLoading === w.id
+                      ? <ActivityIndicator size="small" color={Colors.primary} />
+                      : <Text style={wS.chatBtnTxt}>Написать</Text>
+                    }
+                  </TouchableOpacity>
+                </View>
+              );
+            }}
+          />
+        )}
+      </View>
+    </Modal>
+  );
+}
 
 // ─────────────────────────────────────────────────
 // Worker List Modal (for employer vacancy stats)
@@ -632,6 +739,12 @@ const wS = StyleSheet.create({
   acceptBtnTxt: { fontSize: 13, color: '#fff', fontWeight: '700' },
   chatBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 100, paddingVertical: 9, alignItems: 'center' },
   chatBtnTxt: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
+  modalContainer: { flex: 1, backgroundColor: Colors.bg },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.divider },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
+  cardInfo: { flex: 1 },
+  cardName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  cardMeta: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
 });
 
 // ─────────────────────────────────────────────────
@@ -1584,6 +1697,7 @@ function EmployerHome() {
   const [confirmClose, setConfirmClose] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [workerListModal, setWorkerListModal] = useState<{ vacId: string; type: 'applicants' | 'hired' | 'rejected' } | null>(null);
+  const [viewersModal, setViewersModal] = useState<string | null>(null);
   const didAutoClose = useRef(false);
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
   const [closingPermIds, setClosingPermIds] = useState<Set<string>>(new Set());
@@ -1756,19 +1870,19 @@ function EmployerHome() {
 
                 <View style={styles.statsRow}>
                   {[
-                    { num: applicantCount(v.id), label: 'Отклики', color: Colors.blue, type: 'applicants' as const, tappable: true },
-                    { num: rejectedCount(v.id), label: 'Отклонено', color: Colors.red, type: 'rejected' as const, tappable: true },
-                    { num: vacancyStatsMap[v.id]?.views ?? 0, label: 'Просмотрели', color: Colors.textMuted, type: 'hired' as const, tappable: false },
+                    { num: applicantCount(v.id), label: 'Отклики', color: Colors.blue, onTap: () => setWorkerListModal({ vacId: v.id, type: 'applicants' }) },
+                    { num: rejectedCount(v.id), label: 'Отклонено', color: Colors.red, onTap: () => setWorkerListModal({ vacId: v.id, type: 'rejected' }) },
+                    { num: vacancyStatsMap[v.id]?.views ?? 0, label: 'Просмотрели', color: Colors.textMuted, onTap: () => setViewersModal(v.id) },
                   ].map((s, i) => (
                     <TouchableOpacity
                       key={i}
                       style={styles.statBox}
-                      onPress={() => s.tappable && setWorkerListModal({ vacId: v.id, type: s.type })}
-                      activeOpacity={s.tappable ? 0.75 : 1}
+                      onPress={s.onTap}
+                      activeOpacity={0.75}
                     >
                       <Text style={[styles.statNum, { color: s.color }]}>{s.num}</Text>
                       <Text style={styles.statLabel}>{s.label}</Text>
-                      {s.tappable ? <Text style={styles.statTap}>↗</Text> : null}
+                      <Text style={styles.statTap}>↗</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -1848,6 +1962,13 @@ function EmployerHome() {
           vacancyId={workerListModal.vacId}
           type={workerListModal.type}
           onClose={() => setWorkerListModal(null)}
+        />
+      ) : null}
+
+      {viewersModal ? (
+        <VacancyViewersModal
+          vacancyId={viewersModal}
+          onClose={() => setViewersModal(null)}
         />
       ) : null}
 

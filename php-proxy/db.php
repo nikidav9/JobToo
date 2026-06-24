@@ -165,6 +165,12 @@ try {
             break;
         }
 
+        case 'dbGetVacancyViewers': {
+            $rows = sb_select('jm_vacancy_views', ['vacancy_id' => 'eq.' . $args[0]], 'worker_id,viewed_at', 'viewed_at.desc');
+            $data = array_values(array_unique(array_column($rows, 'worker_id')));
+            break;
+        }
+
         case 'dbRecordVacancyView': {
             [$vid, $wid] = [$args[0], $args[1]];
             sb('POST', 'jm_vacancy_views', ['on_conflict' => 'vacancy_id,worker_id'],
