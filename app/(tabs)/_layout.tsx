@@ -1,13 +1,14 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import {
-  Platform, View, Text, StyleSheet, TouchableOpacity, PanResponder,
+  Platform, View, Text, StyleSheet, TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Colors } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 
@@ -38,10 +39,7 @@ function FloatingTabBar({
 
   return (
     <View
-      style={[
-        fS.pill,
-        { bottom: insets.bottom + 12 },
-      ]}
+      style={[fS.pill, { bottom: insets.bottom + 12 }]}
       pointerEvents="box-none"
     >
       {tabs.map((tab) => {
@@ -59,23 +57,25 @@ function FloatingTabBar({
             key={tab.route}
             style={fS.tabItem}
             onPress={onPress}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
           >
-            <View>
-              <Ionicons
-                name={focused ? tab.iconFilled : tab.iconOutline}
-                size={24}
-                color={Colors.primary}
-              />
-              {tab.badge && tab.badge > 0 ? (
-                <View style={fS.badge}>
-                  <Text style={fS.badgeText}>{tab.badge > 9 ? '9+' : tab.badge}</Text>
-                </View>
-              ) : null}
+            <View style={[fS.tabInner, focused && fS.tabInnerActive]}>
+              <View>
+                <Ionicons
+                  name={focused ? tab.iconFilled : tab.iconOutline}
+                  size={22}
+                  color={Colors.primary}
+                />
+                {tab.badge && tab.badge > 0 ? (
+                  <View style={fS.badge}>
+                    <Text style={fS.badgeText}>{tab.badge > 9 ? '9+' : tab.badge}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={[fS.label, focused && fS.labelActive]}>
+                {tab.label}
+              </Text>
             </View>
-            <Text style={[fS.label, focused && fS.labelActive]}>
-              {tab.label}
-            </Text>
           </TouchableOpacity>
         );
       })}
@@ -150,69 +150,77 @@ export default function TabLayout() {
     { route: 'profile', iconFilled: 'person', iconOutline: 'person-outline', label: 'Профиль' },
   ];
 
-  // ─── Swipe between tabs ───────────────────────────────────────────────────
+  // ─── Swipe between tabs (RNGH Gesture API) ────────────────────────────────
   const activeIndexRef = useRef(0);
+  const [activeIdx, setActiveIdx] = useState(0);
 
   useEffect(() => {
     const seg = pathname.split('/').pop() ?? 'feed';
     const idx = (TAB_ROUTES as readonly string[]).indexOf(seg);
-    if (idx >= 0) activeIndexRef.current = idx;
+    if (idx >= 0) {
+      activeIndexRef.current = idx;
+      setActiveIdx(idx);
+    }
   }, [pathname]);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      // Only claim gesture if it's clearly horizontal (3:1 ratio, min 50px)
-      onMoveShouldSetPanResponder: (_, gs) =>
-        Math.abs(gs.dx) > Math.abs(gs.dy) * 3 && Math.abs(gs.dx) > 50,
-      onPanResponderRelease: (_, gs) => {
-        const idx = activeIndexRef.current;
-        if (gs.dx < -60 && idx < TAB_ROUTES.length - 1) {
-          router.navigate(`/(tabs)/${TAB_ROUTES[idx + 1]}` as any);
-        } else if (gs.dx > 60 && idx > 0) {
-          router.navigate(`/(tabs)/${TAB_ROUTES[idx - 1]}` as any);
-        }
-      },
-    })
-  ).current;
+  // On the feed screen the card swiper owns horizontal gestures — don't conflict.
+  // On all other screens we capture horizontal swipes to switch tabs.
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-35, 35])    // activate after 35px horizontal
+    .failOffsetY([-30, 30])      // give up if user moves vertically first
+    .enabled(activeIdx !== 0)    // disabled on feed (card swiper conflict)
+    .runOnJS(true)
+    .onEnd((e) => {
+      const idx = activeIndexRef.current;
+      const goRight = (e.translationX < -60 && e.velocityX <= 0) || e.velocityX < -600;
+      const goLeft  = (e.translationX > 60  && e.velocityX >= 0) || e.velocityX > 600;
+      if (goRight && idx < TAB_ROUTES.length - 1) {
+        router.navigate(`/(tabs)/${TAB_ROUTES[idx + 1]}` as any);
+      } else if (goLeft && idx > 0) {
+        router.navigate(`/(tabs)/${TAB_ROUTES[idx - 1]}` as any);
+      }
+    });
 
   // ─── Tab bar height (keeps useBottomTabBarHeight working in screens) ──────
   const tabBarHeight = Platform.select({
-    ios: insets.bottom + 64 + 12,   // pill height + bottom margin + safe area
+    ios: insets.bottom + 64 + 12,
     android: insets.bottom + 64 + 12,
     default: 76,
   });
 
   return (
-    <View style={{ flex: 1 }} {...panResponder.panHandlers}>
-      <Tabs
-        initialRouteName="feed"
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: {
-            height: tabBarHeight,
-            backgroundColor: 'transparent',
-            borderTopWidth: 0,
-            elevation: 0,
-            shadowOpacity: 0,
-          },
-          tabBarBackground: () => null,
-          tabBarShowLabel: false,
-        }}
-        tabBar={(props) => (
-          <FloatingTabBar
-            state={props.state}
-            navigation={props.navigation}
-            tabs={tabs}
-          />
-        )}
-      >
-        <Tabs.Screen name="feed" options={{ tabBarIcon: () => null }} />
-        <Tabs.Screen name="index" options={{ href: null }} />
-        <Tabs.Screen name="matches" options={{ tabBarIcon: () => null }} />
-        <Tabs.Screen name="chats" options={{ tabBarIcon: () => null }} />
-        <Tabs.Screen name="profile" options={{ tabBarIcon: () => null }} />
-      </Tabs>
-    </View>
+    <GestureDetector gesture={swipeGesture}>
+      <View style={{ flex: 1 }}>
+        <Tabs
+          initialRouteName="feed"
+          screenOptions={{
+            headerShown: false,
+            tabBarStyle: {
+              height: tabBarHeight,
+              backgroundColor: 'transparent',
+              borderTopWidth: 0,
+              elevation: 0,
+              shadowOpacity: 0,
+            },
+            tabBarBackground: () => null,
+            tabBarShowLabel: false,
+          }}
+          tabBar={(props) => (
+            <FloatingTabBar
+              state={props.state}
+              navigation={props.navigation}
+              tabs={tabs}
+            />
+          )}
+        >
+          <Tabs.Screen name="feed" options={{ tabBarIcon: () => null }} />
+          <Tabs.Screen name="index" options={{ href: null }} />
+          <Tabs.Screen name="matches" options={{ tabBarIcon: () => null }} />
+          <Tabs.Screen name="chats" options={{ tabBarIcon: () => null }} />
+          <Tabs.Screen name="profile" options={{ tabBarIcon: () => null }} />
+        </Tabs>
+      </View>
+    </GestureDetector>
   );
 }
 
@@ -228,7 +236,7 @@ const fS = StyleSheet.create({
     backgroundColor: Colors.bg,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.10,
@@ -239,14 +247,23 @@ const fS = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  tabInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 3,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+  },
+  tabInnerActive: {
+    backgroundColor: Colors.primaryLight,
   },
   label: {
     fontSize: 10,
     fontWeight: '600',
     color: Colors.primary,
-    opacity: 0.5,
+    opacity: 0.45,
   },
   labelActive: {
     opacity: 1,
