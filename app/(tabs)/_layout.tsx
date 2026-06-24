@@ -174,6 +174,21 @@ export default function TabLayout() {
         }}
       />
 
+      {/* Exchange / Биржа */}
+      <Tabs.Screen
+        name="exchange"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              iconActive="megaphone"
+              iconInactive="megaphone-outline"
+              label="Биржа"
+              focused={focused}
+            />
+          ),
+        }}
+      />
+
       {/* Chats */}
       <Tabs.Screen
         name="chats"
