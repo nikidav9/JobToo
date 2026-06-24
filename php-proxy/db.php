@@ -504,6 +504,67 @@ try {
         case 'dbDeleteAllNotifs':
             sb_delete('jm_notifications', ['user_id' => 'eq.' . $args[0]]); break;
 
+        // ── Bulletins (Биржа) ──────────────────────────────────────────────────
+        case 'dbCreateBulletin': {
+            $p = $args[0];
+            $id = uid();
+            sb_insert('jm_bulletins', [
+                'id' => $id, 'employer_id' => $p['employerId'], 'company' => $p['company'],
+                'work_type' => $p['workType'], 'date' => $p['date'],
+                'time_start' => $p['timeStart'], 'time_end' => $p['timeEnd'],
+                'metro' => $p['metro'], 'address' => $p['address'],
+                'comment' => $p['comment'] ?? null, 'status' => 'open', 'created_at' => now_iso(),
+            ]);
+            $data = $id; break;
+        }
+
+        case 'dbGetActiveBulletins':
+            $data = sb_select('jm_bulletins', ['status' => 'eq.open'], '*', 'created_at.desc'); break;
+
+        case 'dbRespondToBulletin': {
+            [$bid, $wid] = [$args[0], $args[1]];
+            $bul = sb_single('jm_bulletins', ['id' => 'eq.' . $bid]);
+            if (!$bul) throw new RuntimeException('Bulletin not found');
+            $ex = sb_single('jm_chats', ['bulletin_id' => 'eq.' . $bid, 'worker_id' => 'eq.' . $wid], 'id');
+            if ($ex) { $data = $ex['id']; break; }
+            $dateLabel = $bul['date'];
+            $greeting = "Здравствуйте! Видел объявление — {$bul['work_type']} {$dateLabel} {$bul['time_start']}–{$bul['time_end']}. Готов выйти.";
+            $cid = uid();
+            sb_insert('jm_chats', [
+                'id' => $cid, 'vacancy_id' => $bid, 'worker_id' => $wid,
+                'employer_id' => $bul['employer_id'],
+                'vac_title' => $bul['work_type'] . ' ' . $dateLabel,
+                'company_name' => $bul['company'], 'unread_worker' => 0, 'unread_employer' => 1,
+                'bulletin_id' => $bid, 'is_locked' => false, 'created_at' => now_iso(),
+            ]);
+            sb_insert('jm_messages', [
+                'id' => uid(), 'chat_id' => $cid, 'sender_id' => $wid,
+                'text' => $greeting, 'created_at' => now_iso(),
+            ]);
+            $data = $cid; break;
+        }
+
+        case 'dbGetMyBulletins':
+            $data = sb_select('jm_bulletins', ['employer_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;
+
+        case 'dbCloseBulletin': {
+            $bid = $args[0];
+            $closeMsg = 'Работника уже нашли, вакансия больше не актуальна';
+            sb_update('jm_bulletins', ['id' => 'eq.' . $bid], ['status' => 'closed']);
+            $chats = sb_select('jm_chats', ['bulletin_id' => 'eq.' . $bid], 'id');
+            foreach ($chats as $chat) {
+                sb_update('jm_chats', ['id' => 'eq.' . $chat['id']], ['is_locked' => true]);
+                sb_insert('jm_messages', [
+                    'id' => uid(), 'chat_id' => $chat['id'], 'sender_id' => 'system',
+                    'text' => $closeMsg, 'created_at' => now_iso(),
+                ]);
+            }
+            $data = true; break;
+        }
+
+        case 'dbGetAllWorkerTokens':
+            $data = sb_select('jm_users', ['role' => 'eq.worker', 'push_token' => 'not.is.null'], 'id,push_token'); break;
+
         default:
             throw new RuntimeException('Unknown function: ' . $fn);
     }

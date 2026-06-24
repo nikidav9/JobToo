@@ -242,15 +242,15 @@ function ModeSwitcher({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode
         onPress={() => onChange('shift')}
         activeOpacity={0.8}
       >
-        <Ionicons name="flash" size={15} color={mode === 'shift' ? '#fff' : Colors.textMuted} style={{ marginRight: 5 }} />
-        <Text style={[ms.btnTxt, mode === 'shift' && ms.btnTxtActive]}>Подработка</Text>
+        <Ionicons name="flash" size={14} color={mode === 'shift' ? '#fff' : Colors.textMuted} style={{ marginRight: 4 }} />
+        <Text style={[ms.btnTxt, mode === 'shift' && ms.btnTxtActive]}>Смены</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[ms.btn, mode === 'perm' && ms.btnActive]}
         onPress={() => onChange('perm')}
         activeOpacity={0.8}
       >
-        <Ionicons name="briefcase" size={15} color={mode === 'perm' ? '#fff' : Colors.textMuted} style={{ marginRight: 5 }} />
+        <Ionicons name="briefcase" size={14} color={mode === 'perm' ? '#fff' : Colors.textMuted} style={{ marginRight: 4 }} />
         <Text style={[ms.btnTxt, mode === 'perm' && ms.btnTxtActive]}>Работа</Text>
       </TouchableOpacity>
     </View>
@@ -259,14 +259,14 @@ function ModeSwitcher({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode
 
 const ms = StyleSheet.create({
   container: {
-    flexDirection: 'row', gap: 4,
+    flexDirection: 'row', gap: 3,
     backgroundColor: Colors.surface,
-    borderRadius: 100, padding: 4,
+    borderRadius: 100, padding: 3,
     borderWidth: 1, borderColor: Colors.divider,
   },
-  btn: { flex: 1, borderRadius: 100, paddingVertical: 9, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  btn: { flex: 1, borderRadius: 100, paddingVertical: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   btnActive: { backgroundColor: Colors.primary },
-  btnTxt: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
+  btnTxt: { fontSize: 12, fontWeight: '600', color: Colors.textMuted },
   btnTxtActive: { color: '#FFFFFF', fontWeight: '700' },
 });
 

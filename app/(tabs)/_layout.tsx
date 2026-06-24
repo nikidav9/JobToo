@@ -14,7 +14,7 @@ import { useApp } from '@/hooks/useApp';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const TAB_ROUTES = ['feed', 'matches', 'chats', 'profile'] as const;
+const TAB_ROUTES = ['feed', 'matches', 'exchange', 'chats', 'profile'] as const;
 
 // ─── Floating tab bar ───────────────────────────────────────────────────────
 
@@ -216,6 +216,7 @@ export default function TabLayout() {
       label: isWorker ? 'Поиск' : 'Вакансии',
     },
     { route: 'matches', iconFilled: 'people', iconOutline: 'people-outline', label: 'Мэтчи', badge: matchBadge },
+    { route: 'exchange', iconFilled: 'megaphone', iconOutline: 'megaphone-outline', label: 'Биржа' },
     { route: 'chats', iconFilled: 'chatbubble', iconOutline: 'chatbubble-outline', label: 'Чаты', badge: unreadCount },
     { route: 'profile', iconFilled: 'person', iconOutline: 'person-outline', label: 'Профиль' },
   ];
@@ -253,7 +254,9 @@ export default function TabLayout() {
       >
         <Tabs.Screen name="feed" options={{ tabBarIcon: () => null }} />
         <Tabs.Screen name="index" options={{ href: null }} />
+        <Tabs.Screen name="saved" options={{ href: null }} />
         <Tabs.Screen name="matches" options={{ tabBarIcon: () => null }} />
+        <Tabs.Screen name="exchange" options={{ tabBarIcon: () => null }} />
         <Tabs.Screen name="chats" options={{ tabBarIcon: () => null }} />
         <Tabs.Screen name="profile" options={{ tabBarIcon: () => null }} />
       </Tabs>

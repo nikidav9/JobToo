@@ -79,6 +79,23 @@ export interface Chat {
   unreadWorker: number;
   unreadEmployer: number;
   createdAt: string;
+  bulletinId?: string;
+  isLocked?: boolean;
+}
+
+export interface Bulletin {
+  id: string;
+  employerId: string;
+  company: string;
+  workType: string;
+  date: string;
+  timeStart: string;
+  timeEnd: string;
+  metro: string;
+  address: string;
+  comment?: string;
+  status: 'open' | 'closed';
+  createdAt: string;
 }
 
 export interface Complaint {
