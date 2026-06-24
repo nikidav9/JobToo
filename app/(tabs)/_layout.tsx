@@ -44,12 +44,14 @@ function FloatingTabBar({
       ]}
       pointerEvents="box-none"
     >
-      {tabs.map((tab, index) => {
-        const focused = state.index === index;
+      {tabs.map((tab) => {
+        const routeIndex = state.routes.findIndex((r: any) => r.name === tab.route);
+        const focused = routeIndex >= 0 && state.index === routeIndex;
         const onPress = () => {
-          const event = navigation.emit({ type: 'tabPress', target: state.routes[index].key, canPreventDefault: true });
+          if (routeIndex < 0) return;
+          const event = navigation.emit({ type: 'tabPress', target: state.routes[routeIndex].key, canPreventDefault: true });
           if (!focused && !event.defaultPrevented) {
-            navigation.navigate(state.routes[index].name);
+            navigation.navigate(state.routes[routeIndex].name);
           }
         };
         return (
@@ -206,7 +208,6 @@ export default function TabLayout() {
       >
         <Tabs.Screen name="feed" options={{ tabBarIcon: () => null }} />
         <Tabs.Screen name="index" options={{ href: null }} />
-        <Tabs.Screen name="saved" options={{ href: null }} />
         <Tabs.Screen name="matches" options={{ tabBarIcon: () => null }} />
         <Tabs.Screen name="chats" options={{ tabBarIcon: () => null }} />
         <Tabs.Screen name="profile" options={{ tabBarIcon: () => null }} />

@@ -21,8 +21,6 @@ import {
   dbInsertMessage,
   dbIncrementUnread,
   dbApplyPermVacancy,
-  dbAddPermSaved,
-  dbRemovePermSaved,
   dbClosePermVacancy,
   dbDeleteVacancy,
   dbDeletePermVacancy,
@@ -1255,7 +1253,7 @@ function WorkerFeed() {
 // ─────────────────────────────────────────────────
 // Worker Permanent mode
 // ─────────────────────────────────────────────────
-type PermTab = 'open' | 'applied' | 'rejected' | 'saved';
+type PermTab = 'open' | 'applied' | 'rejected';
 
 const SALARY_CHIPS = [
   { label: 'Любая', value: 0 },
@@ -1269,8 +1267,7 @@ function WorkerPermMode() {
   const router = useRouter();
   const {
     currentUser, users, permVacancies, permApplications,
-    permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved,
-    refreshPermVacancies, refreshPermApplications, refreshPermSaved,
+    refreshPermVacancies, refreshPermApplications,
     chats, refreshChats,
     showToast, permVacancyViewsMap, refreshPermVacancyViews,
   } = useApp();
@@ -1302,7 +1299,7 @@ function WorkerPermMode() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refreshPermVacancies(), refreshPermApplications(), refreshPermSaved(), refreshPermVacancyViews()]);
+    await Promise.all([refreshPermVacancies(), refreshPermApplications(), refreshPermVacancyViews()]);
     setRefreshing(false);
   };
 
@@ -1326,15 +1323,13 @@ function WorkerPermMode() {
   const openVacancies     = permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id) && matchesSearch(v) && matchesFilters(v));
   const appliedVacancies  = permVacancies.filter(v => myAppVacIds.has(v.id) && getAppStatus(v.id) !== 'rejected' && matchesSearch(v) && matchesFilters(v));
   const rejectedVacancies = permVacancies.filter(v => myAppVacIds.has(v.id) && getAppStatus(v.id) === 'rejected' && matchesSearch(v) && matchesFilters(v));
-  const savedVacancies    = permVacancies.filter(v => permSavedIds.includes(v.id) && matchesSearch(v) && matchesFilters(v));
 
   const shownVacancies =
     tab === 'open'     ? openVacancies :
     tab === 'applied'  ? appliedVacancies :
-    tab === 'rejected' ? rejectedVacancies :
-    savedVacancies;
+    rejectedVacancies;
 
-  const applyTo = (v: PermVacancy) => {
+  const applyTo = (v: PermVacancy) : void => {
     if (!currentUser) return;
     if (myAppVacIds.has(v.id) || applying === v.id) { showToast('Уже откликнулись', 'success'); return; }
     setApplying(v.id);
@@ -1343,19 +1338,6 @@ function WorkerPermMode() {
       .then(() => refreshPermApplications().catch(() => {}))
       .catch(e => console.warn('[applyTo]', e))
       .finally(() => setApplying(null));
-  };
-
-  const toggleSave = async (v: PermVacancy) => {
-    if (!currentUser) return;
-    if (permSavedIds.includes(v.id)) {
-      optimisticRemovePermSaved(v.id);
-      dbRemovePermSaved(currentUser.id, v.id).catch(() => {});
-      showToast('Удалено из избранного', 'success');
-    } else {
-      optimisticAddPermSaved(v.id);
-      dbAddPermSaved(currentUser.id, v.id).catch(() => {});
-      showToast('Сохранено ❤️', 'success');
-    }
   };
 
   const openPermChat = async (v: PermVacancy, displayCompany: string) => {
@@ -1397,7 +1379,6 @@ function WorkerPermMode() {
   const TAB_CONFIG: { key: PermTab; label: string; count: number }[] = [
     { key: 'open',     label: 'Открытые',     count: openVacancies.length },
     { key: 'applied',  label: 'Откликнулись', count: appliedVacancies.length },
-    { key: 'saved',    label: 'Избранные',    count: savedVacancies.length },
     { key: 'rejected', label: 'Отказы',       count: rejectedVacancies.length },
   ];
 
@@ -1414,7 +1395,6 @@ function WorkerPermMode() {
 
   const renderPerm = ({ item: v }: { item: PermVacancy }) => {
     const isApplied = myAppVacIds.has(v.id);
-    const isSaved = permSavedIds.includes(v.id);
     const isApplying = applying === v.id;
     const appStatus = getAppStatus(v.id);
     const statusInfo = appStatus ? STATUS_MAP[appStatus] : null;
@@ -1454,18 +1434,6 @@ function WorkerPermMode() {
               <Text style={pS.verifiedTxt}>Проверено</Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={pS.saveBtn}
-            onPress={() => toggleSave(v)}
-            activeOpacity={0.7}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons
-              name={isSaved ? 'heart' : 'heart-outline'}
-              size={22}
-              color={isSaved ? Colors.primary : Colors.textMuted}
-            />
-          </TouchableOpacity>
         </View>
 
         {/* Title */}
@@ -1572,7 +1540,6 @@ function WorkerPermMode() {
     open:     { icon: '🔍', title: 'Нет открытых вакансий', sub: 'Попробуйте изменить фильтры' },
     applied:  { icon: '📨', title: 'Нет откликов', sub: 'Откликайтесь на вакансии во вкладке «Открытые»' },
     rejected: { icon: '😔', title: 'Отказов нет', sub: 'Это хорошо! Продолжайте откликаться' },
-    saved:    { icon: '❤️', title: 'Нет избранного', sub: 'Сохраняйте понравившиеся вакансии' },
   };
 
   return (
@@ -1626,13 +1593,7 @@ function WorkerPermMode() {
               onPress={() => setTab(t.key)}
               activeOpacity={0.8}
             >
-              {t.key === 'saved' ? (
-                <Ionicons
-                  name={isActive ? 'heart' : 'heart-outline'}
-                  size={13}
-                  color={isActive ? Colors.primary : Colors.textMuted}
-                />
-              ) : t.key === 'rejected' ? (
+              {t.key === 'rejected' ? (
                 <Ionicons
                   name="close-circle-outline"
                   size={13}
