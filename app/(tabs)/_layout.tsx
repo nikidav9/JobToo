@@ -1,14 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import {
-  Platform, View, Text, StyleSheet, TouchableOpacity,
+  Platform, View, Text, StyleSheet, PanResponder, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Colors } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 
@@ -36,29 +35,43 @@ function FloatingTabBar({
   tabs: TabDef[];
 }) {
   const insets = useSafeAreaInsets();
+  const screenWidth = Dimensions.get('window').width;
+
+  // Always-fresh handler ref — PanResponder is created once but reads latest state
+  const handleRef = useRef<(pageX: number) => void>(() => {});
+  handleRef.current = (pageX: number) => {
+    // pill: left=16 + paddingHorizontal=6 on each side
+    const pillLeft = 16 + 6;
+    const pillInnerWidth = screenWidth - pillLeft * 2;
+    const relX = pageX - pillLeft;
+    const idx = Math.max(0, Math.min(tabs.length - 1, Math.floor(relX / (pillInnerWidth / tabs.length))));
+    const routeIdx = state.routes.findIndex((r: any) => r.name === tabs[idx]?.route);
+    if (routeIdx >= 0 && state.index !== routeIdx) {
+      navigation.navigate(state.routes[routeIdx].name);
+    }
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      // Claim ALL touches on the pill so sliding works
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      // Navigate on first touch (tap) and on every move (slide)
+      onPanResponderGrant: (e) => handleRef.current(e.nativeEvent.pageX),
+      onPanResponderMove: (e) => handleRef.current(e.nativeEvent.pageX),
+    }),
+  ).current;
 
   return (
     <View
       style={[fS.pill, { bottom: insets.bottom + 12 }]}
-      pointerEvents="box-none"
+      {...panResponder.panHandlers}
     >
       {tabs.map((tab) => {
         const routeIndex = state.routes.findIndex((r: any) => r.name === tab.route);
         const focused = routeIndex >= 0 && state.index === routeIndex;
-        const onPress = () => {
-          if (routeIndex < 0) return;
-          const event = navigation.emit({ type: 'tabPress', target: state.routes[routeIndex].key, canPreventDefault: true });
-          if (!focused && !event.defaultPrevented) {
-            navigation.navigate(state.routes[routeIndex].name);
-          }
-        };
         return (
-          <TouchableOpacity
-            key={tab.route}
-            style={fS.tabItem}
-            onPress={onPress}
-            activeOpacity={0.8}
-          >
+          <View key={tab.route} style={fS.tabItem}>
             <View style={[fS.tabInner, focused && fS.tabInnerActive]}>
               <View>
                 <Ionicons
@@ -76,7 +89,7 @@ function FloatingTabBar({
                 {tab.label}
               </Text>
             </View>
-          </TouchableOpacity>
+          </View>
         );
       })}
     </View>
@@ -93,8 +106,6 @@ export default function TabLayout() {
   const likes = app?.likes ?? [];
   const vacancies = app?.vacancies ?? [];
   const isWorker = currentUser?.role === 'worker';
-  const pathname = usePathname();
-  const router = useRouter();
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -150,37 +161,6 @@ export default function TabLayout() {
     { route: 'profile', iconFilled: 'person', iconOutline: 'person-outline', label: 'Профиль' },
   ];
 
-  // ─── Swipe between tabs (RNGH Gesture API) ────────────────────────────────
-  const activeIndexRef = useRef(0);
-  const [activeIdx, setActiveIdx] = useState(0);
-
-  useEffect(() => {
-    const seg = pathname.split('/').pop() ?? 'feed';
-    const idx = (TAB_ROUTES as readonly string[]).indexOf(seg);
-    if (idx >= 0) {
-      activeIndexRef.current = idx;
-      setActiveIdx(idx);
-    }
-  }, [pathname]);
-
-  // On the feed screen the card swiper owns horizontal gestures — don't conflict.
-  // On all other screens we capture horizontal swipes to switch tabs.
-  const swipeGesture = Gesture.Pan()
-    .activeOffsetX([-35, 35])    // activate after 35px horizontal
-    .failOffsetY([-30, 30])      // give up if user moves vertically first
-    .enabled(activeIdx !== 0)    // disabled on feed (card swiper conflict)
-    .runOnJS(true)
-    .onEnd((e) => {
-      const idx = activeIndexRef.current;
-      const goRight = (e.translationX < -60 && e.velocityX <= 0) || e.velocityX < -600;
-      const goLeft  = (e.translationX > 60  && e.velocityX >= 0) || e.velocityX > 600;
-      if (goRight && idx < TAB_ROUTES.length - 1) {
-        router.navigate(`/(tabs)/${TAB_ROUTES[idx + 1]}` as any);
-      } else if (goLeft && idx > 0) {
-        router.navigate(`/(tabs)/${TAB_ROUTES[idx - 1]}` as any);
-      }
-    });
-
   // ─── Tab bar height (keeps useBottomTabBarHeight working in screens) ──────
   const tabBarHeight = Platform.select({
     ios: insets.bottom + 64 + 12,
@@ -189,38 +169,36 @@ export default function TabLayout() {
   });
 
   return (
-    <GestureDetector gesture={swipeGesture}>
-      <View style={{ flex: 1 }}>
-        <Tabs
-          initialRouteName="feed"
-          screenOptions={{
-            headerShown: false,
-            tabBarStyle: {
-              height: tabBarHeight,
-              backgroundColor: 'transparent',
-              borderTopWidth: 0,
-              elevation: 0,
-              shadowOpacity: 0,
-            },
-            tabBarBackground: () => null,
-            tabBarShowLabel: false,
-          }}
-          tabBar={(props) => (
-            <FloatingTabBar
-              state={props.state}
-              navigation={props.navigation}
-              tabs={tabs}
-            />
-          )}
-        >
-          <Tabs.Screen name="feed" options={{ tabBarIcon: () => null }} />
-          <Tabs.Screen name="index" options={{ href: null }} />
-          <Tabs.Screen name="matches" options={{ tabBarIcon: () => null }} />
-          <Tabs.Screen name="chats" options={{ tabBarIcon: () => null }} />
-          <Tabs.Screen name="profile" options={{ tabBarIcon: () => null }} />
-        </Tabs>
-      </View>
-    </GestureDetector>
+    <View style={{ flex: 1 }}>
+      <Tabs
+        initialRouteName="feed"
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: {
+            height: tabBarHeight,
+            backgroundColor: 'transparent',
+            borderTopWidth: 0,
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+          tabBarBackground: () => null,
+          tabBarShowLabel: false,
+        }}
+        tabBar={(props) => (
+          <FloatingTabBar
+            state={props.state}
+            navigation={props.navigation}
+            tabs={tabs}
+          />
+        )}
+      >
+        <Tabs.Screen name="feed" options={{ tabBarIcon: () => null }} />
+        <Tabs.Screen name="index" options={{ href: null }} />
+        <Tabs.Screen name="matches" options={{ tabBarIcon: () => null }} />
+        <Tabs.Screen name="chats" options={{ tabBarIcon: () => null }} />
+        <Tabs.Screen name="profile" options={{ tabBarIcon: () => null }} />
+      </Tabs>
+    </View>
   );
 }
 
