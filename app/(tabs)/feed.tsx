@@ -9,7 +9,7 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { Like, User, Vacancy, PermVacancy } from '@/constants/types';
+import { Like, User, Vacancy, PermVacancy, Bulletin } from '@/constants/types';
 import { getTodayDates, formatDate, scoreVacancy } from '@/services/storage';
 import { METRO_LINES } from '@/constants/metro';
 import {
@@ -29,8 +29,13 @@ import {
   dbGetUserById,
   dbGetLikesByVacancy,
   dbRecordVacancyView,
+  dbRecordPermVacancyView,
+  dbGetVacancyViewers,
+  dbCreateBulletin,
+  dbRespondToBulletin,
+  dbCloseBulletin,
 } from '@/services/db';
-import { notifyEmployerNewApplicant, notifyEmployerGotMatch, notifyWorkerGotMatch } from '@/services/notifications';
+import { notifyEmployerNewApplicant, notifyEmployerGotMatch, notifyWorkerGotMatch, notifyAllWorkersNewBulletin } from '@/services/notifications';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Chip } from '@/components/ui/Chip';
@@ -232,7 +237,7 @@ const metroPickerSt = StyleSheet.create({
 // ─────────────────────────────────────────────────
 // Mode switcher
 // ─────────────────────────────────────────────────
-type AppMode = 'shift' | 'perm';
+type AppMode = 'shift' | 'perm' | 'bulletin';
 
 function ModeSwitcher({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode) => void }) {
   return (
@@ -242,16 +247,24 @@ function ModeSwitcher({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode
         onPress={() => onChange('shift')}
         activeOpacity={0.8}
       >
-        <Ionicons name="flash" size={15} color={mode === 'shift' ? '#fff' : Colors.textMuted} style={{ marginRight: 5 }} />
-        <Text style={[ms.btnTxt, mode === 'shift' && ms.btnTxtActive]}>Подработка</Text>
+        <Ionicons name="flash" size={14} color={mode === 'shift' ? '#fff' : Colors.textMuted} style={{ marginRight: 4 }} />
+        <Text style={[ms.btnTxt, mode === 'shift' && ms.btnTxtActive]}>Смены</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[ms.btn, mode === 'perm' && ms.btnActive]}
         onPress={() => onChange('perm')}
         activeOpacity={0.8}
       >
-        <Ionicons name="briefcase" size={15} color={mode === 'perm' ? '#fff' : Colors.textMuted} style={{ marginRight: 5 }} />
+        <Ionicons name="briefcase" size={14} color={mode === 'perm' ? '#fff' : Colors.textMuted} style={{ marginRight: 4 }} />
         <Text style={[ms.btnTxt, mode === 'perm' && ms.btnTxtActive]}>Работа</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[ms.btn, mode === 'bulletin' && ms.btnActive]}
+        onPress={() => onChange('bulletin')}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="megaphone" size={14} color={mode === 'bulletin' ? '#fff' : Colors.textMuted} style={{ marginRight: 4 }} />
+        <Text style={[ms.btnTxt, mode === 'bulletin' && ms.btnTxtActive]}>Биржа</Text>
       </TouchableOpacity>
     </View>
   );
@@ -259,14 +272,14 @@ function ModeSwitcher({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode
 
 const ms = StyleSheet.create({
   container: {
-    flexDirection: 'row', gap: 4,
+    flexDirection: 'row', gap: 3,
     backgroundColor: Colors.surface,
-    borderRadius: 100, padding: 4,
+    borderRadius: 100, padding: 3,
     borderWidth: 1, borderColor: Colors.divider,
   },
-  btn: { flex: 1, borderRadius: 100, paddingVertical: 9, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  btn: { flex: 1, borderRadius: 100, paddingVertical: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   btnActive: { backgroundColor: Colors.primary },
-  btnTxt: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
+  btnTxt: { fontSize: 12, fontWeight: '600', color: Colors.textMuted },
   btnTxtActive: { color: '#FFFFFF', fontWeight: '700' },
 });
 
@@ -1674,6 +1687,7 @@ function EmployerHome() {
         <ModeSwitcher mode={mode} onChange={setMode} />
       </View>
 
+      {mode === 'bulletin' ? <EmployerBulletinMode /> : (<>
       <View style={styles.tabs}>
         {(['active', 'closed'] as const).map(t => (
           <TouchableOpacity key={t} style={styles.tabItem2} onPress={() => setTab(t)} activeOpacity={0.8}>
@@ -1865,9 +1879,430 @@ function EmployerHome() {
           </View>
         </View>
       ) : null}
+      </>)}
     </SafeAreaView>
   );
 }
+
+// ─────────────────────────────────────────────────
+// Worker Bulletin mode (Биржа)
+// ─────────────────────────────────────────────────
+function WorkerBulletinMode() {
+  const router = useRouter();
+  const { currentUser, bulletins, refreshBulletins, chats, refreshChats, showToast } = useApp();
+  const tabBarHeight = useBottomTabBarHeight();
+  const [refreshing, setRefreshing] = useState(false);
+  const [responding, setResponding] = useState<string | null>(null);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshBulletins();
+    setRefreshing(false);
+  };
+
+  const respond = async (b: Bulletin) => {
+    if (!currentUser || responding) return;
+    const existing = chats.find(c => c.bulletinId === b.id && c.workerId === currentUser.id);
+    if (existing) {
+      router.push({ pathname: '/chat-room', params: { chatId: existing.id } });
+      return;
+    }
+    setResponding(b.id);
+    try {
+      const chatId = await dbRespondToBulletin(b.id, currentUser.id);
+      refreshChats().catch(() => {});
+      router.push({ pathname: '/chat-room', params: { chatId } });
+    } catch {
+      showToast('Ошибка при отклике', 'error');
+    } finally {
+      setResponding(null);
+    }
+  };
+
+  const formatBulletinDate = (iso: string) => {
+    const d = new Date(iso + 'T00:00:00');
+    const days = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+    const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+    return `${d.getDate()} ${months[d.getMonth()]} (${days[d.getDay()]})`;
+  };
+
+  return (
+    <FlatList
+      data={bulletins}
+      keyExtractor={b => b.id}
+      contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: tabBarHeight + 16 }}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
+      ListEmptyComponent={
+        <View style={styles.emptyState}>
+          <Text style={{ fontSize: 48 }}>📋</Text>
+          <Text style={styles.emptyTitle}>Объявлений пока нет</Text>
+          <Text style={styles.emptySubtitle}>Работодатели публикуют срочные объявления здесь</Text>
+        </View>
+      }
+      renderItem={({ item: b }) => {
+        const alreadyResponded = chats.some(c => c.bulletinId === b.id && c.workerId === currentUser?.id);
+        return (
+          <View style={bS.card}>
+            <View style={bS.cardHeader}>
+              <View style={bS.urgentBadge}>
+                <Ionicons name="flash" size={11} color="#92400E" />
+                <Text style={bS.urgentTxt}>Срочно</Text>
+              </View>
+              <Text style={bS.company} numberOfLines={1}>{b.company}</Text>
+            </View>
+            <Text style={bS.workType}>{b.workType}</Text>
+            <View style={bS.metaRow}>
+              <View style={bS.metaItem}>
+                <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
+                <Text style={bS.metaTxt}>{formatBulletinDate(b.date)}</Text>
+              </View>
+              <View style={bS.metaItem}>
+                <Ionicons name="time-outline" size={14} color={Colors.textMuted} />
+                <Text style={bS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
+              </View>
+            </View>
+            <View style={bS.metaRow}>
+              <View style={bS.metaItem}>
+                <Ionicons name="subway-outline" size={14} color={Colors.textMuted} />
+                <Text style={bS.metaTxt}>м. {b.metro}</Text>
+              </View>
+            </View>
+            <View style={bS.addressRow}>
+              <Ionicons name="location-outline" size={14} color="#92400E" />
+              <Text style={bS.addressTxt} numberOfLines={2}>{b.address}</Text>
+            </View>
+            {b.comment ? (
+              <Text style={bS.comment} numberOfLines={3}>{b.comment}</Text>
+            ) : null}
+            <TouchableOpacity
+              style={[bS.respondBtn, alreadyResponded && bS.respondBtnDone]}
+              onPress={() => respond(b)}
+              disabled={responding === b.id}
+              activeOpacity={0.8}
+            >
+              {responding === b.id
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={bS.respondBtnTxt}>{alreadyResponded ? '💬 Открыть чат' : '✉️ Откликнуться'}</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        );
+      }}
+    />
+  );
+}
+
+// ─────────────────────────────────────────────────
+// Employer Bulletin mode (Биржа)
+// ─────────────────────────────────────────────────
+function EmployerBulletinMode() {
+  const router = useRouter();
+  const { currentUser, bulletins, refreshBulletins, showToast } = useApp();
+  const tabBarHeight = useBottomTabBarHeight();
+  const [refreshing, setRefreshing] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
+  const [metroPicker, setMetroPicker] = useState(false);
+
+  // Form state
+  const [workType, setWorkType] = useState('');
+  const [date, setDate] = useState('');
+  const [timeStart, setTimeStart] = useState('');
+  const [timeEnd, setTimeEnd] = useState('');
+  const [metro, setMetro] = useState('');
+  const [address, setAddress] = useState('');
+  const [comment, setComment] = useState('');
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshBulletins();
+    setRefreshing(false);
+  };
+
+  const resetForm = () => {
+    setWorkType(''); setDate(''); setTimeStart(''); setTimeEnd('');
+    setMetro(''); setAddress(''); setComment('');
+  };
+
+  const submitBulletin = async () => {
+    if (!currentUser) return;
+    if (!workType.trim() || !date.trim() || !timeStart.trim() || !timeEnd.trim() || !metro.trim() || !address.trim()) {
+      showToast('Заполните все обязательные поля', 'error');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await dbCreateBulletin({
+        employerId: currentUser.id,
+        company: currentUser.company ?? currentUser.firstName,
+        workType: workType.trim(),
+        date: date.trim(),
+        timeStart: timeStart.trim(),
+        timeEnd: timeEnd.trim(),
+        metro: metro.trim(),
+        address: address.trim(),
+        comment: comment.trim() || undefined,
+      });
+      await refreshBulletins();
+      notifyAllWorkersNewBulletin({
+        company: currentUser.company ?? currentUser.firstName,
+        workType: workType.trim(),
+        date: date.trim(),
+        metro: metro.trim(),
+      }).catch(() => {});
+      resetForm();
+      setShowForm(false);
+      showToast('Объявление опубликовано!', 'success');
+    } catch {
+      showToast('Ошибка при публикации', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const closeBulletin = (id: string) => {
+    if (closingIds.has(id)) return;
+    setClosingIds(prev => new Set([...prev, id]));
+    showToast('Объявление закрыто', 'success');
+    dbCloseBulletin(id)
+      .then(() => refreshBulletins().catch(() => {}))
+      .catch(() => showToast('Ошибка при закрытии', 'error'));
+  };
+
+  const formatBulletinDate = (iso: string) => {
+    const d = new Date(iso + 'T00:00:00');
+    const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+    return `${d.getDate()} ${months[d.getMonth()]}`;
+  };
+
+  const myBulletins = bulletins.filter(b => b.employerId === currentUser?.id);
+  const activeBulletins = myBulletins.filter(b => b.status === 'open' && !closingIds.has(b.id));
+  const closedBulletins = myBulletins.filter(b => b.status === 'closed' || closingIds.has(b.id));
+
+  return (
+    <>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: tabBarHeight + 16 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
+      >
+        {/* Create button */}
+        {!showForm ? (
+          <TouchableOpacity style={bS.createBtn} onPress={() => setShowForm(true)} activeOpacity={0.8}>
+            <Ionicons name="add-circle" size={20} color={Colors.primary} />
+            <Text style={bS.createBtnTxt}>Опубликовать объявление</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={bS.formCard}>
+            <Text style={bS.formTitle}>Новое объявление</Text>
+            <Text style={bS.formLabel}>Специальность *</Text>
+            <TextInput
+              style={bS.formInput}
+              value={workType}
+              onChangeText={setWorkType}
+              placeholder="Напр.: кладовщик, грузчик, повар..."
+              placeholderTextColor={Colors.textMuted}
+            />
+            <Text style={bS.formLabel}>Дата * (дд.мм.гггг или ГГГГ-ММ-ДД)</Text>
+            <TextInput
+              style={bS.formInput}
+              value={date}
+              onChangeText={setDate}
+              placeholder="2024-06-25"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numbers-and-punctuation"
+            />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={bS.formLabel}>Начало *</Text>
+                <TextInput
+                  style={bS.formInput}
+                  value={timeStart}
+                  onChangeText={setTimeStart}
+                  placeholder="08:00"
+                  placeholderTextColor={Colors.textMuted}
+                  keyboardType="numbers-and-punctuation"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={bS.formLabel}>Конец *</Text>
+                <TextInput
+                  style={bS.formInput}
+                  value={timeEnd}
+                  onChangeText={setTimeEnd}
+                  placeholder="16:00"
+                  placeholderTextColor={Colors.textMuted}
+                  keyboardType="numbers-and-punctuation"
+                />
+              </View>
+            </View>
+            <Text style={bS.formLabel}>Метро *</Text>
+            <TouchableOpacity style={[bS.formInput, { justifyContent: 'center' }]} onPress={() => setMetroPicker(true)} activeOpacity={0.8}>
+              <Text style={metro ? { color: Colors.textPrimary, fontSize: 15 } : { color: Colors.textMuted, fontSize: 15 }}>
+                {metro || 'Выберите станцию...'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={bS.formLabel}>Адрес *</Text>
+            <TextInput
+              style={bS.formInput}
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Улица, дом..."
+              placeholderTextColor={Colors.textMuted}
+            />
+            <Text style={bS.formLabel}>Комментарий (необязательно)</Text>
+            <TextInput
+              style={[bS.formInput, { minHeight: 60, textAlignVertical: 'top' }]}
+              value={comment}
+              onChangeText={setComment}
+              placeholder="Дополнительные требования..."
+              placeholderTextColor={Colors.textMuted}
+              multiline
+            />
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+              <TouchableOpacity
+                style={[bS.formCancelBtn]}
+                onPress={() => { setShowForm(false); resetForm(); }}
+                activeOpacity={0.8}
+              >
+                <Text style={bS.formCancelTxt}>Отмена</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[bS.formSubmitBtn, submitting && { opacity: 0.6 }]}
+                onPress={submitBulletin}
+                disabled={submitting}
+                activeOpacity={0.8}
+              >
+                {submitting
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={bS.formSubmitTxt}>Опубликовать</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Active bulletins */}
+        {activeBulletins.length > 0 ? (
+          <>
+            <Text style={bS.sectionLabel}>Активные</Text>
+            {activeBulletins.map(b => (
+              <View key={b.id} style={[bS.card, bS.cardEmployer]}>
+                <View style={bS.cardHeader}>
+                  <Text style={bS.workType}>{b.workType}</Text>
+                  <TouchableOpacity
+                    style={bS.closeBtn}
+                    onPress={() => closeBulletin(b.id)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={bS.closeBtnTxt}>Закрыть</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={bS.metaTxt}>📅 {formatBulletinDate(b.date)}  ⏰ {b.timeStart}–{b.timeEnd}</Text>
+                <Text style={bS.metaTxt}>🚇 м. {b.metro}</Text>
+                <Text style={bS.addressTxt} numberOfLines={1}>📍 {b.address}</Text>
+                {b.comment ? <Text style={bS.comment} numberOfLines={2}>{b.comment}</Text> : null}
+              </View>
+            ))}
+          </>
+        ) : (
+          !showForm && (
+            <View style={styles.emptyState}>
+              <Text style={{ fontSize: 48 }}>📢</Text>
+              <Text style={styles.emptyTitle}>Нет активных объявлений</Text>
+              <Text style={styles.emptySubtitle}>Опубликуйте срочное объявление — все работники получат уведомление</Text>
+            </View>
+          )
+        )}
+
+        {/* Closed bulletins */}
+        {closedBulletins.length > 0 ? (
+          <>
+            <Text style={bS.sectionLabel}>Закрытые</Text>
+            {closedBulletins.map(b => (
+              <View key={b.id} style={[bS.card, bS.cardClosed]}>
+                <Text style={[bS.workType, { color: Colors.textMuted }]}>{b.workType}</Text>
+                <Text style={bS.metaTxt}>📅 {formatBulletinDate(b.date)}  ⏰ {b.timeStart}–{b.timeEnd}</Text>
+                <Text style={bS.metaTxt}>🚇 м. {b.metro}</Text>
+              </View>
+            ))}
+          </>
+        ) : null}
+      </ScrollView>
+
+      <MetroStationPicker
+        visible={metroPicker}
+        selectedStation={metro || null}
+        onSelect={s => setMetro(s ?? '')}
+        onClose={() => setMetroPicker(false)}
+      />
+    </>
+  );
+}
+
+const bS = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.bg, borderRadius: 18,
+    padding: 16, gap: 10, ...Shadow.card,
+    borderWidth: 1, borderColor: Colors.divider,
+  },
+  cardEmployer: { borderLeftWidth: 3, borderLeftColor: Colors.primary },
+  cardClosed: { opacity: 0.55, borderLeftWidth: 3, borderLeftColor: Colors.textMuted },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  urgentBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#FEF3C7', borderRadius: 100,
+    paddingHorizontal: 8, paddingVertical: 3,
+  },
+  urgentTxt: { fontSize: 11, fontWeight: '700', color: '#92400E' },
+  company: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary, flex: 1, marginLeft: 8 },
+  workType: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  metaTxt: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
+  addressRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
+  addressTxt: { fontSize: 13, color: '#92400E', fontWeight: '600', flex: 1, lineHeight: 18 },
+  comment: { fontSize: 13, color: Colors.textMuted, lineHeight: 18 },
+  respondBtn: {
+    backgroundColor: Colors.primary, borderRadius: 100,
+    paddingVertical: 13, alignItems: 'center', marginTop: 4,
+  },
+  respondBtnDone: { backgroundColor: Colors.green },
+  respondBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  createBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 100,
+    paddingVertical: 14, backgroundColor: Colors.primaryLight,
+  },
+  createBtnTxt: { fontSize: 15, fontWeight: '700', color: Colors.primary },
+  sectionLabel: { fontSize: 13, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  closeBtn: {
+    backgroundColor: '#FEE2E2', borderRadius: 100,
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
+  closeBtnTxt: { fontSize: 12, fontWeight: '700', color: Colors.red },
+  formCard: {
+    backgroundColor: Colors.bg, borderRadius: 18,
+    padding: 18, gap: 6, ...Shadow.card,
+    borderWidth: 1, borderColor: Colors.divider,
+  },
+  formTitle: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary, marginBottom: 8 },
+  formLabel: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary, marginTop: 4 },
+  formInput: {
+    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, color: Colors.textPrimary,
+    backgroundColor: Colors.bg,
+  },
+  formCancelBtn: {
+    flex: 1, borderWidth: 1.5, borderColor: Colors.inputBorder,
+    borderRadius: 100, paddingVertical: 13, alignItems: 'center',
+  },
+  formCancelTxt: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
+  formSubmitBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
+  formSubmitTxt: { fontSize: 14, fontWeight: '700', color: '#fff' },
+});
 
 // ─────────────────────────────────────────────────
 // Worker Home (wrapper with mode switcher)
@@ -1891,7 +2326,7 @@ function WorkerHome() {
       <View style={styles.modeSwitcherRow}>
         <ModeSwitcher mode={mode} onChange={setMode} />
       </View>
-      {mode === 'shift' ? <WorkerFeed /> : <WorkerPermMode />}
+      {mode === 'shift' ? <WorkerFeed /> : mode === 'perm' ? <WorkerPermMode /> : <WorkerBulletinMode />}
     </SafeAreaView>
   );
 }

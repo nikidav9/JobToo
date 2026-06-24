@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { dbSavePushToken, dbGetPushToken, dbGetWorkerTokensByMetro, dbGetWebPushSubscription, dbSaveNotification } from '@/services/db';
+import { dbSavePushToken, dbGetPushToken, dbGetWorkerTokensByMetro, dbGetWebPushSubscription, dbSaveNotification, dbGetAllWorkerTokens } from '@/services/db';
 
 const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6';
 const DASHBOARD_URL = process.env.EXPO_PUBLIC_DASHBOARD_URL || '';
@@ -406,4 +406,40 @@ export async function notifyWorkerPermApplicationRejected(
     `${companyName} отклонили вашу заявку на «${vacancyTitle}».`,
     'perm_rejected', 'matches',
   );
+}
+
+// ─── Bulletin broadcast ───────────────────────────────────────────────────────
+
+export async function notifyAllWorkersNewBulletin(params: {
+  company: string;
+  workType: string;
+  date: string;
+  metro: string;
+}): Promise<void> {
+  try {
+    const { company, workType, date, metro } = params;
+    const workers = await dbGetAllWorkerTokens();
+    if (workers.length === 0) return;
+
+    const title = '⚡ Срочно нужен сотрудник!';
+    const body = `${company}: ${workType} — м. ${metro}, ${date}`;
+
+    const messages = workers
+      .filter(w => w.push_token)
+      .map(w => ({
+        to: w.push_token,
+        title,
+        body,
+        sound: 'default' as const,
+        channelId: 'vacancies',
+        priority: 'high' as const,
+        data: { type: 'new_bulletin' },
+      }));
+
+    for (let i = 0; i < messages.length; i += 100) {
+      await sendExpoPush(messages.slice(i, i + 100));
+    }
+  } catch {
+    // Never crash due to notification failure
+  }
 }

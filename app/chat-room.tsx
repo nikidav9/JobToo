@@ -279,8 +279,8 @@ export default function ChatRoom() {
     }
   };
 
-  // Chat is blocked for BOTH parties when rejected
-  const isChatBlocked = likeStatus === 'rejected';
+  // Chat is locked for bulletin closure or rejected for vacancy
+  const isChatBlocked = likeStatus === 'rejected' || (chat?.isLocked ?? false);
 
   const sendMessage = async () => {
     const text = input.trim();
@@ -458,7 +458,9 @@ export default function ChatRoom() {
       {isChatBlocked ? (
         <View style={styles.blockedBar}>
           <Text style={styles.blockedBarTxt}>
-            {isEmployer ? '🚫 Чат закрыт — кандидат отклонён' : '🚫 Чат закрыт — работодатель отклонил кандидатуру'}
+            {chat?.isLocked
+              ? '🔒 Объявление закрыто — работника уже нашли'
+              : (isEmployer ? '🚫 Чат закрыт — кандидат отклонён' : '🚫 Чат закрыт — работодатель отклонил кандидатуру')}
           </Text>
         </View>
       ) : null}
