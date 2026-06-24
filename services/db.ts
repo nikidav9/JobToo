@@ -1043,10 +1043,6 @@ function rowToBulletin(r: any): Bulletin {
   };
 }
 
-export async function dbRecordPermVacancyView(_userId: string, _vacancyId: string): Promise<void> {}
-export async function dbGetVacancyViewers(_vacancyId: string): Promise<string[]> { return []; }
-export async function dbGetPermVacancyViewsMap(): Promise<Record<string, number>> { return {}; }
-
 export async function dbCreateBulletin(params: {
   employerId: string;
   company: string;
