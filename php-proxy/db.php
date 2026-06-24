@@ -106,6 +106,9 @@ try {
         case 'dbUpsertUser':
             sb_upsert('jm_users', $args[0], 'id'); break;
 
+        case 'dbWarmup':
+            $data = true; break;
+
         case 'dbDeleteUser':
             sb_delete('jm_users', ['id' => 'eq.' . $args[0]]); break;
 

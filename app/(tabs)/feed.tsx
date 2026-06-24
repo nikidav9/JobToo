@@ -1577,7 +1577,7 @@ function getTodayISO() {
 
 function EmployerHome() {
   const router = useRouter();
-  const { currentUser, vacancies, likes, permVacancies, permApplications, refreshVacancies, refreshPermVacancies, refreshPermApplications, refreshLikes, refreshAll, showToast } = useApp();
+  const { currentUser, vacancies, likes, permVacancies, permApplications, refreshVacancies, refreshPermVacancies, refreshPermApplications, refreshLikes, refreshAll, showToast, vacancyStatsMap } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
   const [mode, setMode] = useState<AppMode>('shift');
   const [tab, setTab] = useState<'active' | 'closed'>('active');
@@ -1756,19 +1756,19 @@ function EmployerHome() {
 
                 <View style={styles.statsRow}>
                   {[
-                    { num: applicantCount(v.id), label: 'Отклики', color: Colors.blue, type: 'applicants' as const },
-                    { num: rejectedCount(v.id), label: 'Отклонено', color: Colors.red, type: 'rejected' as const },
-                    { num: `${v.workersFound}/${v.workersNeeded}`, label: 'Набрано', color: Colors.green, type: 'hired' as const },
+                    { num: applicantCount(v.id), label: 'Отклики', color: Colors.blue, type: 'applicants' as const, tappable: true },
+                    { num: rejectedCount(v.id), label: 'Отклонено', color: Colors.red, type: 'rejected' as const, tappable: true },
+                    { num: vacancyStatsMap[v.id]?.views ?? 0, label: 'Просмотрели', color: Colors.textMuted, type: 'hired' as const, tappable: false },
                   ].map((s, i) => (
                     <TouchableOpacity
                       key={i}
                       style={styles.statBox}
-                      onPress={() => setWorkerListModal({ vacId: v.id, type: s.type })}
-                      activeOpacity={0.75}
+                      onPress={() => s.tappable && setWorkerListModal({ vacId: v.id, type: s.type })}
+                      activeOpacity={s.tappable ? 0.75 : 1}
                     >
                       <Text style={[styles.statNum, { color: s.color }]}>{s.num}</Text>
                       <Text style={styles.statLabel}>{s.label}</Text>
-                      <Text style={styles.statTap}>↗</Text>
+                      {s.tappable ? <Text style={styles.statTap}>↗</Text> : null}
                     </TouchableOpacity>
                   ))}
                 </View>

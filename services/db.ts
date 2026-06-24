@@ -119,7 +119,14 @@ export async function dbDeleteUser(id: string): Promise<void> {
 }
 
 export function dbWarmup(): void {
-  if (IS_NATIVE) return; // skip on native — connection warmup not needed for API proxy
+  if (IS_NATIVE) {
+    fetch(`${API_BASE}/api/db.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
+      body: JSON.stringify({ fn: 'dbWarmup', args: [] }),
+    }).catch(() => {});
+    return;
+  }
   withTimeout(
     supabase.from('jm_users').select('id').limit(1),
     20_000
