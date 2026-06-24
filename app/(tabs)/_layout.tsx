@@ -1,6 +1,8 @@
-import React, { useEffect } from 'react';
-import { Tabs } from 'expo-router';
-import { Platform, View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Tabs, usePathname, useRouter } from 'expo-router';
+import {
+  Platform, View, Text, StyleSheet, TouchableOpacity, PanResponder,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackActions } from '@react-navigation/native';
@@ -11,43 +13,75 @@ import { useApp } from '@/hooks/useApp';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
-function TabIcon({
-  iconActive,
-  iconInactive,
-  label,
-  focused,
-  badge,
-}: {
-  iconActive: IoniconName;
-  iconInactive: IoniconName;
+const TAB_ROUTES = ['feed', 'matches', 'chats', 'profile'] as const;
+
+// ─── Floating tab bar ───────────────────────────────────────────────────────
+
+interface TabDef {
+  route: string;
+  iconFilled: IoniconName;
+  iconOutline: IoniconName;
   label: string;
-  focused: boolean;
   badge?: number;
+}
+
+function FloatingTabBar({
+  state,
+  navigation,
+  tabs,
+}: {
+  state: any;
+  navigation: any;
+  tabs: TabDef[];
 }) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.tabItem}>
-      <View>
-        <Ionicons
-          name={focused ? iconActive : iconInactive}
-          size={24}
-          color={focused ? Colors.primary : '#9CA3AF'}
-        />
-        {badge && badge > 0 ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
-          </View>
-        ) : null}
-      </View>
-      <Text
-        style={[styles.tabLabel, { color: focused ? Colors.primary : '#9CA3AF' }]}
-        numberOfLines={1}
-        ellipsizeMode="clip"
-      >
-        {label}
-      </Text>
+    <View
+      style={[
+        fS.pill,
+        { bottom: insets.bottom + 12 },
+      ]}
+      pointerEvents="box-none"
+    >
+      {tabs.map((tab, index) => {
+        const focused = state.index === index;
+        const onPress = () => {
+          const event = navigation.emit({ type: 'tabPress', target: state.routes[index].key, canPreventDefault: true });
+          if (!focused && !event.defaultPrevented) {
+            navigation.navigate(state.routes[index].name);
+          }
+        };
+        return (
+          <TouchableOpacity
+            key={tab.route}
+            style={fS.tabItem}
+            onPress={onPress}
+            activeOpacity={0.7}
+          >
+            <View>
+              <Ionicons
+                name={focused ? tab.iconFilled : tab.iconOutline}
+                size={24}
+                color={Colors.primary}
+              />
+              {tab.badge && tab.badge > 0 ? (
+                <View style={fS.badge}>
+                  <Text style={fS.badgeText}>{tab.badge > 9 ? '9+' : tab.badge}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={[fS.label, focused && fS.labelActive]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
+
+// ─── Layout ─────────────────────────────────────────────────────────────────
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -57,10 +91,8 @@ export default function TabLayout() {
   const likes = app?.likes ?? [];
   const vacancies = app?.vacancies ?? [];
   const isWorker = currentUser?.role === 'worker';
-
-  // useNavigation() here gives the ROOT Stack's navigation (TabLayout is a screen in that Stack).
-  // StackActions.replace('index') bypasses URL resolution entirely — directly replaces (tabs)
-  // with app/index.tsx by route name, so no ambiguity with (tabs)/index.tsx URL collision.
+  const pathname = usePathname();
+  const router = useRouter();
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -69,152 +101,166 @@ export default function TabLayout() {
     }
   }, [app?.loading, currentUser]);
 
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
+  // ─── Match badge ─────────────────────────────────────────────────────────
   const matchBadge = (() => {
     if (!currentUser) return 0;
     if (isWorker) {
-      // Pending (awaiting employer decision)
       const awaiting = likes.filter(l =>
         l.workerId === currentUser.id && l.workerLiked && l.employerLiked === null && !l.isMatch
       ).length;
-      // Rejected by employer
       const rejected = likes.filter(l =>
         l.workerId === currentUser.id && l.workerLiked && l.employerLiked === false
       ).length;
-      // Active matches (not yet completed, or completed but worker hasn't rated)
       const matched = likes.filter(l =>
         l.workerId === currentUser.id && l.isMatch && !l.shiftCompleted
       ).length;
-      // Employer confirmed — worker needs to rate
       const needsRating = likes.filter(l =>
         l.workerId === currentUser.id && l.isMatch && l.shiftCompleted && !l.workerRated
       ).length;
       return awaiting + rejected + matched + needsRating;
     }
     const myVacIds = vacancies.filter(v => v.employerId === currentUser.id).map(v => v.id);
-    // Pending applications awaiting employer decision
     const pending = likes.filter(l =>
       myVacIds.includes(l.vacancyId) && l.workerLiked && l.employerLiked === null && !l.isMatch
     ).length;
-    // Active matches (not yet completed)
     const matched = likes.filter(l =>
       myVacIds.includes(l.vacancyId) && l.isMatch && !l.shiftCompleted
     ).length;
-    // Shift completed but employer hasn't rated yet
     const needsRating = likes.filter(l =>
       myVacIds.includes(l.vacancyId) && l.isMatch && l.shiftCompleted && !l.employerRated
     ).length;
     return pending + matched + needsRating;
   })();
 
-  // Hide the splash (web overlay or native splash) once tabs are rendered
-  useEffect(() => {
-    SplashScreen.hideAsync().catch(() => {});
-  }, []);
+  const tabs: TabDef[] = [
+    {
+      route: 'feed',
+      iconFilled: isWorker ? 'search' : 'briefcase',
+      iconOutline: isWorker ? 'search-outline' : 'briefcase-outline',
+      label: isWorker ? 'Поиск' : 'Вакансии',
+    },
+    { route: 'matches', iconFilled: 'people', iconOutline: 'people-outline', label: 'Мэтчи', badge: matchBadge },
+    { route: 'chats', iconFilled: 'chatbubble', iconOutline: 'chatbubble-outline', label: 'Чаты', badge: unreadCount },
+    { route: 'profile', iconFilled: 'person', iconOutline: 'person-outline', label: 'Профиль' },
+  ];
 
+  // ─── Swipe between tabs ───────────────────────────────────────────────────
+  const activeIndexRef = useRef(0);
+
+  useEffect(() => {
+    const seg = pathname.split('/').pop() ?? 'feed';
+    const idx = (TAB_ROUTES as readonly string[]).indexOf(seg);
+    if (idx >= 0) activeIndexRef.current = idx;
+  }, [pathname]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      // Only claim gesture if it's clearly horizontal (3:1 ratio, min 50px)
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dx) > Math.abs(gs.dy) * 3 && Math.abs(gs.dx) > 50,
+      onPanResponderRelease: (_, gs) => {
+        const idx = activeIndexRef.current;
+        if (gs.dx < -60 && idx < TAB_ROUTES.length - 1) {
+          router.navigate(`/(tabs)/${TAB_ROUTES[idx + 1]}` as any);
+        } else if (gs.dx > 60 && idx > 0) {
+          router.navigate(`/(tabs)/${TAB_ROUTES[idx - 1]}` as any);
+        }
+      },
+    })
+  ).current;
+
+  // ─── Tab bar height (keeps useBottomTabBarHeight working in screens) ──────
   const tabBarHeight = Platform.select({
-    ios: insets.bottom + 60,
-    android: insets.bottom + 60,
-    default: 66,
+    ios: insets.bottom + 64 + 12,   // pill height + bottom margin + safe area
+    android: insets.bottom + 64 + 12,
+    default: 76,
   });
 
   return (
-    <Tabs
-      initialRouteName="feed"
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          height: tabBarHeight,
-          paddingTop: 8,
-          paddingBottom: Platform.select({
-            ios: insets.bottom + 6,
-            android: insets.bottom + 6,
-            default: 8,
-          }),
-          backgroundColor: Colors.bg,
-          borderTopWidth: 1,
-          borderTopColor: Colors.divider,
-        },
-        tabBarShowLabel: false,
-      }}
-    >
-      {/* Home: search (worker) or vacancies (employer) */}
-      <Tabs.Screen
-        name="feed"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              iconActive={isWorker ? 'search' : 'briefcase'}
-              iconInactive={isWorker ? 'search-outline' : 'briefcase-outline'}
-              label={isWorker ? 'Поиск' : 'Вакансии'}
-              focused={focused}
-            />
-          ),
+    <View style={{ flex: 1 }} {...panResponder.panHandlers}>
+      <Tabs
+        initialRouteName="feed"
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: {
+            height: tabBarHeight,
+            backgroundColor: 'transparent',
+            borderTopWidth: 0,
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+          tabBarBackground: () => null,
+          tabBarShowLabel: false,
         }}
-      />
-
-      {/* Hide the old index redirect from the tab bar */}
-      <Tabs.Screen name="index" options={{ href: null }} />
-
-      {/* Saved — hidden from tab bar */}
-      <Tabs.Screen name="saved" options={{ href: null }} />
-
-      {/* Matches */}
-      <Tabs.Screen
-        name="matches"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              iconActive="people"
-              iconInactive="people-outline"
-              label="Мэтчи"
-              focused={focused}
-              badge={matchBadge}
-            />
-          ),
-        }}
-      />
-
-      {/* Chats */}
-      <Tabs.Screen
-        name="chats"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              iconActive="chatbubble"
-              iconInactive="chatbubble-outline"
-              label="Чаты"
-              focused={focused}
-              badge={unreadCount}
-            />
-          ),
-        }}
-      />
-
-      {/* Profile */}
-      <Tabs.Screen
-        name="profile"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              iconActive="person"
-              iconInactive="person-outline"
-              label="Профиль"
-              focused={focused}
-            />
-          ),
-        }}
-      />
-    </Tabs>
+        tabBar={(props) => (
+          <FloatingTabBar
+            state={props.state}
+            navigation={props.navigation}
+            tabs={tabs}
+          />
+        )}
+      >
+        <Tabs.Screen name="feed" options={{ tabBarIcon: () => null }} />
+        <Tabs.Screen name="index" options={{ href: null }} />
+        <Tabs.Screen name="saved" options={{ href: null }} />
+        <Tabs.Screen name="matches" options={{ tabBarIcon: () => null }} />
+        <Tabs.Screen name="chats" options={{ tabBarIcon: () => null }} />
+        <Tabs.Screen name="profile" options={{ tabBarIcon: () => null }} />
+      </Tabs>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  tabItem: { alignItems: 'center', gap: 2, minWidth: 52 },
-  tabLabel: { fontSize: 10, fontWeight: '600', textAlign: 'center' },
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
+const fS = StyleSheet.create({
+  pill: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    height: 64,
+    borderRadius: 28,
+    backgroundColor: Colors.bg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    paddingVertical: 8,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.primary,
+    opacity: 0.5,
+  },
+  labelActive: {
+    opacity: 1,
+  },
   badge: {
-    position: 'absolute', top: -4, right: -8,
-    backgroundColor: Colors.primary, borderRadius: 100,
-    minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: Colors.primary,
+    borderRadius: 100,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
   },
   badgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
 });
