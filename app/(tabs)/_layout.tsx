@@ -1,13 +1,14 @@
-import React, { useEffect, useRef } from 'react';
-import { Tabs, usePathname, useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import { Tabs } from 'expo-router';
 import {
-  Platform, View, Text, StyleSheet, PanResponder, Dimensions,
+  Platform, View, Text, StyleSheet, PanResponder, Dimensions, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
+import { BlurView } from 'expo-blur';
 import { Colors } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 
@@ -25,6 +26,9 @@ interface TabDef {
   badge?: number;
 }
 
+const PILL_PADDING = 6;   // paddingHorizontal on the pill
+const INDICATOR_MARGIN = 4; // gap between indicator and tab slot edge
+
 function FloatingTabBar({
   state,
   navigation,
@@ -36,12 +40,42 @@ function FloatingTabBar({
 }) {
   const insets = useSafeAreaInsets();
   const screenWidth = Dimensions.get('window').width;
+  const [pillWidth, setPillWidth] = useState(0);
 
-  // Always-fresh handler ref — PanResponder is created once but reads latest state
+  // Animated value = floating-point tab index (e.g. 1.5 while sliding)
+  const animIndex = useRef(new Animated.Value(0)).current;
+
+  // Which of our tabs is currently focused
+  const focusedTabIdx = Math.max(0, tabs.findIndex(t => {
+    const ri = state.routes.findIndex((r: any) => r.name === t.route);
+    return ri === state.index;
+  }));
+
+  useEffect(() => {
+    Animated.spring(animIndex, {
+      toValue: focusedTabIdx,
+      tension: 85,
+      friction: 11,
+      useNativeDriver: true,
+    }).start();
+  }, [focusedTabIdx]);
+
+  // Indicator geometry
+  const tabSlotWidth = pillWidth > 0
+    ? (pillWidth - PILL_PADDING * 2) / tabs.length
+    : 80;
+  const indicatorW = tabSlotWidth - INDICATOR_MARGIN * 2;
+
+  const indicatorX = animIndex.interpolate({
+    inputRange: tabs.map((_, i) => i),
+    outputRange: tabs.map((_, i) => PILL_PADDING + INDICATOR_MARGIN + i * tabSlotWidth),
+    extrapolate: 'clamp',
+  });
+
+  // Always-fresh pointer handler (PanResponder closure is stale by design)
   const handleRef = useRef<(pageX: number) => void>(() => {});
   handleRef.current = (pageX: number) => {
-    // pill: left=16 + paddingHorizontal=6 on each side
-    const pillLeft = 16 + 6;
+    const pillLeft = 16 + PILL_PADDING;
     const pillInnerWidth = screenWidth - pillLeft * 2;
     const relX = pageX - pillLeft;
     const idx = Math.max(0, Math.min(tabs.length - 1, Math.floor(relX / (pillInnerWidth / tabs.length))));
@@ -60,7 +94,7 @@ function FloatingTabBar({
     }),
   ).current;
 
-  // Web: PanResponder doesn't intercept mouse events — add explicit handlers
+  // Web: PanResponder doesn't intercept mouse — add explicit handlers
   const webHandlers = Platform.OS === 'web' ? {
     onMouseDown: (e: any) => handleRef.current(e.pageX ?? e.clientX ?? 0),
     onMouseMove: (e: any) => { if (e.buttons > 0) handleRef.current(e.pageX ?? e.clientX ?? 0); },
@@ -69,36 +103,54 @@ function FloatingTabBar({
   } : {};
 
   return (
+    // Outer: shadow (overflow:hidden would clip Android elevation)
     <View
-      style={[fS.pill, { bottom: insets.bottom + 12 }]}
+      style={[fS.pillShadow, { bottom: insets.bottom + 12 }]}
+      onLayout={(e) => setPillWidth(e.nativeEvent.layout.width)}
       {...panResponder.panHandlers}
       {...webHandlers}
     >
-      {tabs.map((tab) => {
-        const routeIndex = state.routes.findIndex((r: any) => r.name === tab.route);
-        const focused = routeIndex >= 0 && state.index === routeIndex;
-        return (
-          <View key={tab.route} style={fS.tabItem}>
-            <View style={[fS.tabInner, focused && fS.tabInnerActive]}>
-              <View>
-                <Ionicons
-                  name={focused ? tab.iconFilled : tab.iconOutline}
-                  size={22}
-                  color={Colors.primary}
-                />
-                {tab.badge && tab.badge > 0 ? (
-                  <View style={fS.badge}>
-                    <Text style={fS.badgeText}>{tab.badge > 9 ? '9+' : tab.badge}</Text>
-                  </View>
-                ) : null}
+      {/* Inner: clips blur + indicator to rounded shape */}
+      <View style={fS.pillClip}>
+        {/* Frosted glass background */}
+        <BlurView intensity={72} tint="light" style={StyleSheet.absoluteFill} />
+        {/* Semi-transparent overlay for contrast on dark content */}
+        <View style={fS.pillTint} />
+
+        {/* Sliding active indicator */}
+        {pillWidth > 0 && (
+          <Animated.View
+            style={[fS.indicator, { width: indicatorW, transform: [{ translateX: indicatorX }] }]}
+          />
+        )}
+
+        {/* Tab items — rendered on top of indicator */}
+        <View style={fS.tabsRow}>
+          {tabs.map((tab) => {
+            const routeIndex = state.routes.findIndex((r: any) => r.name === tab.route);
+            const focused = routeIndex >= 0 && state.index === routeIndex;
+            return (
+              <View key={tab.route} style={fS.tabItem}>
+                <View>
+                  <Ionicons
+                    name={focused ? tab.iconFilled : tab.iconOutline}
+                    size={22}
+                    color={Colors.primary}
+                  />
+                  {tab.badge && tab.badge > 0 ? (
+                    <View style={fS.badge}>
+                      <Text style={fS.badgeText}>{tab.badge > 9 ? '9+' : tab.badge}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={[fS.label, focused && fS.labelActive]}>
+                  {tab.label}
+                </Text>
               </View>
-              <Text style={[fS.label, focused && fS.labelActive]}>
-                {tab.label}
-              </Text>
-            </View>
-          </View>
-        );
-      })}
+            );
+          })}
+        </View>
+      </View>
     </View>
   );
 }
@@ -212,37 +264,51 @@ export default function TabLayout() {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const fS = StyleSheet.create({
-  pill: {
+  // Outer view: carries the shadow (can't use overflow:hidden here on Android)
+  pillShadow: {
     position: 'absolute',
     left: 16,
     right: 16,
     height: 64,
     borderRadius: 28,
-    backgroundColor: Colors.bg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.13,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  // Inner view: clips blur + indicator to pill shape
+  pillClip: {
+    flex: 1,
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.75)',
+  },
+  pillTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+  },
+  // Sliding orange indicator
+  indicator: {
+    position: 'absolute',
+    top: 10,     // (64 - 44) / 2
+    height: 44,
+    borderRadius: 20,
+    backgroundColor: Colors.primaryLight,
+  },
+  // Row of tab items, laid on top of the indicator
+  tabsRow: {
+    ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.10,
-    shadowRadius: 16,
-    elevation: 10,
+    paddingHorizontal: PILL_PADDING,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  tabInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
     gap: 3,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-  },
-  tabInnerActive: {
-    backgroundColor: Colors.primaryLight,
   },
   label: {
     fontSize: 10,
