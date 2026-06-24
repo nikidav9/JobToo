@@ -53,19 +53,26 @@ function FloatingTabBar({
 
   const panResponder = useRef(
     PanResponder.create({
-      // Claim ALL touches on the pill so sliding works
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      // Navigate on first touch (tap) and on every move (slide)
       onPanResponderGrant: (e) => handleRef.current(e.nativeEvent.pageX),
       onPanResponderMove: (e) => handleRef.current(e.nativeEvent.pageX),
     }),
   ).current;
 
+  // Web: PanResponder doesn't intercept mouse events — add explicit handlers
+  const webHandlers = Platform.OS === 'web' ? {
+    onMouseDown: (e: any) => handleRef.current(e.pageX ?? e.clientX ?? 0),
+    onMouseMove: (e: any) => { if (e.buttons > 0) handleRef.current(e.pageX ?? e.clientX ?? 0); },
+    onTouchStart: (e: any) => handleRef.current(e.touches?.[0]?.pageX ?? 0),
+    onTouchMove: (e: any) => handleRef.current(e.touches?.[0]?.pageX ?? 0),
+  } : {};
+
   return (
     <View
       style={[fS.pill, { bottom: insets.bottom + 12 }]}
       {...panResponder.panHandlers}
+      {...webHandlers}
     >
       {tabs.map((tab) => {
         const routeIndex = state.routes.findIndex((r: any) => r.name === tab.route);
