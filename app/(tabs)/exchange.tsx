@@ -253,6 +253,14 @@ function WorkerExchange() {
     <FlatList
       data={bulletins}
       keyExtractor={b => b.id}
+      ListHeaderComponent={
+        <View style={xS.workerChatHeader}>
+          <View style={xS.workerChatChip}>
+            <Ionicons name="chatbubbles-outline" size={14} color={Colors.primary} />
+            <Text style={xS.workerChatChipTxt}>Чат</Text>
+          </View>
+        </View>
+      }
       contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: tabBarHeight + 16 }}
       showsVerticalScrollIndicator={false}
       refreshControl={
@@ -304,7 +312,7 @@ function WorkerExchange() {
             >
               {responding === b.id
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={xS.respondBtnTxt}>{alreadyResponded ? '💬 Открыть чат' : '✉️ Откликнуться'}</Text>
+                : <Text style={xS.respondBtnTxt}>{alreadyResponded ? 'Открыть чат' : 'Откликнуться'}</Text>
               }
             </TouchableOpacity>
           </View>
@@ -829,6 +837,15 @@ const xS = StyleSheet.create({
   cancelTxt: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
   submitBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
   submitTxt: { fontSize: 14, fontWeight: '700', color: '#fff' },
+
+  // Worker chat header
+  workerChatHeader: { marginBottom: 4 },
+  workerChatChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+    backgroundColor: Colors.primaryLight, borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 7,
+  },
+  workerChatChipTxt: { fontSize: 13, fontWeight: '700', color: Colors.primary },
 
   // Empty state
   emptyWrap: { alignItems: 'center', paddingTop: 80, gap: 12 },

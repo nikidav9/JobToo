@@ -103,7 +103,15 @@ function FloatingTabBar({
   } : {};
 
   return (
-    // Outer: shadow (overflow:hidden would clip Android elevation)
+    <>
+    {/* White background covering safe-area gap under the pill */}
+    {insets.bottom > 0 && (
+      <View style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: insets.bottom + 12, backgroundColor: '#fff',
+      }} />
+    )}
+    {/* Outer: shadow (overflow:hidden would clip Android elevation) */}
     <View
       style={[fS.pillShadow, { bottom: insets.bottom + 12 }]}
       onLayout={(e) => setPillWidth(e.nativeEvent.layout.width)}
@@ -152,6 +160,7 @@ function FloatingTabBar({
         </View>
       </View>
     </View>
+    </>
   );
 }
 
@@ -290,7 +299,7 @@ const fS = StyleSheet.create({
   },
   pillTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
   },
   // Sliding orange indicator
   indicator: {

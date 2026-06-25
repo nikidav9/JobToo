@@ -510,7 +510,6 @@ const styles = StyleSheet.create({
 
   descText: {
     fontSize: 14, color: Colors.textSecondary, lineHeight: 22,
-    backgroundColor: Colors.surface, borderRadius: 12, padding: 14,
   },
 
   employerCard: {
