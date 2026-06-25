@@ -1532,10 +1532,10 @@ function WorkerPermMode() {
     );
   };
 
-  const emptyMessages: Record<PermTab, { icon: string; title: string; sub: string }> = {
-    open:     { icon: '🔍', title: 'Нет открытых вакансий', sub: 'Попробуйте изменить фильтры' },
-    applied:  { icon: '📨', title: 'Нет откликов', sub: 'Откликайтесь на вакансии во вкладке «Открытые»' },
-    rejected: { icon: '😔', title: 'Отказов нет', sub: 'Это хорошо! Продолжайте откликаться' },
+  const emptyMessages: Record<PermTab, { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; sub: string }> = {
+    open:     { icon: 'search-outline', title: 'Нет открытых вакансий', sub: 'Попробуйте изменить фильтры' },
+    applied:  { icon: 'paper-plane-outline', title: 'Нет откликов', sub: 'Откликайтесь на вакансии во вкладке «Открытые»' },
+    rejected: { icon: 'close-circle-outline', title: 'Отказов нет', sub: 'Это хорошо! Продолжайте откликаться' },
   };
 
   return (
@@ -1609,7 +1609,7 @@ function WorkerPermMode() {
 
       {shownVacancies.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={{ fontSize: 48 }}>{emptyMessages[tab].icon}</Text>
+          <Ionicons name={emptyMessages[tab].icon} size={48} color={Colors.textMuted} />
           <Text style={styles.emptyTitle}>{emptyMessages[tab].title}</Text>
           <Text style={styles.emptySubtitle}>{emptyMessages[tab].sub}</Text>
         </View>
@@ -1788,7 +1788,7 @@ function EmployerHome() {
         {mode === 'shift' ? (
           shown.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={{ fontSize: 52 }}>📋</Text>
+              <Ionicons name="document-text-outline" size={52} color={Colors.textMuted} />
               <Text style={styles.emptyTitle}>Нет активных вакансий</Text>
               <Text style={styles.emptySubtitle}>Создайте первую вакансию</Text>
               <TouchableOpacity style={styles.createBtn} onPress={() => router.push('/create-vacancy')}>
@@ -1853,7 +1853,7 @@ function EmployerHome() {
         ) : (
           shownPerm.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={{ fontSize: 52 }}>💼</Text>
+              <Ionicons name="briefcase-outline" size={52} color={Colors.textMuted} />
               <Text style={styles.emptyTitle}>Нет постоянных вакансий</Text>
               <Text style={styles.emptySubtitle}>Создайте первую вакансию на постоянную работу</Text>
               <TouchableOpacity style={[styles.createBtn, { borderColor: '#7C3AED' }]} onPress={() => router.push('/create-perm-vacancy')}>
