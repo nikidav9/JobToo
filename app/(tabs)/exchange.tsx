@@ -295,13 +295,32 @@ function WorkerSlotCard({
 
 // ─── Worker view ──────────────────────────────────────────────────────────────
 
+type WorkerSection = 'vacancies' | 'myslots';
+
 function WorkerExchange() {
   const router = useRouter();
-  const { currentUser, bulletins, refreshBulletins, chats, refreshChats, showToast } = useApp();
+  const { currentUser, bulletins, refreshBulletins, chats, refreshChats, workerSlots, refreshWorkerSlots, showToast } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
+  const [section, setSection] = useState<WorkerSection>('vacancies');
   const [refreshing, setRefreshing] = useState(false);
   const [responding, setResponding] = useState<string | null>(null);
   const [viewsMarked, setViewsMarked] = useState(false);
+
+  // Slot form state
+  const [showSlotForm, setShowSlotForm] = useState(false);
+  const [submittingSlot, setSubmittingSlot] = useState(false);
+  const [closingSlotIds, setClosingSlotIds] = useState<Set<string>>(new Set());
+  const [slotWorkType, setSlotWorkType] = useState('');
+  const [slotDate, setSlotDate] = useState<Date>(() => new Date());
+  const [slotTimeStart, setSlotTimeStart] = useState<Date>(() => { const d = new Date(); d.setHours(8, 0, 0, 0); return d; });
+  const [slotTimeEnd, setSlotTimeEnd] = useState<Date>(() => { const d = new Date(); d.setHours(17, 0, 0, 0); return d; });
+  const [slotMetro, setSlotMetro] = useState('');
+  const [slotComment, setSlotComment] = useState('');
+  const [slotPickerMode, setSlotPickerMode] = useState<PickerMode>(null);
+  const [slotIosPickerVisible, setSlotIosPickerVisible] = useState(false);
+  const [slotTempDate, setSlotTempDate] = useState<Date>(new Date());
+  const [slotMetroPicker, setSlotMetroPicker] = useState(false);
+  const [slotWorkTypePicker, setSlotWorkTypePicker] = useState(false);
 
   useEffect(() => {
     if (!viewsMarked && bulletins.length > 0) {
@@ -312,7 +331,7 @@ function WorkerExchange() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refreshBulletins();
+    await Promise.all([refreshBulletins(), refreshWorkerSlots()]);
     setRefreshing(false);
   };
 
@@ -335,66 +354,366 @@ function WorkerExchange() {
     }
   };
 
+  const openSlotPicker = (mode: PickerMode) => {
+    if (!mode) return;
+    const val = mode === 'date' ? slotDate : mode === 'timeStart' ? slotTimeStart : slotTimeEnd;
+    setSlotTempDate(val);
+    if (Platform.OS === 'ios') { setSlotPickerMode(mode); setSlotIosPickerVisible(true); }
+    else setSlotPickerMode(mode);
+  };
+
+  const applySlotPickerDate = (mode: PickerMode, date: Date) => {
+    if (mode === 'date') setSlotDate(date);
+    else if (mode === 'timeStart') setSlotTimeStart(date);
+    else if (mode === 'timeEnd') setSlotTimeEnd(date);
+  };
+
+  const onSlotAndroidChange = (event: DateTimePickerEvent, date?: Date) => {
+    setSlotPickerMode(null);
+    if (event.type === 'dismissed' || !date) return;
+    applySlotPickerDate(slotPickerMode, date);
+  };
+
+  const onSlotIOSChange = (_: DateTimePickerEvent, date?: Date) => { if (date) setSlotTempDate(date); };
+  const confirmSlotIOS = () => { applySlotPickerDate(slotPickerMode, slotTempDate); setSlotIosPickerVisible(false); setSlotPickerMode(null); };
+
+  const slotPickerDateValue = slotPickerMode === 'date'
+    ? (Platform.OS === 'ios' ? slotTempDate : slotDate)
+    : slotPickerMode === 'timeStart'
+    ? (Platform.OS === 'ios' ? slotTempDate : slotTimeStart)
+    : (Platform.OS === 'ios' ? slotTempDate : slotTimeEnd);
+
+  const resetSlotForm = () => {
+    setSlotWorkType(''); setSlotDate(new Date());
+    setSlotTimeStart(() => { const d = new Date(); d.setHours(8, 0, 0, 0); return d; });
+    setSlotTimeEnd(() => { const d = new Date(); d.setHours(17, 0, 0, 0); return d; });
+    setSlotMetro(''); setSlotComment('');
+  };
+
+  const submitSlot = async () => {
+    if (!currentUser) return;
+    if (!slotWorkType.trim() || !slotMetro.trim()) {
+      showToast('Выберите специальность и метро', 'error');
+      return;
+    }
+    setSubmittingSlot(true);
+    try {
+      await dbCreateWorkerSlot({
+        workerId: currentUser.id,
+        workerName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+        workType: slotWorkType.trim(),
+        date: formatISODate(slotDate),
+        timeStart: formatTime(slotTimeStart),
+        timeEnd: formatTime(slotTimeEnd),
+        metro: slotMetro.trim(),
+        comment: slotComment.trim() || undefined,
+      });
+      await refreshWorkerSlots();
+      resetSlotForm();
+      setShowSlotForm(false);
+      showToast('Заявка опубликована!', 'success');
+    } catch {
+      showToast('Ошибка при публикации', 'error');
+    } finally {
+      setSubmittingSlot(false);
+    }
+  };
+
+  const closeSlot = (id: string) => {
+    if (closingSlotIds.has(id)) return;
+    setClosingSlotIds(prev => new Set([...prev, id]));
+    dbCloseWorkerSlot(id)
+      .then(() => refreshWorkerSlots().catch(() => {}))
+      .catch(() => showToast('Ошибка при закрытии', 'error'));
+  };
+
+  const myActiveSlots = workerSlots.filter(s => s.status === 'open' && !closingSlotIds.has(s.id));
+  const myClosedSlots = workerSlots.filter(s => s.status === 'closed' || closingSlotIds.has(s.id));
+
   return (
-    <FlatList
-      data={bulletins}
-      keyExtractor={b => b.id}
-      ListHeaderComponent={
-        <View style={xS.workerChatHeader}>
-          <View style={xS.workerChatChip}>
-            <Ionicons name="chatbubbles-outline" size={14} color={Colors.primary} />
-            <Text style={xS.workerChatChipTxt}>Чат</Text>
-          </View>
+    <View style={{ flex: 1 }}>
+      {/* ── Tab bar ── */}
+      <View style={xS.segWrap}>
+        <View style={xS.segControl}>
+          <TouchableOpacity
+            style={[xS.segBtn, section === 'vacancies' && xS.segBtnActive]}
+            onPress={() => setSection('vacancies')}
+            activeOpacity={0.8}
+          >
+            <Text style={[xS.segTxt, section === 'vacancies' && xS.segTxtActive]}>Вакансии</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[xS.segBtn, section === 'myslots' && xS.segBtnActive]}
+            onPress={() => setSection('myslots')}
+            activeOpacity={0.8}
+          >
+            <Text style={[xS.segTxt, section === 'myslots' && xS.segTxtActive]}>Мои смены</Text>
+          </TouchableOpacity>
         </View>
-      }
-      contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: tabBarHeight + 16 }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />
-      }
-      ListEmptyComponent={
-        <View style={xS.emptyWrap}>
-          <Ionicons name="document-text-outline" size={48} color={Colors.textMuted} />
-          <Text style={xS.emptyTitle}>Объявлений пока нет</Text>
-          <Text style={xS.emptySubtitle}>Работодатели публикуют срочные объявления здесь</Text>
-        </View>
-      }
-      renderItem={({ item: b }) => {
-        const alreadyResponded = chats.some(c => c.bulletinId === b.id && c.workerId === currentUser?.id);
-        return (
-          <BulletinChatCard
-            key={b.id}
-            b={b}
-            respondBtn={
-              <TouchableOpacity
-                style={[xS.respondBtn, alreadyResponded && xS.respondBtnDone]}
-                onPress={() => respond(b)}
-                disabled={responding === b.id}
-                activeOpacity={0.8}
-              >
-                {responding === b.id
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={xS.respondBtnTxt}>{alreadyResponded ? 'Открыть чат' : 'Откликнуться'}</Text>
+      </View>
+
+      {section === 'vacancies' ? (
+        <FlatList
+          data={bulletins}
+          keyExtractor={b => b.id}
+          contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: tabBarHeight + 16 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />
+          }
+          ListEmptyComponent={
+            <View style={xS.emptyWrap}>
+              <Ionicons name="document-text-outline" size={48} color={Colors.textMuted} />
+              <Text style={xS.emptyTitle}>Объявлений пока нет</Text>
+              <Text style={xS.emptySubtitle}>Работодатели публикуют срочные объявления здесь</Text>
+            </View>
+          }
+          renderItem={({ item: b }) => {
+            const alreadyResponded = chats.some(c => c.bulletinId === b.id && c.workerId === currentUser?.id);
+            return (
+              <BulletinChatCard
+                key={b.id}
+                b={b}
+                respondBtn={
+                  <TouchableOpacity
+                    style={[xS.respondBtn, alreadyResponded && xS.respondBtnDone]}
+                    onPress={() => respond(b)}
+                    disabled={responding === b.id}
+                    activeOpacity={0.8}
+                  >
+                    {responding === b.id
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Text style={xS.respondBtnTxt}>{alreadyResponded ? 'Открыть чат' : 'Откликнуться'}</Text>
+                    }
+                  </TouchableOpacity>
                 }
+              />
+            );
+          }}
+        />
+      ) : (
+        /* ── Мои смены ── */
+        <ScrollView
+          contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: tabBarHeight + 16 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
+        >
+          {!showSlotForm ? (
+            <TouchableOpacity style={xS.createBtn} onPress={() => setShowSlotForm(true)} activeOpacity={0.8}>
+              <Ionicons name="add-circle" size={20} color={Colors.primary} />
+              <Text style={xS.createBtnTxt}>Опубликовать заявку</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={xS.formCard}>
+              <Text style={xS.formTitle}>Я ищу смену</Text>
+              <Text style={xS.formLabel}>Специальность *</Text>
+              <TouchableOpacity style={[xS.formInput, { justifyContent: 'center' }]} onPress={() => setSlotWorkTypePicker(true)} activeOpacity={0.8}>
+                <Text style={{ color: slotWorkType ? Colors.textPrimary : Colors.textMuted, fontSize: 15 }}>
+                  {slotWorkType || 'Выберите специальность...'}
+                </Text>
               </TouchableOpacity>
-            }
-          />
-        );
-      }}
-    />
+              <Text style={xS.formLabel}>Дата *</Text>
+              {Platform.OS === 'web' ? (
+                <View style={xS.pickerField}>
+                  <Ionicons name="calendar-outline" size={18} color={Colors.textMuted} />
+                  {/* @ts-ignore */}
+                  <input type="date" value={formatISODate(slotDate)} min={formatISODate(new Date())}
+                    onChange={(e: any) => e.target.value && applySlotPickerDate('date', parseISOToDate(e.target.value))}
+                    style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+                </View>
+              ) : (
+                <TouchableOpacity style={xS.pickerField} onPress={() => openSlotPicker('date')} activeOpacity={0.8}>
+                  <Ionicons name="calendar-outline" size={18} color={Colors.textMuted} />
+                  <Text style={xS.pickerValue}>{formatDisplayDate(slotDate)}</Text>
+                  <Text style={xS.pickerArrow}>›</Text>
+                </TouchableOpacity>
+              )}
+              {Platform.OS === 'android' && slotPickerMode === 'date' ? (
+                <DateTimePicker value={slotDate} mode="date" display="calendar" minimumDate={new Date()} onChange={onSlotAndroidChange} />
+              ) : null}
+              <Text style={xS.formLabel}>Время *</Text>
+              {Platform.OS === 'web' ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={[xS.pickerField, { flex: 1 }]}>
+                    <Ionicons name="time-outline" size={18} color={Colors.textMuted} />
+                    {/* @ts-ignore */}
+                    <input type="time" value={formatTime(slotTimeStart)}
+                      onChange={(e: any) => e.target.value && applySlotPickerDate('timeStart', parseTimeToDate(e.target.value))}
+                      style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+                  </View>
+                  <Text style={xS.timeSep}>–</Text>
+                  <View style={[xS.pickerField, { flex: 1 }]}>
+                    <Ionicons name="time-outline" size={18} color={Colors.textMuted} />
+                    {/* @ts-ignore */}
+                    <input type="time" value={formatTime(slotTimeEnd)}
+                      onChange={(e: any) => e.target.value && applySlotPickerDate('timeEnd', parseTimeToDate(e.target.value))}
+                      style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openSlotPicker('timeStart')} activeOpacity={0.8}>
+                      <Ionicons name="time-outline" size={18} color={Colors.textMuted} />
+                      <Text style={xS.pickerValue}>{formatTime(slotTimeStart)}</Text>
+                    </TouchableOpacity>
+                    <Text style={xS.timeSep}>–</Text>
+                    <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openSlotPicker('timeEnd')} activeOpacity={0.8}>
+                      <Ionicons name="time-outline" size={18} color={Colors.textMuted} />
+                      <Text style={xS.pickerValue}>{formatTime(slotTimeEnd)}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {Platform.OS === 'android' && slotPickerMode === 'timeStart' ? (
+                    <DateTimePicker value={slotTimeStart} mode="time" display="spinner" is24Hour onChange={onSlotAndroidChange} />
+                  ) : null}
+                  {Platform.OS === 'android' && slotPickerMode === 'timeEnd' ? (
+                    <DateTimePicker value={slotTimeEnd} mode="time" display="spinner" is24Hour onChange={onSlotAndroidChange} />
+                  ) : null}
+                </>
+              )}
+              <Text style={xS.formLabel}>Метро *</Text>
+              <TouchableOpacity style={[xS.formInput, { justifyContent: 'center' }]} onPress={() => setSlotMetroPicker(true)} activeOpacity={0.8}>
+                <Text style={{ color: slotMetro ? Colors.textPrimary : Colors.textMuted, fontSize: 15 }}>
+                  {slotMetro || 'Выберите станцию...'}
+                </Text>
+              </TouchableOpacity>
+              <Text style={xS.formLabel}>Комментарий (необязательно)</Text>
+              <TextInput style={[xS.formInput, { minHeight: 60, textAlignVertical: 'top' }]}
+                value={slotComment} onChangeText={setSlotComment}
+                placeholder="Опыт, пожелания к месту работы..." placeholderTextColor={Colors.textMuted} multiline />
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <TouchableOpacity style={xS.cancelBtn} onPress={() => { setShowSlotForm(false); resetSlotForm(); }} activeOpacity={0.8}>
+                  <Text style={xS.cancelTxt}>Отмена</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[xS.submitBtn, submittingSlot && { opacity: 0.6 }]} onPress={submitSlot} disabled={submittingSlot} activeOpacity={0.8}>
+                  {submittingSlot ? <ActivityIndicator size="small" color="#fff" /> : <Text style={xS.submitTxt}>Опубликовать</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {myActiveSlots.length > 0 && (
+            <>
+              <Text style={xS.sectionLabel}>Активные</Text>
+              {myActiveSlots.map(s => (
+                <View key={s.id} style={[xS.card, xS.cardEmployer]}>
+                  <View style={xS.cardHeader}>
+                    <Text style={xS.workType}>{s.workType}</Text>
+                    <TouchableOpacity style={xS.closeBtn} onPress={() => closeSlot(s.id)} activeOpacity={0.8}>
+                      <Text style={xS.closeBtnTxt}>Закрыть</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={xS.metaRow}>
+                    <View style={xS.metaItem}>
+                      <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
+                      <Text style={xS.metaTxt}>{formatDateShort(s.date)}</Text>
+                    </View>
+                    <View style={xS.metaItem}>
+                      <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+                      <Text style={xS.metaTxt}>{s.timeStart}–{s.timeEnd}</Text>
+                    </View>
+                    <View style={xS.metaItem}>
+                      <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
+                      <Text style={xS.metaTxt}>м. {s.metro}</Text>
+                    </View>
+                  </View>
+                  {s.comment ? <Text style={xS.comment} numberOfLines={2}>{s.comment}</Text> : null}
+                </View>
+              ))}
+            </>
+          )}
+
+          {myClosedSlots.length > 0 && (
+            <>
+              <Text style={xS.sectionLabel}>Закрытые</Text>
+              {myClosedSlots.map(s => (
+                <View key={s.id} style={[xS.card, xS.cardClosed]}>
+                  <Text style={[xS.workType, { color: Colors.textMuted }]}>{s.workType}</Text>
+                  <View style={xS.metaRow}>
+                    <View style={xS.metaItem}>
+                      <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
+                      <Text style={xS.metaTxt}>{formatDateShort(s.date)}</Text>
+                    </View>
+                    <View style={xS.metaItem}>
+                      <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+                      <Text style={xS.metaTxt}>{s.timeStart}–{s.timeEnd}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+
+          {myActiveSlots.length === 0 && !showSlotForm && (
+            <View style={xS.emptyWrap}>
+              <Text style={xS.emptyTitle}>Нет активных заявок</Text>
+              <Text style={xS.emptySubtitle}>Опубликуйте заявку — работодатели увидят вас в списке</Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
+
+      {/* Pickers for slot form */}
+      <MetroStationPicker
+        visible={slotMetroPicker}
+        selectedStation={slotMetro || null}
+        onSelect={s => setSlotMetro(s ?? '')}
+        onClose={() => setSlotMetroPicker(false)}
+      />
+      <WorkTypePicker
+        visible={slotWorkTypePicker}
+        selectedLabel={slotWorkType || null}
+        onSelect={label => setSlotWorkType(label)}
+        onClose={() => setSlotWorkTypePicker(false)}
+      />
+      {Platform.OS === 'ios' && (
+        <Modal visible={slotIosPickerVisible} transparent animationType="slide">
+          <View style={xS.iosOverlay}>
+            <View style={xS.iosSheet}>
+              <View style={xS.iosSheetHeader}>
+                <TouchableOpacity onPress={() => { setSlotIosPickerVisible(false); setSlotPickerMode(null); }}>
+                  <Text style={xS.iosCancelText}>Отмена</Text>
+                </TouchableOpacity>
+                <Text style={xS.iosSheetTitle}>
+                  {slotPickerMode === 'date' ? 'Дата смены' : slotPickerMode === 'timeStart' ? 'Начало смены' : 'Конец смены'}
+                </Text>
+                <TouchableOpacity onPress={confirmSlotIOS}>
+                  <Text style={xS.iosDoneText}>Готово</Text>
+                </TouchableOpacity>
+              </View>
+              {slotPickerMode && (
+                <View style={xS.iosPickerWrap}>
+                  <DateTimePicker
+                    value={slotPickerDateValue ?? new Date()}
+                    mode={slotPickerMode === 'date' ? 'date' : 'time'}
+                    display="spinner"
+                    is24Hour
+                    minimumDate={slotPickerMode === 'date' ? new Date() : undefined}
+                    onChange={onSlotIOSChange}
+                    style={xS.iosPicker}
+                    textColor="#111111"
+                  />
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
+    </View>
   );
 }
 
 // ─── Employer view ────────────────────────────────────────────────────────────
 
-type EmployerSection = 'chat' | 'active';
+type EmployerSection = 'chat' | 'workers' | 'active';
 
 function EmployerExchange() {
-  const { currentUser, bulletins, refreshBulletins, showToast } = useApp();
+  const { currentUser, bulletins, refreshBulletins, chats, refreshChats, workerSlots, refreshWorkerSlots, showToast } = useApp();
   const router = useRouter();
   const tabBarHeight = useBottomTabBarHeight();
   const [section, setSection] = useState<EmployerSection>('chat');
   const [refreshing, setRefreshing] = useState(false);
+  const [contacting, setContacting] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
@@ -444,7 +763,7 @@ function EmployerExchange() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refreshBulletins();
+    await Promise.all([refreshBulletins(), refreshWorkerSlots()]);
     setRefreshing(false);
   };
 
@@ -521,6 +840,13 @@ function EmployerExchange() {
             <Text style={[xS.segTxt, section === 'chat' && xS.segTxtActive]}>Чат</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={[xS.segBtn, section === 'workers' && xS.segBtnActive]}
+            onPress={() => setSection('workers')}
+            activeOpacity={0.8}
+          >
+            <Text style={[xS.segTxt, section === 'workers' && xS.segTxtActive]}>Работники</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[xS.segBtn, section === 'active' && xS.segBtnActive]}
             onPress={() => setSection('active')}
             activeOpacity={0.8}
@@ -545,6 +871,47 @@ function EmployerExchange() {
             </View>
           ) : (
             bulletins.map(b => <BulletinChatCard key={b.id} b={b} />)
+          )
+        )}
+
+        {/* ── Работники: список доступных работников ── */}
+        {section === 'workers' && (
+          workerSlots.length === 0 ? (
+            <View style={xS.emptyWrap}>
+              <Ionicons name="people-outline" size={48} color={Colors.textMuted} />
+              <Text style={xS.emptyTitle}>Нет доступных работников</Text>
+              <Text style={xS.emptySubtitle}>Работники, ищущие смену, появятся здесь</Text>
+            </View>
+          ) : (
+            workerSlots.map(slot => {
+              const alreadyContacted = chats.some(c => c.workerSlotId === slot.id && c.employerId === currentUser?.id);
+              return (
+                <WorkerSlotCard
+                  key={slot.id}
+                  slot={slot}
+                  alreadyContacted={alreadyContacted}
+                  contacting={contacting === slot.id}
+                  onContact={async () => {
+                    if (!currentUser || contacting) return;
+                    if (alreadyContacted) {
+                      const existing = chats.find(c => c.workerSlotId === slot.id && c.employerId === currentUser.id);
+                      if (existing) router.push({ pathname: '/chat-room', params: { chatId: existing.id } });
+                      return;
+                    }
+                    setContacting(slot.id);
+                    try {
+                      const chatId = await dbContactWorkerSlot(slot.id, currentUser.id);
+                      refreshChats().catch(() => {});
+                      router.push({ pathname: '/chat-room', params: { chatId } });
+                    } catch {
+                      showToast('Ошибка при открытии чата', 'error');
+                    } finally {
+                      setContacting(null);
+                    }
+                  }}
+                />
+              );
+            })
           )
         )}
 
@@ -851,6 +1218,13 @@ const xS = StyleSheet.create({
     marginTop: 2,
   },
   chatAvatarClosed: { backgroundColor: '#9CA3AF' },
+  chatAvatarWorker: { backgroundColor: '#059669' },
+  availBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start',
+    backgroundColor: '#ECFDF5', borderRadius: 100,
+    paddingHorizontal: 7, paddingVertical: 2,
+  },
+  availBadgeTxt: { fontSize: 11, fontWeight: '600', color: '#059669' },
   chatAvatarTxt: { fontSize: 16, fontWeight: '800', color: '#fff' },
   chatNameLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
   chatCompany: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, flex: 1, marginRight: 6 },
