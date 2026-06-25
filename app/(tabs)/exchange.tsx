@@ -456,13 +456,6 @@ function EmployerExchange() {
           >
             <Text style={[xS.segTxt, section === 'active' && xS.segTxtActive]}>Активные</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={xS.segBtn}
-            onPress={() => router.push('/create-vacancy')}
-            activeOpacity={0.8}
-          >
-            <Text style={xS.segTxt} numberOfLines={2}>{'Опубликовать\nподработку'}</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
