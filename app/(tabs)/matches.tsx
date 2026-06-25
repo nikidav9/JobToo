@@ -389,8 +389,10 @@ function EmployerMatches() {
 
       refreshAll().catch(() => {});
 
-      if (result.matched || result.chatId) {
+      if (result.matched) {
         notifyWorkerGotMatch(like.workerId, vac?.company ?? currentUser.company ?? '', vac?.title ?? '').catch(() => {});
+      }
+      if (result.matched || result.chatId) {
         showToast(`Мэтч с ${workerName}!`, 'success');
         router.push({ pathname: '/chat-room', params: { chatId: result.chatId } });
       } else {

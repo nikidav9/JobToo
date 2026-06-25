@@ -11,7 +11,7 @@ import { Colors, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { Bulletin, WorkerSlot } from '@/constants/types';
 import { dbRespondToBulletin, dbCreateBulletin, dbCloseBulletin, dbIncrementBulletinViews, dbCreateWorkerSlot, dbCloseWorkerSlot, dbContactWorkerSlot } from '@/services/db';
-import { notifyAllWorkersNewBulletin } from '@/services/notifications';
+import { notifyAllWorkersNewBulletin, notifyEmployerNewMessage, notifyWorkerNewMessage } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { METRO_LINES } from '@/constants/metro';
 import { NotifBell } from '@/components/ui/NotifBell';
@@ -345,6 +345,12 @@ function WorkerExchange() {
     setResponding(b.id);
     try {
       const chatId = await dbRespondToBulletin(b.id, currentUser.id);
+      notifyEmployerNewMessage(
+        b.employerId,
+        `${currentUser.firstName} ${currentUser.lastName}`,
+        `Откликнулся на объявление «${b.workType}»`,
+        chatId,
+      ).catch(() => {});
       refreshChats().catch(() => {});
       router.push({ pathname: '/chat-room', params: { chatId } });
     } catch {
@@ -901,6 +907,12 @@ function EmployerExchange() {
                     setContacting(slot.id);
                     try {
                       const chatId = await dbContactWorkerSlot(slot.id, currentUser.id);
+                      notifyWorkerNewMessage(
+                        slot.workerId,
+                        currentUser.company ?? `${currentUser.firstName} ${currentUser.lastName}`,
+                        `Работодатель хочет обсудить смену «${slot.workType}»`,
+                        chatId,
+                      ).catch(() => {});
                       refreshChats().catch(() => {});
                       router.push({ pathname: '/chat-room', params: { chatId } });
                     } catch {
