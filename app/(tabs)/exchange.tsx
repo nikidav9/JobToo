@@ -9,8 +9,8 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useRouter } from 'expo-router';
 import { Colors, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { Bulletin } from '@/constants/types';
-import { dbRespondToBulletin, dbCreateBulletin, dbCloseBulletin, dbIncrementBulletinViews } from '@/services/db';
+import { Bulletin, WorkerSlot } from '@/constants/types';
+import { dbRespondToBulletin, dbCreateBulletin, dbCloseBulletin, dbIncrementBulletinViews, dbCreateWorkerSlot, dbCloseWorkerSlot, dbContactWorkerSlot } from '@/services/db';
 import { notifyAllWorkersNewBulletin } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { METRO_LINES } from '@/constants/metro';
@@ -228,6 +228,66 @@ function BulletinChatCard({
         </View>
         {b.comment ? <Text style={xS.comment} numberOfLines={3}>{b.comment}</Text> : null}
         {respondBtn}
+      </View>
+    </View>
+  );
+}
+
+// ─── Worker slot card (for employer's "Работники" tab) ───────────────────────
+
+function WorkerSlotCard({
+  slot,
+  onContact,
+  contacting,
+  alreadyContacted,
+}: {
+  slot: WorkerSlot;
+  onContact: () => void;
+  contacting: boolean;
+  alreadyContacted: boolean;
+}) {
+  const initial = (slot.workerName || '?').charAt(0).toUpperCase();
+  return (
+    <View style={xS.chatCard}>
+      <View style={xS.chatSenderRow}>
+        <View style={[xS.chatAvatar, xS.chatAvatarWorker]}>
+          <Text style={xS.chatAvatarTxt}>{initial}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <View style={xS.chatNameLine}>
+            <Text style={xS.chatCompany} numberOfLines={1}>{slot.workerName}</Text>
+            <Text style={xS.chatTimestamp}>{formatDateShort(slot.date)}</Text>
+          </View>
+          <View style={xS.availBadge}>
+            <Ionicons name="checkmark-circle" size={10} color="#059669" />
+            <Text style={xS.availBadgeTxt}>Ищет смену</Text>
+          </View>
+        </View>
+      </View>
+      <View style={xS.chatBubble}>
+        <Text style={xS.chatWorkType}>{slot.workType}</Text>
+        <View style={xS.metaRow}>
+          <View style={xS.metaItem}>
+            <Ionicons name="time-outline" size={12} color={Colors.textMuted} />
+            <Text style={xS.metaTxt}>{slot.timeStart}–{slot.timeEnd}</Text>
+          </View>
+          <View style={xS.metaItem}>
+            <Ionicons name="subway-outline" size={12} color={Colors.textMuted} />
+            <Text style={xS.metaTxt}>м. {slot.metro}</Text>
+          </View>
+        </View>
+        {slot.comment ? <Text style={xS.comment} numberOfLines={2}>{slot.comment}</Text> : null}
+        <TouchableOpacity
+          style={[xS.respondBtn, alreadyContacted && xS.respondBtnDone]}
+          onPress={onContact}
+          disabled={contacting}
+          activeOpacity={0.8}
+        >
+          {contacting
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Text style={xS.respondBtnTxt}>{alreadyContacted ? 'Открыть чат' : 'Написать'}</Text>
+          }
+        </TouchableOpacity>
       </View>
     </View>
   );
