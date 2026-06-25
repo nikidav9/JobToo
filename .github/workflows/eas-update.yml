@@ -26,7 +26,11 @@ jobs:
         run: npm ci
 
       - name: Publish EAS Update
-        run: eas update --channel production --message "${{ github.event.head_commit.message }}" --non-interactive
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          SAFE_MSG=$(echo "$COMMIT_MSG" | head -1 | cut -c1-100)
+          eas update --channel production --message "$SAFE_MSG" --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
