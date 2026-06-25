@@ -326,7 +326,7 @@ function VacancyViewersModal({ vacancyId, onClose }: { vacancyId: string; onClos
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={wS.modalContainer}>
         <View style={wS.modalHeader}>
-          <Text style={wS.modalTitle}>👁 Просмотрели вакансию</Text>
+          <Text style={wS.modalTitle}>Просмотрели вакансию</Text>
           <TouchableOpacity onPress={onClose} style={wS.closeBtn}>
             <Ionicons name="close" size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
@@ -673,7 +673,7 @@ function WorkerListModal({
                           disabled={isLoading}
                           onPress={() => openChat(like)}
                         >
-                          <Text style={wS.chatBtnTxt}>💬 Написать</Text>
+                          <Text style={wS.chatBtnTxt}>Написать</Text>
                         </TouchableOpacity>
                       ) : type === 'rejected' ? (
                         <TouchableOpacity
@@ -681,7 +681,7 @@ function WorkerListModal({
                           disabled={isLoading}
                           onPress={() => onDiscussRejected(like)}
                         >
-                          <Text style={wS.chatBtnTxt}>💬 Написать</Text>
+                          <Text style={wS.chatBtnTxt}>Написать</Text>
                         </TouchableOpacity>
                       ) : (
                         <>
@@ -690,7 +690,7 @@ function WorkerListModal({
                             disabled={isLoading}
                             onPress={() => openOrCreateChat(like)}
                           >
-                            <Text style={wS.chatBtnTxt}>💬 Написать</Text>
+                            <Text style={wS.chatBtnTxt}>Написать</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={[wS.acceptBtn, isLoading && { opacity: 0.5 }]}
@@ -735,8 +735,8 @@ const wS = StyleSheet.create({
   rejectionReason: { fontSize: 11, color: Colors.red, marginTop: 3, fontStyle: 'italic' },
   acceptBtn: { backgroundColor: Colors.primary, borderRadius: 100, paddingVertical: 9, paddingHorizontal: 14, alignItems: 'center' },
   acceptBtnTxt: { fontSize: 13, color: '#fff', fontWeight: '700' },
-  chatBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 100, paddingVertical: 9, alignItems: 'center' },
-  chatBtnTxt: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
+  chatBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  chatBtnTxt: { fontSize: 13, color: '#fff', fontWeight: '600' },
   modalContainer: { flex: 1, backgroundColor: Colors.bg },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.divider },
   modalTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
@@ -1142,11 +1142,6 @@ function WorkerFeed() {
                         <Text style={[styles.slotValue, { color: Colors.blue }]}>{vacancyStats.applicants}</Text>
                         <Text style={styles.slotLabel}>Отклики</Text>
                       </View>
-                      <View style={[styles.slotInfo, styles.slotInfoBordered]}>
-                        <Ionicons name="close-circle-outline" size={20} color={Colors.red} />
-                        <Text style={[styles.slotValue, { color: Colors.red }]}>{vacancyStats.rejected}</Text>
-                        <Text style={styles.slotLabel}>Отклонено</Text>
-                      </View>
                       <View style={styles.slotInfo}>
                         <Ionicons name="eye-outline" size={20} color={Colors.green} />
                         <Text style={[styles.slotValue, { color: Colors.green }]}>{vacancyStats.views}</Text>
@@ -1166,47 +1161,49 @@ function WorkerFeed() {
                 </TouchableOpacity>
               </View>
             </Animated.View>
-
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.actionUndo, !dateHistory.length && { opacity: 0.3 }]}
-                onPress={doUndo}
-                disabled={!dateHistory.length || swiping}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="arrow-undo" size={22} color={Colors.textMuted} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.actionSkip]}
-                onPress={() => doSkip(0.5)}
-                disabled={swiping}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="close" size={28} color={Colors.red} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.actionSave]}
-                onPress={() => doMessageRef.current?.()}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="chatbubble-outline" size={22} color={Colors.textSecondary} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.actionWant]}
-                onPress={() => doWant(0.5)}
-                disabled={swiping}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="heart" size={26} color="#fff" />
-              </TouchableOpacity>
-            </View>
           </>
         )}
       </View>
+
+      {currentCard ? (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionUndo, !dateHistory.length && { opacity: 0.3 }]}
+            onPress={doUndo}
+            disabled={!dateHistory.length || swiping}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="arrow-undo" size={22} color={Colors.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionSkip]}
+            onPress={() => doSkip(0.5)}
+            disabled={swiping}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={28} color={Colors.red} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionSave]}
+            onPress={() => doMessageRef.current?.()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="chatbubble-outline" size={22} color={Colors.textSecondary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionWant]}
+            onPress={() => doWant(0.5)}
+            disabled={swiping}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="heart" size={26} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <MetroStationPicker
         visible={filterPicker}
@@ -1804,7 +1801,7 @@ function EmployerHome() {
               <View key={v.id} style={styles.vacCard}>
                 <View style={styles.vacTop}>
                   <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                    {v.isUrgent ? <View style={styles.urgentBadge}><Text style={styles.urgentText}>🔥</Text></View> : null}
+                    {v.isUrgent ? <View style={styles.urgentBadge}><Ionicons name="flash" size={12} color="#D97706" /></View> : null}
                     <Text style={styles.vacTitle} numberOfLines={1}>{v.title}</Text>
                   </View>
                   <View style={styles.vacTopRight}>
@@ -1814,7 +1811,7 @@ function EmployerHome() {
                       activeOpacity={0.7}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Text style={styles.editBtnText}>✏️</Text>
+                      <Ionicons name="create-outline" size={16} color={Colors.textSecondary} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.editBtn, { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}
@@ -1822,12 +1819,12 @@ function EmployerHome() {
                       activeOpacity={0.7}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Text style={styles.editBtnText}>🗑</Text>
+                      <Ionicons name="trash-outline" size={16} color={Colors.red} />
                     </TouchableOpacity>
                   </View>
                 </View>
-                <Text style={styles.vacMeta}>🚇 {v.metroStation} · 📅 {formatDate(v.date)} · ⏰ {v.timeStart}–{v.timeEnd}</Text>
-                {v.address ? <Text style={styles.vacAddress}>📍 {v.address}</Text> : null}
+                <Text style={styles.vacMeta}>м. {v.metroStation} · {formatDate(v.date)} · {v.timeStart}–{v.timeEnd}</Text>
+                {v.address ? <Text style={styles.vacAddress}>{v.address}</Text> : null}
 
                 <View style={styles.statsRow}>
                   {[
@@ -1879,7 +1876,7 @@ function EmployerHome() {
                       activeOpacity={0.7}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Text style={styles.editBtnText}>✏️</Text>
+                      <Ionicons name="create-outline" size={16} color={Colors.textSecondary} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.editBtn, { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}
@@ -1887,13 +1884,13 @@ function EmployerHome() {
                       activeOpacity={0.7}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Text style={styles.editBtnText}>🗑</Text>
+                      <Ionicons name="trash-outline" size={16} color={Colors.red} />
                     </TouchableOpacity>
                   </View>
                 </View>
                 <View style={pS.permMetaRow}>
-                  {v.metroStation ? <Text style={styles.vacMeta}>🚇 {v.metroStation}</Text> : null}
-                  {v.address ? <Text style={styles.vacAddress}>📍 {v.address}</Text> : null}
+                  {v.metroStation ? <Text style={styles.vacMeta}>м. {v.metroStation}</Text> : null}
+                  {v.address ? <Text style={styles.vacAddress}>{v.address}</Text> : null}
                 </View>
                 <View style={pS.permTagsRow}>
                   <View style={pS.permSalaryTag}>
@@ -2199,7 +2196,7 @@ const styles = StyleSheet.create({
   dcNumActive: { color: '#fff' },
   dcCnt: { fontSize: 10, fontWeight: '700', color: Colors.primary },
   dcCntActive: { color: 'rgba(255,255,255,0.8)' },
-  cardArea: { flex: 1, flexDirection: 'column', paddingHorizontal: 10, paddingTop: 10, paddingBottom: 8 },
+  cardArea: { flex: 1, flexDirection: 'column', paddingHorizontal: 10, paddingTop: 10 },
   ghost1: { position: 'absolute', left: 10, right: 10, top: 10, bottom: 90, backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.97 }, { translateY: 6 }], opacity: 0.5, zIndex: 0, ...Shadow.card },
   ghost2: { position: 'absolute', left: 10, right: 10, top: 10, bottom: 90, backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.94 }, { translateY: 12 }], opacity: 0.3, zIndex: 0, ...Shadow.card },
   cardAnimated: { flex: 1, marginBottom: 8, zIndex: 1, elevation: 10 },
@@ -2244,9 +2241,9 @@ const styles = StyleSheet.create({
   detailHintText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
   detailHintArrow: { fontSize: 14, color: Colors.primary },
   actions: {
-    height: 74,
+    height: 82,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
-    paddingHorizontal: 16, backgroundColor: 'transparent',
+    paddingHorizontal: 16, paddingBottom: 8, backgroundColor: 'transparent',
   },
   actionBtn: { borderRadius: 100, alignItems: 'center', justifyContent: 'center', ...Shadow.card },
   actionUndo: { width: 52, height: 52, backgroundColor: Colors.bg, borderWidth: 1.5, borderColor: Colors.inputBorder },
