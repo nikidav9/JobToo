@@ -267,7 +267,7 @@ function WorkerExchange() {
 // ─── Employer view ────────────────────────────────────────────────────────────
 
 function EmployerExchange() {
-  const { currentUser, bulletins, refreshBulletins, showToast } = useApp();
+  const { currentUser, bulletins, refreshBulletins, chats, showToast } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -458,20 +458,27 @@ function EmployerExchange() {
         {activeBulletins.length > 0 ? (
           <>
             <Text style={xS.sectionLabel}>Активные</Text>
-            {activeBulletins.map(b => (
-              <View key={b.id} style={[xS.card, xS.cardEmployer]}>
-                <View style={xS.cardHeader}>
-                  <Text style={xS.workType}>{b.workType}</Text>
-                  <TouchableOpacity style={xS.closeBtn} onPress={() => closeBulletin(b.id)} activeOpacity={0.8}>
-                    <Text style={xS.closeBtnTxt}>Закрыть</Text>
-                  </TouchableOpacity>
+            {activeBulletins.map(b => {
+              const responseCount = chats.filter(c => c.bulletinId === b.id).length;
+              return (
+                <View key={b.id} style={[xS.card, xS.cardEmployer]}>
+                  <View style={xS.cardHeader}>
+                    <Text style={xS.workType}>{b.workType}</Text>
+                    <TouchableOpacity style={xS.closeBtn} onPress={() => closeBulletin(b.id)} activeOpacity={0.8}>
+                      <Text style={xS.closeBtnTxt}>Закрыть</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={xS.metaTxt}>📅 {formatDateShort(b.date)}  ⏰ {b.timeStart}–{b.timeEnd}</Text>
+                  <Text style={xS.metaTxt}>🚇 м. {b.metro}</Text>
+                  <Text style={xS.addressTxt} numberOfLines={1}>📍 {b.address}</Text>
+                  {b.comment ? <Text style={xS.comment} numberOfLines={2}>{b.comment}</Text> : null}
+                  <View style={xS.viewsRow}>
+                    <Ionicons name="eye-outline" size={14} color={Colors.textMuted} />
+                    <Text style={xS.viewsTxt}>{responseCount}</Text>
+                  </View>
                 </View>
-                <Text style={xS.metaTxt}>📅 {formatDateShort(b.date)}  ⏰ {b.timeStart}–{b.timeEnd}</Text>
-                <Text style={xS.metaTxt}>🚇 м. {b.metro}</Text>
-                <Text style={xS.addressTxt} numberOfLines={1}>📍 {b.address}</Text>
-                {b.comment ? <Text style={xS.comment} numberOfLines={2}>{b.comment}</Text> : null}
-              </View>
-            ))}
+              );
+            })}
           </>
         ) : (
           !showForm && (
@@ -486,13 +493,20 @@ function EmployerExchange() {
         {closedBulletins.length > 0 ? (
           <>
             <Text style={xS.sectionLabel}>Закрытые</Text>
-            {closedBulletins.map(b => (
-              <View key={b.id} style={[xS.card, xS.cardClosed]}>
-                <Text style={[xS.workType, { color: Colors.textMuted }]}>{b.workType}</Text>
-                <Text style={xS.metaTxt}>📅 {formatDateShort(b.date)}  ⏰ {b.timeStart}–{b.timeEnd}</Text>
-                <Text style={xS.metaTxt}>🚇 м. {b.metro}</Text>
-              </View>
-            ))}
+            {closedBulletins.map(b => {
+              const responseCount = chats.filter(c => c.bulletinId === b.id).length;
+              return (
+                <View key={b.id} style={[xS.card, xS.cardClosed]}>
+                  <Text style={[xS.workType, { color: Colors.textMuted }]}>{b.workType}</Text>
+                  <Text style={xS.metaTxt}>📅 {formatDateShort(b.date)}  ⏰ {b.timeStart}–{b.timeEnd}</Text>
+                  <Text style={xS.metaTxt}>🚇 м. {b.metro}</Text>
+                  <View style={xS.viewsRow}>
+                    <Ionicons name="eye-outline" size={14} color={Colors.textMuted} />
+                    <Text style={xS.viewsTxt}>{responseCount}</Text>
+                  </View>
+                </View>
+              );
+            })}
           </>
         ) : null}
       </ScrollView>
@@ -653,6 +667,10 @@ const xS = StyleSheet.create({
   stationRowSelected: { backgroundColor: Colors.primaryLight },
   lineDot: { width: 12, height: 12, borderRadius: 6 },
   stationName: { fontSize: 15, color: Colors.textPrimary },
+
+  // Views counter
+  viewsRow: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 2 },
+  viewsTxt: { fontSize: 12, color: Colors.textMuted, fontWeight: '500' },
 
   // Picker fields
   pickerField: {
