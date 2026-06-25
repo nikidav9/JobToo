@@ -14,6 +14,7 @@ import { notifyAllWorkersNewBulletin } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { METRO_LINES } from '@/constants/metro';
 import { NotifBell } from '@/components/ui/NotifBell';
+import { WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
 
 // ─── Metro picker ─────────────────────────────────────────────────────────────
 
@@ -76,6 +77,61 @@ function MetroStationPicker({
               </TouchableOpacity>
             )}
           />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Work type picker ─────────────────────────────────────────────────────────
+
+const WORK_TYPE_LIST = (Object.keys(WORK_TYPE_META) as (keyof typeof WORK_TYPE_META)[]).map(k => ({
+  key: k,
+  label: WORK_TYPE_META[k].label,
+  desc: WORK_TYPE_META[k].desc,
+}));
+
+function WorkTypePicker({
+  visible, selectedLabel, onSelect, onClose,
+}: {
+  visible: boolean;
+  selectedLabel: string | null;
+  onSelect: (label: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={xS.overlay}>
+        <View style={xS.sheet}>
+          <View style={xS.sheetHeader}>
+            <Text style={xS.sheetTitle}>Специальность</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={xS.sheetClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+            <View style={{ gap: 10, paddingBottom: 24 }}>
+              {WORK_TYPE_LIST.map(wt => {
+                const selected = selectedLabel === wt.label;
+                return (
+                  <TouchableOpacity
+                    key={wt.key}
+                    style={[xS.wtRow, selected && xS.wtRowSelected]}
+                    onPress={() => { onSelect(wt.label); onClose(); }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[xS.wtLabel, selected && xS.wtLabelSelected]}>{wt.label}</Text>
+                      <Text style={xS.wtDesc}>{wt.desc}</Text>
+                    </View>
+                    <View style={[xS.wtCircle, selected && xS.wtCircleSelected]}>
+                      {selected && <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -208,6 +264,7 @@ function EmployerExchange() {
   const [submitting, setSubmitting] = useState(false);
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
   const [metroPicker, setMetroPicker] = useState(false);
+  const [workTypePicker, setWorkTypePicker] = useState(false);
 
   const [workType, setWorkType] = useState('');
   const [date, setDate] = useState('');
@@ -293,8 +350,11 @@ function EmployerExchange() {
           <View style={xS.formCard}>
             <Text style={xS.formTitle}>Новое объявление</Text>
             <Text style={xS.formLabel}>Специальность *</Text>
-            <TextInput style={xS.formInput} value={workType} onChangeText={setWorkType}
-              placeholder="Напр.: кладовщик, грузчик, повар..." placeholderTextColor={Colors.textMuted} />
+            <TouchableOpacity style={[xS.formInput, { justifyContent: 'center' }]} onPress={() => setWorkTypePicker(true)} activeOpacity={0.8}>
+              <Text style={{ color: workType ? Colors.textPrimary : Colors.textMuted, fontSize: 15 }}>
+                {workType || 'Выберите специальность...'}
+              </Text>
+            </TouchableOpacity>
             <Text style={xS.formLabel}>Дата * (ГГГГ-ММ-ДД)</Text>
             <TextInput style={xS.formInput} value={date} onChangeText={setDate}
               placeholder="2024-06-25" placeholderTextColor={Colors.textMuted} keyboardType="numbers-and-punctuation" />
@@ -381,6 +441,12 @@ function EmployerExchange() {
         selectedStation={metro || null}
         onSelect={s => setMetro(s ?? '')}
         onClose={() => setMetroPicker(false)}
+      />
+      <WorkTypePicker
+        visible={workTypePicker}
+        selectedLabel={workType || null}
+        onSelect={label => setWorkType(label)}
+        onClose={() => setWorkTypePicker(false)}
       />
     </>
   );
@@ -492,4 +558,21 @@ const xS = StyleSheet.create({
   stationRowSelected: { backgroundColor: Colors.primaryLight },
   lineDot: { width: 12, height: 12, borderRadius: 6 },
   stationName: { fontSize: 15, color: Colors.textPrimary },
+
+  // Work type picker
+  wtRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: Colors.bg, borderRadius: 14,
+    padding: 16, borderWidth: 2, borderColor: Colors.inputBorder,
+  },
+  wtRowSelected: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  wtLabel: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
+  wtLabelSelected: { color: Colors.primary },
+  wtDesc: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },
+  wtCircle: {
+    width: 24, height: 24, borderRadius: 12,
+    borderWidth: 1.5, borderColor: Colors.inputBorder,
+    backgroundColor: Colors.bg, alignItems: 'center', justifyContent: 'center',
+  },
+  wtCircleSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
 });
