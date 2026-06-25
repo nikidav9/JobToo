@@ -410,22 +410,21 @@ function EmployerExchange() {
             onPress={() => setSection('exchange')}
             activeOpacity={0.8}
           >
-            <Text style={[xS.segTxt, section === 'exchange' && xS.segTxtActive]}>Биржа</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={xS.segBtn}
-            onPress={() => router.push('/create-vacancy')}
-            activeOpacity={0.8}
-          >
-            <Text style={xS.segTxt}>Подработка</Text>
-            <Ionicons name="arrow-forward-outline" size={11} color={Colors.textSecondary} />
+            <Text style={[xS.segTxt, section === 'exchange' && xS.segTxtActive]}>Чат</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[xS.segBtn, section === 'active' && xS.segBtnActive]}
             onPress={() => setSection('active')}
             activeOpacity={0.8}
           >
-            <Text style={[xS.segTxt, section === 'active' && xS.segTxtActive]}>Объявления</Text>
+            <Text style={[xS.segTxt, section === 'active' && xS.segTxtActive]}>Активные</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={xS.segBtn}
+            onPress={() => router.push('/create-vacancy')}
+            activeOpacity={0.8}
+          >
+            <Text style={xS.segTxt} numberOfLines={2}>{'Опубликовать\nподработку'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -572,7 +571,7 @@ function EmployerExchange() {
             ) : (
               <View style={xS.emptyWrap}>
                 <Text style={xS.emptyTitle}>Нет активных объявлений</Text>
-                <Text style={xS.emptySubtitle}>Перейдите во вкладку «Биржа» и опубликуйте объявление</Text>
+                <Text style={xS.emptySubtitle}>Перейдите во вкладку «Чат» и опубликуйте объявление</Text>
               </View>
             )}
             {closedBulletins.length > 0 && (
@@ -712,10 +711,11 @@ const xS = StyleSheet.create({
     elevation: 2,
   },
   segTxt: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: Colors.textSecondary,
     textAlign: 'center',
+    lineHeight: 15,
   },
   segTxtActive: {
     color: Colors.primary,
