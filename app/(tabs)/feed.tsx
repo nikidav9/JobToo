@@ -1789,11 +1789,20 @@ function EmployerHome() {
           shown.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="document-text-outline" size={52} color={Colors.textMuted} />
-              <Text style={styles.emptyTitle}>Нет активных вакансий</Text>
-              <Text style={styles.emptySubtitle}>Создайте первую вакансию</Text>
-              <TouchableOpacity style={styles.createBtn} onPress={() => router.push('/create-vacancy')}>
-                <Text style={styles.createBtnText}>+ Создать смену</Text>
-              </TouchableOpacity>
+              {tab === 'active' ? (
+                <>
+                  <Text style={styles.emptyTitle}>Нет активных вакансий</Text>
+                  <Text style={styles.emptySubtitle}>Создайте первую вакансию</Text>
+                  <TouchableOpacity style={styles.createBtn} onPress={() => router.push('/create-vacancy')}>
+                    <Text style={styles.createBtnText}>+ Создать смену</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.emptyTitle}>Нет закрытых вакансий</Text>
+                  <Text style={styles.emptySubtitle}>Здесь появятся завершённые смены</Text>
+                </>
+              )}
             </View>
           ) : (
             shown.map(v => (
@@ -1854,11 +1863,20 @@ function EmployerHome() {
           shownPerm.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="briefcase-outline" size={52} color={Colors.textMuted} />
-              <Text style={styles.emptyTitle}>Нет постоянных вакансий</Text>
-              <Text style={styles.emptySubtitle}>Создайте первую вакансию на постоянную работу</Text>
-              <TouchableOpacity style={[styles.createBtn, { borderColor: '#7C3AED' }]} onPress={() => router.push('/create-perm-vacancy')}>
-                <Text style={[styles.createBtnText, { color: '#7C3AED' }]}>+ Создать вакансию</Text>
-              </TouchableOpacity>
+              {tab === 'active' ? (
+                <>
+                  <Text style={styles.emptyTitle}>Нет постоянных вакансий</Text>
+                  <Text style={styles.emptySubtitle}>Создайте первую вакансию на постоянную работу</Text>
+                  <TouchableOpacity style={[styles.createBtn, { borderColor: '#7C3AED' }]} onPress={() => router.push('/create-perm-vacancy')}>
+                    <Text style={[styles.createBtnText, { color: '#7C3AED' }]}>+ Создать вакансию</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.emptyTitle}>Нет закрытых вакансий</Text>
+                  <Text style={styles.emptySubtitle}>Здесь появятся завершённые вакансии</Text>
+                </>
+              )}
             </View>
           ) : (
             shownPerm.map(v => (
