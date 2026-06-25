@@ -2241,9 +2241,8 @@ const styles = StyleSheet.create({
   detailHintText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
   detailHintArrow: { fontSize: 14, color: Colors.primary },
   actions: {
-    height: 82,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
-    paddingHorizontal: 16, paddingBottom: 8, backgroundColor: 'transparent',
+    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, backgroundColor: 'transparent',
   },
   actionBtn: { borderRadius: 100, alignItems: 'center', justifyContent: 'center', ...Shadow.card },
   actionUndo: { width: 52, height: 52, backgroundColor: Colors.bg, borderWidth: 1.5, borderColor: Colors.inputBorder },
