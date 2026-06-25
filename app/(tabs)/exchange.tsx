@@ -171,6 +171,42 @@ function formatDateShort(iso: string) {
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
+// ─── Shared bulletin card (read-only, for employer Чат view) ──────────────────
+
+function BulletinCard({ b }: { b: Bulletin }) {
+  return (
+    <View style={xS.card}>
+      <View style={xS.cardHeader}>
+        <View style={xS.urgentBadge}>
+          <Ionicons name="flash" size={11} color="#92400E" />
+          <Text style={xS.urgentTxt}>Срочно</Text>
+        </View>
+        <Text style={xS.company} numberOfLines={1}>{b.company}</Text>
+      </View>
+      <Text style={xS.workType}>{b.workType}</Text>
+      <View style={xS.metaRow}>
+        <View style={xS.metaItem}>
+          <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
+          <Text style={xS.metaTxt}>{formatDate(b.date)}</Text>
+        </View>
+        <View style={xS.metaItem}>
+          <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+          <Text style={xS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
+        </View>
+        <View style={xS.metaItem}>
+          <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
+          <Text style={xS.metaTxt}>м. {b.metro}</Text>
+        </View>
+      </View>
+      <View style={xS.metaItem}>
+        <Ionicons name="location-outline" size={13} color={Colors.textSecondary} />
+        <Text style={[xS.metaTxt, { flex: 1 }]} numberOfLines={2}>{b.address}</Text>
+      </View>
+      {b.comment ? <Text style={xS.comment} numberOfLines={3}>{b.comment}</Text> : null}
+    </View>
+  );
+}
+
 // ─── Worker view ──────────────────────────────────────────────────────────────
 
 function WorkerExchange() {
@@ -280,14 +316,15 @@ function WorkerExchange() {
 
 // ─── Employer view ────────────────────────────────────────────────────────────
 
-type EmployerSection = 'exchange' | 'active';
+type EmployerSection = 'chat' | 'active';
 
 function EmployerExchange() {
   const { currentUser, bulletins, refreshBulletins, showToast } = useApp();
   const router = useRouter();
   const tabBarHeight = useBottomTabBarHeight();
-  const [section, setSection] = useState<EmployerSection>('exchange');
+  const [section, setSection] = useState<EmployerSection>('chat');
   const [refreshing, setRefreshing] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
   const [metroPicker, setMetroPicker] = useState(false);
@@ -378,7 +415,7 @@ function EmployerExchange() {
         metro: metro.trim(),
       }).catch(() => {});
       resetForm();
-      setSection('active');
+      setShowForm(false);
       showToast('Объявление опубликовано!', 'success');
     } catch {
       showToast('Ошибка при публикации', 'error');
@@ -406,11 +443,11 @@ function EmployerExchange() {
       <View style={xS.segWrap}>
         <View style={xS.segControl}>
           <TouchableOpacity
-            style={[xS.segBtn, section === 'exchange' && xS.segBtnActive]}
-            onPress={() => setSection('exchange')}
+            style={[xS.segBtn, section === 'chat' && xS.segBtnActive]}
+            onPress={() => setSection('chat')}
             activeOpacity={0.8}
           >
-            <Text style={[xS.segTxt, section === 'exchange' && xS.segTxtActive]}>Чат</Text>
+            <Text style={[xS.segTxt, section === 'chat' && xS.segTxtActive]}>Чат</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[xS.segBtn, section === 'active' && xS.segBtnActive]}
@@ -434,103 +471,120 @@ function EmployerExchange() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
       >
-        {/* ── Биржа: форма публикации объявления ── */}
-        {section === 'exchange' && (
-          <View style={xS.formCard}>
-            <Text style={xS.formTitle}>Новое объявление</Text>
-            <Text style={xS.formLabel}>Специальность *</Text>
-            <TouchableOpacity style={[xS.formInput, { justifyContent: 'center' }]} onPress={() => setWorkTypePicker(true)} activeOpacity={0.8}>
-              <Text style={{ color: workType ? Colors.textPrimary : Colors.textMuted, fontSize: 15 }}>
-                {workType || 'Выберите специальность...'}
-              </Text>
-            </TouchableOpacity>
-            <Text style={xS.formLabel}>Дата *</Text>
-            {Platform.OS === 'web' ? (
-              <View style={xS.pickerField}>
-                <Text style={xS.pickerIcon}>📅</Text>
-                {/* @ts-ignore */}
-                <input type="date" value={formatISODate(selectedDate)} min={formatISODate(new Date())}
-                  onChange={(e: any) => e.target.value && applyPickerDate('date', parseISOToDate(e.target.value))}
-                  style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
-              </View>
-            ) : (
-              <TouchableOpacity style={xS.pickerField} onPress={() => openPicker('date')} activeOpacity={0.8}>
-                <Text style={xS.pickerIcon}>📅</Text>
-                <Text style={xS.pickerValue}>{formatDisplayDate(selectedDate)}</Text>
-                <Text style={xS.pickerArrow}>›</Text>
-              </TouchableOpacity>
-            )}
-            {Platform.OS === 'android' && pickerMode === 'date' ? (
-              <DateTimePicker value={selectedDate} mode="date" display="calendar" minimumDate={new Date()} onChange={onAndroidChange} />
-            ) : null}
-
-            <Text style={xS.formLabel}>Время *</Text>
-            {Platform.OS === 'web' ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={[xS.pickerField, { flex: 1 }]}>
-                  <Text style={xS.pickerIcon}>⏰</Text>
-                  {/* @ts-ignore */}
-                  <input type="time" value={formatTime(selectedTimeStart)}
-                    onChange={(e: any) => e.target.value && applyPickerDate('timeStart', parseTimeToDate(e.target.value))}
-                    style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
-                </View>
-                <Text style={xS.timeSep}>–</Text>
-                <View style={[xS.pickerField, { flex: 1 }]}>
-                  <Text style={xS.pickerIcon}>⏰</Text>
-                  {/* @ts-ignore */}
-                  <input type="time" value={formatTime(selectedTimeEnd)}
-                    onChange={(e: any) => e.target.value && applyPickerDate('timeEnd', parseTimeToDate(e.target.value))}
-                    style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
-                </View>
-              </View>
-            ) : (
-              <>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openPicker('timeStart')} activeOpacity={0.8}>
-                    <Text style={xS.pickerIcon}>⏰</Text>
-                    <Text style={xS.pickerValue}>{formatTime(selectedTimeStart)}</Text>
-                  </TouchableOpacity>
-                  <Text style={xS.timeSep}>–</Text>
-                  <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openPicker('timeEnd')} activeOpacity={0.8}>
-                    <Text style={xS.pickerIcon}>⏰</Text>
-                    <Text style={xS.pickerValue}>{formatTime(selectedTimeEnd)}</Text>
-                  </TouchableOpacity>
-                </View>
-                {Platform.OS === 'android' && pickerMode === 'timeStart' ? (
-                  <DateTimePicker value={selectedTimeStart} mode="time" display="spinner" is24Hour onChange={onAndroidChange} />
-                ) : null}
-                {Platform.OS === 'android' && pickerMode === 'timeEnd' ? (
-                  <DateTimePicker value={selectedTimeEnd} mode="time" display="spinner" is24Hour onChange={onAndroidChange} />
-                ) : null}
-              </>
-            )}
-            <Text style={xS.formLabel}>Метро *</Text>
-            <TouchableOpacity style={[xS.formInput, { justifyContent: 'center' }]} onPress={() => setMetroPicker(true)} activeOpacity={0.8}>
-              <Text style={{ color: metro ? Colors.textPrimary : Colors.textMuted, fontSize: 15 }}>
-                {metro || 'Выберите станцию...'}
-              </Text>
-            </TouchableOpacity>
-            <Text style={xS.formLabel}>Адрес *</Text>
-            <TextInput style={xS.formInput} value={address} onChangeText={setAddress}
-              placeholder="Улица, дом..." placeholderTextColor={Colors.textMuted} />
-            <Text style={xS.formLabel}>Комментарий (необязательно)</Text>
-            <TextInput style={[xS.formInput, { minHeight: 60, textAlignVertical: 'top' }]}
-              value={comment} onChangeText={setComment}
-              placeholder="Дополнительные требования..." placeholderTextColor={Colors.textMuted} multiline />
-            <TouchableOpacity
-              style={[xS.submitBtn, submitting && { opacity: 0.6 }, { marginTop: 4 }]}
-              onPress={submitBulletin}
-              disabled={submitting}
-              activeOpacity={0.8}
-            >
-              {submitting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={xS.submitTxt}>Опубликовать</Text>}
-            </TouchableOpacity>
-          </View>
+        {/* ── Чат: общая биржа объявлений ── */}
+        {section === 'chat' && (
+          bulletins.length === 0 ? (
+            <View style={xS.emptyWrap}>
+              <Text style={{ fontSize: 48 }}>📋</Text>
+              <Text style={xS.emptyTitle}>Объявлений пока нет</Text>
+              <Text style={xS.emptySubtitle}>Здесь появятся срочные объявления работодателей</Text>
+            </View>
+          ) : (
+            bulletins.map(b => <BulletinCard key={b.id} b={b} />)
+          )
         )}
 
-        {/* ── Активные объявления ── */}
+        {/* ── Активные: свои объявления + форма ── */}
         {section === 'active' && (
           <>
+            {!showForm ? (
+              <TouchableOpacity style={xS.createBtn} onPress={() => setShowForm(true)} activeOpacity={0.8}>
+                <Ionicons name="add-circle" size={20} color={Colors.primary} />
+                <Text style={xS.createBtnTxt}>Опубликовать объявление</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={xS.formCard}>
+                <Text style={xS.formTitle}>Новое объявление</Text>
+                <Text style={xS.formLabel}>Специальность *</Text>
+                <TouchableOpacity style={[xS.formInput, { justifyContent: 'center' }]} onPress={() => setWorkTypePicker(true)} activeOpacity={0.8}>
+                  <Text style={{ color: workType ? Colors.textPrimary : Colors.textMuted, fontSize: 15 }}>
+                    {workType || 'Выберите специальность...'}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={xS.formLabel}>Дата *</Text>
+                {Platform.OS === 'web' ? (
+                  <View style={xS.pickerField}>
+                    <Text style={xS.pickerIcon}>📅</Text>
+                    {/* @ts-ignore */}
+                    <input type="date" value={formatISODate(selectedDate)} min={formatISODate(new Date())}
+                      onChange={(e: any) => e.target.value && applyPickerDate('date', parseISOToDate(e.target.value))}
+                      style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+                  </View>
+                ) : (
+                  <TouchableOpacity style={xS.pickerField} onPress={() => openPicker('date')} activeOpacity={0.8}>
+                    <Text style={xS.pickerIcon}>📅</Text>
+                    <Text style={xS.pickerValue}>{formatDisplayDate(selectedDate)}</Text>
+                    <Text style={xS.pickerArrow}>›</Text>
+                  </TouchableOpacity>
+                )}
+                {Platform.OS === 'android' && pickerMode === 'date' ? (
+                  <DateTimePicker value={selectedDate} mode="date" display="calendar" minimumDate={new Date()} onChange={onAndroidChange} />
+                ) : null}
+
+                <Text style={xS.formLabel}>Время *</Text>
+                {Platform.OS === 'web' ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={[xS.pickerField, { flex: 1 }]}>
+                      <Text style={xS.pickerIcon}>⏰</Text>
+                      {/* @ts-ignore */}
+                      <input type="time" value={formatTime(selectedTimeStart)}
+                        onChange={(e: any) => e.target.value && applyPickerDate('timeStart', parseTimeToDate(e.target.value))}
+                        style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+                    </View>
+                    <Text style={xS.timeSep}>–</Text>
+                    <View style={[xS.pickerField, { flex: 1 }]}>
+                      <Text style={xS.pickerIcon}>⏰</Text>
+                      {/* @ts-ignore */}
+                      <input type="time" value={formatTime(selectedTimeEnd)}
+                        onChange={(e: any) => e.target.value && applyPickerDate('timeEnd', parseTimeToDate(e.target.value))}
+                        style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openPicker('timeStart')} activeOpacity={0.8}>
+                        <Text style={xS.pickerIcon}>⏰</Text>
+                        <Text style={xS.pickerValue}>{formatTime(selectedTimeStart)}</Text>
+                      </TouchableOpacity>
+                      <Text style={xS.timeSep}>–</Text>
+                      <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openPicker('timeEnd')} activeOpacity={0.8}>
+                        <Text style={xS.pickerIcon}>⏰</Text>
+                        <Text style={xS.pickerValue}>{formatTime(selectedTimeEnd)}</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {Platform.OS === 'android' && pickerMode === 'timeStart' ? (
+                      <DateTimePicker value={selectedTimeStart} mode="time" display="spinner" is24Hour onChange={onAndroidChange} />
+                    ) : null}
+                    {Platform.OS === 'android' && pickerMode === 'timeEnd' ? (
+                      <DateTimePicker value={selectedTimeEnd} mode="time" display="spinner" is24Hour onChange={onAndroidChange} />
+                    ) : null}
+                  </>
+                )}
+                <Text style={xS.formLabel}>Метро *</Text>
+                <TouchableOpacity style={[xS.formInput, { justifyContent: 'center' }]} onPress={() => setMetroPicker(true)} activeOpacity={0.8}>
+                  <Text style={{ color: metro ? Colors.textPrimary : Colors.textMuted, fontSize: 15 }}>
+                    {metro || 'Выберите станцию...'}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={xS.formLabel}>Адрес *</Text>
+                <TextInput style={xS.formInput} value={address} onChangeText={setAddress}
+                  placeholder="Улица, дом..." placeholderTextColor={Colors.textMuted} />
+                <Text style={xS.formLabel}>Комментарий (необязательно)</Text>
+                <TextInput style={[xS.formInput, { minHeight: 60, textAlignVertical: 'top' }]}
+                  value={comment} onChangeText={setComment}
+                  placeholder="Дополнительные требования..." placeholderTextColor={Colors.textMuted} multiline />
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity style={xS.cancelBtn} onPress={() => { setShowForm(false); resetForm(); }} activeOpacity={0.8}>
+                    <Text style={xS.cancelTxt}>Отмена</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[xS.submitBtn, submitting && { opacity: 0.6 }]} onPress={submitBulletin} disabled={submitting} activeOpacity={0.8}>
+                    {submitting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={xS.submitTxt}>Опубликовать</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             {activeBulletins.length > 0 ? (
               <>
                 <Text style={xS.sectionLabel}>Активные</Text>
@@ -569,11 +623,14 @@ function EmployerExchange() {
                 ))}
               </>
             ) : (
-              <View style={xS.emptyWrap}>
-                <Text style={xS.emptyTitle}>Нет активных объявлений</Text>
-                <Text style={xS.emptySubtitle}>Перейдите во вкладку «Чат» и опубликуйте объявление</Text>
-              </View>
+              !showForm && (
+                <View style={xS.emptyWrap}>
+                  <Text style={xS.emptyTitle}>Нет активных объявлений</Text>
+                  <Text style={xS.emptySubtitle}>Опубликуйте срочное объявление — все работники получат уведомление</Text>
+                </View>
+              )
             )}
+
             {closedBulletins.length > 0 && (
               <>
                 <Text style={xS.sectionLabel}>Закрытые</Text>
@@ -695,12 +752,10 @@ const xS = StyleSheet.create({
   },
   segBtn: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
     borderRadius: 11,
-    gap: 4,
   },
   segBtnActive: {
     backgroundColor: Colors.bg,
@@ -755,6 +810,14 @@ const xS = StyleSheet.create({
   // Close button
   closeBtn: { backgroundColor: '#FEE2E2', borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6 },
   closeBtnTxt: { fontSize: 12, fontWeight: '700', color: Colors.red },
+
+  // Create button
+  createBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 100,
+    paddingVertical: 14, backgroundColor: Colors.primaryLight,
+  },
+  createBtnTxt: { fontSize: 15, fontWeight: '700', color: Colors.primary },
 
   // Form
   formCard: {
