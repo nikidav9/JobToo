@@ -655,7 +655,7 @@ try {
             [$company, $workType, $date, $metro] = [$args[0], $args[1], $args[2], $args[3]];
             $workers = sb_select('jm_users', ['role' => 'eq.worker', 'push_token' => 'not.is.null'], 'id,push_token');
             if (empty($workers)) { $data = ['sent' => 0]; break; }
-            $title = '⚡ Срочно нужен сотрудник!';
+            $title = 'Новая подработка в Бирже';
             $body = "$company: $workType — м. $metro, $date";
             $tokens = array_column($workers, 'push_token');
             $sent = 0;
