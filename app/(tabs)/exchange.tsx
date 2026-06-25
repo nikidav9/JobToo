@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, FlatList, ActivityIndicator, RefreshControl, Modal,
+  TextInput, FlatList, ActivityIndicator, RefreshControl, Modal, Platform,
 } from 'react-native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useRouter } from 'expo-router';
@@ -15,6 +16,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { METRO_LINES } from '@/constants/metro';
 import { NotifBell } from '@/components/ui/NotifBell';
 import { WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
+
+// ─── Date/time helpers ────────────────────────────────────────────────────────
+
+function pad2(n: number) { return n.toString().padStart(2, '0'); }
+function formatDisplayDate(d: Date) { return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()}`; }
+function formatISODate(d: Date) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function formatTime(d: Date) { return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+
+type PickerMode = 'date' | 'timeStart' | 'timeEnd' | null;
 
 // ─── Metro picker ─────────────────────────────────────────────────────────────
 
@@ -267,12 +277,45 @@ function EmployerExchange() {
   const [workTypePicker, setWorkTypePicker] = useState(false);
 
   const [workType, setWorkType] = useState('');
-  const [date, setDate] = useState('');
-  const [timeStart, setTimeStart] = useState('');
-  const [timeEnd, setTimeEnd] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  const [selectedTimeStart, setSelectedTimeStart] = useState<Date>(() => { const d = new Date(); d.setHours(8, 0, 0, 0); return d; });
+  const [selectedTimeEnd, setSelectedTimeEnd] = useState<Date>(() => { const d = new Date(); d.setHours(17, 0, 0, 0); return d; });
   const [metro, setMetro] = useState('');
   const [address, setAddress] = useState('');
   const [comment, setComment] = useState('');
+
+  const [pickerMode, setPickerMode] = useState<PickerMode>(null);
+  const [iosPickerVisible, setIosPickerVisible] = useState(false);
+  const [tempDate, setTempDate] = useState<Date>(new Date());
+
+  const openPicker = (mode: PickerMode) => {
+    if (!mode) return;
+    const val = mode === 'date' ? selectedDate : mode === 'timeStart' ? selectedTimeStart : selectedTimeEnd;
+    setTempDate(val);
+    if (Platform.OS === 'ios') { setPickerMode(mode); setIosPickerVisible(true); }
+    else setPickerMode(mode);
+  };
+
+  const applyPickerDate = (mode: PickerMode, date: Date) => {
+    if (mode === 'date') setSelectedDate(date);
+    else if (mode === 'timeStart') setSelectedTimeStart(date);
+    else if (mode === 'timeEnd') setSelectedTimeEnd(date);
+  };
+
+  const onAndroidChange = (event: DateTimePickerEvent, date?: Date) => {
+    setPickerMode(null);
+    if (event.type === 'dismissed' || !date) return;
+    applyPickerDate(pickerMode, date);
+  };
+
+  const onIOSChange = (_: DateTimePickerEvent, date?: Date) => { if (date) setTempDate(date); };
+  const confirmIOS = () => { applyPickerDate(pickerMode, tempDate); setIosPickerVisible(false); setPickerMode(null); };
+
+  const pickerDateValue = pickerMode === 'date'
+    ? (Platform.OS === 'ios' ? tempDate : selectedDate)
+    : pickerMode === 'timeStart'
+    ? (Platform.OS === 'ios' ? tempDate : selectedTimeStart)
+    : (Platform.OS === 'ios' ? tempDate : selectedTimeEnd);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -281,25 +324,31 @@ function EmployerExchange() {
   };
 
   const resetForm = () => {
-    setWorkType(''); setDate(''); setTimeStart(''); setTimeEnd('');
+    setWorkType('');
+    setSelectedDate(new Date());
+    setSelectedTimeStart(() => { const d = new Date(); d.setHours(8, 0, 0, 0); return d; });
+    setSelectedTimeEnd(() => { const d = new Date(); d.setHours(17, 0, 0, 0); return d; });
     setMetro(''); setAddress(''); setComment('');
   };
 
   const submitBulletin = async () => {
     if (!currentUser) return;
-    if (!workType.trim() || !date.trim() || !timeStart.trim() || !timeEnd.trim() || !metro.trim() || !address.trim()) {
+    if (!workType.trim() || !metro.trim() || !address.trim()) {
       showToast('Заполните все обязательные поля', 'error');
       return;
     }
+    const isoDate = formatISODate(selectedDate);
+    const tsStart = formatTime(selectedTimeStart);
+    const tsEnd = formatTime(selectedTimeEnd);
     setSubmitting(true);
     try {
       await dbCreateBulletin({
         employerId: currentUser.id,
         company: currentUser.company ?? currentUser.firstName,
         workType: workType.trim(),
-        date: date.trim(),
-        timeStart: timeStart.trim(),
-        timeEnd: timeEnd.trim(),
+        date: isoDate,
+        timeStart: tsStart,
+        timeEnd: tsEnd,
         metro: metro.trim(),
         address: address.trim(),
         comment: comment.trim() || undefined,
@@ -308,7 +357,7 @@ function EmployerExchange() {
       notifyAllWorkersNewBulletin({
         company: currentUser.company ?? currentUser.firstName,
         workType: workType.trim(),
-        date: date.trim(),
+        date: isoDate,
         metro: metro.trim(),
       }).catch(() => {});
       resetForm();
@@ -355,21 +404,33 @@ function EmployerExchange() {
                 {workType || 'Выберите специальность...'}
               </Text>
             </TouchableOpacity>
-            <Text style={xS.formLabel}>Дата * (ГГГГ-ММ-ДД)</Text>
-            <TextInput style={xS.formInput} value={date} onChangeText={setDate}
-              placeholder="2024-06-25" placeholderTextColor={Colors.textMuted} keyboardType="numbers-and-punctuation" />
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={xS.formLabel}>Начало *</Text>
-                <TextInput style={xS.formInput} value={timeStart} onChangeText={setTimeStart}
-                  placeholder="08:00" placeholderTextColor={Colors.textMuted} keyboardType="numbers-and-punctuation" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={xS.formLabel}>Конец *</Text>
-                <TextInput style={xS.formInput} value={timeEnd} onChangeText={setTimeEnd}
-                  placeholder="16:00" placeholderTextColor={Colors.textMuted} keyboardType="numbers-and-punctuation" />
-              </View>
+            <Text style={xS.formLabel}>Дата *</Text>
+            <TouchableOpacity style={xS.pickerField} onPress={() => openPicker('date')} activeOpacity={0.8}>
+              <Text style={xS.pickerIcon}>📅</Text>
+              <Text style={xS.pickerValue}>{formatDisplayDate(selectedDate)}</Text>
+              <Text style={xS.pickerArrow}>›</Text>
+            </TouchableOpacity>
+            {Platform.OS === 'android' && pickerMode === 'date' && (
+              <DateTimePicker value={pickerDateValue ?? new Date()} mode="date" display="calendar" minimumDate={new Date()} onChange={onAndroidChange} />
+            )}
+            <Text style={xS.formLabel}>Время *</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openPicker('timeStart')} activeOpacity={0.8}>
+                <Text style={xS.pickerIcon}>⏰</Text>
+                <Text style={xS.pickerValue}>{formatTime(selectedTimeStart)}</Text>
+              </TouchableOpacity>
+              <Text style={xS.timeSep}>–</Text>
+              <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openPicker('timeEnd')} activeOpacity={0.8}>
+                <Text style={xS.pickerIcon}>⏰</Text>
+                <Text style={xS.pickerValue}>{formatTime(selectedTimeEnd)}</Text>
+              </TouchableOpacity>
             </View>
+            {Platform.OS === 'android' && pickerMode === 'timeStart' && (
+              <DateTimePicker value={pickerDateValue ?? new Date()} mode="time" display="spinner" is24Hour onChange={onAndroidChange} />
+            )}
+            {Platform.OS === 'android' && pickerMode === 'timeEnd' && (
+              <DateTimePicker value={pickerDateValue ?? new Date()} mode="time" display="spinner" is24Hour onChange={onAndroidChange} />
+            )}
             <Text style={xS.formLabel}>Метро *</Text>
             <TouchableOpacity style={[xS.formInput, { justifyContent: 'center' }]} onPress={() => setMetroPicker(true)} activeOpacity={0.8}>
               <Text style={{ color: metro ? Colors.textPrimary : Colors.textMuted, fontSize: 15 }}>
@@ -448,6 +509,40 @@ function EmployerExchange() {
         onSelect={label => setWorkType(label)}
         onClose={() => setWorkTypePicker(false)}
       />
+
+      {Platform.OS === 'ios' && (
+        <Modal visible={iosPickerVisible} transparent animationType="slide">
+          <View style={xS.iosOverlay}>
+            <View style={xS.iosSheet}>
+              <View style={xS.iosSheetHeader}>
+                <TouchableOpacity onPress={() => { setIosPickerVisible(false); setPickerMode(null); }}>
+                  <Text style={xS.iosCancelText}>Отмена</Text>
+                </TouchableOpacity>
+                <Text style={xS.iosSheetTitle}>
+                  {pickerMode === 'date' ? 'Дата смены' : pickerMode === 'timeStart' ? 'Начало смены' : 'Конец смены'}
+                </Text>
+                <TouchableOpacity onPress={confirmIOS}>
+                  <Text style={xS.iosDoneText}>Готово</Text>
+                </TouchableOpacity>
+              </View>
+              {pickerMode && (
+                <View style={xS.iosPickerWrap}>
+                  <DateTimePicker
+                    value={pickerDateValue ?? new Date()}
+                    mode={pickerMode === 'date' ? 'date' : 'time'}
+                    display="spinner"
+                    is24Hour
+                    minimumDate={pickerMode === 'date' ? new Date() : undefined}
+                    onChange={onIOSChange}
+                    style={xS.iosPicker}
+                    textColor="#111111"
+                  />
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
     </>
   );
 }
@@ -558,6 +653,31 @@ const xS = StyleSheet.create({
   stationRowSelected: { backgroundColor: Colors.primaryLight },
   lineDot: { width: 12, height: 12, borderRadius: 6 },
   stationName: { fontSize: 15, color: Colors.textPrimary },
+
+  // Picker fields
+  pickerField: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 13, backgroundColor: Colors.bg,
+  },
+  pickerIcon: { fontSize: 18 },
+  pickerValue: { flex: 1, fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
+  pickerArrow: { fontSize: 20, color: Colors.textMuted },
+  timeSep: { fontSize: 20, color: Colors.textMuted, fontWeight: '600' },
+
+  // iOS picker modal
+  iosOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  iosSheet: { backgroundColor: Colors.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32 },
+  iosPickerWrap: { backgroundColor: '#FFFFFF', width: '100%' },
+  iosPicker: { width: '100%', height: 200, backgroundColor: '#FFFFFF' },
+  iosSheetHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 16,
+    borderBottomWidth: 1, borderBottomColor: Colors.divider,
+  },
+  iosSheetTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
+  iosCancelText: { fontSize: 15, color: Colors.textSecondary, fontWeight: '500' },
+  iosDoneText: { fontSize: 15, color: Colors.primary, fontWeight: '700' },
 
   // Work type picker
   wtRow: {
