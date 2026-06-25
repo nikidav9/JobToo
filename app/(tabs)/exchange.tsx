@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, FlatList, ActivityIndicator, RefreshControl, Modal, Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -153,6 +154,55 @@ function WorkTypePicker({
         </View>
       </View>
     </Modal>
+  );
+}
+
+// ─── Onboarding hint card ─────────────────────────────────────────────────────
+
+const HINT_KEY_WORKER = '@birzha_hint_worker_v1';
+const HINT_KEY_EMPLOYER = '@birzha_hint_employer_v1';
+
+function BirzhaHint({ role }: { role: 'worker' | 'employer' }) {
+  const [visible, setVisible] = useState(false);
+  const key = role === 'worker' ? HINT_KEY_WORKER : HINT_KEY_EMPLOYER;
+
+  useEffect(() => {
+    AsyncStorage.getItem(key).then(val => { if (!val) setVisible(true); }).catch(() => {});
+  }, [key]);
+
+  const dismiss = useCallback(() => {
+    setVisible(false);
+    AsyncStorage.setItem(key, '1').catch(() => {});
+  }, [key]);
+
+  if (!visible) return null;
+
+  const workerLines = [
+    { icon: 'megaphone-outline' as const, text: 'Вкладка «Вакансии» — срочные объявления от работодателей. Нажми «Откликнуться» и сразу открывается чат.' },
+    { icon: 'calendar-outline' as const, text: 'Вкладка «Мои смены» — опубликуй когда ты свободен. Укажи специальность, дату, время и метро, и работодатели сами напишут тебе.' },
+  ];
+  const employerLines = [
+    { icon: 'chatbubbles-outline' as const, text: 'Вкладка «Чат» — объявления от всех работодателей. Ты тоже можешь опубликовать своё.' },
+    { icon: 'people-outline' as const, text: 'Вкладка «Работники» — работники, которые ищут смену прямо сейчас. Нажми «Написать» и сразу открывается чат.' },
+    { icon: 'add-circle-outline' as const, text: 'Вкладка «Активные» — твои объявления и кнопка публикации нового.' },
+  ];
+  const lines = role === 'worker' ? workerLines : employerLines;
+
+  return (
+    <View style={xS.hintCard}>
+      <View style={xS.hintHeader}>
+        <Text style={xS.hintTitle}>Как работает Биржа</Text>
+        <TouchableOpacity onPress={dismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="close" size={20} color={Colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+      {lines.map((l, i) => (
+        <View key={i} style={xS.hintRow}>
+          <Ionicons name={l.icon} size={18} color={Colors.primary} style={{ marginTop: 1 }} />
+          <Text style={xS.hintTxt}>{l.text}</Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -467,6 +517,7 @@ function WorkerExchange() {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />
           }
+          ListHeaderComponent={<BirzhaHint role="worker" />}
           ListEmptyComponent={
             <View style={xS.emptyWrap}>
               <Ionicons name="document-text-outline" size={48} color={Colors.textMuted} />
@@ -869,7 +920,9 @@ function EmployerExchange() {
       >
         {/* ── Чат: общая биржа объявлений ── */}
         {section === 'chat' && (
-          bulletins.length === 0 ? (
+          <>
+            <BirzhaHint role="employer" />
+            {bulletins.length === 0 ? (
             <View style={xS.emptyWrap}>
               <Ionicons name="document-text-outline" size={48} color={Colors.textMuted} />
               <Text style={xS.emptyTitle}>Объявлений пока нет</Text>
@@ -877,7 +930,8 @@ function EmployerExchange() {
             </View>
           ) : (
             bulletins.map(b => <BulletinChatCard key={b.id} b={b} />)
-          )
+          )}
+          </>
         )}
 
         {/* ── Работники: список доступных работников ── */}
@@ -1390,4 +1444,16 @@ const xS = StyleSheet.create({
     backgroundColor: Colors.bg, alignItems: 'center', justifyContent: 'center',
   },
   wtCircleSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+
+  // Onboarding hint card
+  hintCard: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 16, padding: 16, gap: 10,
+    borderWidth: 1, borderColor: Colors.primary + '30',
+    marginBottom: 4,
+  },
+  hintHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  hintTitle: { fontSize: 15, fontWeight: '800', color: Colors.primary },
+  hintRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  hintTxt: { fontSize: 13, color: Colors.textSecondary, lineHeight: 19, flex: 1 },
 });
