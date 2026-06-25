@@ -356,14 +356,14 @@ function VacancyViewersModal({ vacancyId, onClose }: { vacancyId: string; onClos
                     {w.metroStation ? <Text style={wS.cardMeta}>м. {w.metroStation}</Text> : null}
                   </View>
                   <TouchableOpacity
-                    style={[wS.chatBtn, { flex: 0, paddingHorizontal: 16 }]}
+                    style={[wS.chatBtn, { flex: 0, width: 40, height: 40, padding: 0, borderRadius: 12 }]}
                     onPress={() => openChat(w)}
                     disabled={chatLoading === w.id}
                     activeOpacity={0.8}
                   >
                     {chatLoading === w.id
-                      ? <ActivityIndicator size="small" color={Colors.primary} />
-                      : <Text style={wS.chatBtnTxt}>Написать</Text>
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Ionicons name="chatbubble" size={18} color="#fff" />
                     }
                   </TouchableOpacity>
                 </View>
