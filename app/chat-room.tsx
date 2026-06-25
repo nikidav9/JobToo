@@ -86,6 +86,7 @@ export default function ChatRoom() {
   }, [chatId]);
 
   const isEmployer = currentUser?.role === 'employer';
+  const isBulletinChat = !!chat?.bulletinId || !!chat?.workerSlotId;
 
   const otherId = chat
     ? (currentUser?.role === 'worker' ? chat.employerId : chat.workerId)
@@ -106,9 +107,10 @@ export default function ChatRoom() {
   const otherColor = nameColorFromString(otherId || otherName);
   const otherAvatarUrl = other?.avatarUrl;
 
-  // Fetch like status (for employer decision bar)
+  // Fetch like status (for employer decision bar — not applicable for bulletin/slot chats)
   useEffect(() => {
     if (!chat || !currentUser) return;
+    if (chat.bulletinId || chat.workerSlotId) { setLikeStatus(null); return; }
     dbGetLikes().then(allLikes => {
       const like = allLikes.find(l => l.vacancyId === chat.vacancyId && l.workerId === chat.workerId);
       if (!like) { setLikeStatus('pending'); return; }
@@ -136,7 +138,7 @@ export default function ChatRoom() {
       try {
         const [msgs, like] = await Promise.all([
           dbGetMessages(localChatId),
-          dbGetLikeByVacancyWorker(chat.vacancyId, chat.workerId),
+          (chat.bulletinId || chat.workerSlotId) ? Promise.resolve(null) : dbGetLikeByVacancyWorker(chat.vacancyId, chat.workerId),
         ]);
         if (msgs.length !== lastCountRef.current) {
           msgCache.set(localChatId, msgs);
@@ -193,9 +195,9 @@ export default function ChatRoom() {
     return () => { channel.unsubscribe(); };
   }, [chatId, currentUser?.id]);
 
-  // Real-time subscription for like status changes (match / reject)
+  // Real-time subscription for like status changes (match / reject) — not applicable for bulletin/slot chats
   useEffect(() => {
-    if (!chat) return;
+    if (!chat || chat.bulletinId || chat.workerSlotId) return;
     const { vacancyId, workerId } = chat;
     const sb = getSupabaseClient();
     const channel = sb
@@ -422,7 +424,7 @@ export default function ChatRoom() {
       ) : null}
 
       {/* Employer decision bar — shown at the top */}
-      {isEmployer && likeStatus === 'pending' ? (
+      {isEmployer && !isBulletinChat && likeStatus === 'pending' ? (
         <View style={styles.decisionBar}>
           <Text style={styles.decisionBarLabel}>Принять решение по кандидату:</Text>
           <View style={styles.decisionBtnsRow}>
@@ -444,11 +446,11 @@ export default function ChatRoom() {
             </TouchableOpacity>
           </View>
         </View>
-      ) : isEmployer && likeStatus === 'approved' ? (
+      ) : isEmployer && !isBulletinChat && likeStatus === 'approved' ? (
         <View style={[styles.decisionBar, { backgroundColor: '#D1FAE5' }]}>
           <Text style={[styles.decisionBarLabel, { color: Colors.green, textAlign: 'center' }]}>🎉 Мэтч создан!</Text>
         </View>
-      ) : isEmployer && likeStatus === 'rejected' ? (
+      ) : isEmployer && !isBulletinChat && likeStatus === 'rejected' ? (
         <View style={[styles.decisionBar, { backgroundColor: '#FEE2E2' }]}>
           <Text style={[styles.decisionBarLabel, { color: Colors.red, textAlign: 'center' }]}>✕ Кандидат отклонён</Text>
         </View>
