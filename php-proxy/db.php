@@ -580,6 +580,34 @@ try {
         case 'dbGetAllWorkerTokens':
             $data = sb_select('jm_users', ['role' => 'eq.worker', 'push_token' => 'not.is.null'], 'id,push_token'); break;
 
+        case 'dbNotifyAllWorkersNewBulletin': {
+            [$company, $workType, $date, $metro] = [$args[0], $args[1], $args[2], $args[3]];
+            $workers = sb_select('jm_users', ['role' => 'eq.worker', 'push_token' => 'not.is.null'], 'id,push_token');
+            if (empty($workers)) { $data = ['sent' => 0]; break; }
+            $title = '⚡ Срочно нужен сотрудник!';
+            $body = "$company: $workType — м. $metro, $date";
+            $tokens = array_column($workers, 'push_token');
+            $sent = 0;
+            foreach (array_chunk($tokens, 100) as $batch) {
+                $msgs = array_map(fn($t) => [
+                    'to' => $t, 'title' => $title, 'body' => $body,
+                    'sound' => 'default', 'priority' => 'high',
+                    'channelId' => 'vacancies', 'data' => ['type' => 'new_bulletin'],
+                ], $batch);
+                $payload = count($msgs) === 1 ? $msgs[0] : $msgs;
+                $ch = curl_init('https://exp.host/--/api/v2/push/send');
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => json_encode($payload),
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
+                    CURLOPT_TIMEOUT => 15,
+                ]);
+                curl_exec($ch); curl_close($ch);
+                $sent += count($batch);
+            }
+            $data = ['sent' => $sent]; break;
+        }
+
         default:
             throw new RuntimeException('Unknown function: ' . $fn);
     }

@@ -171,38 +171,64 @@ function formatDateShort(iso: string) {
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
-// ─── Shared bulletin card (read-only, for employer Чат view) ──────────────────
+// ─── Chat-style bulletin card ─────────────────────────────────────────────────
 
-function BulletinCard({ b }: { b: Bulletin }) {
+function BulletinChatCard({
+  b,
+  respondBtn,
+}: {
+  b: Bulletin;
+  respondBtn?: React.ReactNode;
+}) {
+  const isClosed = b.status === 'closed';
+  const initial = (b.company || '?').charAt(0).toUpperCase();
+
   return (
-    <View style={xS.card}>
-      <View style={xS.cardHeader}>
-        <View style={xS.urgentBadge}>
-          <Ionicons name="flash" size={11} color="#92400E" />
-          <Text style={xS.urgentTxt}>Срочно</Text>
+    <View style={xS.chatCard}>
+      {/* Sender row: avatar + name + badge + time */}
+      <View style={xS.chatSenderRow}>
+        <View style={[xS.chatAvatar, isClosed && xS.chatAvatarClosed]}>
+          <Text style={xS.chatAvatarTxt}>{initial}</Text>
         </View>
-        <Text style={xS.company} numberOfLines={1}>{b.company}</Text>
+        <View style={{ flex: 1 }}>
+          <View style={xS.chatNameLine}>
+            <Text style={xS.chatCompany} numberOfLines={1}>{b.company}</Text>
+            <Text style={xS.chatTimestamp}>{formatDateShort(b.date)}</Text>
+          </View>
+          {isClosed ? (
+            <View style={xS.closedBadge}>
+              <Ionicons name="lock-closed" size={10} color="#6B7280" />
+              <Text style={xS.closedBadgeTxt}>Закрыта</Text>
+            </View>
+          ) : (
+            <View style={xS.urgentBadge}>
+              <Ionicons name="flash" size={10} color="#92400E" />
+              <Text style={xS.urgentTxt}>Срочно</Text>
+            </View>
+          )}
+        </View>
       </View>
-      <Text style={xS.workType}>{b.workType}</Text>
-      <View style={xS.metaRow}>
-        <View style={xS.metaItem}>
-          <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
-          <Text style={xS.metaTxt}>{formatDate(b.date)}</Text>
+
+      {/* Bubble */}
+      <View style={[xS.chatBubble, isClosed && xS.chatBubbleClosed]}>
+        <Text style={[xS.chatWorkType, isClosed && xS.chatWorkTypeClosed]}>{b.workType}</Text>
+        <View style={xS.metaRow}>
+          <View style={xS.metaItem}>
+            <Ionicons name="time-outline" size={12} color={Colors.textMuted} />
+            <Text style={xS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
+          </View>
+          <View style={xS.metaItem}>
+            <Ionicons name="subway-outline" size={12} color={Colors.textMuted} />
+            <Text style={xS.metaTxt}>м. {b.metro}</Text>
+          </View>
         </View>
         <View style={xS.metaItem}>
-          <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
-          <Text style={xS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
+          <Ionicons name="location-outline" size={12} color={Colors.textSecondary} />
+          <Text style={[xS.metaTxt, { flex: 1 }]} numberOfLines={2}>{b.address}</Text>
         </View>
-        <View style={xS.metaItem}>
-          <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
-          <Text style={xS.metaTxt}>м. {b.metro}</Text>
-        </View>
+        {b.comment ? <Text style={xS.comment} numberOfLines={3}>{b.comment}</Text> : null}
+        {respondBtn}
       </View>
-      <View style={xS.metaItem}>
-        <Ionicons name="location-outline" size={13} color={Colors.textSecondary} />
-        <Text style={[xS.metaTxt, { flex: 1 }]} numberOfLines={2}>{b.address}</Text>
-      </View>
-      {b.comment ? <Text style={xS.comment} numberOfLines={3}>{b.comment}</Text> : null}
     </View>
   );
 }
@@ -276,46 +302,23 @@ function WorkerExchange() {
       renderItem={({ item: b }) => {
         const alreadyResponded = chats.some(c => c.bulletinId === b.id && c.workerId === currentUser?.id);
         return (
-          <View style={xS.card}>
-            <View style={xS.cardHeader}>
-              <View style={xS.urgentBadge}>
-                <Ionicons name="flash" size={11} color="#92400E" />
-                <Text style={xS.urgentTxt}>Срочно</Text>
-              </View>
-              <Text style={xS.company} numberOfLines={1}>{b.company}</Text>
-            </View>
-            <Text style={xS.workType}>{b.workType}</Text>
-            <View style={xS.metaRow}>
-              <View style={xS.metaItem}>
-                <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
-                <Text style={xS.metaTxt}>{formatDate(b.date)}</Text>
-              </View>
-              <View style={xS.metaItem}>
-                <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
-                <Text style={xS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
-              </View>
-              <View style={xS.metaItem}>
-                <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
-                <Text style={xS.metaTxt}>м. {b.metro}</Text>
-              </View>
-            </View>
-            <View style={xS.metaItem}>
-              <Ionicons name="location-outline" size={13} color={Colors.textSecondary} />
-              <Text style={[xS.metaTxt, { flex: 1 }]} numberOfLines={2}>{b.address}</Text>
-            </View>
-            {b.comment ? <Text style={xS.comment} numberOfLines={3}>{b.comment}</Text> : null}
-            <TouchableOpacity
-              style={[xS.respondBtn, alreadyResponded && xS.respondBtnDone]}
-              onPress={() => respond(b)}
-              disabled={responding === b.id}
-              activeOpacity={0.8}
-            >
-              {responding === b.id
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={xS.respondBtnTxt}>{alreadyResponded ? 'Открыть чат' : 'Откликнуться'}</Text>
-              }
-            </TouchableOpacity>
-          </View>
+          <BulletinChatCard
+            key={b.id}
+            b={b}
+            respondBtn={
+              <TouchableOpacity
+                style={[xS.respondBtn, alreadyResponded && xS.respondBtnDone]}
+                onPress={() => respond(b)}
+                disabled={responding === b.id}
+                activeOpacity={0.8}
+              >
+                {responding === b.id
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={xS.respondBtnTxt}>{alreadyResponded ? 'Открыть чат' : 'Откликнуться'}</Text>
+                }
+              </TouchableOpacity>
+            }
+          />
         );
       }}
     />
@@ -481,7 +484,7 @@ function EmployerExchange() {
               <Text style={xS.emptySubtitle}>Здесь появятся срочные объявления работодателей</Text>
             </View>
           ) : (
-            bulletins.map(b => <BulletinCard key={b.id} b={b} />)
+            bulletins.map(b => <BulletinChatCard key={b.id} b={b} />)
           )
         )}
 
@@ -778,7 +781,38 @@ const xS = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Cards
+  // Chat-style bulletin card
+  chatCard: { gap: 8 },
+  chatSenderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  chatAvatar: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: 2,
+  },
+  chatAvatarClosed: { backgroundColor: '#9CA3AF' },
+  chatAvatarTxt: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  chatNameLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
+  chatCompany: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, flex: 1, marginRight: 6 },
+  chatTimestamp: { fontSize: 11, color: Colors.textMuted, fontWeight: '500' },
+  chatBubble: {
+    marginLeft: 48, backgroundColor: Colors.bg,
+    borderRadius: 4, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderBottomRightRadius: 16,
+    padding: 14, gap: 8,
+    borderWidth: 1, borderColor: Colors.divider,
+    ...Shadow.card,
+  },
+  chatBubbleClosed: { backgroundColor: Colors.outerBg, borderColor: Colors.divider, opacity: 0.75 },
+  chatWorkType: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
+  chatWorkTypeClosed: { color: Colors.textMuted },
+  closedBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start',
+    backgroundColor: '#F3F4F6', borderRadius: 100,
+    paddingHorizontal: 7, paddingVertical: 2,
+  },
+  closedBadgeTxt: { fontSize: 11, fontWeight: '600', color: '#6B7280' },
+
+  // Employer active/closed cards
   card: {
     backgroundColor: Colors.bg, borderRadius: 18,
     padding: 16, gap: 10, ...Shadow.card,
@@ -788,9 +822,9 @@ const xS = StyleSheet.create({
   cardClosed: { opacity: 0.55, borderLeftWidth: 3, borderLeftColor: Colors.textMuted },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   urgentBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
+    flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start',
     backgroundColor: '#FEF3C7', borderRadius: 100,
-    paddingHorizontal: 8, paddingVertical: 3,
+    paddingHorizontal: 7, paddingVertical: 2,
   },
   urgentTxt: { fontSize: 11, fontWeight: '700', color: '#92400E' },
   company: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary, flex: 1, marginLeft: 8 },
