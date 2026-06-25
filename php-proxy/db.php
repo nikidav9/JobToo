@@ -577,6 +577,66 @@ try {
             $data = true; break;
         }
 
+        case 'dbGetActiveWorkerSlots':
+            $data = sb_select('jm_worker_slots', ['status' => 'eq.open'], '*', 'created_at.desc'); break;
+
+        case 'dbGetMyWorkerSlots':
+            $data = sb_select('jm_worker_slots', ['worker_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;
+
+        case 'dbCreateWorkerSlot': {
+            $p = $args[0];
+            $id = uid();
+            sb_insert('jm_worker_slots', [
+                'id' => $id,
+                'worker_id' => $p['workerId'],
+                'worker_name' => $p['workerName'],
+                'work_type' => $p['workType'],
+                'date' => $p['date'],
+                'time_start' => $p['timeStart'],
+                'time_end' => $p['timeEnd'],
+                'metro' => $p['metro'],
+                'comment' => $p['comment'] ?? null,
+                'status' => 'open',
+                'created_at' => now_iso(),
+            ]);
+            $data = $id; break;
+        }
+
+        case 'dbCloseWorkerSlot':
+            sb_update('jm_worker_slots', ['id' => 'eq.' . $args[0]], ['status' => 'closed']);
+            $data = true; break;
+
+        case 'dbContactWorkerSlot': {
+            [$slotId, $empId] = [$args[0], $args[1]];
+            $slot = sb_single('jm_worker_slots', ['id' => 'eq.' . $slotId]);
+            if (!$slot) throw new RuntimeException('Worker slot not found');
+            $wid = $slot['worker_id'];
+            $ex = sb_single('jm_chats', ['worker_slot_id' => 'eq.' . $slotId, 'employer_id' => 'eq.' . $empId], 'id');
+            if ($ex) { $data = $ex['id']; break; }
+            $emp = sb_single('jm_users', ['id' => 'eq.' . $empId]);
+            $empName = $emp['company'] ?? $emp['first_name'];
+            $cid = uid();
+            $greeting = "Здравствуйте! Видели вашу заявку — {$slot['work_type']}, {$slot['date']}. Хотим пригласить вас на смену.";
+            sb_insert('jm_chats', [
+                'id' => $cid,
+                'vacancy_id' => $slotId,
+                'worker_id' => $wid,
+                'employer_id' => $empId,
+                'vac_title' => $slot['work_type'],
+                'company_name' => $empName,
+                'unread_worker' => 1,
+                'unread_employer' => 0,
+                'worker_slot_id' => $slotId,
+                'is_locked' => false,
+                'created_at' => now_iso(),
+            ]);
+            sb_insert('jm_messages', [
+                'id' => uid(), 'chat_id' => $cid, 'sender_id' => $empId,
+                'text' => $greeting, 'created_at' => now_iso(),
+            ]);
+            $data = $cid; break;
+        }
+
         case 'dbGetAllWorkerTokens':
             $data = sb_select('jm_users', ['role' => 'eq.worker', 'push_token' => 'not.is.null'], 'id,push_token'); break;
 

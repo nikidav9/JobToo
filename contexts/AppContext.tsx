@@ -11,7 +11,7 @@ export interface AppNotification {
 import { Platform, AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { getSupabaseClient } from '@/template';
-import { User, Vacancy, Like, Chat, PermVacancy, PermApplication, Bulletin } from '@/constants/types';
+import { User, Vacancy, Like, Chat, PermVacancy, PermApplication, Bulletin, WorkerSlot } from '@/constants/types';
 import {
   getSessionUser,
   saveSessionUser,
@@ -41,6 +41,8 @@ import {
   dbMarkAllNotifsRead,
   dbGetActiveBulletins,
   dbGetMyBulletins,
+  dbGetActiveWorkerSlots,
+  dbGetMyWorkerSlots,
 } from '@/services/db';
 import { registerForPushNotifications } from '@/services/notifications';
 
@@ -117,6 +119,8 @@ export interface AppContextValue {
   refreshPermVacancyViews: () => Promise<void>;
   bulletins: Bulletin[];
   refreshBulletins: (u?: User) => Promise<void>;
+  workerSlots: WorkerSlot[];
+  refreshWorkerSlots: (u?: User) => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextValue | null>(null);
@@ -147,6 +151,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [vacancyStatsMap, setVacancyStatsMap] = useState<Record<string, VacancyStats>>({});
   const [permVacancyViewsMap, setPermVacancyViewsMap] = useState<Record<string, number>>({});
   const [bulletins, setBulletins] = useState<Bulletin[]>([]);
+  const [workerSlots, setWorkerSlots] = useState<WorkerSlot[]>([]);
 
   const unreadNotifCount = notifications.filter(n => !n.isRead).length;
 
@@ -285,6 +290,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               refreshVacancyStats(),
               refreshPermVacancyViews(),
               refreshBulletins(sessionUser),
+              refreshWorkerSlots(sessionUser),
             ]).catch(() => {});
           }, 100);
 
@@ -633,6 +639,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch {}
   };
 
+  const refreshWorkerSlots = async (u?: User) => {
+    const user = u ?? currentUser;
+    if (!user) return;
+    try {
+      const data = user.role === 'employer'
+        ? await dbGetActiveWorkerSlots()
+        : await dbGetMyWorkerSlots(user.id);
+      setWorkerSlots(data);
+    } catch {}
+  };
+
   const unreadCount = chats.reduce((sum, c) => {
     if (currentUser?.role === 'worker') return sum + (c.unreadWorker ?? 0);
     if (currentUser?.role === 'employer') return sum + (c.unreadEmployer ?? 0);
@@ -689,6 +706,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshPermVacancyViews,
         bulletins,
         refreshBulletins,
+        workerSlots,
+        refreshWorkerSlots,
         notifications,
         unreadNotifCount,
         refreshNotifications,

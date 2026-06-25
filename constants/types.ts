@@ -80,6 +80,7 @@ export interface Chat {
   unreadEmployer: number;
   createdAt: string;
   bulletinId?: string;
+  workerSlotId?: string;
   isLocked?: boolean;
 }
 
@@ -96,6 +97,20 @@ export interface Bulletin {
   comment?: string;
   status: 'open' | 'closed';
   views: number;
+  createdAt: string;
+}
+
+export interface WorkerSlot {
+  id: string;
+  workerId: string;
+  workerName: string;
+  workType: string;
+  date: string;
+  timeStart: string;
+  timeEnd: string;
+  metro: string;
+  comment?: string;
+  status: 'open' | 'closed';
   createdAt: string;
 }
 
