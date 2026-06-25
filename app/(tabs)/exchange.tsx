@@ -280,11 +280,14 @@ function WorkerExchange() {
 
 // ─── Employer view ────────────────────────────────────────────────────────────
 
+type EmployerSection = 'exchange' | 'active';
+
 function EmployerExchange() {
-  const { currentUser, bulletins, refreshBulletins, chats, showToast } = useApp();
+  const { currentUser, bulletins, refreshBulletins, showToast } = useApp();
+  const router = useRouter();
   const tabBarHeight = useBottomTabBarHeight();
+  const [section, setSection] = useState<EmployerSection>('exchange');
   const [refreshing, setRefreshing] = useState(false);
-  const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
   const [metroPicker, setMetroPicker] = useState(false);
@@ -375,7 +378,7 @@ function EmployerExchange() {
         metro: metro.trim(),
       }).catch(() => {});
       resetForm();
-      setShowForm(false);
+      setSection('active');
       showToast('Объявление опубликовано!', 'success');
     } catch {
       showToast('Ошибка при публикации', 'error');
@@ -399,17 +402,41 @@ function EmployerExchange() {
 
   return (
     <>
+      {/* ── 3-segment tab bar ── */}
+      <View style={xS.segWrap}>
+        <View style={xS.segControl}>
+          <TouchableOpacity
+            style={[xS.segBtn, section === 'exchange' && xS.segBtnActive]}
+            onPress={() => setSection('exchange')}
+            activeOpacity={0.8}
+          >
+            <Text style={[xS.segTxt, section === 'exchange' && xS.segTxtActive]}>Биржа</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={xS.segBtn}
+            onPress={() => router.push('/create-vacancy')}
+            activeOpacity={0.8}
+          >
+            <Text style={xS.segTxt}>Подработка</Text>
+            <Ionicons name="arrow-forward-outline" size={11} color={Colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[xS.segBtn, section === 'active' && xS.segBtnActive]}
+            onPress={() => setSection('active')}
+            activeOpacity={0.8}
+          >
+            <Text style={[xS.segTxt, section === 'active' && xS.segTxtActive]}>Объявления</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <ScrollView
         contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: tabBarHeight + 16 }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
       >
-        {!showForm ? (
-          <TouchableOpacity style={xS.createBtn} onPress={() => setShowForm(true)} activeOpacity={0.8}>
-            <Ionicons name="add-circle" size={20} color={Colors.primary} />
-            <Text style={xS.createBtnTxt}>Опубликовать объявление</Text>
-          </TouchableOpacity>
-        ) : (
+        {/* ── Биржа: форма публикации объявления ── */}
+        {section === 'exchange' && (
           <View style={xS.formCard}>
             <Text style={xS.formTitle}>Новое объявление</Text>
             <Text style={xS.formLabel}>Специальность *</Text>
@@ -491,92 +518,93 @@ function EmployerExchange() {
             <TextInput style={[xS.formInput, { minHeight: 60, textAlignVertical: 'top' }]}
               value={comment} onChangeText={setComment}
               placeholder="Дополнительные требования..." placeholderTextColor={Colors.textMuted} multiline />
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-              <TouchableOpacity style={xS.cancelBtn} onPress={() => { setShowForm(false); resetForm(); }} activeOpacity={0.8}>
-                <Text style={xS.cancelTxt}>Отмена</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[xS.submitBtn, submitting && { opacity: 0.6 }]} onPress={submitBulletin} disabled={submitting} activeOpacity={0.8}>
-                {submitting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={xS.submitTxt}>Опубликовать</Text>}
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[xS.submitBtn, submitting && { opacity: 0.6 }, { marginTop: 4 }]}
+              onPress={submitBulletin}
+              disabled={submitting}
+              activeOpacity={0.8}
+            >
+              {submitting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={xS.submitTxt}>Опубликовать</Text>}
+            </TouchableOpacity>
           </View>
         )}
 
-        {activeBulletins.length > 0 ? (
+        {/* ── Активные объявления ── */}
+        {section === 'active' && (
           <>
-            <Text style={xS.sectionLabel}>Активные</Text>
-            {activeBulletins.map(b => (
-              <View key={b.id} style={[xS.card, xS.cardEmployer]}>
-                <View style={xS.cardHeader}>
-                  <Text style={xS.workType}>{b.workType}</Text>
-                  <TouchableOpacity style={xS.closeBtn} onPress={() => closeBulletin(b.id)} activeOpacity={0.8}>
-                    <Text style={xS.closeBtnTxt}>Закрыть</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={xS.metaRow}>
-                  <View style={xS.metaItem}>
-                    <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
-                    <Text style={xS.metaTxt}>{formatDateShort(b.date)}</Text>
+            {activeBulletins.length > 0 ? (
+              <>
+                <Text style={xS.sectionLabel}>Активные</Text>
+                {activeBulletins.map(b => (
+                  <View key={b.id} style={[xS.card, xS.cardEmployer]}>
+                    <View style={xS.cardHeader}>
+                      <Text style={xS.workType}>{b.workType}</Text>
+                      <TouchableOpacity style={xS.closeBtn} onPress={() => closeBulletin(b.id)} activeOpacity={0.8}>
+                        <Text style={xS.closeBtnTxt}>Закрыть</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={xS.metaRow}>
+                      <View style={xS.metaItem}>
+                        <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
+                        <Text style={xS.metaTxt}>{formatDateShort(b.date)}</Text>
+                      </View>
+                      <View style={xS.metaItem}>
+                        <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+                        <Text style={xS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
+                      </View>
+                      <View style={xS.metaItem}>
+                        <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
+                        <Text style={xS.metaTxt}>м. {b.metro}</Text>
+                      </View>
+                    </View>
+                    <View style={xS.metaItem}>
+                      <Ionicons name="location-outline" size={13} color={Colors.textSecondary} />
+                      <Text style={[xS.metaTxt, { flex: 1 }]} numberOfLines={1}>{b.address}</Text>
+                    </View>
+                    {b.comment ? <Text style={xS.comment} numberOfLines={2}>{b.comment}</Text> : null}
+                    <View style={xS.viewsRow}>
+                      <Ionicons name="eye-outline" size={13} color={Colors.textMuted} />
+                      <Text style={xS.viewsTxt}>{b.views}</Text>
+                    </View>
                   </View>
-                  <View style={xS.metaItem}>
-                    <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
-                    <Text style={xS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
-                  </View>
-                  <View style={xS.metaItem}>
-                    <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
-                    <Text style={xS.metaTxt}>м. {b.metro}</Text>
-                  </View>
-                </View>
-                <View style={xS.metaItem}>
-                  <Ionicons name="location-outline" size={13} color={Colors.textSecondary} />
-                  <Text style={[xS.metaTxt, { flex: 1 }]} numberOfLines={1}>{b.address}</Text>
-                </View>
-                {b.comment ? <Text style={xS.comment} numberOfLines={2}>{b.comment}</Text> : null}
-                <View style={xS.viewsRow}>
-                  <Ionicons name="eye-outline" size={13} color={Colors.textMuted} />
-                  <Text style={xS.viewsTxt}>{b.views}</Text>
-                </View>
+                ))}
+              </>
+            ) : (
+              <View style={xS.emptyWrap}>
+                <Text style={xS.emptyTitle}>Нет активных объявлений</Text>
+                <Text style={xS.emptySubtitle}>Перейдите во вкладку «Биржа» и опубликуйте объявление</Text>
               </View>
-            ))}
+            )}
+            {closedBulletins.length > 0 && (
+              <>
+                <Text style={xS.sectionLabel}>Закрытые</Text>
+                {closedBulletins.map(b => (
+                  <View key={b.id} style={[xS.card, xS.cardClosed]}>
+                    <Text style={[xS.workType, { color: Colors.textMuted }]}>{b.workType}</Text>
+                    <View style={xS.metaRow}>
+                      <View style={xS.metaItem}>
+                        <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
+                        <Text style={xS.metaTxt}>{formatDateShort(b.date)}</Text>
+                      </View>
+                      <View style={xS.metaItem}>
+                        <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+                        <Text style={xS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
+                      </View>
+                      <View style={xS.metaItem}>
+                        <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
+                        <Text style={xS.metaTxt}>м. {b.metro}</Text>
+                      </View>
+                    </View>
+                    <View style={xS.viewsRow}>
+                      <Ionicons name="eye-outline" size={13} color={Colors.textMuted} />
+                      <Text style={xS.viewsTxt}>{b.views}</Text>
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
           </>
-        ) : (
-          !showForm && (
-            <View style={xS.emptyWrap}>
-              <Text style={{ fontSize: 48 }}>📢</Text>
-              <Text style={xS.emptyTitle}>Нет активных объявлений</Text>
-              <Text style={xS.emptySubtitle}>Опубликуйте срочное объявление — все работники получат уведомление</Text>
-            </View>
-          )
         )}
-
-        {closedBulletins.length > 0 ? (
-          <>
-            <Text style={xS.sectionLabel}>Закрытые</Text>
-            {closedBulletins.map(b => (
-              <View key={b.id} style={[xS.card, xS.cardClosed]}>
-                <Text style={[xS.workType, { color: Colors.textMuted }]}>{b.workType}</Text>
-                <View style={xS.metaRow}>
-                  <View style={xS.metaItem}>
-                    <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
-                    <Text style={xS.metaTxt}>{formatDateShort(b.date)}</Text>
-                  </View>
-                  <View style={xS.metaItem}>
-                    <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
-                    <Text style={xS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
-                  </View>
-                  <View style={xS.metaItem}>
-                    <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
-                    <Text style={xS.metaTxt}>м. {b.metro}</Text>
-                  </View>
-                </View>
-                <View style={xS.viewsRow}>
-                  <Ionicons name="eye-outline" size={13} color={Colors.textMuted} />
-                  <Text style={xS.viewsTxt}>{b.views}</Text>
-                </View>
-              </View>
-            ))}
-          </>
-        ) : null}
       </ScrollView>
 
       <MetroStationPicker
@@ -658,6 +686,42 @@ const xS = StyleSheet.create({
   },
   headerTitle: { fontSize: 26, fontWeight: '800', color: Colors.textPrimary },
 
+  // 3-segment control
+  segWrap: { paddingHorizontal: 16, paddingBottom: 12 },
+  segControl: {
+    flexDirection: 'row',
+    backgroundColor: Colors.outerBg,
+    borderRadius: 14,
+    padding: 3,
+  },
+  segBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 11,
+    gap: 4,
+  },
+  segBtnActive: {
+    backgroundColor: Colors.bg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segTxt: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  segTxtActive: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+
   // Cards
   card: {
     backgroundColor: Colors.bg, borderRadius: 18,
@@ -691,14 +755,6 @@ const xS = StyleSheet.create({
   // Close button
   closeBtn: { backgroundColor: '#FEE2E2', borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6 },
   closeBtnTxt: { fontSize: 12, fontWeight: '700', color: Colors.red },
-
-  // Create button
-  createBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 100,
-    paddingVertical: 14, backgroundColor: Colors.primaryLight,
-  },
-  createBtnTxt: { fontSize: 15, fontWeight: '700', color: Colors.primary },
 
   // Form
   formCard: {
