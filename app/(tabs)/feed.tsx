@@ -1159,51 +1159,50 @@ function WorkerFeed() {
                   <Text style={styles.detailHintText}>Подробности и нормативы</Text>
                   <Text style={styles.detailHintArrow}>→</Text>
                 </TouchableOpacity>
+
+                <View style={styles.cardActionsRow}>
+                  <TouchableOpacity
+                    style={[styles.cardActionItem, !dateHistory.length && { opacity: 0.3 }]}
+                    onPress={doUndo}
+                    disabled={!dateHistory.length || swiping}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="arrow-undo" size={20} color={Colors.textMuted} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.cardActionItem, styles.cardActionSkip]}
+                    onPress={() => doSkip(0.5)}
+                    disabled={swiping}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="close" size={24} color={Colors.red} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.cardActionItem}
+                    onPress={() => doMessageRef.current?.()}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="chatbubble-outline" size={20} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.cardActionItem, styles.cardActionWant]}
+                    onPress={() => doWant(0.5)}
+                    disabled={swiping}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="heart" size={22} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               </View>
             </Animated.View>
           </>
         )}
       </View>
 
-      {currentCard ? (
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionUndo, !dateHistory.length && { opacity: 0.3 }]}
-            onPress={doUndo}
-            disabled={!dateHistory.length || swiping}
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="arrow-undo" size={22} color={Colors.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionSkip]}
-            onPress={() => doSkip(0.5)}
-            disabled={swiping}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="close" size={28} color={Colors.red} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionSave]}
-            onPress={() => doMessageRef.current?.()}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="chatbubble-outline" size={22} color={Colors.textSecondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionWant]}
-            onPress={() => doWant(0.5)}
-            disabled={swiping}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="heart" size={26} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      ) : null}
 
       <MetroStationPicker
         visible={filterPicker}
@@ -2196,11 +2195,11 @@ const styles = StyleSheet.create({
   dcNumActive: { color: '#fff' },
   dcCnt: { fontSize: 10, fontWeight: '700', color: Colors.primary },
   dcCntActive: { color: 'rgba(255,255,255,0.8)' },
-  cardArea: { flex: 1, flexDirection: 'column', paddingHorizontal: 10, paddingTop: 10 },
-  ghost1: { position: 'absolute', left: 10, right: 10, top: 10, bottom: 90, backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.97 }, { translateY: 6 }], opacity: 0.5, zIndex: 0, ...Shadow.card },
-  ghost2: { position: 'absolute', left: 10, right: 10, top: 10, bottom: 90, backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.94 }, { translateY: 12 }], opacity: 0.3, zIndex: 0, ...Shadow.card },
-  cardAnimated: { flex: 1, marginBottom: 8, zIndex: 1, elevation: 10 },
-  card: { flex: 1, backgroundColor: Colors.bg, borderRadius: Radius.xl, ...Shadow.strong, overflow: 'hidden' },
+  cardArea: { flex: 1, flexDirection: 'column', paddingHorizontal: 10, paddingTop: 10, paddingBottom: 10 },
+  ghost1: { position: 'absolute', left: 10, right: 10, top: 10, bottom: 0, backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.97 }, { translateY: 6 }], opacity: 0.5, zIndex: 0, ...Shadow.card },
+  ghost2: { position: 'absolute', left: 10, right: 10, top: 10, bottom: 0, backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.94 }, { translateY: 12 }], opacity: 0.3, zIndex: 0, ...Shadow.card },
+  cardAnimated: { flex: 1, zIndex: 1, elevation: 10 },
+  card: { flex: 1, backgroundColor: Colors.bg, borderRadius: Radius.xl, ...Shadow.strong, overflow: 'hidden', borderWidth: 1, borderColor: Colors.inputBorder },
   wantOverlay: { position: 'absolute', top: 20, left: 20, zIndex: 10, backgroundColor: Colors.green, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, transform: [{ rotate: '-10deg' }] },
   wantText: { color: '#fff', fontSize: 20, fontWeight: '800' },
   skipOverlay: { position: 'absolute', top: 20, right: 20, zIndex: 10, backgroundColor: Colors.red, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, transform: [{ rotate: '10deg' }] },
@@ -2240,15 +2239,17 @@ const styles = StyleSheet.create({
   },
   detailHintText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
   detailHintArrow: { fontSize: 14, color: Colors.primary },
-  actions: {
+  cardActionsRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
-    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, backgroundColor: 'transparent',
+    paddingVertical: 10, paddingHorizontal: 20,
+    borderTopWidth: 1, borderTopColor: Colors.divider,
   },
-  actionBtn: { borderRadius: 100, alignItems: 'center', justifyContent: 'center', ...Shadow.card },
-  actionUndo: { width: 52, height: 52, backgroundColor: Colors.bg, borderWidth: 1.5, borderColor: Colors.inputBorder },
-  actionSkip: { width: 64, height: 64, backgroundColor: '#FEF2F2', borderWidth: 2, borderColor: Colors.red },
-  actionSave: { width: 52, height: 52, backgroundColor: Colors.bg, borderWidth: 1.5, borderColor: Colors.inputBorder },
-  actionWant: { width: 64, height: 64, backgroundColor: Colors.primary },
+  cardActionItem: {
+    width: 46, height: 46, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  cardActionSkip: { backgroundColor: '#FEF2F2' },
+  cardActionWant: { backgroundColor: Colors.primary },
   detailSkipBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.red, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
   detailSkipTxt: { color: Colors.red, fontSize: 14, fontWeight: '600' },
   detailWantBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
