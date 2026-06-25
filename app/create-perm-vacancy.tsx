@@ -81,7 +81,7 @@ export default function CreatePermVacancy() {
       if (!isEdit && metroStation) {
         notifyWorkersNearVacancy({ metroStation, title: title.trim(), company: vac.company, type: 'permanent' }).catch(() => {});
       }
-      showToast(isEdit ? 'Вакансия обновлена ✅' : 'Вакансия опубликована ✅', 'success');
+      showToast(isEdit ? 'Вакансия обновлена' : 'Вакансия опубликована', 'success');
       router.back();
       refreshPermVacancies().catch(() => {});
     } catch (e) {
@@ -211,7 +211,7 @@ export default function CreatePermVacancy() {
               {saving ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.submitBtnTxt}>{isEdit ? '💾 Сохранить' : '📋 Опубликовать'}</Text>
+                <Text style={styles.submitBtnTxt}>{isEdit ? 'Сохранить' : 'Опубликовать'}</Text>
               )}
             </TouchableOpacity>
           </View>

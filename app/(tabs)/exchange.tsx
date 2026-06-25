@@ -260,7 +260,7 @@ function WorkerExchange() {
       }
       ListEmptyComponent={
         <View style={xS.emptyWrap}>
-          <Text style={{ fontSize: 48 }}>📋</Text>
+          <Ionicons name="document-text-outline" size={48} color={Colors.textMuted} />
           <Text style={xS.emptyTitle}>Объявлений пока нет</Text>
           <Text style={xS.emptySubtitle}>Работодатели публикуют срочные объявления здесь</Text>
         </View>
@@ -475,7 +475,7 @@ function EmployerExchange() {
         {section === 'chat' && (
           bulletins.length === 0 ? (
             <View style={xS.emptyWrap}>
-              <Text style={{ fontSize: 48 }}>📋</Text>
+              <Ionicons name="document-text-outline" size={48} color={Colors.textMuted} />
               <Text style={xS.emptyTitle}>Объявлений пока нет</Text>
               <Text style={xS.emptySubtitle}>Здесь появятся срочные объявления работодателей</Text>
             </View>
@@ -504,7 +504,7 @@ function EmployerExchange() {
                 <Text style={xS.formLabel}>Дата *</Text>
                 {Platform.OS === 'web' ? (
                   <View style={xS.pickerField}>
-                    <Text style={xS.pickerIcon}>📅</Text>
+                    <Ionicons name="calendar-outline" size={18} color={Colors.textMuted} />
                     {/* @ts-ignore */}
                     <input type="date" value={formatISODate(selectedDate)} min={formatISODate(new Date())}
                       onChange={(e: any) => e.target.value && applyPickerDate('date', parseISOToDate(e.target.value))}
@@ -512,7 +512,7 @@ function EmployerExchange() {
                   </View>
                 ) : (
                   <TouchableOpacity style={xS.pickerField} onPress={() => openPicker('date')} activeOpacity={0.8}>
-                    <Text style={xS.pickerIcon}>📅</Text>
+                    <Ionicons name="calendar-outline" size={18} color={Colors.textMuted} />
                     <Text style={xS.pickerValue}>{formatDisplayDate(selectedDate)}</Text>
                     <Text style={xS.pickerArrow}>›</Text>
                   </TouchableOpacity>
@@ -525,7 +525,7 @@ function EmployerExchange() {
                 {Platform.OS === 'web' ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={[xS.pickerField, { flex: 1 }]}>
-                      <Text style={xS.pickerIcon}>⏰</Text>
+                      <Ionicons name="time-outline" size={18} color={Colors.textMuted} />
                       {/* @ts-ignore */}
                       <input type="time" value={formatTime(selectedTimeStart)}
                         onChange={(e: any) => e.target.value && applyPickerDate('timeStart', parseTimeToDate(e.target.value))}
@@ -533,7 +533,7 @@ function EmployerExchange() {
                     </View>
                     <Text style={xS.timeSep}>–</Text>
                     <View style={[xS.pickerField, { flex: 1 }]}>
-                      <Text style={xS.pickerIcon}>⏰</Text>
+                      <Ionicons name="time-outline" size={18} color={Colors.textMuted} />
                       {/* @ts-ignore */}
                       <input type="time" value={formatTime(selectedTimeEnd)}
                         onChange={(e: any) => e.target.value && applyPickerDate('timeEnd', parseTimeToDate(e.target.value))}
@@ -544,12 +544,12 @@ function EmployerExchange() {
                   <>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openPicker('timeStart')} activeOpacity={0.8}>
-                        <Text style={xS.pickerIcon}>⏰</Text>
+                        <Ionicons name="time-outline" size={18} color={Colors.textMuted} />
                         <Text style={xS.pickerValue}>{formatTime(selectedTimeStart)}</Text>
                       </TouchableOpacity>
                       <Text style={xS.timeSep}>–</Text>
                       <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openPicker('timeEnd')} activeOpacity={0.8}>
-                        <Text style={xS.pickerIcon}>⏰</Text>
+                        <Ionicons name="time-outline" size={18} color={Colors.textMuted} />
                         <Text style={xS.pickerValue}>{formatTime(selectedTimeEnd)}</Text>
                       </TouchableOpacity>
                     </View>

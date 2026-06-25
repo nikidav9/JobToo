@@ -17,6 +17,7 @@ import { notifyWorkersNearVacancy } from '@/services/notifications';
 import { Vacancy, WorkType } from '@/constants/types';
 import { METRO_LINES } from '@/constants/metro';
 import { WorkTypeSelector, WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
+import { Ionicons } from '@expo/vector-icons';
 
 function pad2(n: number) { return n.toString().padStart(2, '0'); }
 function formatDisplayDate(d: Date) { return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()}`; }
@@ -247,7 +248,7 @@ export default function CreateVacancy() {
         };
         await upsertWithTimeout(dbUpsertVacancy(vac));
         optimisticUpdateVacancy(vac);
-        showToast('Вакансия обновлена ✅', 'success');
+        showToast('Вакансия обновлена', 'success');
       } else if (multiDay) {
         const dates = getDatesBetween(selectedDate, selectedEndDate);
         const vacs: Vacancy[] = dates.map(d => ({
@@ -263,7 +264,7 @@ export default function CreateVacancy() {
         if (metroStation) {
           notifyWorkersNearVacancy({ metroStation, title: meta.label, company: base.company, type: 'shift' }).catch(() => {});
         }
-        showToast(`Опубликовано ${dates.length} вакансий ✅`, 'success');
+        showToast(`Опубликовано ${dates.length} вакансий`, 'success');
       } else {
         const vac: Vacancy = {
           ...base,
@@ -278,7 +279,7 @@ export default function CreateVacancy() {
         if (metroStation) {
           notifyWorkersNearVacancy({ metroStation, title: meta.label, company: base.company, type: 'shift' }).catch(() => {});
         }
-        showToast('Вакансия опубликована ✅', 'success');
+        showToast('Вакансия опубликована', 'success');
       }
       router.back();
       refreshVacancies().catch(() => {});
@@ -384,7 +385,7 @@ export default function CreateVacancy() {
 
             {Platform.OS === 'web' ? (
               <View style={styles.pickerField}>
-                <Text style={styles.pickerIcon}>📅</Text>
+                <Ionicons name="calendar-outline" size={18} color={Colors.textMuted} />
                 {/* @ts-ignore */}
                 <input type="date" value={formatISODate(selectedDate)} min={formatISODate(new Date())}
                   onChange={(e: any) => e.target.value && applyDate('date', parseISOToDate(e.target.value))}
@@ -392,7 +393,7 @@ export default function CreateVacancy() {
               </View>
             ) : (
               <TouchableOpacity style={styles.pickerField} onPress={() => openPicker('date')} activeOpacity={0.8}>
-                <Text style={styles.pickerIcon}>📅</Text>
+                <Ionicons name="calendar-outline" size={18} color={Colors.textMuted} />
                 <Text style={styles.pickerValue}>{multiDay ? `С ${formatDisplayDate(selectedDate)}` : formatDisplayDate(selectedDate)}</Text>
                 <Text style={styles.pickerArrow}>›</Text>
               </TouchableOpacity>
@@ -405,7 +406,7 @@ export default function CreateVacancy() {
               <>
                 {Platform.OS === 'web' ? (
                   <View style={styles.pickerField}>
-                    <Text style={styles.pickerIcon}>📅</Text>
+                    <Ionicons name="calendar-outline" size={18} color={Colors.textMuted} />
                     {/* @ts-ignore */}
                     <input type="date" value={formatISODate(selectedEndDate)} min={formatISODate(selectedDate)}
                       onChange={(e: any) => e.target.value && applyDate('endDate', parseISOToDate(e.target.value))}
@@ -413,7 +414,7 @@ export default function CreateVacancy() {
                   </View>
                 ) : (
                   <TouchableOpacity style={styles.pickerField} onPress={() => openPicker('endDate')} activeOpacity={0.8}>
-                    <Text style={styles.pickerIcon}>📅</Text>
+                    <Ionicons name="calendar-outline" size={18} color={Colors.textMuted} />
                     <Text style={styles.pickerValue}>По {formatDisplayDate(selectedEndDate)}</Text>
                     <Text style={styles.pickerArrow}>›</Text>
                   </TouchableOpacity>
@@ -425,7 +426,7 @@ export default function CreateVacancy() {
                 {daysInRange.length > 0 ? (
                   <View style={styles.daysPreview}>
                     <Text style={styles.daysPreviewTitle}>
-                      📋 Будет создано {daysInRange.length} {daysInRange.length === 1 ? 'вакансия' : daysInRange.length < 5 ? 'вакансии' : 'вакансий'}:
+                      Будет создано {daysInRange.length} {daysInRange.length === 1 ? 'вакансия' : daysInRange.length < 5 ? 'вакансии' : 'вакансий'}:
                     </Text>
                     <Text style={styles.daysPreviewDates}>
                       {daysInRange.map(d => `${d.getDate()}.${pad2(d.getMonth() + 1)}`).join(' · ')}
@@ -442,7 +443,7 @@ export default function CreateVacancy() {
             {Platform.OS === 'web' ? (
               <View style={styles.timeRow}>
                 <View style={[styles.pickerField, { flex: 1 }]}>
-                  <Text style={styles.pickerIcon}>⏰</Text>
+                  <Ionicons name="time-outline" size={18} color={Colors.textMuted} />
                   {/* @ts-ignore */}
                   <input type="time" value={formatTime(selectedTimeStart)}
                     onChange={(e: any) => e.target.value && applyDate('timeStart', parseTimeToDate(e.target.value))}
@@ -450,7 +451,7 @@ export default function CreateVacancy() {
                 </View>
                 <Text style={styles.timeSep}>–</Text>
                 <View style={[styles.pickerField, { flex: 1 }]}>
-                  <Text style={styles.pickerIcon}>⏰</Text>
+                  <Ionicons name="time-outline" size={18} color={Colors.textMuted} />
                   {/* @ts-ignore */}
                   <input type="time" value={formatTime(selectedTimeEnd)}
                     onChange={(e: any) => e.target.value && applyDate('timeEnd', parseTimeToDate(e.target.value))}
@@ -461,12 +462,12 @@ export default function CreateVacancy() {
               <>
                 <View style={styles.timeRow}>
                   <TouchableOpacity style={[styles.pickerField, { flex: 1 }]} onPress={() => openPicker('timeStart')} activeOpacity={0.8}>
-                    <Text style={styles.pickerIcon}>⏰</Text>
+                    <Ionicons name="time-outline" size={18} color={Colors.textMuted} />
                     <Text style={styles.pickerValue}>{formatTime(selectedTimeStart)}</Text>
                   </TouchableOpacity>
                   <Text style={styles.timeSep}>–</Text>
                   <TouchableOpacity style={[styles.pickerField, { flex: 1 }]} onPress={() => openPicker('timeEnd')} activeOpacity={0.8}>
-                    <Text style={styles.pickerIcon}>⏰</Text>
+                    <Ionicons name="time-outline" size={18} color={Colors.textMuted} />
                     <Text style={styles.pickerValue}>{formatTime(selectedTimeEnd)}</Text>
                   </TouchableOpacity>
                 </View>
@@ -569,9 +570,9 @@ export default function CreateVacancy() {
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <Text style={styles.submitBtnTxt}>
-                  {isEdit ? '💾 Сохранить изменения'
-                    : multiDay ? `📋 Опубликовать ${daysInRange.length} вакансий`
-                    : '📋 Опубликовать вакансию'}
+                  {isEdit ? 'Сохранить изменения'
+                    : multiDay ? `Опубликовать ${daysInRange.length} вакансий`
+                    : 'Опубликовать вакансию'}
                 </Text>
               )}
             </TouchableOpacity>
