@@ -1039,6 +1039,7 @@ function rowToBulletin(r: any): Bulletin {
     address: r.address,
     comment: r.comment ?? undefined,
     status: r.status,
+    views: r.views ?? 0,
     createdAt: r.created_at,
   };
 }
@@ -1073,6 +1074,10 @@ export async function dbGetMyBulletins(employerId: string): Promise<Bulletin[]> 
 
 export async function dbCloseBulletin(bulletinId: string): Promise<void> {
   await proxy('dbCloseBulletin', [bulletinId]);
+}
+
+export async function dbIncrementBulletinViews(bulletinId: string): Promise<void> {
+  await proxy('dbIncrementBulletinViews', [bulletinId]);
 }
 
 export async function dbGetAllWorkerTokens(): Promise<{ id: string; push_token: string }[]> {

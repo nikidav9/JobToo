@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, FlatList, ActivityIndicator, RefreshControl, Modal, Platform,
@@ -10,7 +10,7 @@ import { useRouter } from 'expo-router';
 import { Colors, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { Bulletin } from '@/constants/types';
-import { dbRespondToBulletin, dbCreateBulletin, dbCloseBulletin } from '@/services/db';
+import { dbRespondToBulletin, dbCreateBulletin, dbCloseBulletin, dbIncrementBulletinViews } from '@/services/db';
 import { notifyAllWorkersNewBulletin } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { METRO_LINES } from '@/constants/metro';
@@ -23,6 +23,14 @@ function pad2(n: number) { return n.toString().padStart(2, '0'); }
 function formatDisplayDate(d: Date) { return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()}`; }
 function formatISODate(d: Date) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 function formatTime(d: Date) { return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+function parseISOToDate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(); dt.setFullYear(y, m - 1, d); dt.setHours(0, 0, 0, 0); return dt;
+}
+function parseTimeToDate(time: string): Date {
+  const [h, min] = time.split(':').map(Number);
+  const d = new Date(); d.setHours(h, min, 0, 0); return d;
+}
 
 type PickerMode = 'date' | 'timeStart' | 'timeEnd' | null;
 
@@ -171,6 +179,14 @@ function WorkerExchange() {
   const tabBarHeight = useBottomTabBarHeight();
   const [refreshing, setRefreshing] = useState(false);
   const [responding, setResponding] = useState<string | null>(null);
+  const [viewsMarked, setViewsMarked] = useState(false);
+
+  useEffect(() => {
+    if (!viewsMarked && bulletins.length > 0) {
+      bulletins.forEach(b => dbIncrementBulletinViews(b.id).catch(() => {}));
+      setViewsMarked(true);
+    }
+  }, [bulletins]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -227,23 +243,21 @@ function WorkerExchange() {
             <Text style={xS.workType}>{b.workType}</Text>
             <View style={xS.metaRow}>
               <View style={xS.metaItem}>
-                <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
+                <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
                 <Text style={xS.metaTxt}>{formatDate(b.date)}</Text>
               </View>
               <View style={xS.metaItem}>
-                <Ionicons name="time-outline" size={14} color={Colors.textMuted} />
+                <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
                 <Text style={xS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
               </View>
-            </View>
-            <View style={xS.metaRow}>
               <View style={xS.metaItem}>
-                <Ionicons name="subway-outline" size={14} color={Colors.textMuted} />
+                <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
                 <Text style={xS.metaTxt}>м. {b.metro}</Text>
               </View>
             </View>
-            <View style={xS.addressRow}>
-              <Ionicons name="location-outline" size={14} color="#92400E" />
-              <Text style={xS.addressTxt} numberOfLines={2}>{b.address}</Text>
+            <View style={xS.metaItem}>
+              <Ionicons name="location-outline" size={13} color={Colors.textSecondary} />
+              <Text style={[xS.metaTxt, { flex: 1 }]} numberOfLines={2}>{b.address}</Text>
             </View>
             {b.comment ? <Text style={xS.comment} numberOfLines={3}>{b.comment}</Text> : null}
             <TouchableOpacity
@@ -405,31 +419,64 @@ function EmployerExchange() {
               </Text>
             </TouchableOpacity>
             <Text style={xS.formLabel}>Дата *</Text>
-            <TouchableOpacity style={xS.pickerField} onPress={() => openPicker('date')} activeOpacity={0.8}>
-              <Text style={xS.pickerIcon}>📅</Text>
-              <Text style={xS.pickerValue}>{formatDisplayDate(selectedDate)}</Text>
-              <Text style={xS.pickerArrow}>›</Text>
-            </TouchableOpacity>
-            {Platform.OS === 'android' && pickerMode === 'date' && (
-              <DateTimePicker value={pickerDateValue ?? new Date()} mode="date" display="calendar" minimumDate={new Date()} onChange={onAndroidChange} />
+            {Platform.OS === 'web' ? (
+              <View style={xS.pickerField}>
+                <Text style={xS.pickerIcon}>📅</Text>
+                {/* @ts-ignore */}
+                <input type="date" value={formatISODate(selectedDate)} min={formatISODate(new Date())}
+                  onChange={(e: any) => e.target.value && applyPickerDate('date', parseISOToDate(e.target.value))}
+                  style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+              </View>
+            ) : (
+              <TouchableOpacity style={xS.pickerField} onPress={() => openPicker('date')} activeOpacity={0.8}>
+                <Text style={xS.pickerIcon}>📅</Text>
+                <Text style={xS.pickerValue}>{formatDisplayDate(selectedDate)}</Text>
+                <Text style={xS.pickerArrow}>›</Text>
+              </TouchableOpacity>
             )}
+            {Platform.OS === 'android' && pickerMode === 'date' ? (
+              <DateTimePicker value={selectedDate} mode="date" display="calendar" minimumDate={new Date()} onChange={onAndroidChange} />
+            ) : null}
+
             <Text style={xS.formLabel}>Время *</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openPicker('timeStart')} activeOpacity={0.8}>
-                <Text style={xS.pickerIcon}>⏰</Text>
-                <Text style={xS.pickerValue}>{formatTime(selectedTimeStart)}</Text>
-              </TouchableOpacity>
-              <Text style={xS.timeSep}>–</Text>
-              <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openPicker('timeEnd')} activeOpacity={0.8}>
-                <Text style={xS.pickerIcon}>⏰</Text>
-                <Text style={xS.pickerValue}>{formatTime(selectedTimeEnd)}</Text>
-              </TouchableOpacity>
-            </View>
-            {Platform.OS === 'android' && pickerMode === 'timeStart' && (
-              <DateTimePicker value={pickerDateValue ?? new Date()} mode="time" display="spinner" is24Hour onChange={onAndroidChange} />
-            )}
-            {Platform.OS === 'android' && pickerMode === 'timeEnd' && (
-              <DateTimePicker value={pickerDateValue ?? new Date()} mode="time" display="spinner" is24Hour onChange={onAndroidChange} />
+            {Platform.OS === 'web' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={[xS.pickerField, { flex: 1 }]}>
+                  <Text style={xS.pickerIcon}>⏰</Text>
+                  {/* @ts-ignore */}
+                  <input type="time" value={formatTime(selectedTimeStart)}
+                    onChange={(e: any) => e.target.value && applyPickerDate('timeStart', parseTimeToDate(e.target.value))}
+                    style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+                </View>
+                <Text style={xS.timeSep}>–</Text>
+                <View style={[xS.pickerField, { flex: 1 }]}>
+                  <Text style={xS.pickerIcon}>⏰</Text>
+                  {/* @ts-ignore */}
+                  <input type="time" value={formatTime(selectedTimeEnd)}
+                    onChange={(e: any) => e.target.value && applyPickerDate('timeEnd', parseTimeToDate(e.target.value))}
+                    style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+                </View>
+              </View>
+            ) : (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openPicker('timeStart')} activeOpacity={0.8}>
+                    <Text style={xS.pickerIcon}>⏰</Text>
+                    <Text style={xS.pickerValue}>{formatTime(selectedTimeStart)}</Text>
+                  </TouchableOpacity>
+                  <Text style={xS.timeSep}>–</Text>
+                  <TouchableOpacity style={[xS.pickerField, { flex: 1 }]} onPress={() => openPicker('timeEnd')} activeOpacity={0.8}>
+                    <Text style={xS.pickerIcon}>⏰</Text>
+                    <Text style={xS.pickerValue}>{formatTime(selectedTimeEnd)}</Text>
+                  </TouchableOpacity>
+                </View>
+                {Platform.OS === 'android' && pickerMode === 'timeStart' ? (
+                  <DateTimePicker value={selectedTimeStart} mode="time" display="spinner" is24Hour onChange={onAndroidChange} />
+                ) : null}
+                {Platform.OS === 'android' && pickerMode === 'timeEnd' ? (
+                  <DateTimePicker value={selectedTimeEnd} mode="time" display="spinner" is24Hour onChange={onAndroidChange} />
+                ) : null}
+              </>
             )}
             <Text style={xS.formLabel}>Метро *</Text>
             <TouchableOpacity style={[xS.formInput, { justifyContent: 'center' }]} onPress={() => setMetroPicker(true)} activeOpacity={0.8}>
@@ -458,27 +505,39 @@ function EmployerExchange() {
         {activeBulletins.length > 0 ? (
           <>
             <Text style={xS.sectionLabel}>Активные</Text>
-            {activeBulletins.map(b => {
-              const responseCount = chats.filter(c => c.bulletinId === b.id).length;
-              return (
-                <View key={b.id} style={[xS.card, xS.cardEmployer]}>
-                  <View style={xS.cardHeader}>
-                    <Text style={xS.workType}>{b.workType}</Text>
-                    <TouchableOpacity style={xS.closeBtn} onPress={() => closeBulletin(b.id)} activeOpacity={0.8}>
-                      <Text style={xS.closeBtnTxt}>Закрыть</Text>
-                    </TouchableOpacity>
+            {activeBulletins.map(b => (
+              <View key={b.id} style={[xS.card, xS.cardEmployer]}>
+                <View style={xS.cardHeader}>
+                  <Text style={xS.workType}>{b.workType}</Text>
+                  <TouchableOpacity style={xS.closeBtn} onPress={() => closeBulletin(b.id)} activeOpacity={0.8}>
+                    <Text style={xS.closeBtnTxt}>Закрыть</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={xS.metaRow}>
+                  <View style={xS.metaItem}>
+                    <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
+                    <Text style={xS.metaTxt}>{formatDateShort(b.date)}</Text>
                   </View>
-                  <Text style={xS.metaTxt}>📅 {formatDateShort(b.date)}  ⏰ {b.timeStart}–{b.timeEnd}</Text>
-                  <Text style={xS.metaTxt}>🚇 м. {b.metro}</Text>
-                  <Text style={xS.addressTxt} numberOfLines={1}>📍 {b.address}</Text>
-                  {b.comment ? <Text style={xS.comment} numberOfLines={2}>{b.comment}</Text> : null}
-                  <View style={xS.viewsRow}>
-                    <Ionicons name="eye-outline" size={14} color={Colors.textMuted} />
-                    <Text style={xS.viewsTxt}>{responseCount}</Text>
+                  <View style={xS.metaItem}>
+                    <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+                    <Text style={xS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
+                  </View>
+                  <View style={xS.metaItem}>
+                    <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
+                    <Text style={xS.metaTxt}>м. {b.metro}</Text>
                   </View>
                 </View>
-              );
-            })}
+                <View style={xS.metaItem}>
+                  <Ionicons name="location-outline" size={13} color={Colors.textSecondary} />
+                  <Text style={[xS.metaTxt, { flex: 1 }]} numberOfLines={1}>{b.address}</Text>
+                </View>
+                {b.comment ? <Text style={xS.comment} numberOfLines={2}>{b.comment}</Text> : null}
+                <View style={xS.viewsRow}>
+                  <Ionicons name="eye-outline" size={13} color={Colors.textMuted} />
+                  <Text style={xS.viewsTxt}>{b.views}</Text>
+                </View>
+              </View>
+            ))}
           </>
         ) : (
           !showForm && (
@@ -493,20 +552,29 @@ function EmployerExchange() {
         {closedBulletins.length > 0 ? (
           <>
             <Text style={xS.sectionLabel}>Закрытые</Text>
-            {closedBulletins.map(b => {
-              const responseCount = chats.filter(c => c.bulletinId === b.id).length;
-              return (
-                <View key={b.id} style={[xS.card, xS.cardClosed]}>
-                  <Text style={[xS.workType, { color: Colors.textMuted }]}>{b.workType}</Text>
-                  <Text style={xS.metaTxt}>📅 {formatDateShort(b.date)}  ⏰ {b.timeStart}–{b.timeEnd}</Text>
-                  <Text style={xS.metaTxt}>🚇 м. {b.metro}</Text>
-                  <View style={xS.viewsRow}>
-                    <Ionicons name="eye-outline" size={14} color={Colors.textMuted} />
-                    <Text style={xS.viewsTxt}>{responseCount}</Text>
+            {closedBulletins.map(b => (
+              <View key={b.id} style={[xS.card, xS.cardClosed]}>
+                <Text style={[xS.workType, { color: Colors.textMuted }]}>{b.workType}</Text>
+                <View style={xS.metaRow}>
+                  <View style={xS.metaItem}>
+                    <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
+                    <Text style={xS.metaTxt}>{formatDateShort(b.date)}</Text>
+                  </View>
+                  <View style={xS.metaItem}>
+                    <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+                    <Text style={xS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
+                  </View>
+                  <View style={xS.metaItem}>
+                    <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
+                    <Text style={xS.metaTxt}>м. {b.metro}</Text>
                   </View>
                 </View>
-              );
-            })}
+                <View style={xS.viewsRow}>
+                  <Ionicons name="eye-outline" size={13} color={Colors.textMuted} />
+                  <Text style={xS.viewsTxt}>{b.views}</Text>
+                </View>
+              </View>
+            ))}
           </>
         ) : null}
       </ScrollView>

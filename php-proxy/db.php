@@ -90,6 +90,16 @@ function sb_delete(string $t, array $f): void {
     sb('DELETE', $t, $f);
 }
 
+function sb_rpc(string $fn, array $params = []): mixed {
+    $url = SB_URL . '/rest/v1/rpc/' . $fn;
+    $hdrs = ['apikey: ' . SB_KEY, 'Authorization: Bearer ' . SB_KEY, 'Content-Type: application/json'];
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_HTTPHEADER => $hdrs, CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => true]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($params));
+    $resp = curl_exec($ch); curl_close($ch);
+    return json_decode($resp ?: 'null', true);
+}
+
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 try {
     $data = null;
@@ -559,6 +569,11 @@ try {
                     'text' => $closeMsg, 'created_at' => now_iso(),
                 ]);
             }
+            $data = true; break;
+        }
+
+        case 'dbIncrementBulletinViews': {
+            sb_rpc('increment_bulletin_views', ['bid' => $args[0]]);
             $data = true; break;
         }
 

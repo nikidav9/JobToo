@@ -95,6 +95,7 @@ export interface Bulletin {
   address: string;
   comment?: string;
   status: 'open' | 'closed';
+  views: number;
   createdAt: string;
 }
 
