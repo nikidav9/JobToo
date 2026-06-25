@@ -557,6 +557,17 @@ try {
         case 'dbGetMyBulletins':
             $data = sb_select('jm_bulletins', ['employer_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;
 
+        case 'dbDeleteBulletin': {
+            $bid = $args[0];
+            $chats = sb_select('jm_chats', ['bulletin_id' => 'eq.' . $bid], 'id');
+            foreach ($chats as $chat) {
+                sb('DELETE', 'jm_messages', ['chat_id' => 'eq.' . $chat['id']]);
+                sb('DELETE', 'jm_chats', ['id' => 'eq.' . $chat['id']]);
+            }
+            sb('DELETE', 'jm_bulletins', ['id' => 'eq.' . $bid]);
+            $data = true; break;
+        }
+
         case 'dbCloseBulletin': {
             $bid = $args[0];
             $closeMsg = 'Работника уже нашли, вакансия больше не актуальна';
