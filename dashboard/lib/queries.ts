@@ -1200,41 +1200,57 @@ export async function fetchExchange() {
     { data: bulletins },
     { data: slots },
     { data: chats },
+    { data: slotChats },
   ] = await Promise.all([
     supabase.from('jm_bulletins').select('id,work_type,date,time_start,time_end,metro,status,views,employer_id,company,created_at'),
-    supabase.from('jm_worker_slots').select('id,work_type,date,time_start,time_end,metro,status,created_at'),
+    supabase.from('jm_worker_slots').select('id,work_type,date,time_start,time_end,metro,status,worker_id,created_at'),
     supabase.from('jm_chats').select('id,bulletin_id,worker_slot_id,created_at').not('bulletin_id', 'is', null),
+    supabase.from('jm_chats').select('id,bulletin_id,worker_slot_id,created_at').not('worker_slot_id', 'is', null),
   ])
 
   const bl = bulletins ?? []
   const sl = slots ?? []
   const ch = chats ?? []
+  const sch = slotChats ?? []
 
   const now = new Date()
-  const w7 = subDays(now, 7).toISOString()
   const w30 = subDays(now, 30).toISOString()
   const w60 = subDays(now, 60).toISOString()
+  const w7 = subDays(now, 7).toISOString()
 
   const openBulletins = bl.filter((x: any) => x.status === 'open')
   const closedBulletins = bl.filter((x: any) => x.status === 'closed')
   const openSlots = sl.filter((x: any) => x.status === 'open')
+  const closedSlots = sl.filter((x: any) => x.status === 'closed')
 
   const newBulletinsMonth = bl.filter((x: any) => x.created_at > w30).length
   const prevBulletinsMonth = bl.filter((x: any) => x.created_at > w60 && x.created_at <= w30).length
   const newChatsMonth = ch.filter((x: any) => x.created_at > w30).length
   const prevChatsMonth = ch.filter((x: any) => x.created_at > w60 && x.created_at <= w30).length
+  const newSlotsMonth = sl.filter((x: any) => x.created_at > w30).length
+  const prevSlotsMonth = sl.filter((x: any) => x.created_at > w60 && x.created_at <= w30).length
 
   const totalViews = bl.reduce((s: number, x: any) => s + (x.views ?? 0), 0)
-  const avgResponseRate = bl.length > 0
-    ? (ch.length / bl.length).toFixed(2)
-    : '0'
+  const avgViews = bl.length > 0 ? Math.round(totalViews / bl.length) : 0
+  const avgResponses = bl.length > 0 ? (ch.length / bl.length).toFixed(1) : '0'
+
+  // per-bulletin response counts
+  const respByBulletin: Record<string, number> = {}
+  for (const c of ch) {
+    const bid = (c as any).bulletin_id
+    if (bid) respByBulletin[bid] = (respByBulletin[bid] ?? 0) + 1
+  }
+  const zeroResponseBulletins = bl.filter((b: any) => !(b.id in respByBulletin)).length
+  const zeroResponsePct = bl.length > 0 ? Math.round((zeroResponseBulletins / bl.length) * 100) : 0
+
+  // view-to-response conversion
+  const conversionPct = totalViews > 0 ? ((ch.length / totalViews) * 100).toFixed(1) : '0'
 
   // daily 30-day activity
   const days30 = dayRange(30)
   const blByDay = groupByDate(bl, 'created_at')
   const chByDay = groupByDate(ch, 'created_at')
   const slByDay = groupByDate(sl, 'created_at')
-
   const daily30 = days30.map(d => ({
     date: toDayLabel(d),
     bulletins: blByDay[d] ?? 0,
@@ -1252,7 +1268,17 @@ export async function fetchExchange() {
     .map(([key, value]) => ({ name: WORK_TYPE_LABELS[key] ?? key, value }))
     .sort((a, b) => b.value - a.value)
 
-  // metro distribution
+  // work type distribution for worker slots
+  const slWtMap: Record<string, number> = {}
+  for (const s of sl) {
+    const wt = (s as any).work_type ?? 'other'
+    slWtMap[wt] = (slWtMap[wt] ?? 0) + 1
+  }
+  const slotWorkTypeDist = Object.entries(slWtMap)
+    .map(([key, value]) => ({ name: WORK_TYPE_LABELS[key] ?? key, value }))
+    .sort((a, b) => b.value - a.value)
+
+  // metro distribution for bulletins
   const metroMap: Record<string, number> = {}
   for (const b of bl) {
     const m = (b as any).metro
@@ -1263,19 +1289,84 @@ export async function fetchExchange() {
     .sort((a, b) => b.value - a.value)
     .slice(0, 10)
 
-  // top employers
-  const empMap: Record<string, { name: string; bulletins: number; responses: number }> = {}
+  // metro distribution for worker slots
+  const slMetroMap: Record<string, number> = {}
+  for (const s of sl) {
+    const m = (s as any).metro
+    if (m) slMetroMap[m] = (slMetroMap[m] ?? 0) + 1
+  }
+  const slotMetroTop = Object.entries(slMetroMap)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
+  // hour distribution (time_start → hour)
+  const hourMap: Record<number, number> = {}
+  for (const b of bl) {
+    const ts: string = (b as any).time_start ?? ''
+    const hour = ts ? parseInt(ts.slice(0, 2), 10) : -1
+    if (hour >= 0 && hour <= 23) hourMap[hour] = (hourMap[hour] ?? 0) + 1
+  }
+  const hourDist = Array.from({ length: 24 }, (_, h) => ({
+    hour: `${String(h).padStart(2, '0')}:00`,
+    value: hourMap[h] ?? 0,
+  })).filter(x => x.value > 0)
+
+  // day of week distribution
+  const DAYS_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
+  const dowMap: Record<number, number> = {}
+  for (const b of bl) {
+    const d: string = (b as any).date ?? ''
+    if (d) {
+      const dow = new Date(d).getDay()
+      dowMap[dow] = (dowMap[dow] ?? 0) + 1
+    }
+  }
+  const weekdayDist = [1, 2, 3, 4, 5, 6, 0].map(d => ({
+    name: DAYS_RU[d],
+    value: dowMap[d] ?? 0,
+  }))
+
+  // funnel: views → responses → (unique responders)
+  const uniqueResponders = new Set(ch.map((c: any) => c.worker_slot_id)).size
+  const funnelData = [
+    { name: 'Просмотров', value: totalViews },
+    { name: 'Откликов', value: ch.length },
+    { name: 'Уникальных', value: uniqueResponders },
+  ]
+
+  // top employers (with views and slots)
+  const empSlotMap: Record<string, number> = {}
+  for (const s of sl) {
+    const wid = (s as any).worker_id
+    if (wid) empSlotMap[wid] = (empSlotMap[wid] ?? 0) + 1
+  }
+  const empMap: Record<string, { name: string; bulletins: number; responses: number; views: number }> = {}
   for (const b of bl) {
     const eid = (b as any).employer_id
     const company = (b as any).company ?? 'Unknown'
-    if (!empMap[eid]) empMap[eid] = { name: company, bulletins: 0, responses: 0 }
+    if (!empMap[eid]) empMap[eid] = { name: company, bulletins: 0, responses: 0, views: 0 }
     empMap[eid].bulletins++
-    const resp = ch.filter((c: any) => c.bulletin_id === (b as any).id).length
-    empMap[eid].responses += resp
+    empMap[eid].views += (b as any).views ?? 0
+    empMap[eid].responses += respByBulletin[(b as any).id] ?? 0
   }
   const topEmployers = Object.values(empMap)
     .sort((a, b) => b.bulletins - a.bulletins)
     .slice(0, 10)
+
+  // weekly comparison: this week vs last week
+  const w14 = subDays(now, 14).toISOString()
+  const blThisWeek = bl.filter((x: any) => x.created_at > w7).length
+  const blLastWeek = bl.filter((x: any) => x.created_at > w14 && x.created_at <= w7).length
+  const chThisWeek = ch.filter((x: any) => x.created_at > w7).length
+  const chLastWeek = ch.filter((x: any) => x.created_at > w14 && x.created_at <= w7).length
+  const slThisWeek = sl.filter((x: any) => x.created_at > w7).length
+  const slLastWeek = sl.filter((x: any) => x.created_at > w14 && x.created_at <= w7).length
+  const weekComparison = [
+    { name: 'Объявления', thisWeek: blThisWeek, lastWeek: blLastWeek },
+    { name: 'Отклики', thisWeek: chThisWeek, lastWeek: chLastWeek },
+    { name: 'Слоты', thisWeek: slThisWeek, lastWeek: slLastWeek },
+  ]
 
   // bulletin cards with response counts
   const bulletinCards = bl
@@ -1289,7 +1380,7 @@ export async function fetchExchange() {
       metro: b.metro ?? '',
       status: b.status,
       views: b.views ?? 0,
-      responses: ch.filter((c: any) => c.bulletin_id === b.id).length,
+      responses: respByBulletin[b.id] ?? 0,
       createdAt: b.created_at ? format(parseISO(b.created_at), 'dd.MM.yy') : '',
     }))
     .sort((a: any, b: any) => b.responses - a.responses)
@@ -1299,18 +1390,32 @@ export async function fetchExchange() {
       totalBulletins: bl.length,
       openBulletins: openBulletins.length,
       closedBulletins: closedBulletins.length,
+      totalSlots: sl.length,
       openSlots: openSlots.length,
+      closedSlots: closedSlots.length,
       totalChats: ch.length,
       totalViews,
-      avgResponseRate,
+      avgViews,
+      avgResponses,
+      conversionPct,
+      zeroResponseBulletins,
+      zeroResponsePct,
       newBulletinsMonth,
       newChatsMonth,
+      newSlotsMonth,
       bulletinsTrend: trend(newBulletinsMonth, prevBulletinsMonth),
       chatsTrend: trend(newChatsMonth, prevChatsMonth),
+      slotsTrend: trend(newSlotsMonth, prevSlotsMonth),
     },
     daily30,
     workTypeDist,
+    slotWorkTypeDist,
     metroTop,
+    slotMetroTop,
+    hourDist,
+    weekdayDist,
+    funnelData,
+    weekComparison,
     topEmployers,
     bulletinCards,
   }

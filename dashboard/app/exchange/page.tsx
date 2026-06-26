@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { fetchExchange, PALETTE } from '@/lib/queries'
 import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
@@ -27,12 +27,13 @@ export default function ExchangePage() {
       <PageHeader title="Биржа" intervalSec={30} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
 
       <div className="page-content">
-        {/* KPI row */}
+
+        {/* KPI row 1 — bulletins & responses */}
         <div className="g-4">
           <KpiCard
             label="Всего объявлений"
             value={d.kpi.totalBulletins}
-            sub={`${d.kpi.openBulletins} открыто`}
+            sub={`${d.kpi.openBulletins} открыто · ${d.kpi.closedBulletins} закрыто`}
             sparkColor={PALETTE.orange}
             delta={d.kpi.bulletinsTrend !== 0 ? `${d.kpi.bulletinsTrend > 0 ? '+' : ''}${d.kpi.bulletinsTrend}%` : undefined}
             deltaTone={d.kpi.bulletinsTrend > 0 ? 'pos' : d.kpi.bulletinsTrend < 0 ? 'neg' : undefined}
@@ -46,20 +47,50 @@ export default function ExchangePage() {
             deltaTone={d.kpi.chatsTrend > 0 ? 'pos' : d.kpi.chatsTrend < 0 ? 'neg' : undefined}
           />
           <KpiCard
-            label="Просмотров"
+            label="Просмотров объявлений"
             value={d.kpi.totalViews}
-            sub="суммарно по объявлениям"
+            sub={`ср. ${d.kpi.avgViews} на объявление`}
             sparkColor={PALETTE.cyan}
           />
           <KpiCard
             label="Слотов работников"
-            value={d.kpi.openSlots}
-            sub="открытых предложений"
+            value={d.kpi.totalSlots}
+            sub={`${d.kpi.openSlots} открыто · ${d.kpi.closedSlots} закрыто`}
             sparkColor={PALETTE.green}
+            delta={d.kpi.slotsTrend !== 0 ? `${d.kpi.slotsTrend > 0 ? '+' : ''}${d.kpi.slotsTrend}%` : undefined}
+            deltaTone={d.kpi.slotsTrend > 0 ? 'pos' : d.kpi.slotsTrend < 0 ? 'neg' : undefined}
           />
         </div>
 
-        {/* Daily chart */}
+        {/* KPI row 2 — quality */}
+        <div className="g-4">
+          <KpiCard
+            label="Конверсия просм.→отклик"
+            value={`${d.kpi.conversionPct}%`}
+            sub="от всех просмотров"
+            sparkColor={PALETTE.purple}
+          />
+          <KpiCard
+            label="Ср. откликов на объявление"
+            value={d.kpi.avgResponses}
+            sub="среднее по всем объявлениям"
+            sparkColor={PALETTE.blue}
+          />
+          <KpiCard
+            label="Без откликов"
+            value={`${d.kpi.zeroResponsePct}%`}
+            sub={`${d.kpi.zeroResponseBulletins} объявлений без интереса`}
+            sparkColor={PALETTE.red}
+          />
+          <KpiCard
+            label="Новых за месяц"
+            value={d.kpi.newBulletinsMonth}
+            sub={`+ ${d.kpi.newSlotsMonth} слотов за месяц`}
+            sparkColor={PALETTE.amber}
+          />
+        </div>
+
+        {/* Daily activity chart */}
         <ChartCard title="Активность биржи" sub="Объявления, отклики и слоты · 30 дней">
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={d.daily30} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
@@ -89,9 +120,74 @@ export default function ExchangePage() {
           </ResponsiveContainer>
         </ChartCard>
 
+        {/* Week comparison */}
+        <ChartCard title="Эта неделя vs прошлая" sub="Объявления · отклики · слоты">
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={d.weekComparison} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+              <XAxis dataKey="name" tick={AXIS} tickLine={false} axisLine={false} />
+              <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip contentStyle={TT} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+              <Bar dataKey="thisWeek" name="Эта неделя" fill={PALETTE.orange} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="lastWeek" name="Прошлая неделя" fill="#E8E6DF" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        {/* Funnel + Weekday distribution */}
         <div className="g-2">
-          {/* Work type distribution */}
-          <ChartCard title="Типы работ" sub="Объявления работодателей">
+          <ChartCard title="Воронка" sub="Просмотры → Отклики → Уникальных работников">
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={d.funnelData} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+                <XAxis dataKey="name" tick={AXIS} tickLine={false} axisLine={false} />
+                <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={TT} />
+                <Bar dataKey="value" name="Кол-во" radius={[4, 4, 0, 0]}>
+                  {d.funnelData.map((_: any, i: number) => (
+                    <Cell key={i} fill={[PALETTE.cyan, PALETTE.blue, PALETTE.purple][i] ?? PALETTE.gray} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          <ChartCard title="Дни недели" sub="Объявления по дням недели">
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={d.weekdayDist} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+                <XAxis dataKey="name" tick={AXIS} tickLine={false} axisLine={false} />
+                <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={TT} />
+                <Bar dataKey="value" name="Объявлений" radius={[4, 4, 0, 0]}>
+                  {d.weekdayDist.map((item: any, i: number) => (
+                    <Cell key={i} fill={item.name === 'Сб' || item.name === 'Вс' ? PALETTE.amber : PALETTE.orange} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </div>
+
+        {/* Hour distribution */}
+        {d.hourDist.length > 0 && (
+          <ChartCard title="Популярные часы смен" sub="Распределение начала работы (time_start)">
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={d.hourDist} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+                <XAxis dataKey="hour" tick={AXIS} tickLine={false} axisLine={false} />
+                <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={TT} />
+                <Bar dataKey="value" name="Объявлений" fill={PALETTE.purple} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        )}
+
+        {/* Work type distributions */}
+        <div className="g-2">
+          <ChartCard title="Типы работ — объявления" sub="По работодателям">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={d.workTypeDist} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" horizontal={false} />
@@ -105,9 +201,25 @@ export default function ExchangePage() {
             </ResponsiveContainer>
           </ChartCard>
 
-          {/* Metro distribution */}
-          <ChartCard title="Топ станций метро" sub="По числу объявлений">
+          <ChartCard title="Типы работ — слоты работников" sub="По предложениям от работников">
             <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={d.slotWorkTypeDist} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" horizontal={false} />
+                <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" tick={{ ...AXIS, fill: '#3D3A33' }} tickLine={false} axisLine={false} width={90} />
+                <Tooltip contentStyle={TT} />
+                <Bar dataKey="value" name="Слотов" radius={[0, 4, 4, 0]}>
+                  {d.slotWorkTypeDist.map((_: any, i: number) => <Cell key={i} fill={Object.values(PALETTE)[i % Object.values(PALETTE).length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </div>
+
+        {/* Metro distributions */}
+        <div className="g-2">
+          <ChartCard title="Топ станций — объявления" sub="По числу объявлений работодателей">
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={d.metroTop} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" horizontal={false} />
                 <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
@@ -117,36 +229,55 @@ export default function ExchangePage() {
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
+
+          <ChartCard title="Топ станций — слоты" sub="По числу слотов работников">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={d.slotMetroTop} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" horizontal={false} />
+                <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" tick={{ ...AXIS, fill: '#3D3A33' }} tickLine={false} axisLine={false} width={110} />
+                <Tooltip contentStyle={TT} />
+                <Bar dataKey="value" name="Слотов" fill={PALETTE.green} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
         </div>
 
         {/* Top employers table */}
         <ChartCard title="Топ работодателей" sub="По числу объявлений на бирже">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-            <thead>
-              <tr>
-                {['Компания', 'Объявлений', 'Откликов', 'Конверсия'].map(h => (
-                  <th key={h} style={{
-                    textAlign: 'left', fontSize: 10.5, textTransform: 'uppercase',
-                    letterSpacing: '0.06em', color: 'var(--ink-3)', fontWeight: 500,
-                    padding: '0 16px 10px 0', borderBottom: '1px solid var(--line)',
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {d.topEmployers.map((e: any, i: number) => {
-                const conv = e.bulletins > 0 ? ((e.responses / e.bulletins) * 100).toFixed(0) + '%' : '—'
-                return (
-                  <tr key={i} style={{ borderBottom: '1px solid var(--line)' }}>
-                    <td style={{ padding: '9px 16px 9px 0', fontWeight: 500, color: 'var(--ink)' }}>{e.name}</td>
-                    <td style={{ padding: '9px 16px 9px 0', color: 'var(--ink-2)' }}>{e.bulletins}</td>
-                    <td style={{ padding: '9px 16px 9px 0', color: 'var(--ink-2)' }}>{e.responses}</td>
-                    <td style={{ padding: '9px 0', fontWeight: 600, color: PALETTE.blue }}>{conv}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 540 }}>
+              <thead>
+                <tr>
+                  {['#', 'Компания', 'Объявлений', 'Просмотров', 'Откликов', 'Конверсия'].map(h => (
+                    <th key={h} style={{
+                      textAlign: 'left', fontSize: 10.5, textTransform: 'uppercase',
+                      letterSpacing: '0.06em', color: 'var(--ink-3)', fontWeight: 500,
+                      padding: '0 16px 10px 0', borderBottom: '1px solid var(--line)',
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {d.topEmployers.map((e: any, i: number) => {
+                  const conv = e.views > 0 ? ((e.responses / e.views) * 100).toFixed(0) + '%' : '—'
+                  const convColor = e.views > 0
+                    ? (e.responses / e.views) > 0.1 ? PALETTE.green : (e.responses / e.views) > 0.05 ? PALETTE.amber : PALETTE.red
+                    : 'var(--ink-3)'
+                  return (
+                    <tr key={i} style={{ borderBottom: '1px solid var(--line)' }}>
+                      <td style={{ padding: '9px 16px 9px 0', color: 'var(--ink-4)', fontSize: 11 }}>{i + 1}</td>
+                      <td style={{ padding: '9px 16px 9px 0', fontWeight: 600, color: 'var(--ink)' }}>{e.name}</td>
+                      <td style={{ padding: '9px 16px 9px 0', color: 'var(--ink-2)' }}>{e.bulletins}</td>
+                      <td style={{ padding: '9px 16px 9px 0', color: 'var(--ink-2)' }}>{e.views}</td>
+                      <td style={{ padding: '9px 16px 9px 0', color: 'var(--ink-2)' }}>{e.responses}</td>
+                      <td style={{ padding: '9px 0', fontWeight: 700, color: convColor }}>{conv}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </ChartCard>
 
         {/* Bulletin cards */}
@@ -192,6 +323,7 @@ function BulletinCards({ cards }: { cards: BulletinCardData[] }) {
 function BulletinCard({ c }: { c: BulletinCardData }) {
   const isOpen = c.status === 'open'
   const hasResp = c.responses > 0
+  const ctr = c.views > 0 ? ((c.responses / c.views) * 100).toFixed(0) + '%' : '—'
 
   return (
     <div className="perm-vac-card">
@@ -239,13 +371,16 @@ function BulletinCard({ c }: { c: BulletinCardData }) {
           <span style={{ fontSize: 16, fontWeight: 700, color: hasResp ? 'var(--ink)' : 'var(--ink-4)' }}>{c.responses}</span>
           <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>откл.</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <IconEye color="#B0ADA6" />
           <span style={{ fontSize: 13, color: 'var(--ink-2)' }}>{c.views}</span>
           <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>просм.</span>
         </div>
+        <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+          CTR <span style={{ fontWeight: 600, color: 'var(--ink-2)' }}>{ctr}</span>
+        </div>
         {c.createdAt && (
-          <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 'auto' }}>Опубл. {c.createdAt}</span>
+          <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 'auto' }}>{c.createdAt}</span>
         )}
       </div>
     </div>
@@ -295,7 +430,7 @@ function IconEye({ color }: { color: string }) {
 function Loader() {
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {Array.from({ length: 3 }).map((_, i) => (
+      {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} style={{ height: 120, background: 'var(--bg-sunken)', borderRadius: 10 }} />
       ))}
     </div>
