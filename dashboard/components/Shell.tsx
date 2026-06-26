@@ -28,10 +28,10 @@ const NAV = [
   { href: '/moderation', label: 'Модерация', icon: IconShield },
   { href: '/tickets', label: 'Тикеты', icon: IconTicket },
   { href: '/broadcast', label: 'Рассылка', icon: IconBell },
+  { href: '/exchange', label: 'Биржа', icon: IconMegaphone },
   { href: '/funnel', label: 'Воронка', icon: IconFunnel },
   { href: '/cohorts', label: 'Когорты', icon: IconCohort },
   { href: '/geo', label: 'Гео', icon: IconGeo },
-  { href: '/exchange', label: 'Биржа', icon: IconMegaphone },
 ]
 
 export default function Shell({ children }: { children: React.ReactNode }) {
