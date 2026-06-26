@@ -264,6 +264,10 @@ function BulletinChatCard({
         <Text style={[xS.chatWorkType, isClosed && xS.chatWorkTypeClosed]}>{b.workType}</Text>
         <View style={xS.metaRow}>
           <View style={xS.metaItem}>
+            <Ionicons name="calendar-outline" size={12} color={Colors.textMuted} />
+            <Text style={xS.metaTxt}>{formatDateShort(b.date)}</Text>
+          </View>
+          <View style={xS.metaItem}>
             <Ionicons name="time-outline" size={12} color={Colors.textMuted} />
             <Text style={xS.metaTxt}>{b.timeStart}–{b.timeEnd}</Text>
           </View>
