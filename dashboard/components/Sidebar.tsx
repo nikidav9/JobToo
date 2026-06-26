@@ -15,6 +15,7 @@ const NAV = [
   { href: '/moderation',  icon: IconShield,   label: 'Модерация' },
   { href: '/tickets',     icon: IconTicket,   label: 'Тикеты' },
   { href: '/broadcast',      icon: IconBell,     label: 'Рассылка' },
+  { href: '/exchange',       icon: IconMegaphone, label: 'Биржа' },
 ]
 
 export default function Sidebar() {
@@ -195,6 +196,9 @@ function IconTicket({ style }: { style?: React.CSSProperties }) {
 }
 function IconActivity({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M2 8h2.5l1-3 2 7 1.5-5H14"/><circle cx="2" cy="8" r=".5" fill="currentColor"/></svg>
+}
+function IconMegaphone({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M13 2.5 3 6v4l10 3.5V2.5z"/><path d="M3 8.5H1.5a.5.5 0 0 1-.5-.5V7a.5.5 0 0 1 .5-.5H3"/><path d="M5 10.3v2.2a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V11"/></svg>
 }
 function IconInbox({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M2 9h3l1 2h4l1-2h3"/><rect x="2" y="3" width="12" height="10" rx="1.5"/></svg>
