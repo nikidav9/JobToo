@@ -529,7 +529,18 @@ try {
         }
 
         case 'dbGetActiveBulletins':
-            $data = sb_select('jm_bulletins', ['status' => 'eq.open'], '*', 'created_at.desc'); break;
+            $today = date('Y-m-d');
+            $data = sb_select('jm_bulletins', ['status' => 'eq.open', 'date' => 'gte.' . $today], '*', 'created_at.desc'); break;
+
+        case 'dbAutoClosePastBulletins': {
+            $today = date('Y-m-d');
+            $past = sb_select('jm_bulletins', ['status' => 'eq.open', 'date' => 'lt.' . $today], 'id');
+            foreach ($past as $row) {
+                sb_update('jm_bulletins', ['id' => 'eq.' . $row['id']], ['status' => 'closed']);
+            }
+            $data = count($past);
+            break;
+        }
 
         case 'dbRespondToBulletin': {
             [$bid, $wid] = [$args[0], $args[1]];

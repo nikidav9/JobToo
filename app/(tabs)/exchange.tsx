@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { Colors, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { Bulletin, WorkerSlot } from '@/constants/types';
-import { dbRespondToBulletin, dbCreateBulletin, dbCloseBulletin, dbIncrementBulletinViews, dbCreateWorkerSlot, dbCloseWorkerSlot, dbContactWorkerSlot } from '@/services/db';
+import { dbRespondToBulletin, dbCreateBulletin, dbCloseBulletin, dbIncrementBulletinViews, dbCreateWorkerSlot, dbCloseWorkerSlot, dbContactWorkerSlot, dbAutoClosePastBulletins } from '@/services/db';
 import { notifyAllWorkersNewBulletin, notifyEmployerNewMessage, notifyWorkerNewMessage } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { METRO_LINES } from '@/constants/metro';
@@ -773,6 +773,12 @@ function EmployerExchange() {
   const router = useRouter();
   const tabBarHeight = useBottomTabBarHeight();
   const [section, setSection] = useState<EmployerSection>('chat');
+
+  useEffect(() => {
+    dbAutoClosePastBulletins()
+      .then(() => refreshBulletins().catch(() => {}))
+      .catch(() => {});
+  }, []);
   const [refreshing, setRefreshing] = useState(false);
   const [contacting, setContacting] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);

@@ -1081,6 +1081,10 @@ export async function dbIncrementBulletinViews(bulletinId: string): Promise<void
   await proxy('dbIncrementBulletinViews', [bulletinId]);
 }
 
+export async function dbAutoClosePastBulletins(): Promise<void> {
+  await proxy('dbAutoClosePastBulletins');
+}
+
 export async function dbGetAllWorkerTokens(): Promise<{ id: string; push_token: string }[]> {
   return proxy<{ id: string; push_token: string }[]>('dbGetAllWorkerTokens');
 }
