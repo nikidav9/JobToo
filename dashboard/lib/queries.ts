@@ -1192,3 +1192,126 @@ export async function fetchGeo() {
     vacMetroTop,
   }
 }
+
+// ─── exchange (биржа) ────────────────────────────────────────────────────────
+
+export async function fetchExchange() {
+  const [
+    { data: bulletins },
+    { data: slots },
+    { data: chats },
+  ] = await Promise.all([
+    supabase.from('jm_bulletins').select('id,work_type,date,time_start,time_end,metro,status,views,employer_id,company,created_at'),
+    supabase.from('jm_worker_slots').select('id,work_type,date,time_start,time_end,metro,status,created_at'),
+    supabase.from('jm_chats').select('id,bulletin_id,worker_slot_id,created_at').not('bulletin_id', 'is', null),
+  ])
+
+  const bl = bulletins ?? []
+  const sl = slots ?? []
+  const ch = chats ?? []
+
+  const now = new Date()
+  const w7 = subDays(now, 7).toISOString()
+  const w30 = subDays(now, 30).toISOString()
+  const w60 = subDays(now, 60).toISOString()
+
+  const openBulletins = bl.filter((x: any) => x.status === 'open')
+  const closedBulletins = bl.filter((x: any) => x.status === 'closed')
+  const openSlots = sl.filter((x: any) => x.status === 'open')
+
+  const newBulletinsMonth = bl.filter((x: any) => x.created_at > w30).length
+  const prevBulletinsMonth = bl.filter((x: any) => x.created_at > w60 && x.created_at <= w30).length
+  const newChatsMonth = ch.filter((x: any) => x.created_at > w30).length
+  const prevChatsMonth = ch.filter((x: any) => x.created_at > w60 && x.created_at <= w30).length
+
+  const totalViews = bl.reduce((s: number, x: any) => s + (x.views ?? 0), 0)
+  const avgResponseRate = bl.length > 0
+    ? (ch.length / bl.length).toFixed(2)
+    : '0'
+
+  // daily 30-day activity
+  const days30 = dayRange(30)
+  const blByDay = groupByDate(bl, 'created_at')
+  const chByDay = groupByDate(ch, 'created_at')
+  const slByDay = groupByDate(sl, 'created_at')
+
+  const daily30 = days30.map(d => ({
+    date: toDayLabel(d),
+    bulletins: blByDay[d] ?? 0,
+    responses: chByDay[d] ?? 0,
+    slots: slByDay[d] ?? 0,
+  }))
+
+  // work type distribution for bulletins
+  const wtMap: Record<string, number> = {}
+  for (const b of bl) {
+    const wt = (b as any).work_type ?? 'other'
+    wtMap[wt] = (wtMap[wt] ?? 0) + 1
+  }
+  const workTypeDist = Object.entries(wtMap)
+    .map(([key, value]) => ({ name: WORK_TYPE_LABELS[key] ?? key, value }))
+    .sort((a, b) => b.value - a.value)
+
+  // metro distribution
+  const metroMap: Record<string, number> = {}
+  for (const b of bl) {
+    const m = (b as any).metro
+    if (m) metroMap[m] = (metroMap[m] ?? 0) + 1
+  }
+  const metroTop = Object.entries(metroMap)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10)
+
+  // top employers
+  const empMap: Record<string, { name: string; bulletins: number; responses: number }> = {}
+  for (const b of bl) {
+    const eid = (b as any).employer_id
+    const company = (b as any).company ?? 'Unknown'
+    if (!empMap[eid]) empMap[eid] = { name: company, bulletins: 0, responses: 0 }
+    empMap[eid].bulletins++
+    const resp = ch.filter((c: any) => c.bulletin_id === (b as any).id).length
+    empMap[eid].responses += resp
+  }
+  const topEmployers = Object.values(empMap)
+    .sort((a, b) => b.bulletins - a.bulletins)
+    .slice(0, 10)
+
+  // bulletin cards with response counts
+  const bulletinCards = bl
+    .map((b: any) => ({
+      id: b.id,
+      company: b.company ?? '',
+      workType: WORK_TYPE_LABELS[b.work_type] ?? b.work_type ?? '',
+      date: b.date ?? '',
+      timeStart: b.time_start ?? '',
+      timeEnd: b.time_end ?? '',
+      metro: b.metro ?? '',
+      status: b.status,
+      views: b.views ?? 0,
+      responses: ch.filter((c: any) => c.bulletin_id === b.id).length,
+      createdAt: b.created_at ? format(parseISO(b.created_at), 'dd.MM.yy') : '',
+    }))
+    .sort((a: any, b: any) => b.responses - a.responses)
+
+  return {
+    kpi: {
+      totalBulletins: bl.length,
+      openBulletins: openBulletins.length,
+      closedBulletins: closedBulletins.length,
+      openSlots: openSlots.length,
+      totalChats: ch.length,
+      totalViews,
+      avgResponseRate,
+      newBulletinsMonth,
+      newChatsMonth,
+      bulletinsTrend: trend(newBulletinsMonth, prevBulletinsMonth),
+      chatsTrend: trend(newChatsMonth, prevChatsMonth),
+    },
+    daily30,
+    workTypeDist,
+    metroTop,
+    topEmployers,
+    bulletinCards,
+  }
+}

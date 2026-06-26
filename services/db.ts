@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus, Bulletin, WorkerSlot } from '@/constants/types';
+import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus, Bulletin } from '@/constants/types';
 import { uid, nowISO } from '@/services/storage';
 
 const DB_TIMEOUT = 12_000;
@@ -461,7 +461,6 @@ function rowToChat(r: any, messages: Message[] = []): Chat {
     unreadEmployer: r.unread_employer ?? 0,
     createdAt: r.created_at,
     bulletinId: r.bulletin_id ?? undefined,
-    workerSlotId: r.worker_slot_id ?? undefined,
     isLocked: r.is_locked ?? false,
   };
 }
@@ -1085,55 +1084,10 @@ export async function dbAutoClosePastBulletins(): Promise<void> {
   await proxy('dbAutoClosePastBulletins');
 }
 
+export async function dbAutoClosePastWorkerSlots(): Promise<void> {
+  await proxy('dbAutoClosePastWorkerSlots');
+}
+
 export async function dbGetAllWorkerTokens(): Promise<{ id: string; push_token: string }[]> {
   return proxy<{ id: string; push_token: string }[]>('dbGetAllWorkerTokens');
-}
-
-// ─── Worker slots ─────────────────────────────────────────────────────────────
-
-function rowToWorkerSlot(r: any): WorkerSlot {
-  return {
-    id: r.id,
-    workerId: r.worker_id,
-    workerName: r.worker_name,
-    workType: r.work_type,
-    date: r.date,
-    timeStart: r.time_start,
-    timeEnd: r.time_end,
-    metro: r.metro,
-    comment: r.comment ?? undefined,
-    status: r.status,
-    createdAt: r.created_at,
-  };
-}
-
-export async function dbGetActiveWorkerSlots(): Promise<WorkerSlot[]> {
-  const d = await proxy<any[]>('dbGetActiveWorkerSlots');
-  return d.map(rowToWorkerSlot);
-}
-
-export async function dbGetMyWorkerSlots(workerId: string): Promise<WorkerSlot[]> {
-  const d = await proxy<any[]>('dbGetMyWorkerSlots', [workerId]);
-  return d.map(rowToWorkerSlot);
-}
-
-export async function dbCreateWorkerSlot(params: {
-  workerId: string;
-  workerName: string;
-  workType: string;
-  date: string;
-  timeStart: string;
-  timeEnd: string;
-  metro: string;
-  comment?: string;
-}): Promise<string> {
-  return proxy<string>('dbCreateWorkerSlot', [params]);
-}
-
-export async function dbCloseWorkerSlot(slotId: string): Promise<void> {
-  await proxy('dbCloseWorkerSlot', [slotId]);
-}
-
-export async function dbContactWorkerSlot(slotId: string, employerId: string): Promise<string> {
-  return proxy<string>('dbContactWorkerSlot', [slotId, employerId]);
 }

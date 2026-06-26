@@ -1,0 +1,303 @@
+'use client'
+import { useCallback, useState } from 'react'
+import { fetchExchange, PALETTE } from '@/lib/queries'
+import { useRealtime } from '@/lib/useRealtime'
+import KpiCard from '@/components/KpiCard'
+import ChartCard from '@/components/ChartCard'
+import PageHeader from '@/components/PageHeader'
+import {
+  AreaChart, Area, BarChart, Bar, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts'
+
+const TT = { borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, boxShadow: 'var(--shadow-md)' }
+const AXIS = { fontSize: 10, fill: '#9A9690', fontFamily: 'Geist Mono, monospace' }
+
+export default function ExchangePage() {
+  const fetcher = useCallback(() => fetchExchange(), [])
+  const { data: d, loading, lastUpdated, pulse, refresh } = useRealtime(fetcher, {
+    tables: ['jm_bulletins', 'jm_worker_slots', 'jm_chats'],
+    intervalSec: 30,
+  })
+
+  if (loading || !d) return <Loader />
+
+  return (
+    <div>
+      <PageHeader title="Биржа" intervalSec={30} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
+
+      <div className="page-content">
+        {/* KPI row */}
+        <div className="g-4">
+          <KpiCard
+            label="Всего объявлений"
+            value={d.kpi.totalBulletins}
+            sub={`${d.kpi.openBulletins} открыто`}
+            sparkColor={PALETTE.orange}
+            delta={d.kpi.bulletinsTrend !== 0 ? `${d.kpi.bulletinsTrend > 0 ? '+' : ''}${d.kpi.bulletinsTrend}%` : undefined}
+            deltaTone={d.kpi.bulletinsTrend > 0 ? 'pos' : d.kpi.bulletinsTrend < 0 ? 'neg' : undefined}
+          />
+          <KpiCard
+            label="Откликов (чатов)"
+            value={d.kpi.totalChats}
+            sub={`+${d.kpi.newChatsMonth} за месяц`}
+            sparkColor={PALETTE.blue}
+            delta={d.kpi.chatsTrend !== 0 ? `${d.kpi.chatsTrend > 0 ? '+' : ''}${d.kpi.chatsTrend}%` : undefined}
+            deltaTone={d.kpi.chatsTrend > 0 ? 'pos' : d.kpi.chatsTrend < 0 ? 'neg' : undefined}
+          />
+          <KpiCard
+            label="Просмотров"
+            value={d.kpi.totalViews}
+            sub="суммарно по объявлениям"
+            sparkColor={PALETTE.cyan}
+          />
+          <KpiCard
+            label="Слотов работников"
+            value={d.kpi.openSlots}
+            sub="открытых предложений"
+            sparkColor={PALETTE.green}
+          />
+        </div>
+
+        {/* Daily chart */}
+        <ChartCard title="Активность биржи" sub="Объявления, отклики и слоты · 30 дней">
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={d.daily30} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gBl" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={PALETTE.orange} stopOpacity={0.2} />
+                  <stop offset="95%" stopColor={PALETTE.orange} stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gCh" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={PALETTE.blue} stopOpacity={0.2} />
+                  <stop offset="95%" stopColor={PALETTE.blue} stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gSl" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={PALETTE.green} stopOpacity={0.2} />
+                  <stop offset="95%" stopColor={PALETTE.green} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+              <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false} interval={4} />
+              <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip contentStyle={TT} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+              <Area type="monotone" dataKey="bulletins" name="Объявления" stroke={PALETTE.orange} fill="url(#gBl)" strokeWidth={1.7} dot={false} />
+              <Area type="monotone" dataKey="responses" name="Отклики" stroke={PALETTE.blue} fill="url(#gCh)" strokeWidth={1.7} dot={false} />
+              <Area type="monotone" dataKey="slots" name="Слоты" stroke={PALETTE.green} fill="url(#gSl)" strokeWidth={1.7} dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <div className="g-2">
+          {/* Work type distribution */}
+          <ChartCard title="Типы работ" sub="Объявления работодателей">
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={d.workTypeDist} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" horizontal={false} />
+                <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" tick={{ ...AXIS, fill: '#3D3A33' }} tickLine={false} axisLine={false} width={90} />
+                <Tooltip contentStyle={TT} />
+                <Bar dataKey="value" name="Объявлений" radius={[0, 4, 4, 0]}>
+                  {d.workTypeDist.map((_: any, i: number) => <Cell key={i} fill={Object.values(PALETTE)[i % Object.values(PALETTE).length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          {/* Metro distribution */}
+          <ChartCard title="Топ станций метро" sub="По числу объявлений">
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={d.metroTop} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" horizontal={false} />
+                <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" tick={{ ...AXIS, fill: '#3D3A33' }} tickLine={false} axisLine={false} width={110} />
+                <Tooltip contentStyle={TT} />
+                <Bar dataKey="value" name="Объявлений" fill={PALETTE.purple} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </div>
+
+        {/* Top employers table */}
+        <ChartCard title="Топ работодателей" sub="По числу объявлений на бирже">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead>
+              <tr>
+                {['Компания', 'Объявлений', 'Откликов', 'Конверсия'].map(h => (
+                  <th key={h} style={{
+                    textAlign: 'left', fontSize: 10.5, textTransform: 'uppercase',
+                    letterSpacing: '0.06em', color: 'var(--ink-3)', fontWeight: 500,
+                    padding: '0 16px 10px 0', borderBottom: '1px solid var(--line)',
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {d.topEmployers.map((e: any, i: number) => {
+                const conv = e.bulletins > 0 ? ((e.responses / e.bulletins) * 100).toFixed(0) + '%' : '—'
+                return (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--line)' }}>
+                    <td style={{ padding: '9px 16px 9px 0', fontWeight: 500, color: 'var(--ink)' }}>{e.name}</td>
+                    <td style={{ padding: '9px 16px 9px 0', color: 'var(--ink-2)' }}>{e.bulletins}</td>
+                    <td style={{ padding: '9px 16px 9px 0', color: 'var(--ink-2)' }}>{e.responses}</td>
+                    <td style={{ padding: '9px 0', fontWeight: 600, color: PALETTE.blue }}>{conv}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </ChartCard>
+
+        {/* Bulletin cards */}
+        <BulletinCards cards={d.bulletinCards} />
+      </div>
+    </div>
+  )
+}
+
+type BulletinCardData = {
+  id: string
+  company: string
+  workType: string
+  date: string
+  timeStart: string
+  timeEnd: string
+  metro: string
+  status: string
+  views: number
+  responses: number
+  createdAt: string
+}
+
+function BulletinCards({ cards }: { cards: BulletinCardData[] }) {
+  if (!cards || cards.length === 0) return null
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', flex: 1 }}>
+          Объявления биржи
+          <span style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 400, color: 'var(--ink-3)' }}>
+            {cards.length} всего · сортировка по откликам
+          </span>
+        </div>
+      </div>
+      <div className="perm-vac-grid">
+        {cards.map(c => <BulletinCard key={c.id} c={c} />)}
+      </div>
+    </div>
+  )
+}
+
+function BulletinCard({ c }: { c: BulletinCardData }) {
+  const isOpen = c.status === 'open'
+  const hasResp = c.responses > 0
+
+  return (
+    <div className="perm-vac-card">
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+          background: isOpen ? '#FFF3EC' : '#F2F1EE',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <IconMegaphone color={isOpen ? PALETTE.orange : '#B0ADA6'} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.3 }}>{c.workType}</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{c.company}</div>
+        </div>
+        <span style={{
+          flexShrink: 0, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+          background: isOpen ? '#FFF3EC' : '#F2F1EE',
+          color: isOpen ? PALETTE.orange : '#9A9690',
+          letterSpacing: '0.04em',
+        }}>
+          {isOpen ? 'ОТКРЫТО' : 'ЗАКРЫТО'}
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10, padding: '8px 10px', background: 'var(--bg-sunken)', borderRadius: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+          <IconCalendar />
+          <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{c.date}</span>
+          <span style={{ color: 'var(--ink-3)' }}>{c.timeStart}{c.timeEnd ? ` – ${c.timeEnd}` : ''}</span>
+        </div>
+        {c.metro && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--ink-2)' }}>
+            <IconMetro />
+            <span>м. {c.metro}</span>
+          </div>
+        )}
+      </div>
+
+      <div style={{ height: 1, background: 'var(--line)', marginBottom: 10 }} />
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <IconChat color={hasResp ? PALETTE.blue : '#C8C5BF'} />
+          <span style={{ fontSize: 16, fontWeight: 700, color: hasResp ? 'var(--ink)' : 'var(--ink-4)' }}>{c.responses}</span>
+          <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>откл.</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 8 }}>
+          <IconEye color="#B0ADA6" />
+          <span style={{ fontSize: 13, color: 'var(--ink-2)' }}>{c.views}</span>
+          <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>просм.</span>
+        </div>
+        {c.createdAt && (
+          <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 'auto' }}>Опубл. {c.createdAt}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function IconCalendar() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6B6760" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  )
+}
+
+function IconMetro() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9A9690" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><path d="M12 6 8 18M12 6l4 12M8 14h8" />
+    </svg>
+  )
+}
+
+function IconMegaphone({ color }: { color: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 4L12 12 2 4" /><path d="M3 4h18v16H3z" />
+    </svg>
+  )
+}
+
+function IconChat({ color }: { color: string }) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
+function IconEye({ color }: { color: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+function Loader() {
+  return (
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} style={{ height: 120, background: 'var(--bg-sunken)', borderRadius: 10 }} />
+      ))}
+    </div>
+  )
+}
