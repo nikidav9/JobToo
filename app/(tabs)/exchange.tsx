@@ -9,9 +9,9 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useRouter } from 'expo-router';
 import { Colors, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { Bulletin } from '@/constants/types';
-import { dbRespondToBulletin, dbCreateBulletin, dbCloseBulletin, dbIncrementBulletinViews } from '@/services/db';
-import { notifyAllWorkersNewBulletin } from '@/services/notifications';
+import { Bulletin, WorkerSlot } from '@/constants/types';
+import { dbRespondToBulletin, dbCreateBulletin, dbCloseBulletin, dbIncrementBulletinViews, dbCreateWorkerSlot, dbCloseWorkerSlot, dbContactWorkerSlot, dbAutoClosePastBulletins, dbAutoClosePastWorkerSlots } from '@/services/db';
+import { notifyAllWorkersNewBulletin, notifyEmployerNewMessage, notifyWorkerNewMessage } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { METRO_LINES } from '@/constants/metro';
 import { NotifBell } from '@/components/ui/NotifBell';
@@ -218,6 +218,12 @@ function WorkerExchange() {
   const [viewsMarked, setViewsMarked] = useState(false);
 
   useEffect(() => {
+    dbAutoClosePastWorkerSlots()
+      .then(() => refreshWorkerSlots().catch(() => {}))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!viewsMarked && bulletins.length > 0) {
       bulletins.forEach(b => dbIncrementBulletinViews(b.id).catch(() => {}));
       setViewsMarked(true);
@@ -341,6 +347,12 @@ function EmployerExchange() {
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [iosPickerVisible, setIosPickerVisible] = useState(false);
   const [tempDate, setTempDate] = useState<Date>(new Date());
+
+  useEffect(() => {
+    dbAutoClosePastBulletins()
+      .then(() => refreshBulletins().catch(() => {}))
+      .catch(() => {});
+  }, []);
 
   const openPicker = (mode: PickerMode) => {
     if (!mode) return;
