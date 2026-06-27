@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase, supabaseAdmin } from './supabase'
 import { subDays, format, eachDayOfInterval, parseISO, startOfDay } from 'date-fns'
 
 // ─── constants ───────────────────────────────────────────────────────────────
@@ -1202,10 +1202,10 @@ export async function fetchExchange() {
     { data: chats },
     { data: slotChats },
   ] = await Promise.all([
-    supabase.from('jm_bulletins').select('id,work_type,date,time_start,time_end,metro,status,views,employer_id,company,created_at'),
-    supabase.from('jm_worker_slots').select('id,work_type,date,time_start,time_end,metro,status,worker_id,created_at'),
-    supabase.from('jm_chats').select('id,bulletin_id,worker_slot_id,created_at').not('bulletin_id', 'is', null),
-    supabase.from('jm_chats').select('id,bulletin_id,worker_slot_id,created_at').not('worker_slot_id', 'is', null),
+    supabaseAdmin.from('jm_bulletins').select('id,work_type,date,time_start,time_end,metro,status,views,employer_id,company,created_at'),
+    supabaseAdmin.from('jm_worker_slots').select('id,work_type,date,time_start,time_end,metro,status,worker_id,created_at'),
+    supabaseAdmin.from('jm_chats').select('id,bulletin_id,worker_slot_id,created_at').not('bulletin_id', 'is', null),
+    supabaseAdmin.from('jm_chats').select('id,bulletin_id,worker_slot_id,created_at').not('worker_slot_id', 'is', null),
   ])
 
   const bl = bulletins ?? []
