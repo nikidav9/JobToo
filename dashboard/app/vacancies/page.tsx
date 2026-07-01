@@ -459,7 +459,9 @@ type PermCard = {
   title: string
   company: string
   metro: string | null
+  address: string | null
   salary: string | null
+  salaryRaw: number | null
   status: string
   schedule: string | null
   createdAt: string | null
@@ -467,22 +469,75 @@ type PermCard = {
   applicants: AppInfo[]
 }
 
+function makeVacancyPost(c: PermCard): string {
+  const lines: string[] = []
+  lines.push(`👷 ${c.title}`)
+  if (c.company && c.company !== '—') lines.push(`🏢 ${c.company}`)
+  if (c.address) lines.push(`📍 ${c.address}`)
+  if (c.metro) lines.push(`🚇 м. ${c.metro}`)
+  if (c.salary) lines.push(`💰 ${c.salary}/мес`)
+  if (c.schedule) lines.push(`🗓 ${c.schedule}`)
+  return lines.join('\n')
+}
+
 function PermVacancyCards({ cards, onExport, onRefresh }: { cards: PermCard[]; onExport: () => void; onRefresh: () => void }) {
   if (!cards || cards.length === 0) return null
+  const [allPostCopied, setAllPostCopied] = useState(false)
+  const [showAllPost, setShowAllPost] = useState(false)
+
+  const openCards = cards.filter(c => c.status === 'open')
+
+  function copyAllPosts() {
+    const text = openCards.map(makeVacancyPost).join('\n\n—————\n\n')
+    navigator.clipboard.writeText(text).then(() => {
+      setAllPostCopied(true)
+      setTimeout(() => setAllPostCopied(false), 2000)
+    })
+  }
+
+  const allPostText = openCards.map(makeVacancyPost).join('\n\n—————\n\n')
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', flex: 1 }}>
           Постоянные вакансии
           <span style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 400, color: 'var(--ink-3)' }}>
             {cards.length} всего · сортировка по откликам
           </span>
         </div>
+        <button
+          onClick={() => setShowAllPost(v => !v)}
+          style={{ height: 30, padding: '0 12px', borderRadius: 7, border: '1px solid var(--line)', background: showAllPost ? PALETTE.orange : 'var(--bg-elev)', color: showAllPost ? '#fff' : 'var(--ink-2)', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+        >
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M2 8h12M8 3l5 5-5 5"/></svg>
+          Посты для группы ({openCards.length})
+        </button>
         <button onClick={onExport} style={{ height: 30, padding: '0 12px', borderRadius: 7, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink-2)', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
           <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>
           CSV
         </button>
       </div>
+
+      {showAllPost && openCards.length > 0 && (
+        <div style={{ marginBottom: 16, background: 'var(--bg-sunken)', borderRadius: 10, padding: 14, border: '1px solid var(--line)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+              Готовые посты · {openCards.length} открытых вакансий
+            </span>
+            <button
+              onClick={copyAllPosts}
+              style={{ height: 28, padding: '0 12px', borderRadius: 6, border: 'none', background: allPostCopied ? PALETTE.green : PALETTE.orange, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              {allPostCopied ? '✓ Скопировано' : 'Скопировать всё'}
+            </button>
+          </div>
+          <pre style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--ink)', fontFamily: 'inherit', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 320, overflowY: 'auto' }}>
+            {allPostText}
+          </pre>
+        </div>
+      )}
+
       <div className="perm-vac-grid">
         {cards.map(c => <PermCard key={c.id} c={c} onRefresh={onRefresh} />)}
       </div>
