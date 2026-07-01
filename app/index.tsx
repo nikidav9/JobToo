@@ -12,10 +12,9 @@ import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LogoDots } from '@/components/EntryTransition';
 
 const USER_COUNT_KEY = 'cached_user_count';
-
-const TRACK_W = 140;
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const sc = Math.min(SW / 390, SH / 844);
@@ -42,8 +41,6 @@ const CARD2_MT = r(18);
 export default function RootScreen() {
   const router = useRouter();
   const { currentUser, loading } = useApp();
-  const progress = useRef(new Animated.Value(0)).current;
-  const slowAnim = useRef<Animated.CompositeAnimation | null>(null);
   const finishing = useRef(false);
   // true if loading was already false when this component mounted (post-logout navigation)
   const skipSplash = useRef(!loading);
@@ -79,14 +76,6 @@ export default function RootScreen() {
   }, []);
 
   useEffect(() => {
-    slowAnim.current = Animated.sequence([
-      Animated.timing(progress, { toValue: TRACK_W * 0.55, duration: 350, useNativeDriver: false }),
-      Animated.timing(progress, { toValue: TRACK_W * 0.88, duration: 3500, useNativeDriver: false }),
-    ]);
-    slowAnim.current.start();
-  }, []);
-
-  useEffect(() => {
     // Post-logout: loading was already false when we mounted — skip splash, show screen now
     if (skipSplash.current && !loading) {
       SplashScreen.hideAsync().catch(() => {});
@@ -100,31 +89,23 @@ export default function RootScreen() {
 
     if (loading || finishing.current) return;
     finishing.current = true;
-    slowAnim.current?.stop();
-    Animated.timing(progress, { toValue: TRACK_W, duration: 220, useNativeDriver: false }).start(() => {
-      // Read from ref so we get the committed value, not a stale closure
-      if (currentUserRef.current) {
-        // Splash hides in /(tabs)/_layout.tsx once tabs are mounted
-        router.replace('/(tabs)');
-      } else {
-        // No tabs will mount — hide splash now and show the welcome screen
-        SplashScreen.hideAsync().catch(() => {});
-        setReady(true);
-      }
-    });
+    // Read from ref so we get the committed value, not a stale closure
+    if (currentUserRef.current) {
+      // Splash hides in /(tabs)/_layout.tsx once tabs are mounted;
+      // EntryTransition (same logo + dots) continues the loading visual there.
+      router.replace('/(tabs)');
+    } else {
+      // No tabs will mount — hide splash now and show the welcome screen
+      SplashScreen.hideAsync().catch(() => {});
+      setReady(true);
+    }
   }, [loading, currentUser]);
 
   if (!ready) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.splashCenter}>
-          <Text style={styles.splashLogo}>
-            <Text style={styles.logoBlack}>Job</Text>
-            <Text style={styles.logoOrange}>Too</Text>
-          </Text>
-          <View style={styles.track}>
-            <Animated.View style={[styles.fill, { width: progress }]} />
-          </View>
+          <LogoDots />
         </View>
       </SafeAreaView>
     );
@@ -277,13 +258,7 @@ export default function RootScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F5F7FA' },
 
-  splashCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  splashLogo: { fontSize: r(44), fontWeight: '800' },
-  track: {
-    width: TRACK_W, height: 3, backgroundColor: Colors.inputBorder,
-    borderRadius: 100, overflow: 'hidden', marginTop: 28,
-  },
-  fill: { height: 3, backgroundColor: Colors.primary, borderRadius: 100 },
+  splashCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
 
   scroll: {
     flexGrow: 1,

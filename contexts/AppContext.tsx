@@ -121,6 +121,8 @@ export interface AppContextValue {
   refreshBulletins: (u?: User) => Promise<void>;
   workerSlots: WorkerSlot[];
   refreshWorkerSlots: (u?: User) => Promise<void>;
+  /** true once the initial fresh-data fetch (vacancies, bulletins, …) has completed */
+  dataReady: boolean;
 }
 
 export const AppContext = createContext<AppContextValue | null>(null);
@@ -128,6 +130,7 @@ export const AppContext = createContext<AppContextValue | null>(null);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, _setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dataReady, setDataReady] = useState(false);
   const [vacanciesLoading, setVacanciesLoading] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -291,7 +294,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               refreshPermVacancyViews(),
               refreshBulletins(sessionUser),
               refreshWorkerSlots(sessionUser),
-            ]).catch(() => {});
+            ]).catch(() => {}).finally(() => { if (!cancelled) setDataReady(true); });
           }, 100);
 
           // Register/refresh push token on every app open — catches users
@@ -300,6 +303,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (cancelled) return;
             registerForPushNotifications(sessionUser.id).catch(() => {});
           }, 2000);
+        } else {
+          // Guest: nothing user-specific to load
+          setDataReady(true);
         }
       } catch (e) {
         console.warn('[AppContext] boot error', e);
@@ -472,7 +478,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshPermVacancies(u),
         refreshPermApplications(u),
         refreshPermSaved(u),
-      ]).catch(() => {});
+      ]).catch(() => {}).finally(() => setDataReady(true));
     }, 300);
   };
 
@@ -497,7 +503,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshPermVacancies(found),
         refreshPermApplications(found),
         refreshPermSaved(found),
-      ]).catch(() => {});
+      ]).catch(() => {}).finally(() => setDataReady(true));
     }, 300);
     return found;
   };
@@ -661,6 +667,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       value={{
         currentUser,
         loading,
+        dataReady,
         vacanciesLoading,
         toast,
         showToast,
