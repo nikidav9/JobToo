@@ -78,14 +78,11 @@ export async function registerForPushNotifications(userId: string): Promise<void
     return;
   }
 
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  let finalStatus = existing;
-  if (existing !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-  if (finalStatus !== 'granted') {
-    console.warn('[push] Permission denied: cannot register Expo push token.');
+  // Never trigger the OS permission dialog here — boot-time calls must stay
+  // silent. The dialog is requested only from NotificationPermissionSheet.
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') {
+    console.info('[push] Permission not granted yet: skipping token registration.');
     return;
   }
 

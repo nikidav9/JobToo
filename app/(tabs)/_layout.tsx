@@ -11,6 +11,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { BlurView } from 'expo-blur';
 import { Colors } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
+import NotificationPermissionSheet from '@/components/NotificationPermissionSheet';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -269,6 +270,7 @@ export default function TabLayout() {
         <Tabs.Screen name="chats" options={{ tabBarIcon: () => null }} />
         <Tabs.Screen name="profile" options={{ tabBarIcon: () => null }} />
       </Tabs>
+      <NotificationPermissionSheet />
     </View>
   );
 }

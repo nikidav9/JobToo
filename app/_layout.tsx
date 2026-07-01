@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AlertProvider } from '@/template';
 import { AppProvider, AppContext } from '@/contexts/AppContext';
 import { ToastLayer } from '@/components/ui/ToastLayer';
-import { requestNotificationPermissions, setupAndroidChannels } from '@/services/notifications';
+import { setupAndroidChannels } from '@/services/notifications';
 
 // Keep the web/native splash visible until hideAsync() is called from the tabs layout or index screen.
 // This prevents the white flash while expo-router navigates and hydrates the tabs route on web.
@@ -123,7 +123,8 @@ export default function RootLayout() {
   useEffect(() => {
     if (Platform.OS === 'web') return;
     setupAndroidChannels().catch(() => {});
-    requestNotificationPermissions().catch(() => {});
+    // Permission is requested from the NotificationPermissionSheet (tabs layout),
+    // not automatically on boot — the sheet explains why before the OS dialog.
   }, []);
 
   return (
