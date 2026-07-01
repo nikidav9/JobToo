@@ -12,6 +12,7 @@ import { BlurView } from 'expo-blur';
 import { Colors } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import NotificationPermissionSheet from '@/components/NotificationPermissionSheet';
+import EntryTransition from '@/components/EntryTransition';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -271,6 +272,7 @@ export default function TabLayout() {
         <Tabs.Screen name="profile" options={{ tabBarIcon: () => null }} />
       </Tabs>
       <NotificationPermissionSheet />
+      <EntryTransition />
     </View>
   );
 }

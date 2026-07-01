@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { Colors, Radius } from '@/constants/theme';
 import { registerForPushNotifications } from '@/services/notifications';
+import { registerWebPush } from '@/lib/webPush';
 import { useApp } from '@/hooks/useApp';
 
 const CHOICE_KEY = 'jm_notif_prompt_choice'; // 'enabled' | 'declined'
@@ -30,7 +31,7 @@ export default function NotificationPermissionSheet() {
 
   // ─── Decide whether to show ────────────────────────────────────────────────
   useEffect(() => {
-    if (Platform.OS === 'web' || !userId) return;
+    if (!userId) return;
     let cancelled = false;
 
     (async () => {
@@ -38,15 +39,26 @@ export default function NotificationPermissionSheet() {
         const choice = await AsyncStorage.getItem(CHOICE_KEY);
         if (choice === 'enabled' || choice === 'declined') return;
 
-        const { status } = await Notifications.getPermissionsAsync();
-        if (status === 'granted') {
-          await AsyncStorage.setItem(CHOICE_KEY, 'enabled');
-          return;
-        }
-        // iOS: after a hard OS-level deny the dialog can't be re-shown — stop nagging
-        if (status === 'denied' && Platform.OS === 'ios') {
-          const { canAskAgain } = await Notifications.getPermissionsAsync();
-          if (!canAskAgain) return;
+        if (Platform.OS === 'web') {
+          // Browser Notification API: skip if unsupported or already resolved
+          if (typeof Notification === 'undefined') return;
+          if (Notification.permission === 'granted') {
+            await AsyncStorage.setItem(CHOICE_KEY, 'enabled');
+            registerWebPush(userId).catch(() => {});
+            return;
+          }
+          if (Notification.permission === 'denied') return;
+        } else {
+          const { status } = await Notifications.getPermissionsAsync();
+          if (status === 'granted') {
+            await AsyncStorage.setItem(CHOICE_KEY, 'enabled');
+            return;
+          }
+          // iOS: after a hard OS-level deny the dialog can't be re-shown — stop nagging
+          if (status === 'denied' && Platform.OS === 'ios') {
+            const { canAskAgain } = await Notifications.getPermissionsAsync();
+            if (!canAskAgain) return;
+          }
         }
 
         setTimeout(() => { if (!cancelled) open(); }, SHOW_DELAY_MS);
@@ -121,10 +133,15 @@ export default function NotificationPermissionSheet() {
     if (busy) return;
     setBusy(true);
     try {
-      const { status } = await Notifications.requestPermissionsAsync();
-      await AsyncStorage.setItem(CHOICE_KEY, status === 'granted' ? 'enabled' : 'declined');
-      if (status === 'granted' && userId) {
-        registerForPushNotifications(userId).catch(() => {});
+      if (Platform.OS === 'web') {
+        const ok = userId ? await registerWebPush(userId) : false;
+        await AsyncStorage.setItem(CHOICE_KEY, ok ? 'enabled' : 'declined');
+      } else {
+        const { status } = await Notifications.requestPermissionsAsync();
+        await AsyncStorage.setItem(CHOICE_KEY, status === 'granted' ? 'enabled' : 'declined');
+        if (status === 'granted' && userId) {
+          registerForPushNotifications(userId).catch(() => {});
+        }
       }
     } catch {} finally {
       setBusy(false);
