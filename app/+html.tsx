@@ -29,6 +29,8 @@ export default function Root({ children }: PropsWithChildren) {
 
         <ScrollViewStyleReset />
 
+        {/* Static splash — same visual as LogoDots (components/EntryTransition.tsx),
+            so the pre-hydration screen and the in-app loader read as one screen */}
         <style>{`
           #splash {
             position: fixed; inset: 0;
@@ -38,69 +40,51 @@ export default function Root({ children }: PropsWithChildren) {
             transition: opacity 0.35s ease;
           }
           #splash.hidden { opacity: 0; pointer-events: none; }
-          #splash-logo {
-            width: 80px; height: 80px; border-radius: 20px;
-            object-fit: cover;
-          }
           #splash-name {
-            margin-top: 14px; font-size: 24px; font-weight: 800;
-            color: #FF6B1A; font-family: -apple-system, sans-serif;
+            font-size: 40px; font-weight: 800; letter-spacing: -1px;
+            color: #111111;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           }
-          #splash-track {
-            margin-top: 36px;
-            width: 160px; height: 4px;
-            background: #F0E8E0;
-            border-radius: 2px;
-            overflow: hidden;
+          #splash-name span { color: #FF6B1A; }
+          #splash-dots {
+            display: flex; gap: 8px; margin-top: 22px;
+            height: 20px; align-items: flex-end;
           }
-          #splash-bar {
-            height: 100%; width: 0%;
-            background: #FF6B1A;
-            border-radius: 2px;
-            transition: width 0.25s ease-out;
+          .splash-dot {
+            width: 9px; height: 9px; border-radius: 5px;
+            animation: splash-bounce 1.04s ease-in-out infinite;
+          }
+          .splash-dot:nth-child(1) { background: #FF6B1A; animation-delay: 0s; }
+          .splash-dot:nth-child(2) { background: #FFB27A; animation-delay: 0.12s; }
+          .splash-dot:nth-child(3) { background: #FF8A47; animation-delay: 0.24s; }
+          @keyframes splash-bounce {
+            0%, 50%, 100% { transform: translateY(0); }
+            25% { transform: translateY(-9px); }
           }
         `}</style>
       </head>
       <body>
         <div id="splash">
-          <img id="splash-logo" src="/jt-logo.jpg" alt="JobToo" />
-          <div id="splash-name">JobToo</div>
-          <div id="splash-track">
-            <div id="splash-bar" />
+          <div id="splash-name">Job<span>Too</span></div>
+          <div id="splash-dots">
+            <div className="splash-dot" />
+            <div className="splash-dot" />
+            <div className="splash-dot" />
           </div>
         </div>
         {children}
         <script>{`
           (function() {
-            var bar = document.getElementById('splash-bar');
             var splash = document.getElementById('splash');
-            var progress = 0;
             var done = false;
-
-            // Gradually move bar toward 80% — slows as it gets closer
-            var ticker = setInterval(function() {
-              if (done) return;
-              var gap = 80 - progress;
-              var step = Math.max(gap * 0.07, 0.4);
-              progress = Math.min(progress + step, 80);
-              if (bar) bar.style.width = progress + '%';
-            }, 80);
 
             function finish() {
               if (done) return;
               done = true;
-              clearInterval(ticker);
-              // Snap to 100% quickly, then fade out
-              if (bar) {
-                bar.style.transition = 'width 0.3s ease-in';
-                bar.style.width = '100%';
+              if (splash) {
+                splash.classList.add('hidden');
+                setTimeout(function() { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 400);
               }
-              setTimeout(function() {
-                if (splash) {
-                  splash.classList.add('hidden');
-                  setTimeout(function() { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 400);
-                }
-              }, 320);
             }
 
             if (document.readyState === 'complete') {
