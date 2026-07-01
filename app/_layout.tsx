@@ -13,10 +13,29 @@ import { AlertProvider } from '@/template';
 import { AppProvider, AppContext } from '@/contexts/AppContext';
 import { ToastLayer } from '@/components/ui/ToastLayer';
 import { setupAndroidChannels } from '@/services/notifications';
+import { hideWebSplash } from '@/lib/webSplash';
 
 // Keep the web/native splash visible until hideAsync() is called from the tabs layout or index screen.
 // This prevents the white flash while expo-router navigates and hydrates the tabs route on web.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// The static HTML splash (web) stays up through the '/' boot flow and the tabs
+// entry — those hide it once data is ready. Any other route (deep links like
+// /perm-vacancy-detail, /login, …) should reveal the page immediately.
+const ENTRY_PATHS = new Set(['/', '/feed', '/matches', '/exchange', '/chats', '/profile', '/saved']);
+
+function WebSplashController() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (!ENTRY_PATHS.has(pathname.replace(/\/$/, '') || '/')) {
+      hideWebSplash();
+    }
+  }, [pathname]);
+
+  return null;
+}
 
 function AuthGuard() {
   const router = useRouter();
@@ -132,6 +151,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AppProvider>
           <StatusBar style="dark" />
+          <WebSplashController />
           <AuthGuard />
           <NotificationHandler />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FFFFFF' } }}>

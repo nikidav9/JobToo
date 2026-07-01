@@ -87,13 +87,12 @@ export default function Root({ children }: PropsWithChildren) {
               }
             }
 
-            if (document.readyState === 'complete') {
-              setTimeout(finish, 200);
-            } else {
-              window.addEventListener('load', function() { setTimeout(finish, 200); });
-            }
-            // Hard cap at 5s in case load never fires
-            setTimeout(finish, 5000);
+            // The app hides the splash itself once data is loaded
+            // (EntryTransition / index.tsx call window.__hideSplash).
+            window.__hideSplash = finish;
+
+            // Failsafe: never trap the user if the app fails to signal
+            setTimeout(finish, 12000);
           })();
         `}</script>
       </body>

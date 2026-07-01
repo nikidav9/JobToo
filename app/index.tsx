@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated,
-  ScrollView, Image, Dimensions,
+  ScrollView, Image, Dimensions, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -13,6 +13,7 @@ import { Colors } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LogoDots } from '@/components/EntryTransition';
+import { hideWebSplash } from '@/lib/webSplash';
 
 const USER_COUNT_KEY = 'cached_user_count';
 
@@ -82,6 +83,7 @@ export default function RootScreen() {
       if (currentUserRef.current) {
         router.replace('/(tabs)');
       } else {
+        hideWebSplash();
         setReady(true);
       }
       return;
@@ -91,17 +93,21 @@ export default function RootScreen() {
     finishing.current = true;
     // Read from ref so we get the committed value, not a stale closure
     if (currentUserRef.current) {
-      // Splash hides in /(tabs)/_layout.tsx once tabs are mounted;
-      // EntryTransition (same logo + dots) continues the loading visual there.
+      // Loading screen hides once tabs are mounted and data is ready:
+      // native — EntryTransition overlay, web — the static HTML splash.
       router.replace('/(tabs)');
     } else {
       // No tabs will mount — hide splash now and show the welcome screen
       SplashScreen.hideAsync().catch(() => {});
+      hideWebSplash();
       setReady(true);
     }
   }, [loading, currentUser]);
 
   if (!ready) {
+    // Web: the static HTML splash (app/+html.tsx) is the single loading
+    // screen — render nothing so there is no second screen behind it.
+    if (Platform.OS === 'web') return null;
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.splashCenter}>

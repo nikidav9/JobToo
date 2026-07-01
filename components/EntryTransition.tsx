@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Platform } from 'react-native';
 import { useApp } from '@/hooks/useApp';
+import { hideWebSplash } from '@/lib/webSplash';
 
 // Sorce-style entry: logo on white with playful bouncing dots. The overlay
 // stays up while real data loads (dataReady from AppContext), then dissolves.
@@ -68,13 +69,19 @@ export default function EntryTransition() {
   const dataReady = app?.dataReady ?? false;
 
   const [done, setDone] = useState(false);
-  const [minPassed, setMinPassed] = useState(false);
+  const [minPassed, setMinPassed] = useState(Platform.OS === 'web');
   const overlay = useRef(new Animated.Value(1)).current;
   const dissolving = useRef(false);
 
   function dissolve() {
     if (dissolving.current) return;
     dissolving.current = true;
+    if (Platform.OS === 'web') {
+      // On web the static HTML splash is the loading screen — just hide it
+      hideWebSplash();
+      setDone(true);
+      return;
+    }
     Animated.timing(overlay, {
       toValue: 0, duration: FADE_MS,
       easing: Easing.out(Easing.cubic), useNativeDriver: true,
@@ -82,16 +89,17 @@ export default function EntryTransition() {
   }
 
   useEffect(() => {
-    const minT = setTimeout(() => setMinPassed(true), MIN_SHOW_MS);
+    // Web: HTML splash has already been visible during JS load — no extra min hold
+    const minT = Platform.OS === 'web' ? null : setTimeout(() => setMinPassed(true), MIN_SHOW_MS);
     const maxT = setTimeout(dissolve, MAX_SHOW_MS);
-    return () => { clearTimeout(minT); clearTimeout(maxT); };
+    return () => { if (minT) clearTimeout(minT); clearTimeout(maxT); };
   }, []);
 
   useEffect(() => {
     if (minPassed && dataReady) dissolve();
   }, [minPassed, dataReady]);
 
-  if (done) return null;
+  if (done || Platform.OS === 'web') return null;
 
   return (
     <Animated.View style={[styles.overlay, { opacity: overlay }]} pointerEvents="none">
