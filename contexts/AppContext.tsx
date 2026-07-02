@@ -43,8 +43,11 @@ import {
   dbGetMyBulletins,
   dbGetActiveWorkerSlots,
   dbGetMyWorkerSlots,
+  dbTelegramAuth,
+  dbBindTelegram,
 } from '@/services/db';
 import { registerForPushNotifications } from '@/services/notifications';
+import { isTelegramMiniApp, getTelegramInitData } from '@/lib/telegram';
 
 // Polling interval for native (Realtime is primary, polling is fallback)
 const NATIVE_POLL_INTERVAL = 8_000;
@@ -240,7 +243,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           await new Promise<void>(r => setTimeout(r, 1000));
         }
         if (cancelled) return;
-        const sessionUser = await getSessionUser().catch(() => null);
+        let sessionUser = await getSessionUser().catch(() => null);
+
+        // Telegram Mini App: auto-login via signed initData — no password needed
+        if (!sessionUser && isTelegramMiniApp()) {
+          const initData = getTelegramInitData();
+          if (initData) {
+            const res = await dbTelegramAuth(initData).catch(() => null);
+            if (res?.ok && res.user && !res.user.isBlocked) {
+              sessionUser = res.user;
+              await saveSessionUser(res.user).catch(() => {});
+            }
+          }
+        }
 
         if (cancelled) return;
 
@@ -466,6 +481,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     await dbUpsertUser(u);
     _setCurrentUser(u);
     await saveSessionUser(u);
+    // Inside the Telegram Mini App: link this Telegram account for auto-login
+    if (isTelegramMiniApp()) {
+      const initData = getTelegramInitData();
+      if (initData) dbBindTelegram(u.id, initData).catch(() => {});
+    }
     // Задержка нужна чтобы система успела обработать разрешения на уведомления
     setTimeout(() => { registerForPushNotifications(u.id).catch(() => {}); }, 2000);
     setTimeout(() => {
@@ -492,6 +512,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!found || !passwordOk) return null;
     _setCurrentUser(found);
     await saveSessionUser(found);
+    // Inside the Telegram Mini App: link this Telegram account for auto-login
+    if (isTelegramMiniApp()) {
+      const initData = getTelegramInitData();
+      if (initData) dbBindTelegram(found.id, initData).catch(() => {});
+    }
     registerForPushNotifications(found.id).catch(() => {});
     setTimeout(() => {
       Promise.all([

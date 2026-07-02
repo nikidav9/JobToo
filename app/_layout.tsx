@@ -14,6 +14,7 @@ import { AppProvider, AppContext } from '@/contexts/AppContext';
 import { ToastLayer } from '@/components/ui/ToastLayer';
 import { setupAndroidChannels } from '@/services/notifications';
 import { hideWebSplash } from '@/lib/webSplash';
+import { initTelegramMiniApp, isTelegramMiniApp, getTelegramStartParam } from '@/lib/telegram';
 
 // Keep the web/native splash visible until hideAsync() is called from the tabs layout or index screen.
 // This prevents the white flash while expo-router navigates and hydrates the tabs route on web.
@@ -33,6 +34,29 @@ function WebSplashController() {
       hideWebSplash();
     }
   }, [pathname]);
+
+  return null;
+}
+
+// Telegram Mini App: viewport setup + startapp deep links
+// (t.me/<bot>/<app>?startapp=vacancy_<id> opens that vacancy directly)
+function TelegramMiniAppController() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !isTelegramMiniApp()) return;
+    initTelegramMiniApp();
+
+    const startParam = getTelegramStartParam();
+    if (startParam?.startsWith('vacancy_')) {
+      const vacancyId = startParam.slice('vacancy_'.length);
+      if (vacancyId) {
+        setTimeout(() => {
+          router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId } });
+        }, 300);
+      }
+    }
+  }, []);
 
   return null;
 }
@@ -152,6 +176,7 @@ export default function RootLayout() {
         <AppProvider>
           <StatusBar style="dark" />
           <WebSplashController />
+          <TelegramMiniAppController />
           <AuthGuard />
           <NotificationHandler />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FFFFFF' } }}>

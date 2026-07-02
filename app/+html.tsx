@@ -27,6 +27,9 @@ export default function Root({ children }: PropsWithChildren) {
         {/* Favicon */}
         <link rel="icon" href="/favicon.ico" />
 
+        {/* Telegram Mini App SDK — no-op outside Telegram's WebView */}
+        <script src="https://telegram.org/js/telegram-web-app.js" />
+
         <ScrollViewStyleReset />
 
         {/* Static splash — same visual as LogoDots (components/EntryTransition.tsx),

@@ -1091,3 +1091,27 @@ export async function dbAutoClosePastWorkerSlots(): Promise<void> {
 export async function dbGetAllWorkerTokens(): Promise<{ id: string; push_token: string }[]> {
   return proxy<{ id: string; push_token: string }[]>('dbGetAllWorkerTokens');
 }
+
+// ─── Telegram Mini App ────────────────────────────────────────────────────────
+
+export type TgAuthResult = {
+  ok: boolean;
+  user?: User | null;
+  tg?: { id: number; first_name: string; last_name: string; username: string };
+};
+
+/** Validates Telegram initData server-side and returns the linked user (if any) */
+export async function dbTelegramAuth(initData: string): Promise<TgAuthResult> {
+  const res = await proxy<{ ok: boolean; user?: any; tg?: TgAuthResult['tg'] }>('tgAuth', [initData]);
+  return { ...res, user: res.user ? rowToUser(res.user) : null };
+}
+
+/** Links the current Telegram account to an existing JobToo user */
+export async function dbBindTelegram(userId: string, initData: string): Promise<boolean> {
+  return proxy<boolean>('tgBindTelegram', [userId, initData]);
+}
+
+/** Sends a Telegram message to a user's linked account (bot notification) */
+export async function dbTelegramNotifyUser(userId: string, text: string): Promise<boolean> {
+  return proxy<boolean>('tgNotifyUser', [userId, text]);
+}

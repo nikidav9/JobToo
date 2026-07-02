@@ -100,6 +100,55 @@ function sb_rpc(string $fn, array $params = []): mixed {
     return json_decode($resp ?: 'null', true);
 }
 
+// ─── Telegram Mini App ────────────────────────────────────────────────────────
+
+define('TG_BOT_TOKEN', getenv('TG_BOT_TOKEN') ?: '');
+
+/**
+ * Validates Telegram WebApp initData signature (HMAC per official spec).
+ * Returns ['user' => [...], 'params' => [...]] or null if invalid/expired.
+ */
+function tg_validate_init_data(string $initData): ?array {
+    if (TG_BOT_TOKEN === '' || $initData === '') return null;
+    parse_str($initData, $params);
+    $hash = $params['hash'] ?? '';
+    if (!$hash) return null;
+    unset($params['hash']);
+    ksort($params);
+    $pairs = [];
+    foreach ($params as $k => $v) $pairs[] = $k . '=' . $v;
+    $dataCheckString = implode("\n", $pairs);
+    $secretKey = hash_hmac('sha256', TG_BOT_TOKEN, 'WebAppData', true);
+    $calc = bin2hex(hash_hmac('sha256', $dataCheckString, $secretKey, true));
+    if (!hash_equals($calc, $hash)) return null;
+    // Reject init data older than 24 hours
+    if (isset($params['auth_date']) && (time() - (int)$params['auth_date']) > 86400) return null;
+    $user = isset($params['user']) ? json_decode($params['user'], true) : null;
+    return ['user' => is_array($user) ? $user : null, 'params' => $params];
+}
+
+/** Sends a message to a Telegram user via Bot API. Never throws. */
+function tg_send_message(int $chatId, string $text): bool {
+    if (TG_BOT_TOKEN === '') return false;
+    $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendMessage');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_POSTFIELDS => json_encode([
+            'chat_id' => $chatId,
+            'text' => $text,
+            'parse_mode' => 'HTML',
+            'disable_web_page_preview' => true,
+        ]),
+    ]);
+    $resp = curl_exec($ch); curl_close($ch);
+    $dec = json_decode($resp ?: 'null', true);
+    return is_array($dec) && ($dec['ok'] ?? false) === true;
+}
+
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 try {
     $data = null;
@@ -127,6 +176,44 @@ try {
 
         case 'dbGetUserByPhone':
             $data = sb_single('jm_users', ['phone' => 'eq.' . $args[0]]); break;
+
+        // ── Telegram Mini App ──────────────────────────────────────────────────
+        // args: [initDataString] → { ok, user|null, tg: {id, first_name, ...} }
+        case 'tgAuth': {
+            $v = tg_validate_init_data($args[0] ?? '');
+            if (!$v || empty($v['user']['id'])) { $data = ['ok' => false]; break; }
+            $tgId = (int)$v['user']['id'];
+            $u = sb_single('jm_users', ['telegram_id' => 'eq.' . $tgId]);
+            $data = [
+                'ok' => true,
+                'user' => $u,
+                'tg' => [
+                    'id' => $tgId,
+                    'first_name' => $v['user']['first_name'] ?? '',
+                    'last_name' => $v['user']['last_name'] ?? '',
+                    'username' => $v['user']['username'] ?? '',
+                ],
+            ];
+            break;
+        }
+
+        // args: [userId, initDataString] — link a Telegram account to a user
+        case 'tgBindTelegram': {
+            $v = tg_validate_init_data($args[1] ?? '');
+            if (!$v || empty($v['user']['id'])) { $data = false; break; }
+            sb_update('jm_users', ['id' => 'eq.' . $args[0]], ['telegram_id' => (int)$v['user']['id']]);
+            $data = true;
+            break;
+        }
+
+        // args: [userId, text] — message the user's linked Telegram account
+        case 'tgNotifyUser': {
+            $u = sb_single('jm_users', ['id' => 'eq.' . $args[0]], 'telegram_id');
+            $data = ($u && !empty($u['telegram_id']))
+                ? tg_send_message((int)$u['telegram_id'], (string)$args[1])
+                : false;
+            break;
+        }
 
         // ── Vacancies ──────────────────────────────────────────────────────────
         case 'dbGetVacancies':
