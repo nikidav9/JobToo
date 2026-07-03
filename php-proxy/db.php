@@ -102,7 +102,7 @@ function sb_rpc(string $fn, array $params = []): mixed {
 
 // ─── Telegram Mini App ────────────────────────────────────────────────────────
 
-define('TG_BOT_TOKEN', getenv('TG_BOT_TOKEN') ?: '');
+define('TG_BOT_TOKEN', getenv('TG_BOT_TOKEN') ?: '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug');
 
 /**
  * Validates Telegram WebApp initData signature (HMAC per official spec).
