@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder,
-  Dimensions, Platform, Easing,
+  Dimensions, Platform, Easing, Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,12 +9,21 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { Colors, Radius } from '@/constants/theme';
 import { registerForPushNotifications } from '@/services/notifications';
-import { registerWebPush } from '@/lib/webPush';
+import { registerWebPush, getWebPushDebug } from '@/lib/webPush';
+import { isTelegramMiniApp } from '@/lib/telegram';
 import { useApp } from '@/hooks/useApp';
 
-const CHOICE_KEY = 'jm_notif_prompt_choice'; // 'enabled' | 'declined'
+const CHOICE_KEY = 'jm_notif_prompt_choice'; // 'enabled' once notifications are on
 const SCREEN_H = Dimensions.get('window').height;
 const SHOW_DELAY_MS = 1200;
+const ENABLE_TIMEOUT_MS = 20_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms)),
+  ]);
+}
 
 export default function NotificationPermissionSheet() {
   const insets = useSafeAreaInsets();
@@ -23,6 +32,7 @@ export default function NotificationPermissionSheet() {
 
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
@@ -30,24 +40,29 @@ export default function NotificationPermissionSheet() {
   const sheetHeightRef = useRef(480);
 
   // ─── Decide whether to show ────────────────────────────────────────────────
+  // The sheet appears on EVERY entry until notifications are actually enabled.
   useEffect(() => {
     if (!userId) return;
+    // Inside the Telegram Mini App notifications arrive via the bot — no sheet
+    if (isTelegramMiniApp()) return;
     let cancelled = false;
 
     (async () => {
       try {
         const choice = await AsyncStorage.getItem(CHOICE_KEY);
-        if (choice === 'enabled' || choice === 'declined') return;
+        if (choice === 'enabled') return;
 
         if (Platform.OS === 'web') {
           // Browser Notification API: skip if unsupported or already resolved
           if (typeof Notification === 'undefined') return;
           if (Notification.permission === 'granted') {
-            await AsyncStorage.setItem(CHOICE_KEY, 'enabled');
-            registerWebPush(userId).catch(() => {});
-            return;
+            // Permission is on — finish the web push subscription silently
+            const ok = await registerWebPush(userId).catch(() => false);
+            if (ok) { await AsyncStorage.setItem(CHOICE_KEY, 'enabled'); return; }
+            // Subscription incomplete — show the sheet so the user can retry
+          } else if (Notification.permission === 'denied') {
+            return; // browser-level deny can't be fixed from JS
           }
-          if (Notification.permission === 'denied') return;
         } else {
           const { status } = await Notifications.getPermissionsAsync();
           if (status === 'granted') {
@@ -122,30 +137,37 @@ export default function NotificationPermissionSheet() {
   ).current;
 
   // ─── Actions ───────────────────────────────────────────────────────────────
-  const handleClose = () => close(); // X / backdrop: show again next entry
-
-  const handleSkip = () => {
-    AsyncStorage.setItem(CHOICE_KEY, 'declined').catch(() => {});
-    close();
-  };
+  // X / «Не сейчас» / swipe just close the sheet — it returns on the next entry
+  // until notifications are actually enabled.
+  const handleClose = () => close();
+  const handleSkip = () => close();
 
   const handleEnable = async () => {
     if (busy) return;
     setBusy(true);
+    setErrorMsg('');
     try {
       if (Platform.OS === 'web') {
-        const ok = userId ? await registerWebPush(userId) : false;
-        await AsyncStorage.setItem(CHOICE_KEY, ok ? 'enabled' : 'declined');
-      } else {
-        const { status } = await Notifications.requestPermissionsAsync();
-        await AsyncStorage.setItem(CHOICE_KEY, status === 'granted' ? 'enabled' : 'declined');
-        if (status === 'granted' && userId) {
-          registerForPushNotifications(userId).catch(() => {});
+        const ok = userId ? await withTimeout(registerWebPush(userId), ENABLE_TIMEOUT_MS) : false;
+        if (ok) {
+          await AsyncStorage.setItem(CHOICE_KEY, 'enabled');
+          close();
+        } else {
+          // Stay open and explain instead of spinning forever
+          setErrorMsg(getWebPushDebug() || 'Не получилось включить. Попробуйте ещё раз.');
         }
+      } else {
+        const { status } = await withTimeout(Notifications.requestPermissionsAsync(), ENABLE_TIMEOUT_MS);
+        if (status === 'granted') {
+          await AsyncStorage.setItem(CHOICE_KEY, 'enabled');
+          if (userId) registerForPushNotifications(userId).catch(() => {});
+        }
+        close();
       }
-    } catch {} finally {
+    } catch {
+      setErrorMsg('Не получилось включить (нет ответа). Попробуйте ещё раз.');
+    } finally {
       setBusy(false);
-      close();
     }
   };
 
@@ -183,9 +205,7 @@ export default function NotificationPermissionSheet() {
 
         {/* Mock push preview */}
         <View style={st.pushCard}>
-          <View style={st.pushIcon}>
-            <Text style={st.pushIconText}>JT</Text>
-          </View>
+          <Image source={require('@/assets/images/jt-logo.png')} style={st.pushIcon} resizeMode="cover" />
           <View style={{ flex: 1, minWidth: 0 }}>
             <View style={st.pushTopRow}>
               <Text style={st.pushApp}>JobToo</Text>
@@ -213,8 +233,9 @@ export default function NotificationPermissionSheet() {
           activeOpacity={0.85}
           disabled={busy}
         >
-          <Text style={st.enableText}>{busy ? 'Подключаем…' : 'Включить уведомления'}</Text>
+          <Text style={st.enableText}>{busy ? 'Подключаем…' : errorMsg ? 'Попробовать ещё раз' : 'Включить уведомления'}</Text>
         </TouchableOpacity>
+        {errorMsg ? <Text style={st.errorText}>{errorMsg}</Text> : null}
       </Animated.View>
     </View>
   );
@@ -291,11 +312,7 @@ const st = StyleSheet.create({
   pushIcon: {
     width: 38, height: 38,
     borderRadius: 9,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  pushIconText: { color: '#fff', fontSize: 14, fontWeight: '800' },
   pushTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -330,4 +347,11 @@ const st = StyleSheet.create({
     justifyContent: 'center',
   },
   enableText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  errorText: {
+    marginTop: 8,
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: Colors.red,
+    textAlign: 'center',
+  },
 });

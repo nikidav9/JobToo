@@ -1763,7 +1763,6 @@ function EmployerHome() {
         </Text>
         <NotifBell />
       </View>
-      <WebPushBanner userId={currentUser.id} />
 
       <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
         <ModeSwitcher mode={mode} onChange={setMode} />
@@ -2007,7 +2006,6 @@ function WorkerHome() {
         </Text>
         <NotifBell />
       </View>
-      <WebPushBanner userId={currentUser.id} />
       <View style={styles.modeSwitcherRow}>
         <ModeSwitcher mode={mode} onChange={setMode} />
       </View>

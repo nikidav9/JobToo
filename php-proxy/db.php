@@ -103,6 +103,7 @@ function sb_rpc(string $fn, array $params = []): mixed {
 // ─── Telegram Mini App ────────────────────────────────────────────────────────
 
 define('TG_BOT_TOKEN', getenv('TG_BOT_TOKEN') ?: '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug');
+define('DASHBOARD_URL', getenv('DASHBOARD_URL') ?: 'https://dashboard-nujus-projects.vercel.app');
 
 /**
  * Validates Telegram WebApp initData signature (HMAC per official spec).
@@ -198,7 +199,36 @@ function broadcast_workers(string $title, string $body, string $tgHtml, string $
         try { sb_insert('jm_notifications', $rows); } catch (Throwable $e) {}
     }
 
-    return ['push' => count($msgs), 'telegram' => $tgOk, 'bell' => count($rows)];
+    // Web push (PWA users) — sent through the dashboard's VAPID endpoint
+    $webOk = 0;
+    try {
+        $workerIds = array_flip(array_column($all, 'id'));
+        $subs = sb_select('jm_web_push_subscriptions', [], 'user_id,endpoint,p256dh,auth');
+        $appSecret = getenv('APP_SECRET') ?: 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6';
+        foreach ($subs as $s) {
+            if (!isset($workerIds[$s['user_id']]) || empty($s['endpoint'])) continue;
+            $ch = curl_init(DASHBOARD_URL . '/api/webpush/send');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'x-app-secret: ' . $appSecret],
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_POSTFIELDS => json_encode([
+                    'subscription' => [
+                        'endpoint' => $s['endpoint'],
+                        'keys' => ['p256dh' => $s['p256dh'], 'auth' => $s['auth']],
+                    ],
+                    'title' => $title,
+                    'body' => $body,
+                    'data' => ['type' => $dataType],
+                ]),
+            ]);
+            $resp = curl_exec($ch); curl_close($ch);
+            $dec = json_decode($resp ?: 'null', true);
+            if (is_array($dec) && ($dec['ok'] ?? false)) $webOk++;
+        }
+    } catch (Throwable $e) {}
+
+    return ['push' => count($msgs), 'telegram' => $tgOk, 'bell' => count($rows), 'webpush' => $webOk];
 }
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
