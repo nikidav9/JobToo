@@ -189,7 +189,16 @@ function broadcast_workers(string $title, string $body, string $tgHtml, string $
     foreach ($withTg as $w) {
         if (tg_send_message((int)$w['telegram_id'], $tgHtml, true)) $tgOk++;
     }
-    return ['push' => count($msgs), 'telegram' => $tgOk];
+
+    // In-app bell (jm_notifications) — for EVERY worker, so the announcement
+    // is visible in the app even without a push token or linked Telegram
+    $all = sb_select('jm_users', ['role' => 'eq.worker'], 'id');
+    $rows = array_map(fn($w) => ['user_id' => $w['id'], 'title' => $title, 'body' => $body], $all);
+    if (!empty($rows)) {
+        try { sb_insert('jm_notifications', $rows); } catch (Throwable $e) {}
+    }
+
+    return ['push' => count($msgs), 'telegram' => $tgOk, 'bell' => count($rows)];
 }
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
