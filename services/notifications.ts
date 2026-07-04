@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { dbSavePushToken, dbGetPushToken, dbGetWorkerTokensByMetro, dbGetWebPushSubscription, dbSaveNotification } from '@/services/db';
+import { dbSavePushToken, dbGetPushToken, dbGetWebPushSubscription, dbSaveNotification } from '@/services/db';
 
 const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6';
 const DASHBOARD_URL = process.env.EXPO_PUBLIC_DASHBOARD_URL || '';
@@ -337,28 +337,27 @@ export async function notifyWorkersNearVacancy(params: {
 }): Promise<void> {
   try {
     const { metroStation, title, company, type } = params;
-    const workers = await dbGetWorkerTokensByMetro(metroStation);
-    if (workers.length === 0) return;
 
+    // Broadcast to ALL workers (small user base — reach beats geo-precision).
+    // Server sends Expo push to everyone with a token + Telegram bot message
+    // to everyone with a linked telegram_id.
     const notifTitle = type === 'permanent'
-      ? '💼 Новая постоянная вакансия рядом!'
-      : '⚡ Новая подработка рядом!';
-    const body = `${company} ищет сотрудника на «${title}» — м. ${metroStation}`;
+      ? '💼 Новая постоянная вакансия!'
+      : '⚡ Новая подработка!';
+    const body = `${company} ищет сотрудника на «${title}»${metroStation ? ` — м. ${metroStation}` : ''}`;
+    const tgHtml = (type === 'permanent' ? '💼 <b>Новая постоянная вакансия!</b>' : '⚡ <b>Новая подработка!</b>')
+      + `\n\n👷 ${title} — ${company}`
+      + (metroStation ? `\n🚇 м. ${metroStation}` : '')
+      + '\n\nУспей откликнуться 👇';
 
-    const messages = workers.map(w => ({
-      to: w.push_token,
-      title: notifTitle,
-      body,
-      sound: 'default',
-      channelId: 'vacancies',
-      priority: 'normal',
-      data: { type: type === 'permanent' ? 'nearby_perm' : 'nearby_shift' },
-    }));
-
-    // Expo Push API accepts batches of up to 100
-    for (let i = 0; i < messages.length; i += 100) {
-      await sendExpoPush(messages.slice(i, i + 100));
-    }
+    await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
+      body: JSON.stringify({
+        fn: 'dbNotifyAllWorkersNewVacancy',
+        args: [notifTitle, body, tgHtml, type === 'permanent' ? 'nearby_perm' : 'nearby_shift'],
+      }),
+    });
   } catch {
     // Never crash the app due to a notification failure
   }

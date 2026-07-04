@@ -128,8 +128,19 @@ function tg_validate_init_data(string $initData): ?array {
 }
 
 /** Sends a message to a Telegram user via Bot API. Never throws. */
-function tg_send_message(int $chatId, string $text): bool {
+function tg_send_message(int $chatId, string $text, bool $withAppButton = false): bool {
     if (TG_BOT_TOKEN === '') return false;
+    $payload = [
+        'chat_id' => $chatId,
+        'text' => $text,
+        'parse_mode' => 'HTML',
+        'disable_web_page_preview' => true,
+    ];
+    if ($withAppButton) {
+        $payload['reply_markup'] = ['inline_keyboard' => [[
+            ['text' => '🚀 Открыть JobToo', 'url' => 'https://t.me/JobToo_bot/app'],
+        ]]];
+    }
     $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendMessage');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -137,16 +148,48 @@ function tg_send_message(int $chatId, string $text): bool {
         CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
         CURLOPT_TIMEOUT => 10,
         CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_POSTFIELDS => json_encode([
-            'chat_id' => $chatId,
-            'text' => $text,
-            'parse_mode' => 'HTML',
-            'disable_web_page_preview' => true,
-        ]),
+        CURLOPT_POSTFIELDS => json_encode($payload),
     ]);
     $resp = curl_exec($ch); curl_close($ch);
     $dec = json_decode($resp ?: 'null', true);
     return is_array($dec) && ($dec['ok'] ?? false) === true;
+}
+
+/** Sends Expo push messages in batches of 100. Never throws. */
+function expo_push(array $messages): void {
+    for ($i = 0; $i < count($messages); $i += 100) {
+        $chunk = array_slice($messages, $i, 100);
+        $ch = curl_init('https://exp.host/--/api/v2/push/send');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode(count($chunk) === 1 ? $chunk[0] : $chunk),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_TIMEOUT => 15,
+        ]);
+        curl_exec($ch); curl_close($ch);
+    }
+}
+
+/**
+ * Broadcasts a new-job notification to ALL workers:
+ * Expo push to everyone with a push token + Telegram message (with app button)
+ * to everyone with a linked telegram_id.
+ */
+function broadcast_workers(string $title, string $body, string $tgHtml, string $dataType): array {
+    $withPush = sb_select('jm_users', ['role' => 'eq.worker', 'push_token' => 'not.is.null'], 'push_token');
+    $msgs = array_map(fn($w) => [
+        'to' => $w['push_token'], 'title' => $title, 'body' => $body,
+        'sound' => 'default', 'priority' => 'high',
+        'channelId' => 'vacancies', 'data' => ['type' => $dataType],
+    ], $withPush);
+    expo_push($msgs);
+
+    $withTg = sb_select('jm_users', ['role' => 'eq.worker', 'telegram_id' => 'not.is.null'], 'telegram_id');
+    $tgOk = 0;
+    foreach ($withTg as $w) {
+        if (tg_send_message((int)$w['telegram_id'], $tgHtml, true)) $tgOk++;
+    }
+    return ['push' => count($msgs), 'telegram' => $tgOk];
 }
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
@@ -581,6 +624,21 @@ try {
             ]);
             $resp = curl_exec($ch); curl_close($ch);
             $data = json_decode($resp ?: 'null', true); break;
+        }
+
+        // args: [pushTitle, pushBody, tgHtml, dataType] — push + Telegram to ALL workers
+        case 'dbNotifyAllWorkersNewVacancy': {
+            $data = broadcast_workers((string)$args[0], (string)$args[1], (string)$args[2], (string)($args[3] ?? 'nearby_shift'));
+            break;
+        }
+
+        // args: [company, workType, date, metro] — биржа: объявление всем работникам
+        case 'dbNotifyAllWorkersNewBulletin': {
+            $company = (string)$args[0]; $wt = (string)$args[1]; $date = (string)$args[2]; $metro = (string)$args[3];
+            $body = "$company — «$wt», $date" . ($metro !== '' ? ", м. $metro" : '');
+            $tgHtml = "📣 <b>Новое объявление на бирже!</b>\n\n👷 $wt — $company\n📅 $date" . ($metro !== '' ? "\n🚇 м. $metro" : '') . "\n\nУспей откликнуться 👇";
+            $data = broadcast_workers('📣 Новое объявление на бирже!', $body, $tgHtml, 'nearby_shift');
+            break;
         }
 
         case 'dbSaveNotification':
