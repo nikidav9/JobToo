@@ -262,7 +262,11 @@ export default function CreateVacancy() {
         await upsertWithTimeout(Promise.all(vacs.map(v => dbUpsertVacancy(v))));
         vacs.forEach(v => optimisticAddVacancy(v));
         if (metroStation) {
-          notifyWorkersNearVacancy({ metroStation, title: meta.label, company: base.company, type: 'shift' }).catch(() => {});
+          notifyWorkersNearVacancy({
+            metroStation, title: meta.label, company: base.company, type: 'shift',
+            date: vacs[0]?.date, daysCount: vacs.length,
+            timeStart: base.timeStart, timeEnd: base.timeEnd, salary: base.salary,
+          }).catch(() => {});
         }
         showToast(`Опубликовано ${dates.length} вакансий`, 'success');
       } else {
@@ -277,7 +281,10 @@ export default function CreateVacancy() {
         await upsertWithTimeout(dbUpsertVacancy(vac));
         optimisticAddVacancy(vac);
         if (metroStation) {
-          notifyWorkersNearVacancy({ metroStation, title: meta.label, company: base.company, type: 'shift' }).catch(() => {});
+          notifyWorkersNearVacancy({
+            metroStation, title: meta.label, company: base.company, type: 'shift',
+            date: vac.date, timeStart: base.timeStart, timeEnd: base.timeEnd, salary: base.salary,
+          }).catch(() => {});
         }
         showToast('Вакансия опубликована', 'success');
       }

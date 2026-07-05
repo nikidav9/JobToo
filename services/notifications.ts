@@ -329,33 +329,66 @@ export async function notifyWorkerNewMessage(
 
 // ─── Nearby vacancy broadcast ─────────────────────────────────────────────────
 
+const MONTHS_RU = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+
+function formatDateRu(iso?: string): string {
+  if (!iso) return '';
+  const [, m, d] = iso.split('-').map(Number);
+  if (!m || !d) return iso;
+  return `${d} ${MONTHS_RU[m - 1]}`;
+}
+
 export async function notifyWorkersNearVacancy(params: {
   metroStation: string;
   title: string;
   company: string;
   type: 'shift' | 'permanent';
+  date?: string;       // ISO, для смен
+  daysCount?: number;  // если смена на несколько дней
+  timeStart?: string;
+  timeEnd?: string;
+  salary?: number;
+  schedule?: string;   // для постоянных
 }): Promise<void> {
   try {
-    const { metroStation, title, company, type } = params;
+    const { metroStation, title, company, type, date, daysCount, timeStart, timeEnd, salary, schedule } = params;
+
+    const dateLabel = formatDateRu(date) + (daysCount && daysCount > 1 ? ` (+${daysCount - 1} дн.)` : '');
+    const timeLabel = timeStart ? `${timeStart}${timeEnd ? `–${timeEnd}` : ''}` : '';
+    const salaryLabel = salary && salary > 0
+      ? `${salary.toLocaleString('ru-RU')} ₽${type === 'permanent' ? '/мес' : ''}`
+      : '';
 
     // Broadcast to ALL workers (small user base — reach beats geo-precision).
-    // Server sends Expo push to everyone with a token + Telegram bot message
-    // to everyone with a linked telegram_id.
+    // Server sends Expo push + Telegram bot messages + bell + web push.
     const notifTitle = type === 'permanent'
       ? '💼 Новая постоянная вакансия!'
       : '⚡ Новая подработка!';
-    const body = `${company} ищет сотрудника на «${title}»${metroStation ? ` — м. ${metroStation}` : ''}`;
-    const tgHtml = (type === 'permanent' ? '💼 <b>Новая постоянная вакансия!</b>' : '⚡ <b>Новая подработка!</b>')
-      + `\n\n👷 ${title} — ${company}`
+    const body = `${title} — ${company}`
+      + (dateLabel ? `, ${dateLabel}` : '')
+      + (timeLabel ? ` ${timeLabel}` : '')
+      + (metroStation ? `, м. ${metroStation}` : '')
+      + (salaryLabel ? `, ${salaryLabel}` : '')
+      + '. Открой и откликнись!';
+
+    const detailsHtml = `\n\n👷 ${title} — ${company}`
+      + (dateLabel ? `\n📅 ${dateLabel}${timeLabel ? `, ${timeLabel}` : ''}` : (timeLabel ? `\n🕐 ${timeLabel}` : ''))
+      + (schedule ? `\n🗓 ${schedule}` : '')
       + (metroStation ? `\n🚇 м. ${metroStation}` : '')
-      + '\n\nУспей откликнуться 👇';
+      + (salaryLabel ? `\n💰 ${salaryLabel}` : '');
+
+    const headHtml = type === 'permanent' ? '💼 <b>Новая постоянная вакансия!</b>' : '⚡ <b>Новая подработка!</b>';
+    const tgHtml = headHtml + detailsHtml + '\n\nУспей откликнуться 👇';
+    // Пост в группу «ПОДРАБОТКИ» — тот же формат + напоминание про приложение
+    const groupHtml = headHtml + detailsHtml
+      + '\n\n⚡ В приложении смены появляются раньше — откликайся первым 👇';
 
     await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
       body: JSON.stringify({
         fn: 'dbNotifyAllWorkersNewVacancy',
-        args: [notifTitle, body, tgHtml, type === 'permanent' ? 'nearby_perm' : 'nearby_shift'],
+        args: [notifTitle, body, tgHtml, type === 'permanent' ? 'nearby_perm' : 'nearby_shift', groupHtml],
       }),
     });
   } catch {

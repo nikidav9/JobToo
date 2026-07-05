@@ -104,6 +104,7 @@ function sb_rpc(string $fn, array $params = []): mixed {
 
 define('TG_BOT_TOKEN', getenv('TG_BOT_TOKEN') ?: '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug');
 define('DASHBOARD_URL', getenv('DASHBOARD_URL') ?: 'https://dashboard-nujus-projects.vercel.app');
+define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025)); // группа «ПОДРАБОТКИ»
 
 /**
  * Validates Telegram WebApp initData signature (HMAC per official spec).
@@ -665,9 +666,14 @@ try {
             $data = json_decode($resp ?: 'null', true); break;
         }
 
-        // args: [pushTitle, pushBody, tgHtml, dataType] — push + Telegram to ALL workers
+        // args: [pushTitle, pushBody, tgHtml, dataType, groupHtml?]
+        // push + Telegram + bell + web push to ALL workers, plus a post in the group
         case 'dbNotifyAllWorkersNewVacancy': {
             $data = broadcast_workers((string)$args[0], (string)$args[1], (string)$args[2], (string)($args[3] ?? 'nearby_shift'));
+            $groupHtml = (string)($args[4] ?? '');
+            if ($groupHtml !== '' && TG_GROUP_CHAT_ID !== 0) {
+                $data['group'] = tg_send_message(TG_GROUP_CHAT_ID, $groupHtml, true);
+            }
             break;
         }
 
