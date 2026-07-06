@@ -81,7 +81,7 @@ export default function CreatePermVacancy() {
       if (!isEdit && metroStation) {
         notifyWorkersNearVacancy({
           metroStation, title: title.trim(), company: vac.company, type: 'permanent',
-          salary: vac.salary, schedule: vac.schedule,
+          salary: vac.salary, schedule: vac.schedule, vacancyId: vac.id,
         }).catch(() => {});
       }
       showToast(isEdit ? 'Вакансия обновлена' : 'Вакансия опубликована', 'success');

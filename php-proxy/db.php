@@ -129,8 +129,11 @@ function tg_validate_init_data(string $initData): ?array {
     return ['user' => is_array($user) ? $user : null, 'params' => $params];
 }
 
-/** Sends a message to a Telegram user via Bot API. Never throws. */
-function tg_send_message(int $chatId, string $text, bool $withAppButton = false): bool {
+/**
+ * Sends a message to a Telegram user via Bot API. Never throws.
+ * $withAppButton: true — кнопка на главную мини-аппа; string — свой URL кнопки.
+ */
+function tg_send_message(int $chatId, string $text, bool|string $withAppButton = false): bool {
     if (TG_BOT_TOKEN === '') return false;
     $payload = [
         'chat_id' => $chatId,
@@ -138,9 +141,10 @@ function tg_send_message(int $chatId, string $text, bool $withAppButton = false)
         'parse_mode' => 'HTML',
         'disable_web_page_preview' => true,
     ];
-    if ($withAppButton) {
+    if ($withAppButton !== false) {
+        $url = is_string($withAppButton) ? $withAppButton : 'https://t.me/JobToo_bot/app';
         $payload['reply_markup'] = ['inline_keyboard' => [[
-            ['text' => '🚀 Открыть JobToo', 'url' => 'https://t.me/JobToo_bot/app'],
+            ['text' => '🚀 Откликнуться в JobToo', 'url' => $url],
         ]]];
     }
     $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendMessage');
@@ -177,7 +181,7 @@ function expo_push(array $messages): void {
  * Expo push to everyone with a push token + Telegram message (with app button)
  * to everyone with a linked telegram_id.
  */
-function broadcast_workers(string $title, string $body, string $tgHtml, string $dataType): array {
+function broadcast_workers(string $title, string $body, string $tgHtml, string $dataType, bool|string $btnUrl = true): array {
     $withPush = sb_select('jm_users', ['role' => 'eq.worker', 'push_token' => 'not.is.null'], 'push_token');
     $msgs = array_map(fn($w) => [
         'to' => $w['push_token'], 'title' => $title, 'body' => $body,
@@ -189,7 +193,7 @@ function broadcast_workers(string $title, string $body, string $tgHtml, string $
     $withTg = sb_select('jm_users', ['role' => 'eq.worker', 'telegram_id' => 'not.is.null'], 'telegram_id');
     $tgOk = 0;
     foreach ($withTg as $w) {
-        if (tg_send_message((int)$w['telegram_id'], $tgHtml, true)) $tgOk++;
+        if (tg_send_message((int)$w['telegram_id'], $tgHtml, $btnUrl)) $tgOk++;
     }
 
     // In-app bell (jm_notifications) — for EVERY worker, so the announcement
@@ -666,13 +670,18 @@ try {
             $data = json_decode($resp ?: 'null', true); break;
         }
 
-        // args: [pushTitle, pushBody, tgHtml, dataType, groupHtml?]
-        // push + Telegram + bell + web push to ALL workers, plus a post in the group
+        // args: [pushTitle, pushBody, tgHtml, dataType, groupHtml?, vacancyId?]
+        // push + Telegram + bell + web push to ALL workers, plus a post in the group.
+        // vacancyId (перм. вакансии) делает кнопку дип-линком на конкретную вакансию.
         case 'dbNotifyAllWorkersNewVacancy': {
-            $data = broadcast_workers((string)$args[0], (string)$args[1], (string)$args[2], (string)($args[3] ?? 'nearby_shift'));
+            $vacancyId = (string)($args[5] ?? '');
+            $btnUrl = $vacancyId !== ''
+                ? 'https://t.me/JobToo_bot/app?startapp=vacancy_' . $vacancyId
+                : true;
+            $data = broadcast_workers((string)$args[0], (string)$args[1], (string)$args[2], (string)($args[3] ?? 'nearby_shift'), $btnUrl);
             $groupHtml = (string)($args[4] ?? '');
             if ($groupHtml !== '' && TG_GROUP_CHAT_ID !== 0) {
-                $data['group'] = tg_send_message(TG_GROUP_CHAT_ID, $groupHtml, true);
+                $data['group'] = tg_send_message(TG_GROUP_CHAT_ID, $groupHtml, $btnUrl);
             }
             break;
         }

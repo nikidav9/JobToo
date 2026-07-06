@@ -349,9 +349,10 @@ export async function notifyWorkersNearVacancy(params: {
   timeEnd?: string;
   salary?: number;
   schedule?: string;   // для постоянных
+  vacancyId?: string;  // перм. вакансии: кнопка ведёт прямо на неё
 }): Promise<void> {
   try {
-    const { metroStation, title, company, type, date, daysCount, timeStart, timeEnd, salary, schedule } = params;
+    const { metroStation, title, company, type, date, daysCount, timeStart, timeEnd, salary, schedule, vacancyId } = params;
 
     const dateLabel = formatDateRu(date) + (daysCount && daysCount > 1 ? ` (+${daysCount - 1} дн.)` : '');
     const timeLabel = timeStart ? `${timeStart}${timeEnd ? `–${timeEnd}` : ''}` : '';
@@ -388,7 +389,7 @@ export async function notifyWorkersNearVacancy(params: {
       headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
       body: JSON.stringify({
         fn: 'dbNotifyAllWorkersNewVacancy',
-        args: [notifTitle, body, tgHtml, type === 'permanent' ? 'nearby_perm' : 'nearby_shift', groupHtml],
+        args: [notifTitle, body, tgHtml, type === 'permanent' ? 'nearby_perm' : 'nearby_shift', groupHtml, vacancyId ?? ''],
       }),
     });
   } catch {
