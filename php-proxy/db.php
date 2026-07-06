@@ -216,7 +216,7 @@ function broadcast_workers(string $title, string $body, string $tgHtml, string $
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
                 CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'x-app-secret: ' . $appSecret],
-                CURLOPT_TIMEOUT => 10,
+                CURLOPT_TIMEOUT => 6,
                 CURLOPT_POSTFIELDS => json_encode([
                     'subscription' => [
                         'endpoint' => $s['endpoint'],
@@ -674,15 +674,25 @@ try {
         // push + Telegram + bell + web push to ALL workers, plus a post in the group.
         // vacancyId (перм. вакансии) делает кнопку дип-линком на конкретную вакансию.
         case 'dbNotifyAllWorkersNewVacancy': {
+            // Не дать хостингу убить скрипт до конца рассылки
+            @set_time_limit(300);
+            @ignore_user_abort(true);
+
             $vacancyId = (string)($args[5] ?? '');
             $btnUrl = $vacancyId !== ''
                 ? 'https://t.me/JobToo_bot/app?startapp=vacancy_' . $vacancyId
                 : true;
-            $data = broadcast_workers((string)$args[0], (string)$args[1], (string)$args[2], (string)($args[3] ?? 'nearby_shift'), $btnUrl);
+
+            // Пост в группу — ПЕРВЫМ (одна быстрая операция): длинные циклы
+            // рассылки ниже могут упереться в лимит времени PHP
             $groupHtml = (string)($args[4] ?? '');
+            $groupOk = false;
             if ($groupHtml !== '' && TG_GROUP_CHAT_ID !== 0) {
-                $data['group'] = tg_send_message(TG_GROUP_CHAT_ID, $groupHtml, $btnUrl);
+                $groupOk = tg_send_message(TG_GROUP_CHAT_ID, $groupHtml, $btnUrl);
             }
+
+            $data = broadcast_workers((string)$args[0], (string)$args[1], (string)$args[2], (string)($args[3] ?? 'nearby_shift'), $btnUrl);
+            $data['group'] = $groupOk;
             break;
         }
 
