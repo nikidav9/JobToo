@@ -749,6 +749,24 @@ try {
             break;
         }
 
+        // Смены: автозакрытие за 30 минут до начала (та же логика, что у биржи)
+        case 'dbAutoClosePastVacancies': {
+            $today = date('Y-m-d');
+            $cutoff = time() + 30 * 60;
+            $rows = sb_select('jm_vacancies', ['status' => 'eq.open', 'date' => 'lte.' . $today], 'id,date,time_start');
+            $toClose = array_filter($rows, function($v) use ($today, $cutoff) {
+                if ($v['date'] < $today) return true;
+                if (empty($v['time_start'])) return false;
+                $startTs = strtotime($v['date'] . ' ' . $v['time_start'] . ':00');
+                return $startTs !== false && $startTs <= $cutoff;
+            });
+            foreach ($toClose as $row) {
+                sb_update('jm_vacancies', ['id' => 'eq.' . $row['id']], ['status' => 'closed']);
+            }
+            $data = count($toClose);
+            break;
+        }
+
         case 'dbAutoClosePastBulletins': {
             $today = date('Y-m-d');
             $cutoff = time() + 30 * 60; // now + 30 min

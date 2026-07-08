@@ -298,7 +298,21 @@ export async function fetchUsers() {
 
 // ─── vacancies ───────────────────────────────────────────────────────────────
 
+/** Смены с прошедшей датой должны быть закрыты — дашборд подчищает их при загрузке */
+async function autoCloseStaleVacancies() {
+  // МСК = UTC+3
+  const mskToday = new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10)
+  try {
+    await supabaseAdmin
+      .from('jm_vacancies')
+      .update({ status: 'closed' })
+      .eq('status', 'open')
+      .lt('date', mskToday)
+  } catch { /* не блокируем аналитику */ }
+}
+
 export async function fetchVacancies() {
+  await autoCloseStaleVacancies()
   const [{ data: tv }, { data: pv }, { data: apps }, { data: users }, { data: likes }] = await Promise.all([
     supabase.from('jm_vacancies').select('id,status,work_type,work_type_label,created_at,employer_id,salary,workers_needed,workers_found,is_urgent,no_experience_needed,company,date,address,metro_station,time_start,time_end'),
     supabase.from('jm_perm_vacancies').select('id,title,status,created_at,employer_id,salary,company,metro_station,address,description,schedule,work_type'),
@@ -487,6 +501,9 @@ export async function fetchMatching() {
   const vacMap: Record<string, string> = {}
   for (const v of tv ?? []) vacMap[(v as any).id] = WORK_TYPE_LABELS[(v as any).work_type ?? ''] ?? (v as any).work_type ?? '?'
 
+  // В jm_likes лежат и отклики (worker_liked), и скипы (worker_skipped) —
+  // для метрик мэтчей считаем только реальные отклики
+  const realLikes = lk.filter((x: any) => x.worker_liked)
   const matches = lk.filter((x: any) => x.is_match)
   const confirmed = lk.filter((x: any) => x.worker_confirmed && x.employer_confirmed)
   const completed = lk.filter((x: any) => x.shift_completed)
@@ -496,7 +513,7 @@ export async function fetchMatching() {
     matches.map((x: any) => ({ created_at: x.matched_at ?? x.created_at })),
     'created_at'
   )
-  const likeByDay = groupByDate(lk, 'created_at')
+  const likeByDay = groupByDate(realLikes, 'created_at')
 
   const daily30 = days30.map(d => ({
     date: toDayLabel(d),
@@ -506,7 +523,7 @@ export async function fetchMatching() {
 
   const wtLikes: Record<string, number> = {}
   const wtMatches: Record<string, number> = {}
-  for (const l of lk) {
+  for (const l of realLikes) {
     const wt = vacMap[(l as any).vacancy_id] ?? 'Другое'
     wtLikes[wt] = (wtLikes[wt] ?? 0) + 1
     if ((l as any).is_match) wtMatches[wt] = (wtMatches[wt] ?? 0) + 1
@@ -519,18 +536,18 @@ export async function fetchMatching() {
   })).sort((a, b) => b.likes - a.likes)
 
   const funnel = [
-    { name: 'Просмотрено', value: lk.length, fill: PALETTE.blue },
-    { name: 'Лайки рабочих', value: lk.filter((x: any) => x.worker_liked).length, fill: PALETTE.cyan },
-    { name: 'Совпадения', value: matches.length, fill: PALETTE.purple },
+    { name: 'Показы', value: lk.length, fill: PALETTE.blue },
+    { name: 'Отклики', value: realLikes.length, fill: PALETTE.cyan },
+    { name: 'Мэтчи', value: matches.length, fill: PALETTE.purple },
     { name: 'Подтверждено', value: confirmed.length, fill: PALETTE.orange },
     { name: 'Завершено', value: completed.length, fill: PALETTE.green },
   ]
 
   return {
     kpi: {
-      totalLikes: lk.length,
+      totalLikes: realLikes.length,
       totalMatches: matches.length,
-      matchRate: lk.length > 0 ? ((matches.length / lk.length) * 100).toFixed(1) : '0',
+      matchRate: realLikes.length > 0 ? ((matches.length / realLikes.length) * 100).toFixed(1) : '0',
       confirmed: confirmed.length,
       confirmRate: matches.length > 0 ? ((confirmed.length / matches.length) * 100).toFixed(1) : '0',
       completed: completed.length,

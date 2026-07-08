@@ -45,6 +45,7 @@ import {
   dbGetMyWorkerSlots,
   dbTelegramAuth,
   dbBindTelegram,
+  dbAutoClosePastVacancies,
 } from '@/services/db';
 import { registerForPushNotifications } from '@/services/notifications';
 import { isTelegramMiniApp, getTelegramInitData } from '@/lib/telegram';
@@ -235,6 +236,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const boot = async () => {
       // Vacancies are public — start fetching immediately, before session/delay
       refreshVacancies(true).catch(() => {});
+      // Close shifts that start within 30 min (or already passed), then re-fetch
+      dbAutoClosePastVacancies()
+        .then(() => { if (!cancelled) refreshVacancies().catch(() => {}); })
+        .catch(() => {});
 
       try {
         // On Android, AsyncStorage may return null on cold start if read too early.

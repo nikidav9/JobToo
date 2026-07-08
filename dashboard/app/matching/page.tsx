@@ -28,20 +28,20 @@ export default function MatchingPage() {
 
       <div className="page-content">
         <div className="g-4">
-          <KpiCard label="Лайков" value={d.kpi.totalLikes} sparkColor={PALETTE.pink} />
-          <KpiCard label="Совпадений" value={d.kpi.totalMatches} sparkColor={PALETTE.purple} />
-          <KpiCard label="Конверсия" value={`${d.kpi.matchRate}%`} sparkColor={PALETTE.purple} />
+          <KpiCard label="Откликов" value={d.kpi.totalLikes} sub="лайки работников, без скипов" sparkColor={PALETTE.pink} />
+          <KpiCard label="Мэтчей" value={d.kpi.totalMatches} sparkColor={PALETTE.purple} />
+          <KpiCard label="Конверсия отклик→мэтч" value={`${d.kpi.matchRate}%`} sparkColor={PALETTE.purple} />
           <KpiCard label="Завершено смен" value={d.kpi.completed} sparkColor={PALETTE.green} />
         </div>
 
         <div className="g-4">
-          <KpiCard label="Скипов" value={d.kpi.skipped} sparkColor={PALETTE.gray} />
+          <KpiCard label="Скипов" value={d.kpi.skipped} sub="свайпы «мимо», не отклики" sparkColor={PALETTE.gray} />
           <KpiCard label="Подтверждено" value={d.kpi.confirmed} sparkColor={PALETTE.orange} />
           <KpiCard label="% подтверждения" value={`${d.kpi.confirmRate}%`} sparkColor={PALETTE.orange} />
           <KpiCard label="% завершения" value={`${d.kpi.completionRate}%`} sparkColor={PALETTE.green} />
         </div>
 
-        <ChartCard title="Лайки и совпадения по дням" sub="30 дней">
+        <ChartCard title="Отклики и мэтчи по дням" sub="30 дней">
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={d.daily30} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
               <defs>
@@ -57,8 +57,8 @@ export default function MatchingPage() {
               <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip contentStyle={TT} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
-              <Area type="monotone" dataKey="likes" name="Лайки" stroke={PALETTE.pink} fill="url(#gLk)" strokeWidth={1.7} dot={false} />
-              <Area type="monotone" dataKey="matches" name="Совпадения" stroke={PALETTE.purple} fill="url(#gMt)" strokeWidth={1.7} dot={false} />
+              <Area type="monotone" dataKey="likes" name="Отклики" stroke={PALETTE.pink} fill="url(#gLk)" strokeWidth={1.7} dot={false} />
+              <Area type="monotone" dataKey="matches" name="Мэтчи" stroke={PALETTE.purple} fill="url(#gMt)" strokeWidth={1.7} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -101,8 +101,8 @@ export default function MatchingPage() {
                 <Tooltip contentStyle={TT}
                   formatter={(value: any, name: string) => [name === 'rate' ? `${value}%` : value, name === 'rate' ? 'Конверсия %' : name === 'likes' ? 'Лайки' : 'Совпадения']} />
                 <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
-                <Bar dataKey="likes" name="Лайки" fill={PALETTE.pink} opacity={0.7} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="matches" name="Совпадения" fill={PALETTE.purple} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="likes" name="Отклики" fill={PALETTE.pink} opacity={0.7} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="matches" name="Мэтчи" fill={PALETTE.purple} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>

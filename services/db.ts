@@ -1115,3 +1115,7 @@ export async function dbBindTelegram(userId: string, initData: string): Promise<
 export async function dbTelegramNotifyUser(userId: string, text: string): Promise<boolean> {
   return proxy<boolean>('tgNotifyUser', [userId, text]);
 }
+
+export async function dbAutoClosePastVacancies(): Promise<void> {
+  await proxy('dbAutoClosePastVacancies');
+}
