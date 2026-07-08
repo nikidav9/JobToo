@@ -5,6 +5,7 @@ import { clearAuth } from './AuthGuard'
 
 const NAV = [
   { href: '/',            icon: IconGrid,     label: 'Обзор' },
+  { href: '/summary',     icon: IconSummary,  label: 'Сводка' },
   { href: '/users',       icon: IconUsers,    label: 'Пользователи' },
   { href: '/vacancies',   icon: IconJobs,     label: 'Вакансии' },
   { href: '/matching',    icon: IconMatch,    label: 'Совпадения' },
@@ -161,6 +162,9 @@ export default function Sidebar() {
   )
 }
 
+function IconSummary({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"><path d="M2.5 13.5v-4M6.2 13.5V6.5M9.8 13.5V9M13.5 13.5v-9"/></svg>
+}
 function IconGrid({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
 }

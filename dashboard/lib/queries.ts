@@ -1439,3 +1439,172 @@ export async function fetchExchange() {
     bulletinCards,
   }
 }
+
+// ─── executive summary (Сводка для презентаций) ──────────────────────────────
+
+function median(arr: number[]): number {
+  if (!arr.length) return 0
+  const s = [...arr].sort((a, b) => a - b)
+  const m = Math.floor(s.length / 2)
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
+}
+
+export async function fetchExecutiveSummary() {
+  const [
+    { data: users }, { data: tv }, { data: pv }, { data: likes },
+    { data: apps }, { data: chats }, { data: messages }, { data: ratings },
+    { data: websubs },
+  ] = await Promise.all([
+    supabase.from('jm_users').select('id,role,created_at,push_token,telegram_id'),
+    supabase.from('jm_vacancies').select('id,employer_id,status,created_at,workers_needed,workers_found'),
+    supabase.from('jm_perm_vacancies').select('id,employer_id,status,created_at'),
+    supabase.from('jm_likes').select('id,vacancy_id,worker_id,worker_liked,is_match,shift_completed,created_at'),
+    supabase.from('jm_perm_applications').select('id,vacancy_id,worker_id,created_at'),
+    supabase.from('jm_chats').select('id,created_at'),
+    supabase.from('jm_messages').select('id,chat_id,sender_id,created_at'),
+    supabase.from('jm_ratings').select('id,rating'),
+    supabaseAdmin.from('jm_web_push_subscriptions').select('user_id'),
+  ])
+
+  const u = users ?? []
+  const t = tv ?? []
+  const p = pv ?? []
+  const lk = (likes ?? []) as any[]
+  const ap = (apps ?? []) as any[]
+  const ch = chats ?? []
+  const ms = (messages ?? []) as any[]
+  const rt = (ratings ?? []) as any[]
+  const ws = (websubs ?? []) as any[]
+
+  const now = Date.now()
+  const d7 = new Date(now - 7 * 864e5).toISOString()
+  const d30 = new Date(now - 30 * 864e5).toISOString()
+  const d60 = new Date(now - 60 * 864e5).toISOString()
+
+  const workers = u.filter((x: any) => x.role === 'worker')
+  const employers = u.filter((x: any) => x.role === 'employer')
+  const realLikes = lk.filter(x => x.worker_liked)
+
+  // ── Рост ──
+  const newUsers30 = u.filter((x: any) => x.created_at > d30).length
+  const prevUsers30 = u.filter((x: any) => x.created_at > d60 && x.created_at <= d30).length
+  const userGrowthMoM = prevUsers30 > 0 ? Math.round(((newUsers30 - prevUsers30) / prevUsers30) * 100) : 100
+
+  // ── Активные (MAU/WAU): любой, кто совершил действие ──
+  function actorsSince(since: string): Set<string> {
+    const s = new Set<string>()
+    for (const x of realLikes) if (x.created_at > since && x.worker_id) s.add(x.worker_id)
+    for (const x of ap) if (x.created_at > since && x.worker_id) s.add(x.worker_id)
+    for (const x of ms) if (x.created_at > since && x.sender_id) s.add(x.sender_id)
+    for (const x of t as any[]) if (x.created_at > since && x.employer_id) s.add(x.employer_id)
+    for (const x of p as any[]) if (x.created_at > since && x.employer_id) s.add(x.employer_id)
+    return s
+  }
+  const mau = actorsSince(d30).size
+  const wau = actorsSince(d7).size
+
+  // ── Предложение ──
+  const shifts30 = (t as any[]).filter(x => x.created_at > d30).length
+  const perm30 = (p as any[]).filter(x => x.created_at > d30).length
+  const activeDirectors30 = new Set([
+    ...(t as any[]).filter(x => x.created_at > d30).map(x => x.employer_id),
+    ...(p as any[]).filter(x => x.created_at > d30).map(x => x.employer_id),
+  ].filter(Boolean)).size
+
+  // ── Ликвидность ──
+  const respByVac: Record<string, number> = {}
+  for (const x of realLikes) if (x.vacancy_id) respByVac[x.vacancy_id] = (respByVac[x.vacancy_id] ?? 0) + 1
+  const appsByVac: Record<string, number> = {}
+  for (const x of ap) if (x.vacancy_id) appsByVac[x.vacancy_id] = (appsByVac[x.vacancy_id] ?? 0) + 1
+
+  const shiftsWithResponse = (t as any[]).filter(x => respByVac[x.id]).length
+  const permWithResponse = (p as any[]).filter(x => appsByVac[x.id]).length
+  const supplyWithResponsePct = (t.length + p.length) > 0
+    ? Math.round(((shiftsWithResponse + permWithResponse) / (t.length + p.length)) * 100) : 0
+
+  const closedShifts = (t as any[]).filter(x => x.status === 'closed')
+  const needed = closedShifts.reduce((s, x) => s + (x.workers_needed ?? 0), 0)
+  const found = closedShifts.reduce((s, x) => s + (x.workers_found ?? 0), 0)
+  const fillRatePct = needed > 0 ? Math.round((found / needed) * 100) : 0
+
+  // Медиана времени до первого отклика (часы)
+  const vacCreated: Record<string, string> = {}
+  for (const x of t as any[]) vacCreated[x.id] = x.created_at
+  for (const x of p as any[]) vacCreated[x.id] = x.created_at
+  const firstResp: Record<string, string> = {}
+  for (const x of [...realLikes, ...ap]) {
+    if (!x.vacancy_id || !vacCreated[x.vacancy_id]) continue
+    if (!firstResp[x.vacancy_id] || x.created_at < firstResp[x.vacancy_id]) firstResp[x.vacancy_id] = x.created_at
+  }
+  const respHours = Object.keys(firstResp).map(id =>
+    (new Date(firstResp[id]).getTime() - new Date(vacCreated[id]).getTime()) / 3600e3
+  ).filter(h => h >= 0)
+  const medianResponseH = Math.round(median(respHours) * 10) / 10
+  const respWithin24hPct = respHours.length > 0
+    ? Math.round((respHours.filter(h => h <= 24).length / respHours.length) * 100) : 0
+
+  // ── Возвращаемость ──
+  const respCountByWorker: Record<string, number> = {}
+  for (const x of [...realLikes, ...ap]) if (x.worker_id) respCountByWorker[x.worker_id] = (respCountByWorker[x.worker_id] ?? 0) + 1
+  const workersActed = Object.keys(respCountByWorker).length
+  const repeatWorkersPct = workersActed > 0
+    ? Math.round((Object.values(respCountByWorker).filter(n => n >= 2).length / workersActed) * 100) : 0
+
+  const postsByDirector: Record<string, number> = {}
+  for (const x of [...(t as any[]), ...(p as any[])]) if (x.employer_id) postsByDirector[x.employer_id] = (postsByDirector[x.employer_id] ?? 0) + 1
+  const directorsActed = Object.keys(postsByDirector).length
+  const repeatDirectorsPct = directorsActed > 0
+    ? Math.round((Object.values(postsByDirector).filter(n => n >= 2).length / directorsActed) * 100) : 0
+
+  // ── Вовлечённость и охват ──
+  const matches = lk.filter(x => x.is_match).length
+  const avgMsgsPerChat = ch.length > 0 ? Math.round((ms.length / ch.length) * 10) / 10 : 0
+  const avgRating = rt.length > 0 ? Math.round((rt.reduce((s, x) => s + (x.rating ?? 0), 0) / rt.length) * 10) / 10 : 0
+  const webSubIds = new Set(ws.map(x => x.user_id))
+  const reachable = u.filter((x: any) => x.push_token || x.telegram_id || webSubIds.has(x.id)).length
+  const reachPct = u.length > 0 ? Math.round((reachable / u.length) * 100) : 0
+
+  // ── Графики ──
+  // Кумулятивный рост пользователей, 90 дней
+  const days90 = dayRange(90)
+  const byDay = groupByDate(u, 'created_at')
+  const before = u.filter((x: any) => (x.created_at ?? '').slice(0, 10) < days90[0]).length
+  let running = before
+  const cumulativeUsers = days90.map(d => {
+    running += byDay[d] ?? 0
+    return { date: toDayLabel(d), users: running }
+  })
+
+  // Недельная динамика, 12 недель: пользователи / предложение / отклики
+  const weekly = Array.from({ length: 12 }, (_, i) => {
+    const end = now - (11 - i) * 7 * 864e5
+    const start = end - 7 * 864e5
+    const inWeek = (iso?: string) => {
+      if (!iso) return false
+      const ts = new Date(iso).getTime()
+      return ts > start && ts <= end
+    }
+    return {
+      week: format(new Date(start), 'dd.MM'),
+      users: u.filter((x: any) => inWeek(x.created_at)).length,
+      supply: (t as any[]).filter(x => inWeek(x.created_at)).length + (p as any[]).filter(x => inWeek(x.created_at)).length,
+      responses: realLikes.filter(x => inWeek(x.created_at)).length + ap.filter(x => inWeek(x.created_at)).length,
+    }
+  })
+
+  return {
+    kpi: {
+      totalUsers: u.length, workers: workers.length, employers: employers.length,
+      newUsers30, userGrowthMoM, mau, wau,
+      totalResponses: realLikes.length + ap.length,
+      responses30: realLikes.filter(x => x.created_at > d30).length + ap.filter(x => x.created_at > d30).length,
+      shifts30, perm30, activeDirectors30,
+      supplyWithResponsePct, fillRatePct, medianResponseH, respWithin24hPct,
+      repeatWorkersPct, repeatDirectorsPct,
+      matches, completed: lk.filter(x => x.shift_completed).length,
+      chats: ch.length, avgMsgsPerChat, avgRating, ratingsCount: rt.length, reachPct,
+    },
+    cumulativeUsers,
+    weekly,
+  }
+}

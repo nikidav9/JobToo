@@ -18,6 +18,7 @@ function isOnLoginPage(): boolean {
 
 const NAV = [
   { href: '/', label: 'Обзор', icon: IconGrid },
+  { href: '/summary', label: 'Сводка', icon: IconSummary },
   { href: '/users', label: 'Юзеры', icon: IconUsers },
   { href: '/vacancies', label: 'Вакансии', icon: IconJobs },
   { href: '/matching', label: 'Матчи', icon: IconMatch },
@@ -100,6 +101,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   )
 }
 
+function IconSummary({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M2.5 13.5v-4M6.2 13.5V6.5M9.8 13.5V9M13.5 13.5v-9"/></svg>
+}
 function IconGrid({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
 }
