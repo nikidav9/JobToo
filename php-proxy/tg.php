@@ -1,11 +1,160 @@
 <?php
-// Telegram bot webhook — replies to /start (and any message) with the app button.
+// Telegram bot webhook:
+// - /start и любые сообщения в личке → приветствие с кнопкой приложения
+// - callback-кнопки «Одобрить/Отклонить» под заявками на вакансии
 define('TG_BOT_TOKEN', getenv('TG_BOT_TOKEN') ?: '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug');
+define('SB_URL', 'https://bbiqmkeysalwdonlnylb.supabase.co');
+define('SB_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiaXFta2V5c2Fsd2RvbmxueWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTI5NTIsImV4cCI6MjA5MzM4ODk1Mn0.HHYjTdjdP6lN-GosNfGypts6Kg-2CYyoMPMTnLfdfJQ');
 
 header('Content-Type: application/json; charset=utf-8');
 
+// ── Supabase helpers ──────────────────────────────────────────────────────────
+
+function sb(string $method, string $table, array $query = [], $body_data = null): array {
+    $url = SB_URL . '/rest/v1/' . $table;
+    if (!empty($query)) $url .= '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CUSTOMREQUEST  => $method,
+        CURLOPT_HTTPHEADER     => [
+            'apikey: ' . SB_KEY,
+            'Authorization: Bearer ' . SB_KEY,
+            'Content-Type: application/json',
+            'Prefer: return=minimal',
+        ],
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    if ($body_data !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body_data));
+    $resp = curl_exec($ch); curl_close($ch);
+    $dec = json_decode($resp ?: '[]', true);
+    return is_array($dec) ? $dec : [];
+}
+
+function sb_one(string $table, array $filters, string $select = '*'): ?array {
+    $rows = sb('GET', $table, array_merge(['select' => $select, 'limit' => '1'], $filters));
+    return !empty($rows) && isset($rows[0]) ? $rows[0] : null;
+}
+
+// ── Telegram helpers ──────────────────────────────────────────────────────────
+
+function tg(string $method, array $payload): array {
+    $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/' . $method);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT => 10,
+        CURLOPT_POSTFIELDS => json_encode($payload),
+    ]);
+    $resp = curl_exec($ch); curl_close($ch);
+    $dec = json_decode($resp ?: 'null', true);
+    return is_array($dec) ? $dec : [];
+}
+
+function expo_push_one(string $token, string $title, string $body): void {
+    $ch = curl_init('https://exp.host/--/api/v2/push/send');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
+        CURLOPT_TIMEOUT => 10,
+        CURLOPT_POSTFIELDS => json_encode([
+            'to' => $token, 'title' => $title, 'body' => $body,
+            'sound' => 'default', 'priority' => 'high', 'channelId' => 'matches',
+            'data' => ['type' => 'perm_status'],
+        ]),
+    ]);
+    curl_exec($ch); curl_close($ch);
+}
+
+/** Уведомляет работника по всем доступным каналам */
+function notify_worker(string $workerId, string $title, string $body): void {
+    // Колокольчик — всегда
+    sb('POST', 'jm_notifications', [], ['user_id' => $workerId, 'title' => $title, 'body' => $body]);
+    $w = sb_one('jm_users', ['id' => 'eq.' . $workerId], 'telegram_id,push_token');
+    if (!$w) return;
+    if (!empty($w['telegram_id'])) {
+        tg('sendMessage', [
+            'chat_id' => (int)$w['telegram_id'],
+            'text' => $title . "\n\n" . $body,
+            'reply_markup' => ['inline_keyboard' => [[
+                ['text' => '🚀 Открыть JobToo', 'url' => 'https://t.me/JobToo_bot/app'],
+            ]]],
+        ]);
+    }
+    if (!empty($w['push_token'])) {
+        expo_push_one($w['push_token'], $title, $body);
+    }
+}
+
+// ── Update parsing ────────────────────────────────────────────────────────────
+
 $update = json_decode(file_get_contents('php://input'), true);
 if (!is_array($update)) { echo json_encode(['ok' => true]); exit; }
+
+// ── Callback-кнопки (Одобрить/Отклонить заявку) ──────────────────────────────
+
+$cb = $update['callback_query'] ?? null;
+if ($cb) {
+    $data = (string)($cb['data'] ?? '');
+    $cbId = $cb['id'] ?? '';
+    $chatId = $cb['message']['chat']['id'] ?? null;
+    $msgId = $cb['message']['message_id'] ?? null;
+    $origText = $cb['message']['text'] ?? '';
+
+    if (preg_match('/^app(ok|no)_(.+)$/', $data, $m)) {
+        $approve = $m[1] === 'ok';
+        $appId = $m[2];
+
+        $app = sb_one('jm_perm_applications', ['id' => 'eq.' . $appId], 'id,worker_id,vacancy_id,status');
+        if (!$app) {
+            tg('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => 'Заявка не найдена']);
+            echo json_encode(['ok' => true]); exit;
+        }
+
+        if ($app['status'] !== 'pending') {
+            tg('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => 'Уже обработана ранее']);
+            echo json_encode(['ok' => true]); exit;
+        }
+
+        // Обновляем статус
+        sb('PATCH', 'jm_perm_applications', ['id' => 'eq.' . $appId], ['status' => $approve ? 'approved' : 'rejected']);
+
+        // Уведомляем работника
+        $vac = sb_one('jm_perm_vacancies', ['id' => 'eq.' . $app['vacancy_id']], 'title,company');
+        $vTitle = $vac['title'] ?? 'вакансию';
+        if ($approve) {
+            notify_worker($app['worker_id'],
+                '✅ Заявка одобрена!',
+                "Вашу заявку на «{$vTitle}» одобрили. Откройте приложение и свяжитесь с директором!");
+        } else {
+            notify_worker($app['worker_id'],
+                'По заявке отказ',
+                "По вакансии «{$vTitle}» вам отказали. Посмотрите другие открытые вакансии — их много!");
+        }
+
+        // Обновляем сообщение у директора
+        $mark = $approve ? '✅ ВЫ ОДОБРИЛИ ЭТУ ЗАЯВКУ' : '❌ Вы отклонили эту заявку';
+        if ($chatId && $msgId) {
+            tg('editMessageText', [
+                'chat_id' => $chatId,
+                'message_id' => $msgId,
+                'text' => $origText . "\n\n" . $mark,
+                'reply_markup' => ['inline_keyboard' => [[
+                    ['text' => '🚀 Открыть JobToo', 'url' => 'https://t.me/JobToo_bot/app'],
+                ]]],
+            ]);
+        }
+        tg('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => $approve ? 'Одобрено! Работник уведомлён' : 'Отклонено. Работник уведомлён']);
+        echo json_encode(['ok' => true]); exit;
+    }
+
+    tg('answerCallbackQuery', ['callback_query_id' => $cbId]);
+    echo json_encode(['ok' => true]); exit;
+}
+
+// ── Обычные сообщения в личке ────────────────────────────────────────────────
 
 $msg = $update['message'] ?? null;
 if (!$msg || empty($msg['chat']['id'])) { echo json_encode(['ok' => true]); exit; }
@@ -27,24 +176,13 @@ if (str_starts_with($text, '/start')) {
     $reply = "Все смены и вакансии — в приложении 👇";
 }
 
-$payload = [
+tg('sendMessage', [
     'chat_id' => $chatId,
     'text' => $reply,
     'parse_mode' => 'HTML',
     'reply_markup' => ['inline_keyboard' => [[
         ['text' => '🚀 Открыть JobToo', 'url' => 'https://t.me/JobToo_bot/app'],
     ]]],
-];
-
-$ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendMessage');
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_POST => true,
-    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-    CURLOPT_TIMEOUT => 10,
-    CURLOPT_POSTFIELDS => json_encode($payload),
 ]);
-curl_exec($ch);
-curl_close($ch);
 
 echo json_encode(['ok' => true]);

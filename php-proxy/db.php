@@ -293,6 +293,148 @@ try {
             break;
         }
 
+        // args: [employerId, workerId, vacancyId, vacancyTitle]
+        // Директору в Telegram: карточка кандидата + кнопки Одобрить/Отклонить
+        case 'tgNotifyNewApplication': {
+            [$employerId, $workerId, $vacancyId, $vTitle] = [$args[0], $args[1], $args[2], (string)($args[3] ?? '')];
+            $emp = sb_single('jm_users', ['id' => 'eq.' . $employerId], 'telegram_id');
+            if (!$emp || empty($emp['telegram_id'])) { $data = false; break; }
+
+            $app = sb_single('jm_perm_applications', [
+                'vacancy_id' => 'eq.' . $vacancyId,
+                'worker_id'  => 'eq.' . $workerId,
+                'order'      => 'created_at.desc',
+            ], 'id');
+            if (!$app) { $data = false; break; }
+
+            $w = sb_single('jm_users', ['id' => 'eq.' . $workerId], 'first_name,last_name,age,metro_station,phone,avg_rating,rating_count');
+            $name = trim(($w['first_name'] ?? '') . ' ' . ($w['last_name'] ?? '')) ?: 'Кандидат';
+            $lines = ["📥 <b>Новая заявка на «{$vTitle}»</b>", ''];
+            $lines[] = '👤 ' . $name . (!empty($w['age']) ? ", {$w['age']} лет" : '');
+            if (!empty($w['metro_station'])) $lines[] = '🚇 м. ' . $w['metro_station'];
+            if (!empty($w['avg_rating']) && (float)$w['avg_rating'] > 0) {
+                $lines[] = '⭐ Рейтинг ' . $w['avg_rating'] . (!empty($w['rating_count']) ? " ({$w['rating_count']} оценок)" : '');
+            }
+            if (!empty($w['phone'])) $lines[] = '📞 +' . ltrim($w['phone'], '+');
+            $lines[] = '';
+            $lines[] = 'Решите прямо здесь — работник сразу узнает:';
+
+            $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendMessage');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_POSTFIELDS => json_encode([
+                    'chat_id' => (int)$emp['telegram_id'],
+                    'text' => implode("\n", $lines),
+                    'parse_mode' => 'HTML',
+                    'reply_markup' => ['inline_keyboard' => [
+                        [
+                            ['text' => '✅ Одобрить', 'callback_data' => 'appok_' . $app['id']],
+                            ['text' => '❌ Отклонить', 'callback_data' => 'appno_' . $app['id']],
+                        ],
+                        [['text' => '👤 Открыть в JobToo', 'url' => 'https://t.me/JobToo_bot/app']],
+                    ]],
+                ]),
+            ]);
+            $resp = curl_exec($ch); curl_close($ch);
+            $dec = json_decode($resp ?: 'null', true);
+            $data = is_array($dec) && ($dec['ok'] ?? false);
+            break;
+        }
+
+        // Ежедневные авто-касания (вызывается кроном раз в день):
+        // 1) напоминания директорам о необработанных заявках (каждый день)
+        // 2) «разместите смену/вакансию» директорам (раз в 3 дня)
+        // 3) «посмотрите новые смены» работникам (раз в 3 дня, со сдвигом)
+        case 'cronDailyNudges': {
+            @set_time_limit(300);
+            @ignore_user_abort(true);
+            $result = ['pendingReminders' => 0, 'employerNudges' => 0, 'workerNudges' => 0];
+            $dayIdx = (int)date('z');
+
+            // ── 1. Необработанные заявки старше 24 часов ──
+            $cut24 = gmdate('Y-m-d\TH:i:s\Z', time() - 86400);
+            $pending = sb_select('jm_perm_applications', [
+                'status' => 'eq.pending',
+                'created_at' => 'lt.' . $cut24,
+            ], 'employer_id');
+            $byEmp = [];
+            foreach ($pending as $p) {
+                if (!empty($p['employer_id'])) $byEmp[$p['employer_id']] = ($byEmp[$p['employer_id']] ?? 0) + 1;
+            }
+            foreach ($byEmp as $eid => $cnt) {
+                $emp = sb_single('jm_users', ['id' => 'eq.' . $eid], 'telegram_id,push_token');
+                $title = '⏳ Кандидаты ждут ответа';
+                $body = "У вас {$cnt} " . ($cnt === 1 ? 'необработанная заявка' : 'необработанных заявок')
+                    . ' на вакансии. Ответьте — иначе кандидаты уйдут к другим.';
+                sb_insert('jm_notifications', ['user_id' => $eid, 'title' => $title, 'body' => $body]);
+                if ($emp && !empty($emp['telegram_id'])) {
+                    tg_send_message((int)$emp['telegram_id'], $title . "\n\n" . $body, true);
+                } elseif ($emp && !empty($emp['push_token'])) {
+                    expo_push([[ 'to' => $emp['push_token'], 'title' => $title, 'body' => $body,
+                        'sound' => 'default', 'priority' => 'high', 'channelId' => 'matches', 'data' => ['type' => 'pending_apps'] ]]);
+                }
+                $result['pendingReminders']++;
+            }
+
+            // ── 2. Директорам: пора размещать (раз в 3 дня) ──
+            if ($dayIdx % 3 === 0) {
+                $cut3d = gmdate('Y-m-d\TH:i:s\Z', time() - 3 * 86400);
+                $employers = sb_select('jm_users', ['role' => 'eq.employer'], 'id,telegram_id,push_token');
+                $recentTv = sb_select('jm_vacancies', ['created_at' => 'gte.' . $cut3d], 'employer_id');
+                $recentPv = sb_select('jm_perm_vacancies', ['created_at' => 'gte.' . $cut3d], 'employer_id');
+                $recentPosters = [];
+                foreach (array_merge($recentTv, $recentPv) as $r) $recentPosters[$r['employer_id']] = true;
+                $workersCnt = count(sb_select('jm_users', ['role' => 'eq.worker'], 'id'));
+
+                $title = '👷 Работники ждут смен';
+                $body = "В JobToo {$workersCnt}+ работников готовы выйти. Разместите смену или вакансию — отклики придут в тот же день.";
+                foreach ($employers as $e) {
+                    if (isset($recentPosters[$e['id']])) continue; // недавно публиковал — не трогаем
+                    sb_insert('jm_notifications', ['user_id' => $e['id'], 'title' => $title, 'body' => $body]);
+                    if (!empty($e['telegram_id'])) {
+                        tg_send_message((int)$e['telegram_id'], $title . "\n\n" . $body, true);
+                    } elseif (!empty($e['push_token'])) {
+                        expo_push([[ 'to' => $e['push_token'], 'title' => $title, 'body' => $body,
+                            'sound' => 'default', 'priority' => 'default', 'channelId' => 'default', 'data' => ['type' => 'post_nudge'] ]]);
+                    }
+                    $result['employerNudges']++;
+                }
+            }
+
+            // ── 3. Работникам: посмотрите, что открыто (раз в 3 дня, сдвиг +1) ──
+            if ($dayIdx % 3 === 1) {
+                $today = date('Y-m-d');
+                $openShifts = count(sb_select('jm_vacancies', ['status' => 'eq.open', 'date' => 'gte.' . $today], 'id'));
+                $openPerm = count(sb_select('jm_perm_vacancies', ['status' => 'eq.open'], 'id'));
+                if ($openShifts + $openPerm > 0) {
+                    $parts = [];
+                    if ($openShifts > 0) $parts[] = "{$openShifts} " . ($openShifts === 1 ? 'смена' : 'смен');
+                    if ($openPerm > 0) $parts[] = "{$openPerm} постоянных вакансий";
+                    $title = '⚡ Сейчас открыто: ' . implode(' и ', $parts);
+                    $body = 'Загляните — свежие варианты рядом с вашим метро. Отклик в два тапа.';
+                    $workersAll = sb_select('jm_users', ['role' => 'eq.worker'], 'id,telegram_id,push_token');
+                    $bellRows = array_map(fn($w) => ['user_id' => $w['id'], 'title' => $title, 'body' => $body], $workersAll);
+                    if (!empty($bellRows)) { try { sb_insert('jm_notifications', $bellRows); } catch (Throwable $e) {} }
+                    $pushMsgs = [];
+                    foreach ($workersAll as $w) {
+                        if (!empty($w['telegram_id'])) {
+                            tg_send_message((int)$w['telegram_id'], $title . "\n\n" . $body, true);
+                        } elseif (!empty($w['push_token'])) {
+                            $pushMsgs[] = ['to' => $w['push_token'], 'title' => $title, 'body' => $body,
+                                'sound' => 'default', 'priority' => 'default', 'channelId' => 'vacancies', 'data' => ['type' => 'browse_nudge']];
+                        }
+                        $result['workerNudges']++;
+                    }
+                    if (!empty($pushMsgs)) expo_push($pushMsgs);
+                }
+            }
+
+            $data = $result;
+            break;
+        }
+
         // args: [userId, text] — message the user's linked Telegram account
         case 'tgNotifyUser': {
             $u = sb_single('jm_users', ['id' => 'eq.' . $args[0]], 'telegram_id');

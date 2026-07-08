@@ -403,6 +403,8 @@ export async function notifyEmployerNewPermApplicant(
   employerId: string,
   workerName: string,
   vacancyTitle: string,
+  workerId?: string,
+  vacancyId?: string,
 ): Promise<void> {
   await pushTo(
     employerId,
@@ -410,6 +412,17 @@ export async function notifyEmployerNewPermApplicant(
     `${workerName} откликнулся на вакансию «${vacancyTitle}». Посмотрите кандидата!`,
     'new_perm_applicant', 'matches',
   );
+  // Telegram-карточка с кнопками «Одобрить/Отклонить» прямо в чате директора
+  if (workerId && vacancyId) {
+    fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
+      body: JSON.stringify({
+        fn: 'tgNotifyNewApplication',
+        args: [employerId, workerId, vacancyId, vacancyTitle],
+      }),
+    }).catch(() => {});
+  }
 }
 
 export async function notifyWorkerPermApplicationApproved(

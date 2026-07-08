@@ -178,6 +178,8 @@ export default function PermVacancyDetailScreen() {
         vacancy.employerId,
         `${currentUser.firstName} ${currentUser.lastName}`,
         vacancy.title,
+        currentUser.id,
+        vacancy.id,
       ).catch(() => {});
       showToast('Отклик отправлен! 📨', 'success');
     } catch {
