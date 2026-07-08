@@ -409,11 +409,9 @@ try {
                 $openShifts = count(sb_select('jm_vacancies', ['status' => 'eq.open', 'date' => 'gte.' . $today], 'id'));
                 $openPerm = count(sb_select('jm_perm_vacancies', ['status' => 'eq.open'], 'id'));
                 if ($openShifts + $openPerm > 0) {
-                    $parts = [];
-                    if ($openShifts > 0) $parts[] = "{$openShifts} " . ($openShifts === 1 ? 'смена' : 'смен');
-                    if ($openPerm > 0) $parts[] = "{$openPerm} постоянных вакансий";
-                    $title = '⚡ Сейчас открыто: ' . implode(' и ', $parts);
-                    $body = 'Загляните — свежие варианты рядом с вашим метро. Отклик в два тапа.';
+                    // Без конкретных цифр — малые числа отпугивают
+                    $title = '⚡ Свежие смены и вакансии';
+                    $body = 'В приложении появились новые варианты рядом с вашим метро. Загляните — отклик в два тапа.';
                     $workersAll = sb_select('jm_users', ['role' => 'eq.worker'], 'id,telegram_id,push_token');
                     $bellRows = array_map(fn($w) => ['user_id' => $w['id'], 'title' => $title, 'body' => $body], $workersAll);
                     if (!empty($bellRows)) { try { sb_insert('jm_notifications', $bellRows); } catch (Throwable $e) {} }
