@@ -1992,7 +1992,8 @@ function EmployerHome() {
 // Worker Home (wrapper with mode switcher)
 // ─────────────────────────────────────────────────
 function WorkerHome() {
-  const [mode, setMode] = useState<AppMode>('shift');
+  // Постоянка — вкладка по умолчанию: заявок на неё в ~9 раз больше, чем откликов на смены
+  const [mode, setMode] = useState<AppMode>('perm');
   const { currentUser } = useApp();
 
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
