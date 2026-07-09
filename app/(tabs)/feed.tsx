@@ -1762,8 +1762,8 @@ function EmployerHome() {
           <Text style={styles.logoB}>Job</Text>
           <Text style={styles.logoO}>Too</Text>
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <TelegramConnectButton />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <TelegramConnectButton size={22} pad={4} />
           <NotifBell />
         </View>
       </View>
@@ -2009,8 +2009,8 @@ function WorkerHome() {
           <Text style={styles.logoB}>Job</Text>
           <Text style={styles.logoO}>Too</Text>
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <TelegramConnectButton />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <TelegramConnectButton size={22} pad={4} />
           <NotifBell />
         </View>
       </View>

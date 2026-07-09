@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Modal, Linking,
   AppState, ActivityIndicator,
 } from 'react-native';
+import Svg, { Circle, Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
@@ -12,11 +13,33 @@ import { isTelegramMiniApp } from '@/lib/telegram';
 const TG_BLUE = '#2AABEE';
 const BOT_URL = 'https://t.me/JobToo_bot';
 
+// Оригинальный логотип Telegram: градиентный круг + белый самолётик со сгибом
+function TelegramLogo({ size }: { size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Defs>
+        <LinearGradient id="tgGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#2AABEE" />
+          <Stop offset="1" stopColor="#229ED9" />
+        </LinearGradient>
+      </Defs>
+      <Circle cx="12" cy="12" r="12" fill="url(#tgGrad)" />
+      <Path
+        d="M5.45 11.9l11.2-4.32c.52-.19.98.12.81.9l-1.91 9c-.14.64-.52.8-1.05.5l-2.91-2.15-1.4 1.35c-.16.16-.29.29-.59.29l.21-2.98 5.42-4.9c.24-.21-.05-.33-.37-.12l-6.7 4.22-2.89-.9c-.63-.2-.64-.63.18-.89z"
+        fill="#fff"
+      />
+      <Path d="M9.81 16.47l.21-2.98 1.3 1.63-1.51 1.35z" fill="#C8DAEA" />
+    </Svg>
+  );
+}
+
 // Постоянная кнопка в шапке: логотип Telegram → модалка подключения уведомлений.
 // Не исчезает после подключения — через неё же можно отключить или открыть бота.
-export function TelegramConnectButton() {
+// size/pad подбираются под соседний колокольчик конкретной шапки.
+export function TelegramConnectButton({ size = 24, pad = 6 }: { size?: number; pad?: number }) {
   const app = useApp();
   const userId = app?.currentUser?.id ?? null;
+  const isEmployer = app?.currentUser?.role === 'employer';
 
   const [open, setOpen] = useState(false);
   const [linked, setLinked] = useState<boolean | null>(
@@ -65,16 +88,18 @@ export function TelegramConnectButton() {
     }
   };
 
+  const connectedText = isEmployer
+    ? 'Отклики кандидатов и напоминания о заявках приходят в Telegram мгновенно'
+    : 'Новые смены, ответы директоров и сообщения приходят в Telegram мгновенно';
+
   return (
     <>
       <TouchableOpacity
-        style={st.headerBtn}
+        style={{ position: 'relative', padding: pad }}
         onPress={() => { setOpen(true); refreshStatus(); }}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <View style={st.tgCircle}>
-          <Ionicons name="paper-plane" size={13} color="#fff" style={{ marginLeft: -1, marginTop: 1 }} />
-        </View>
+        <TelegramLogo size={size} />
         {linked === false && <View style={st.attentionDot} />}
       </TouchableOpacity>
 
@@ -85,16 +110,14 @@ export function TelegramConnectButton() {
             <View style={st.grabber} />
 
             <View style={st.titleRow}>
-              <View style={st.tgCircleBig}>
-                <Ionicons name="paper-plane" size={22} color="#fff" style={{ marginLeft: -2, marginTop: 2 }} />
-              </View>
+              <TelegramLogo size={46} />
               <View style={{ flex: 1 }}>
                 <Text style={st.title}>
                   {linked ? 'Telegram подключён' : 'Уведомления в Telegram'}
                 </Text>
                 <Text style={st.subtitle}>
                   {linked
-                    ? 'Всё важное приходит тебе в личку'
+                    ? 'Всё важное приходит вам в личку'
                     : 'Самый быстрый способ ничего не пропустить'}
                 </Text>
               </View>
@@ -111,9 +134,7 @@ export function TelegramConnectButton() {
               <>
                 <View style={st.connectedBox}>
                   <Ionicons name="checkmark-circle" size={20} color={Colors.green} />
-                  <Text style={st.connectedText}>
-                    Новые смены, ответы директоров и сообщения приходят в Telegram мгновенно
-                  </Text>
+                  <Text style={st.connectedText}>{connectedText}</Text>
                 </View>
                 <TouchableOpacity style={st.secondaryBtn} onPress={() => Linking.openURL(BOT_URL).catch(() => {})} activeOpacity={0.8}>
                   <Text style={st.secondaryText}>Открыть бота</Text>
@@ -124,17 +145,25 @@ export function TelegramConnectButton() {
               </>
             ) : (
               <>
-                <View style={st.benefits}>
-                  <Benefit icon="flash-outline" text="Новые смены и вакансии — сразу в личку, раньше всех" />
-                  <Benefit icon="mail-unread-outline" text="Ответ директора на отклик — мгновенным сообщением" />
-                  <Benefit icon="chatbubble-ellipses-outline" text="Ничего не потеряется, даже если пуши отключены" />
-                </View>
+                {isEmployer ? (
+                  <View style={st.benefits}>
+                    <Benefit icon="mail-unread-outline" text="Отклики кандидатов — мгновенно в личку" />
+                    <Benefit icon="checkmark-done-outline" text="Одобряйте или отклоняйте заявки прямо из Telegram" />
+                    <Benefit icon="alarm-outline" text="Напоминания о кандидатах, которые ждут ответа" />
+                  </View>
+                ) : (
+                  <View style={st.benefits}>
+                    <Benefit icon="flash-outline" text="Новые смены и вакансии — сразу в личку, раньше всех" />
+                    <Benefit icon="mail-unread-outline" text="Ответ директора на отклик — мгновенным сообщением" />
+                    <Benefit icon="chatbubble-ellipses-outline" text="Ничего не потеряется, даже если пуши отключены" />
+                  </View>
+                )}
                 <TouchableOpacity style={st.connectBtn} onPress={connect} activeOpacity={0.85}>
                   <Ionicons name="paper-plane" size={17} color="#fff" style={{ marginRight: 8 }} />
                   <Text style={st.connectText}>Подключить Telegram</Text>
                 </TouchableOpacity>
                 <Text style={st.hint}>
-                  Откроется Телеграм — нажми «Start». Вернись сюда, статус обновится сам.
+                  Откроется Телеграм — нажмите «Start». Вернитесь сюда, статус обновится сам.
                 </Text>
               </>
             )}
@@ -157,14 +186,8 @@ function Benefit({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['
 }
 
 const st = StyleSheet.create({
-  headerBtn: { position: 'relative' },
-  tgCircle: {
-    width: 26, height: 26, borderRadius: 13,
-    backgroundColor: TG_BLUE,
-    alignItems: 'center', justifyContent: 'center',
-  },
   attentionDot: {
-    position: 'absolute', top: -2, right: -2,
+    position: 'absolute', top: 2, right: 2,
     width: 10, height: 10, borderRadius: 5,
     backgroundColor: Colors.primary,
     borderWidth: 1.5, borderColor: '#fff',
@@ -180,11 +203,6 @@ const st = StyleSheet.create({
     backgroundColor: '#E5E7EB', marginBottom: 16,
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
-  tgCircleBig: {
-    width: 46, height: 46, borderRadius: 23,
-    backgroundColor: TG_BLUE,
-    alignItems: 'center', justifyContent: 'center',
-  },
   title: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
   subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   benefits: { gap: 12, marginBottom: 20 },
