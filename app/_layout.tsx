@@ -55,6 +55,13 @@ function TelegramMiniAppController() {
           router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId } });
         }, 300);
       }
+    } else if (startParam?.startsWith('chat_')) {
+      const chatId = startParam.slice('chat_'.length);
+      if (chatId) {
+        setTimeout(() => {
+          router.push({ pathname: '/chat-room', params: { chatId } });
+        }, 300);
+      }
     }
   }, []);
 

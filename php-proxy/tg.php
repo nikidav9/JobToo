@@ -129,6 +129,39 @@ if ($cb) {
     $msgId = $cb['message']['message_id'] ?? null;
     $origText = $cb['message']['text'] ?? '';
 
+    // «💬 Написать кандидату» — создаёт чат (без смены статуса заявки) и даёт кнопку в него
+    if (preg_match('/^appmsg_(.+)$/', $data, $mm)) {
+        $appId = $mm[1];
+        $app = sb_one('jm_perm_applications', ['id' => 'eq.' . $appId], 'id,worker_id,employer_id,vacancy_id,status');
+        if (!$app) {
+            tg('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => 'Заявка не найдена']);
+            echo json_encode(['ok' => true]); exit;
+        }
+        $vac = sb_one('jm_perm_vacancies', ['id' => 'eq.' . $app['vacancy_id']], 'title,company');
+        $vTitle = $vac['title'] ?? 'вакансию';
+        $chatId2 = ensure_chat(
+            $app['worker_id'], $app['employer_id'] ?? '', $app['vacancy_id'],
+            $vTitle, $vac['company'] ?? '',
+            "💬 Директор хочет обсудить ваш отклик на «{$vTitle}». Напишите ему!"
+        );
+        // Кандидату — знать, что ему написали
+        notify_worker($app['worker_id'],
+            '💬 Директор написал вам',
+            "По вашему отклику на «{$vTitle}» открыт чат — ответьте в разделе «Чаты»!");
+        // Директору — кнопка прямо в чат
+        if ($chatId) {
+            tg('sendMessage', [
+                'chat_id' => $chatId,
+                'text' => "💬 Чат с кандидатом открыт — можно писать:",
+                'reply_markup' => ['inline_keyboard' => [[
+                    ['text' => '💬 Открыть чат', 'url' => 'https://t.me/JobToo_bot/app?startapp=chat_' . $chatId2],
+                ]]],
+            ]);
+        }
+        tg('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => 'Чат создан!']);
+        echo json_encode(['ok' => true]); exit;
+    }
+
     if (preg_match('/^app(ok|no)_(.+)$/', $data, $m)) {
         $approve = $m[1] === 'ok';
         $appId = $m[2];

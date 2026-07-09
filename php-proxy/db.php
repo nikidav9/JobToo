@@ -333,6 +333,7 @@ try {
                             ['text' => '✅ Одобрить', 'callback_data' => 'appok_' . $app['id']],
                             ['text' => '❌ Отклонить', 'callback_data' => 'appno_' . $app['id']],
                         ],
+                        [['text' => '💬 Написать кандидату', 'callback_data' => 'appmsg_' . $app['id']]],
                         [['text' => '👤 Открыть в JobToo', 'url' => 'https://t.me/JobToo_bot/app']],
                     ]],
                 ]),
