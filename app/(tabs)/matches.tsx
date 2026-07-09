@@ -14,6 +14,7 @@ import { Like, Vacancy } from '@/constants/types';
 import { formatDate, getInitials, nameColorFromString } from '@/services/storage';
 import { dbUpsertLike, dbCheckAndCreateMatch, dbConfirmShift } from '@/services/db';
 import { NotifBell } from '@/components/ui/NotifBell';
+import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 import {
   notifyWorkerShiftConfirmedByEmployer,
   notifyWorkerGotMatch,
@@ -284,7 +285,10 @@ function WorkerMatches() {
     <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
       <View style={s.header}>
         <Text style={s.title}>Мои отклики</Text>
-        <NotifBell />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <TelegramConnectButton size={22} pad={4} />
+          <NotifBell />
+        </View>
       </View>
 
       <View style={s.tabStrip}>
@@ -650,7 +654,10 @@ function EmployerMatches() {
             <Text style={s.urgentBadgeTxt}>{needsConfirm} ждут</Text>
           </View>
         ) : null}
-        <NotifBell />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <TelegramConnectButton size={22} pad={4} />
+          <NotifBell />
+        </View>
       </View>
 
       <View style={s.tabStrip}>

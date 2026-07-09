@@ -15,6 +15,7 @@ import { notifyAllWorkersNewBulletin, notifyEmployerNewMessage, notifyWorkerNewM
 import { Ionicons } from '@expo/vector-icons';
 import { METRO_LINES } from '@/constants/metro';
 import { NotifBell } from '@/components/ui/NotifBell';
+import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 import { WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
 
 // ─── Date/time helpers ────────────────────────────────────────────────────────
@@ -737,7 +738,10 @@ export default function ExchangeScreen() {
     <SafeAreaView style={xS.safe} edges={['top', 'left', 'right']}>
       <View style={xS.header}>
         <Text style={xS.headerTitle}>Биржа</Text>
-        <NotifBell />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <TelegramConnectButton size={22} pad={4} />
+          <NotifBell />
+        </View>
       </View>
       {currentUser.role === 'worker' ? <WorkerExchange /> : <EmployerExchange />}
     </SafeAreaView>
