@@ -18,7 +18,7 @@ const AXIS = { fontSize: 10, fill: '#9A9690', fontFamily: 'Geist Mono, monospace
 export default function VacanciesPage() {
   const fetcher = useCallback(() => fetchVacancies(), [])
   const { data: d, loading, lastUpdated, pulse, refresh } = useRealtime(fetcher, {
-    tables: ['jm_vacancies', 'jm_perm_vacancies', 'jm_perm_applications'],
+    tables: ['jm_vacancies', 'jm_perm_vacancies', 'jm_perm_applications', 'jm_vacancy_views', 'jm_perm_vacancy_views'],
     intervalSec: 30,
   })
 
@@ -94,6 +94,31 @@ export default function VacanciesPage() {
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
               <Area type="monotone" dataKey="temp" name="Временные" stroke={PALETTE.orange} fill="url(#gT)" strokeWidth={1.7} dot={false} />
               <Area type="monotone" dataKey="perm" name="Постоянные" stroke={PALETTE.blue} fill="url(#gP)" strokeWidth={1.7} dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard
+          title="Просмотры вакансий"
+          sub={`Уникальные просмотры по дням · 30 дней · за неделю: ${d.viewsKpi.temp7} у смен, ${d.viewsKpi.perm7} у постоянных`}
+        >
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={d.viewsDaily30} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gVT" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={PALETTE.amber} stopOpacity={0.2} /><stop offset="95%" stopColor={PALETTE.amber} stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gVP" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={PALETTE.cyan} stopOpacity={0.2} /><stop offset="95%" stopColor={PALETTE.cyan} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+              <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false} interval={4} />
+              <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip contentStyle={TT} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+              <Area type="monotone" dataKey="temp" name="Смены (подработки)" stroke={PALETTE.amber} fill="url(#gVT)" strokeWidth={1.7} dot={false} />
+              <Area type="monotone" dataKey="perm" name="Постоянные" stroke={PALETTE.cyan} fill="url(#gVP)" strokeWidth={1.7} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>

@@ -313,12 +313,14 @@ async function autoCloseStaleVacancies() {
 
 export async function fetchVacancies() {
   await autoCloseStaleVacancies()
-  const [{ data: tv }, { data: pv }, { data: apps }, { data: users }, { data: likes }] = await Promise.all([
+  const [{ data: tv }, { data: pv }, { data: apps }, { data: users }, { data: likes }, { data: tvViews }, { data: pvViews }] = await Promise.all([
     supabase.from('jm_vacancies').select('id,status,work_type,work_type_label,created_at,employer_id,salary,workers_needed,workers_found,is_urgent,no_experience_needed,company,date,address,metro_station,time_start,time_end'),
     supabase.from('jm_perm_vacancies').select('id,title,status,created_at,employer_id,salary,company,metro_station,address,description,schedule,work_type'),
     supabase.from('jm_perm_applications').select('id,vacancy_id,worker_id,status,created_at').order('created_at', { ascending: false }),
     supabase.from('jm_users').select('id,first_name,last_name,phone'),
     supabase.from('jm_likes').select('id,vacancy_id,worker_id,is_match,worker_liked,employer_liked,worker_skipped,created_at').order('created_at', { ascending: false }),
+    supabase.from('jm_vacancy_views').select('vacancy_id,viewed_at'),
+    supabase.from('jm_perm_vacancy_views').select('vacancy_id,viewed_at'),
   ])
 
   const t = tv ?? []
@@ -461,6 +463,25 @@ export async function fetchVacancies() {
   }
   const salaryDist = Object.entries(salaryBuckets).map(([name, value]) => ({ name, value }))
 
+  // ── Динамика просмотров (уникальные просмотры с меткой времени) ──
+  const tViews = (tvViews ?? []) as any[]
+  const pViews = (pvViews ?? []) as any[]
+  const days30v = dayRange(30)
+  const tViewsByDay = groupByDate(tViews.map(v => ({ created_at: v.viewed_at })), 'created_at')
+  const pViewsByDay = groupByDate(pViews.map(v => ({ created_at: v.viewed_at })), 'created_at')
+  const viewsDaily30 = days30v.map(d => ({
+    date: toDayLabel(d),
+    temp: tViewsByDay[d] ?? 0,
+    perm: pViewsByDay[d] ?? 0,
+  }))
+  const w7v = subDays(new Date(), 7).toISOString()
+  const viewsKpi = {
+    tempTotal: tViews.length,
+    permTotal: pViews.length,
+    temp7: tViews.filter(v => (v.viewed_at ?? '') > w7v).length,
+    perm7: pViews.filter(v => (v.viewed_at ?? '') > w7v).length,
+  }
+
   return {
     kpi: {
       totalTemp: t.length,
@@ -472,6 +493,8 @@ export async function fetchVacancies() {
       urgentTemp: t.filter((x: any) => x.is_urgent).length,
       newMonth: t.filter((x: any) => x.created_at > w30).length + p.filter((x: any) => x.created_at > w30).length,
     },
+    viewsDaily30,
+    viewsKpi,
     daily90,
     workTypeDist,
     topEmployers,
