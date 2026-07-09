@@ -73,7 +73,7 @@ export default function SummaryPage() {
         <div className="g-4">
           <KpiCard label="Мэтчей" value={k.matches} sub={`${k.completed} смен завершено`} sparkColor={PALETTE.purple} />
           <KpiCard label="Чатов" value={k.chats} sub={`ср. ${k.avgMsgsPerChat} сообщ./чат`} sparkColor={PALETTE.pink} />
-          <KpiCard label="Средняя оценка" value={k.avgRating || '—'} sub={`${k.ratingsCount} оценок`} sparkColor={PALETTE.amber} />
+          <KpiCard label="Привязано Telegram" value={k.tgLinked} sub={`из них работников: ${k.tgLinkedWorkers}`} sparkColor={PALETTE.cyan} />
           <KpiCard label="Охват уведомлениями" value={`${k.reachPct}%`} sub="пуш, Telegram или веб-пуш" sparkColor={PALETTE.green} />
         </div>
 

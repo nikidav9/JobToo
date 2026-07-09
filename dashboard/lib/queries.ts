@@ -1586,6 +1586,8 @@ export async function fetchExecutiveSummary() {
   const webSubIds = new Set(ws.map(x => x.user_id))
   const reachable = u.filter((x: any) => x.push_token || x.telegram_id || webSubIds.has(x.id)).length
   const reachPct = u.length > 0 ? Math.round((reachable / u.length) * 100) : 0
+  const tgLinked = u.filter((x: any) => x.telegram_id).length
+  const tgLinkedWorkers = workers.filter((x: any) => x.telegram_id).length
 
   // ── Графики ──
   // Кумулятивный рост пользователей, 90 дней
@@ -1626,6 +1628,7 @@ export async function fetchExecutiveSummary() {
       repeatWorkersPct, repeatDirectorsPct,
       matches, completed: lk.filter(x => x.shift_completed).length,
       chats: ch.length, avgMsgsPerChat, avgRating, ratingsCount: rt.length, reachPct,
+      tgLinked, tgLinkedWorkers,
     },
     cumulativeUsers,
     weekly,
