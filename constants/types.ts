@@ -18,6 +18,7 @@ export interface User {
   avgRating?: number;
   ratingCount?: number;
   bio?: string;
+  telegramId?: number;
 }
 
 export interface Vacancy {

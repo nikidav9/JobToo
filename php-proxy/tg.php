@@ -165,6 +165,31 @@ if (($msg['chat']['type'] ?? '') !== 'private') { echo json_encode(['ok' => true
 $text = trim($msg['text'] ?? '');
 $firstName = $msg['from']['first_name'] ?? '';
 
+// ── Привязка аккаунта из приложения: /start link_<userId> ───────────────────
+if (preg_match('/^\/start\s+link_([a-z0-9]+)$/i', $text, $lm)) {
+    $userId = $lm[1];
+    $u = sb_one('jm_users', ['id' => 'eq.' . $userId], 'id,first_name');
+    if ($u) {
+        // Один Telegram — один аккаунт: освобождаем этот telegram_id у других
+        sb('PATCH', 'jm_users', ['telegram_id' => 'eq.' . $chatId], ['telegram_id' => null]);
+        sb('PATCH', 'jm_users', ['id' => 'eq.' . $userId], ['telegram_id' => $chatId]);
+        tg('sendMessage', [
+            'chat_id' => $chatId,
+            'text' => "✅ <b>Telegram подключён!</b>\n\nТеперь сюда будут приходить:\n⚡ новые смены и вакансии\n📥 ответы директоров на отклики\n💬 уведомления о сообщениях\n\nМожно вернуться в приложение 👌",
+            'parse_mode' => 'HTML',
+            'reply_markup' => ['inline_keyboard' => [[
+                ['text' => '🚀 Открыть JobToo', 'url' => 'https://t.me/JobToo_bot/app'],
+            ]]],
+        ]);
+    } else {
+        tg('sendMessage', [
+            'chat_id' => $chatId,
+            'text' => 'Не удалось найти аккаунт для привязки. Откройте приложение и попробуйте ещё раз.',
+        ]);
+    }
+    echo json_encode(['ok' => true]); exit;
+}
+
 if (str_starts_with($text, '/start')) {
     $reply = "Привет" . ($firstName !== '' ? ", $firstName" : '') . "! 👋\n\n"
         . "<b>JobToo</b> — подработки и постоянные вакансии на складах Москвы.\n\n"

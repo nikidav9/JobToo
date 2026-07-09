@@ -28,6 +28,7 @@ const COMPANY_OPTIONS = ['Лавка'] as const;
 type CompanyOption = typeof COMPANY_OPTIONS[number];
 import { METRO_LINES } from '@/constants/metro';
 import { NotifBell } from '@/components/ui/NotifBell';
+import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 
 type EditSection = 'personal' | 'metro' | 'worktypes' | 'company' | 'bio' | null;
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -475,6 +476,7 @@ export default function ProfileScreen() {
             <Text style={styles.logoOrange}>Too</Text>
           </Text>
           <View style={styles.headerActions}>
+            <TelegramConnectButton />
             <TouchableOpacity onPress={() => setShowNotifications(true)} style={styles.headerBtn}>
               <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
               {unreadCount > 0 && (

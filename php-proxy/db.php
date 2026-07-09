@@ -433,6 +433,13 @@ try {
             break;
         }
 
+        // args: [userId] — отвязать Telegram от аккаунта
+        case 'tgUnbindTelegram': {
+            sb_update('jm_users', ['id' => 'eq.' . $args[0]], ['telegram_id' => null]);
+            $data = true;
+            break;
+        }
+
         // args: [userId, text] — message the user's linked Telegram account
         case 'tgNotifyUser': {
             $u = sb_single('jm_users', ['id' => 'eq.' . $args[0]], 'telegram_id');

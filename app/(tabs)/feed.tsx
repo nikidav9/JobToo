@@ -37,6 +37,7 @@ import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials, normalizeCompany } from '@/services/storage';
 import { NotifBell } from '@/components/ui/NotifBell';
+import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
 
 // ─── Web push permission banner (iOS PWA requires user gesture) ───────────────
@@ -1761,7 +1762,10 @@ function EmployerHome() {
           <Text style={styles.logoB}>Job</Text>
           <Text style={styles.logoO}>Too</Text>
         </Text>
-        <NotifBell />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <TelegramConnectButton />
+          <NotifBell />
+        </View>
       </View>
 
       <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
@@ -2005,7 +2009,10 @@ function WorkerHome() {
           <Text style={styles.logoB}>Job</Text>
           <Text style={styles.logoO}>Too</Text>
         </Text>
-        <NotifBell />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <TelegramConnectButton />
+          <NotifBell />
+        </View>
       </View>
       <View style={styles.modeSwitcherRow}>
         <ModeSwitcher mode={mode} onChange={setMode} />

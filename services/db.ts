@@ -61,8 +61,11 @@ function rowToUser(r: any): User {
     ratingCount: r.rating_count ?? 0,
     password: r.password ?? '',
     bio: r.bio ?? undefined,
+    telegramId: r.telegram_id ?? undefined,
   };
 }
+// NB: telegram_id намеренно НЕ входит в userToRow — привязка живёт только
+// на сервере (tg.php), иначе сохранение профиля затирало бы её.
 
 function userToRow(u: User) {
   return {
@@ -1118,4 +1121,9 @@ export async function dbTelegramNotifyUser(userId: string, text: string): Promis
 
 export async function dbAutoClosePastVacancies(): Promise<void> {
   await proxy('dbAutoClosePastVacancies');
+}
+
+/** Отвязывает Telegram от аккаунта */
+export async function dbUnbindTelegram(userId: string): Promise<void> {
+  await proxy('tgUnbindTelegram', [userId]);
 }
