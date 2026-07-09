@@ -434,6 +434,24 @@ try {
             break;
         }
 
+        // args: [title, body, roleFilter 'all'|'worker'|'employer']
+        // Рассылка по всем с привязанным Telegram (кнопка приложения в каждом сообщении)
+        case 'tgBroadcast': {
+            @set_time_limit(300);
+            @ignore_user_abort(true);
+            [$bTitle, $bBody, $roleF] = [(string)$args[0], (string)$args[1], (string)($args[2] ?? 'all')];
+            $filters = ['telegram_id' => 'not.is.null'];
+            if ($roleF === 'worker' || $roleF === 'employer') $filters['role'] = 'eq.' . $roleF;
+            $recipients = sb_select('jm_users', $filters, 'telegram_id');
+            $text = '<b>' . $bTitle . '</b>' . ($bBody !== '' ? "\n\n" . $bBody : '');
+            $sent = 0;
+            foreach ($recipients as $r) {
+                if (tg_send_message((int)$r['telegram_id'], $text, true)) $sent++;
+            }
+            $data = ['sent' => $sent, 'total' => count($recipients)];
+            break;
+        }
+
         // args: [userId] — отвязать Telegram от аккаунта
         case 'tgUnbindTelegram': {
             sb_update('jm_users', ['id' => 'eq.' . $args[0]], ['telegram_id' => null]);

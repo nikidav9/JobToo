@@ -230,6 +230,25 @@ export async function broadcastBoth(
   return { pushCount: (data?.pushCount ?? 0) as number, inappCount: (data?.inappCount ?? 0) as number }
 }
 
+export async function broadcastTelegram(
+  title: string,
+  body: string,
+  role: 'all' | 'worker' | 'employer' = 'all',
+): Promise<{ sent: number; total: number }> {
+  const res = await fetch('https://jobtoo.ru/api/db.php', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-App-Secret': process.env.NEXT_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6',
+    },
+    body: JSON.stringify({ fn: 'tgBroadcast', args: [title, body, role] }),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) throw new Error(data.error ?? 'Ошибка Telegram-рассылки')
+  logActivity('Telegram-рассылка', `Роль: ${role}, заголовок: "${title}", доставлено: ${data.data?.sent ?? 0}`)
+  return { sent: (data.data?.sent ?? 0) as number, total: (data.data?.total ?? 0) as number }
+}
+
 export async function broadcastWebPush(title: string, body: string): Promise<{ sent: number; failed: number }> {
   const res = await fetch('/api/webpush/broadcast', {
     method: 'POST',

@@ -1,11 +1,11 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import PageHeader from '@/components/PageHeader'
-import { broadcastBoth, broadcastWebPush, sendBothToUser, sendInAppToUser } from '@/lib/admin-actions'
+import { broadcastBoth, broadcastWebPush, broadcastTelegram, sendBothToUser, sendInAppToUser } from '@/lib/admin-actions'
 import { supabaseAdmin } from '@/lib/supabase'
 import { logActivity } from '@/lib/activity-log'
 
-type Target = 'all' | 'workers' | 'employers' | 'metro' | 'webpush'
+type Target = 'all' | 'workers' | 'employers' | 'metro' | 'webpush' | 'telegram' | 'telegram_workers' | 'telegram_employers'
 type St = 'idle' | 'loading' | 'ok' | 'err'
 
 interface UserRow {
@@ -35,6 +35,9 @@ const TARGETS: { value: Target; label: string; desc: string }[] = [
   { value: 'employers', label: '🏢 Работодатели',       desc: 'Только работодатели' },
   { value: 'metro',     label: '🚇 По метро',           desc: 'Пользователи конкретной станции' },
   { value: 'webpush',   label: '📱 iPhone Web Push',    desc: 'Только подписчики PWA (Safari/iOS)' },
+  { value: 'telegram',           label: '✈️ Telegram — все',        desc: 'Все с привязанным Telegram, доставка ~100%' },
+  { value: 'telegram_workers',   label: '✈️ Telegram — работники',  desc: 'Только работники с Telegram' },
+  { value: 'telegram_employers', label: '✈️ Telegram — директора',  desc: 'Только директора с Telegram' },
 ]
 
 interface Trigger {
@@ -145,8 +148,12 @@ export default function BroadcastPage() {
       if (target === 'webpush') {
         const { sent, failed } = await broadcastWebPush(title, body)
         setSt('ok'); setResult(`✓ Web Push отправлено: ${sent}${failed > 0 ? `, ошибок: ${failed}` : ''}`)
+      } else if (target.startsWith('telegram')) {
+        const role = target === 'telegram_workers' ? 'worker' : target === 'telegram_employers' ? 'employer' : 'all'
+        const { sent, total } = await broadcastTelegram(title, body, role)
+        setSt('ok'); setResult(`✓ Telegram: доставлено ${sent} из ${total}`)
       } else {
-        const { pushCount, inappCount } = await broadcastBoth(target, title, body, metro || undefined)
+        const { pushCount, inappCount } = await broadcastBoth(target as 'all' | 'workers' | 'employers' | 'metro', title, body, metro || undefined)
         logActivity('Рассылка', `Цель: ${target}, push: ${pushCount}, inapp: ${inappCount}`)
         setSt('ok'); setResult(`✓ Push: ${pushCount}, уведомлений в приложении: ${inappCount}`)
       }
