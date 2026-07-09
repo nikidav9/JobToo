@@ -37,6 +37,32 @@ function sb_one(string $table, array $filters, string $select = '*'): ?array {
     return !empty($rows) && isset($rows[0]) ? $rows[0] : null;
 }
 
+function uid(): string {
+    return base_convert(time(), 10, 36) . substr(base_convert(mt_rand(), 10, 36), 2, 5);
+}
+
+function now_iso(): string {
+    $ms = intval(microtime(true) * 1000) % 1000;
+    return gmdate('Y-m-d\TH:i:s') . '.' . str_pad((string)$ms, 3, '0', STR_PAD_LEFT) . 'Z';
+}
+
+/** Создаёт чат работник↔директор по вакансии (или возвращает существующий) */
+function ensure_chat(string $workerId, string $employerId, string $vacancyId, string $vacTitle, string $company, string $systemMsg): string {
+    $ex = sb_one('jm_chats', ['vacancy_id' => 'eq.' . $vacancyId, 'worker_id' => 'eq.' . $workerId], 'id');
+    if ($ex) return $ex['id'];
+    $cid = uid();
+    sb('POST', 'jm_chats', [], [
+        'id' => $cid, 'vacancy_id' => $vacancyId, 'worker_id' => $workerId,
+        'employer_id' => $employerId, 'vac_title' => $vacTitle, 'company_name' => $company,
+        'unread_worker' => 1, 'unread_employer' => 0, 'created_at' => now_iso(),
+    ]);
+    sb('POST', 'jm_messages', [], [
+        'id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
+        'text' => $systemMsg, 'created_at' => now_iso(),
+    ]);
+    return $cid;
+}
+
 // ── Telegram helpers ──────────────────────────────────────────────────────────
 
 function tg(string $method, array $payload): array {
@@ -107,7 +133,7 @@ if ($cb) {
         $approve = $m[1] === 'ok';
         $appId = $m[2];
 
-        $app = sb_one('jm_perm_applications', ['id' => 'eq.' . $appId], 'id,worker_id,vacancy_id,status');
+        $app = sb_one('jm_perm_applications', ['id' => 'eq.' . $appId], 'id,worker_id,employer_id,vacancy_id,status');
         if (!$app) {
             tg('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => 'Заявка не найдена']);
             echo json_encode(['ok' => true]); exit;
@@ -121,13 +147,21 @@ if ($cb) {
         // Обновляем статус
         sb('PATCH', 'jm_perm_applications', ['id' => 'eq.' . $appId], ['status' => $approve ? 'approved' : 'rejected']);
 
-        // Уведомляем работника
+        // Уведомляем работника (при одобрении — открываем чат, как делает приложение)
         $vac = sb_one('jm_perm_vacancies', ['id' => 'eq.' . $app['vacancy_id']], 'title,company');
         $vTitle = $vac['title'] ?? 'вакансию';
         if ($approve) {
+            $employerId = $app['employer_id'] ?? '';
+            if ($employerId !== '') {
+                ensure_chat(
+                    $app['worker_id'], $employerId, $app['vacancy_id'],
+                    $vTitle, $vac['company'] ?? '',
+                    "🎉 Поздравляем! Вы одобрены на вакансию «{$vTitle}». Свяжитесь с кандидатом для уточнения деталей."
+                );
+            }
             notify_worker($app['worker_id'],
                 '✅ Заявка одобрена!',
-                "Вашу заявку на «{$vTitle}» одобрили. Откройте приложение и свяжитесь с директором!");
+                "Вашу заявку на «{$vTitle}» одобрили. Чат с директором уже открыт — напишите ему в разделе «Чаты»!");
         } else {
             notify_worker($app['worker_id'],
                 'По заявке отказ',
