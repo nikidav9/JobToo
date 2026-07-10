@@ -231,6 +231,16 @@ export async function dbUpsertVacancy(v: Vacancy): Promise<void> {
   if (error) throwOnError('dbUpsertVacancy', error);
 }
 
+export async function dbUpsertVacancyBatch(vacs: Vacancy[]): Promise<void> {
+  if (vacs.length === 0) return;
+  const rows = vacs.map(vacancyToRow);
+  if (IS_NATIVE) { await proxy('dbUpsertVacancyBatch', [rows]); return; }
+  const { error } = await withTimeout(
+    supabase.from('jm_vacancies').upsert(rows, { onConflict: 'id' })
+  );
+  if (error) throwOnError('dbUpsertVacancyBatch', error);
+}
+
 export async function dbUpdateVacancy(id: string, patch: Partial<{ status: string; workers_found: number }>): Promise<void> {
   if (IS_NATIVE) { await proxy('dbUpdateVacancy', [id, patch]); return; }
   const { error } = await withTimeout(

@@ -12,7 +12,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { MetroPicker } from '@/components/feature/MetroPicker';
 import { useApp } from '@/hooks/useApp';
 import { uid, nowISO } from '@/services/storage';
-import { dbUpsertVacancy } from '@/services/db';
+import { dbUpsertVacancy, dbUpsertVacancyBatch } from '@/services/db';
 import { notifyWorkersNearVacancy } from '@/services/notifications';
 import { Vacancy, WorkType } from '@/constants/types';
 import { METRO_LINES } from '@/constants/metro';
@@ -65,6 +65,9 @@ const ROLE_NORM: Record<string, { label: string; unit: string; hint: string; min
   shift_supervisor: { label: 'Оплата за смену',   unit: '₽/смену', hint: 'Укажите фиксированную оплату за смену', min: 1, max: 99999, placeholder: '3000' },
   picker:           { label: 'Сборка заказов',    unit: '₽/шт',    hint: 'За 1 позицию · диапазон: 1–99 ₽',    min: 1, max: 99,    placeholder: '5'    },
 };
+
+// Максимум дней в мультидневной публикации за один раз
+const MAX_MULTI_DAYS = 14;
 
 type PickerMode = 'date' | 'endDate' | 'timeStart' | 'timeEnd' | null;
 
@@ -193,6 +196,10 @@ export default function CreateVacancy() {
         e.salary = `Введите значение от ${roleNorm.min} до ${roleNorm.max}`;
       }
     }
+    if (!isEdit && multiDay) {
+      const n = getDatesBetween(selectedDate, selectedEndDate).length;
+      if (n > MAX_MULTI_DAYS) e.multiDay = `Максимум ${MAX_MULTI_DAYS} дней за одну публикацию`;
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -251,6 +258,11 @@ export default function CreateVacancy() {
         showToast('Вакансия обновлена', 'success');
       } else if (multiDay) {
         const dates = getDatesBetween(selectedDate, selectedEndDate);
+        if (dates.length > MAX_MULTI_DAYS) {
+          showToast(`Максимум ${MAX_MULTI_DAYS} дней за одну публикацию`, 'error');
+          setSaving(false);
+          return;
+        }
         const vacs: Vacancy[] = dates.map(d => ({
           ...base,
           id: uid(),
@@ -259,7 +271,7 @@ export default function CreateVacancy() {
           status: 'open' as const,
           createdAt: nowISO(),
         }));
-        await upsertWithTimeout(Promise.all(vacs.map(v => dbUpsertVacancy(v))));
+        await upsertWithTimeout(dbUpsertVacancyBatch(vacs));
         vacs.forEach(v => optimisticAddVacancy(v));
         if (metroStation) {
           notifyWorkersNearVacancy({
@@ -440,6 +452,11 @@ export default function CreateVacancy() {
                     </Text>
                   </View>
                 ) : null}
+                {daysInRange.length > MAX_MULTI_DAYS ? (
+                  <Text style={styles.errMsg}>Максимум {MAX_MULTI_DAYS} дней за одну публикацию — сократите период</Text>
+                ) : errors.multiDay ? (
+                  <Text style={styles.errMsg}>{errors.multiDay}</Text>
+                ) : null}
               </>
             ) : null}
           </View>
@@ -568,9 +585,9 @@ export default function CreateVacancy() {
 
           <View style={{ marginBottom: 40 }}>
             <TouchableOpacity
-              style={[styles.submitBtn, saving && { opacity: 0.6 }]}
+              style={[styles.submitBtn, (saving || daysInRange.length > MAX_MULTI_DAYS) && { opacity: 0.6 }]}
               onPress={submit}
-              disabled={saving}
+              disabled={saving || daysInRange.length > MAX_MULTI_DAYS}
               activeOpacity={0.85}
             >
               {saving ? (

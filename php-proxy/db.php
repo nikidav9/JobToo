@@ -475,6 +475,10 @@ try {
         case 'dbUpsertVacancy':
             sb_upsert('jm_vacancies', $args[0], 'id'); break;
 
+        case 'dbUpsertVacancyBatch':
+            // $args[0] — массив строк вакансий, пишется одним запросом
+            sb_upsert('jm_vacancies', $args[0], 'id'); break;
+
         case 'dbUpdateVacancy':
             sb_update('jm_vacancies', ['id' => 'eq.' . $args[0]], $args[1]); break;
 
