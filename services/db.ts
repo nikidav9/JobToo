@@ -307,6 +307,10 @@ export async function dbGetVacancyViewers(vacancyId: string): Promise<string[]> 
   return [...new Set((data ?? []).map((r: any) => r.worker_id))];
 }
 
+export async function dbGetPermVacancyViewers(vacancyId: string): Promise<string[]> {
+  return proxy<string[]>('dbGetPermVacancyViewers', [vacancyId]);
+}
+
 export async function dbRecordVacancyView(vacancyId: string, workerId: string): Promise<void> {
   if (IS_NATIVE) { await proxy('dbRecordVacancyView', [vacancyId, workerId]); return; }
   await withTimeout(

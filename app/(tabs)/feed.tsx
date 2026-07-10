@@ -29,6 +29,7 @@ import {
   dbRecordVacancyView,
   dbRecordPermVacancyView,
   dbGetVacancyViewers,
+  dbGetPermVacancyViewers,
 } from '@/services/db';
 import { notifyEmployerNewApplicant, notifyEmployerGotMatch, notifyWorkerGotMatch } from '@/services/notifications';
 import { Image } from 'expo-image';
@@ -274,20 +275,22 @@ const ms = StyleSheet.create({
 // ─────────────────────────────────────────────────
 // Vacancy Viewers Modal
 // ─────────────────────────────────────────────────
-function VacancyViewersModal({ vacancyId, onClose }: { vacancyId: string; onClose: () => void }) {
+function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId: string; kind?: 'shift' | 'perm'; onClose: () => void }) {
   const router = useRouter();
-  const { currentUser, vacancies, users, chats, showToast, refreshChats } = useApp();
+  const { currentUser, vacancies, permVacancies, users, chats, showToast, refreshChats } = useApp();
   const [loading, setLoading] = useState(true);
   const [viewers, setViewers] = useState<User[]>([]);
   const [chatLoading, setChatLoading] = useState<string | null>(null);
 
-  const vacancy = vacancies.find(v => v.id === vacancyId);
+  const vacancy = kind === 'perm'
+    ? permVacancies.find(v => v.id === vacancyId)
+    : vacancies.find(v => v.id === vacancyId);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const ids = await dbGetVacancyViewers(vacancyId);
+        const ids = await (kind === 'perm' ? dbGetPermVacancyViewers(vacancyId) : dbGetVacancyViewers(vacancyId));
         const fetched = await Promise.all(ids.map(id => dbGetUserById(id)));
         setViewers(fetched.filter(Boolean) as User[]);
       } catch {
@@ -309,7 +312,7 @@ function VacancyViewersModal({ vacancyId, onClose }: { vacancyId: string; onClos
         router.push({ pathname: '/chat-room', params: { chatId: existing.id } });
         return;
       }
-      const vacTitle = vacancy?.title ?? 'Смена';
+      const vacTitle = vacancy?.title ?? (kind === 'perm' ? 'Вакансия' : 'Смена');
       const companyName = vacancy?.company ?? currentUser.company ?? '';
       const greeting = `Здравствуйте, ${worker.firstName}! Вы смотрели вакансию «${vacTitle}». Хотелось бы предложить вам эту работу.`;
       const chatId = await dbCreateChat(worker.id, currentUser.id, vacancyId, vacTitle, companyName, greeting, 1, 0);
@@ -1648,14 +1651,14 @@ function getTodayISO() {
 
 function EmployerHome() {
   const router = useRouter();
-  const { currentUser, vacancies, likes, permVacancies, permApplications, refreshVacancies, refreshPermVacancies, refreshPermApplications, refreshLikes, refreshAll, showToast, vacancyStatsMap } = useApp();
+  const { currentUser, vacancies, likes, permVacancies, permApplications, refreshVacancies, refreshPermVacancies, refreshPermApplications, refreshLikes, refreshAll, showToast, vacancyStatsMap, permVacancyViewsMap } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
   const [mode, setMode] = useState<AppMode>('shift');
   const [tab, setTab] = useState<'active' | 'closed'>('active');
   const [confirmClose, setConfirmClose] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [workerListModal, setWorkerListModal] = useState<{ vacId: string; type: 'applicants' | 'hired' | 'rejected' } | null>(null);
-  const [viewersModal, setViewersModal] = useState<string | null>(null);
+  const [viewersModal, setViewersModal] = useState<{ id: string; kind: 'shift' | 'perm' } | null>(null);
   const didAutoClose = useRef(false);
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
   const [closingPermIds, setClosingPermIds] = useState<Set<string>>(new Set());
@@ -1841,7 +1844,7 @@ function EmployerHome() {
                   {[
                     { num: applicantCount(v.id), label: 'Отклики', color: Colors.blue, onTap: () => setWorkerListModal({ vacId: v.id, type: 'applicants' }) },
                     { num: rejectedCount(v.id), label: 'Отклонено', color: Colors.red, onTap: () => setWorkerListModal({ vacId: v.id, type: 'rejected' }) },
-                    { num: vacancyStatsMap[v.id]?.views ?? 0, label: 'Просмотрели', color: Colors.textMuted, onTap: () => setViewersModal(v.id) },
+                    { num: vacancyStatsMap[v.id]?.views ?? 0, label: 'Просмотрели', color: Colors.textMuted, onTap: () => setViewersModal({ id: v.id, kind: 'shift' }) },
                   ].map((s, i) => (
                     <TouchableOpacity
                       key={i}
@@ -1929,6 +1932,15 @@ function EmployerHome() {
                   <Text style={pS.appStatLabel}>откликов</Text>
                   <Text style={pS.appStatArrow}>Посмотреть ↗</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={[pS.appStatBtn, { backgroundColor: '#F4F4F5', marginTop: 6 }]}
+                  onPress={() => setViewersModal({ id: v.id, kind: 'perm' })}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[pS.appStatNum, { color: Colors.textSecondary }]}>{permVacancyViewsMap[v.id] ?? 0}</Text>
+                  <Text style={[pS.appStatLabel, { color: Colors.textSecondary }]}>посмотрели</Text>
+                  <Text style={[pS.appStatArrow, { color: Colors.textSecondary }]}>Посмотреть ↗</Text>
+                </TouchableOpacity>
               </View>
             ))
           )
@@ -1945,7 +1957,8 @@ function EmployerHome() {
 
       {viewersModal ? (
         <VacancyViewersModal
-          vacancyId={viewersModal}
+          vacancyId={viewersModal.id}
+          kind={viewersModal.kind}
           onClose={() => setViewersModal(null)}
         />
       ) : null}

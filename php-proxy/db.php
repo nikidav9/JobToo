@@ -529,6 +529,12 @@ try {
             break;
         }
 
+        case 'dbGetPermVacancyViewers': {
+            $rows = sb_select('jm_perm_vacancy_views', ['vacancy_id' => 'eq.' . $args[0]], 'worker_id,viewed_at', 'viewed_at.desc');
+            $data = array_values(array_unique(array_column($rows, 'worker_id')));
+            break;
+        }
+
         case 'dbGetPermVacancyViewsMap': {
             $rows = sb_select('jm_perm_vacancy_views', [], 'vacancy_id');
             $map = [];
