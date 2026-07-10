@@ -1988,6 +1988,18 @@ function EmployerHome() {
           </View>
         </View>
       ) : null}
+
+      {/* Плавающая кнопка создания — видна и когда вакансии уже есть */}
+      <TouchableOpacity
+        style={[
+          styles.fab,
+          { bottom: tabBarHeight + 14, backgroundColor: mode === 'shift' ? Colors.primary : '#7C3AED' },
+        ]}
+        onPress={() => router.push(mode === 'shift' ? '/create-vacancy' : '/create-perm-vacancy')}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="add" size={30} color="#fff" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -2295,6 +2307,20 @@ const styles = StyleSheet.create({
   lineName: { flex: 1, fontSize: 15, color: Colors.textPrimary },
   createBtn: { marginTop: 20, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 100, paddingHorizontal: 24, paddingVertical: 10 },
   createBtnText: { color: Colors.primary, fontWeight: '600', fontSize: 15 },
+  fab: {
+    position: 'absolute',
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.divider },
   tabItem2: { flex: 1, alignItems: 'center', paddingVertical: 12 },
   tabLabel2: { fontSize: 15, fontWeight: '500', color: Colors.textMuted },
