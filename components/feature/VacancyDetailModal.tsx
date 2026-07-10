@@ -3,13 +3,13 @@ import {
   View, Text, StyleSheet, Modal, ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { User, Vacancy } from '@/constants/types';
 import { Chip } from '@/components/ui/Chip';
-import { formatDate, nameColorFromString, getInitials } from '@/services/storage';
+import { formatDate, normalizeCompany } from '@/services/storage';
+import { LavkaLogo } from '@/components/ui/LavkaLogo';
 
 interface Props {
   vacancy: Vacancy | null;
@@ -24,9 +24,7 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
   const insets = useSafeAreaInsets();
   if (!vacancy) return null;
 
-  const companyName = employer?.company || vacancy.company || (employer ? `${employer.firstName} ${employer.lastName}` : '');
-  const avatarColor = nameColorFromString(vacancy.employerId);
-  const initials = getInitials(companyName || '?');
+  const companyName = normalizeCompany(employer?.company || vacancy.company);
 
   return (
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
@@ -47,13 +45,7 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
           >
             {/* Company row */}
             <View style={styles.companyRow}>
-              {employer?.avatarUrl ? (
-                <Image source={{ uri: employer.avatarUrl }} style={styles.avatarImg} contentFit="cover" transition={150} />
-              ) : (
-                <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-                  <Text style={styles.avatarTxt}>{initials}</Text>
-                </View>
-              )}
+              <LavkaLogo size={44} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.company}>{companyName}</Text>
                 {vacancy.metroStation ? (

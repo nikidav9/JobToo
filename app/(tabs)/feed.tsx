@@ -38,6 +38,7 @@ import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials, normalizeCompany } from '@/services/storage';
 import { NotifBell } from '@/components/ui/NotifBell';
+import { LavkaLogo } from '@/components/ui/LavkaLogo';
 import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
 
@@ -1097,13 +1098,7 @@ function WorkerFeed() {
                 >
                   <View style={styles.cardTop}>
                     <View style={styles.companyRow}>
-                      {currentEmployer?.avatarUrl ? (
-                        <Image source={{ uri: currentEmployer.avatarUrl }} style={styles.avatarImg} contentFit="cover" transition={150} />
-                      ) : (
-                        <View style={[styles.avatar, { backgroundColor: nameColorFromString(currentCard.employerId) }]}>
-                          <Text style={styles.avatarText}>{getInitials(normalizeCompany())}</Text>
-                        </View>
-                      )}
+                      <LavkaLogo size={44} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.companyName} numberOfLines={1}>
                           {normalizeCompany()}
@@ -1402,11 +1397,7 @@ function WorkerPermMode() {
       ? METRO_LINES.find(l => l.stations.includes(v.metroStation!)) ?? null
       : null;
 
-    const employer = users.find((u: User) => u.id === v.employerId);
     const displayCompany = normalizeCompany();
-
-    const avatarColor = nameColorFromString(displayCompany);
-    const avatarInitials = getInitials(displayCompany);
 
     return (
       <TouchableOpacity
@@ -1422,9 +1413,7 @@ function WorkerPermMode() {
 
         {/* Company row */}
         <View style={pS.companyRow}>
-          <View style={[pS.companyAvatar, { backgroundColor: avatarColor }]}>
-            <Text style={pS.companyAvatarTxt}>{avatarInitials}</Text>
-          </View>
+          <LavkaLogo size={42} />
           <View style={pS.companyMeta}>
             <Text style={pS.companyName} numberOfLines={1}>{displayCompany}</Text>
             <View style={pS.verifiedRow}>

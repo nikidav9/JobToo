@@ -67,6 +67,19 @@ function sb_select(string $t, array $f = [], string $sel = '*', ?string $ord = n
     return sb('GET', $t, $q);
 }
 
+// Supabase режет выборку до 1000 строк — для агрегатов тянем всё постранично
+function sb_select_all(string $t, array $f = [], string $sel = '*'): array {
+    $all = []; $page = 1000; $off = 0;
+    while (true) {
+        $q = array_merge(['select' => $sel, 'limit' => (string)$page, 'offset' => (string)$off], $f);
+        $rows = sb('GET', $t, $q);
+        foreach ($rows as $r) $all[] = $r;
+        if (count($rows) < $page) break;
+        $off += $page;
+    }
+    return $all;
+}
+
 function sb_single(string $t, array $f = [], string $sel = '*'): ?array {
     $rows = sb_select($t, array_merge($f, ['limit' => '1']), $sel);
     return !empty($rows) ? $rows[0] : null;
@@ -495,8 +508,8 @@ try {
             $data = sb_select('jm_likes', ['vacancy_id' => 'eq.' . $args[0]]); break;
 
         case 'dbGetVacancyStatsMap': {
-            $rows = sb_select('jm_likes', [], 'vacancy_id,worker_liked,employer_liked,worker_skipped,is_match');
-            $viewRows = sb_select('jm_vacancy_views', [], 'vacancy_id');
+            $rows = sb_select_all('jm_likes', [], 'vacancy_id,worker_liked,employer_liked,worker_skipped,is_match');
+            $viewRows = sb_select_all('jm_vacancy_views', [], 'vacancy_id');
             $map = [];
             foreach ($rows as $r) {
                 $vid = $r['vacancy_id'];
@@ -540,7 +553,7 @@ try {
         }
 
         case 'dbGetPermVacancyViewsMap': {
-            $rows = sb_select('jm_perm_vacancy_views', [], 'vacancy_id');
+            $rows = sb_select_all('jm_perm_vacancy_views', [], 'vacancy_id');
             $map = [];
             foreach ($rows as $r) {
                 $vid = $r['vacancy_id'];

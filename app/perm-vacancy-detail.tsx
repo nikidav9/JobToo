@@ -9,12 +9,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { getInitials, nameColorFromString, normalizeCompany } from '@/services/storage';
+import { normalizeCompany } from '@/services/storage';
+import { LavkaLogo } from '@/components/ui/LavkaLogo';
 import {
   dbApplyPermVacancy,
   dbAddPermSaved,
@@ -72,8 +72,6 @@ export default function PermVacancyDetailScreen() {
 
   const employerDisplayName = normalizeCompany();
 
-  const employerColor = employer ? nameColorFromString(employer.id) : Colors.primary;
-  const employerInitials = getInitials(employerDisplayName);
 
   const myApp = useMemo(() => {
     if (!currentUser || !vacancy) return null;
@@ -316,18 +314,7 @@ export default function PermVacancyDetailScreen() {
             <Text style={styles.sectionTitle}>Работодатель</Text>
           </View>
           <View style={styles.employerCard}>
-            {employer?.avatarUrl ? (
-              <Image
-                source={{ uri: employer.avatarUrl }}
-                style={styles.employerAvatar}
-                contentFit="cover"
-                transition={150}
-              />
-            ) : (
-              <View style={[styles.employerAvatar, { backgroundColor: employerColor, alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={styles.employerAvatarTxt}>{employerInitials}</Text>
-              </View>
-            )}
+            <LavkaLogo size={48} />
             <View style={{ flex: 1, gap: 3 }}>
               <Text style={styles.employerName}>{employerDisplayName}</Text>
               {employer?.metroStation ? (
