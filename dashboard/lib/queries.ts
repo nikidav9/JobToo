@@ -298,16 +298,18 @@ export async function fetchUsers() {
 
 // ─── vacancies ───────────────────────────────────────────────────────────────
 
-/** Смены с прошедшей датой должны быть закрыты — дашборд подчищает их при загрузке */
+/** Смены с прошедшей датой должны быть закрыты — дашборд подчищает их при загрузке.
+ *  Точная логика (по времени окончания, ночные смены) живёт на сервере;
+ *  здесь только страховка: закрываем то, что старше вчерашнего дня. */
 async function autoCloseStaleVacancies() {
   // МСК = UTC+3
-  const mskToday = new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10)
+  const mskYesterday = new Date(Date.now() + 3 * 3600_000 - 86400_000).toISOString().slice(0, 10)
   try {
     await supabaseAdmin
       .from('jm_vacancies')
       .update({ status: 'closed' })
       .eq('status', 'open')
-      .lt('date', mskToday)
+      .lt('date', mskYesterday)
   } catch { /* не блокируем аналитику */ }
 }
 

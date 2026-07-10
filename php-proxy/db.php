@@ -915,16 +915,27 @@ try {
             break;
         }
 
-        // Смены: автозакрытие за 30 минут до начала (та же логика, что у биржи)
+        // Смены: автозакрытие в момент ОКОНЧАНИЯ смены (директора добирают людей
+        // и в уже идущую смену). Ночные смены (конец меньше начала) заканчиваются
+        // на следующий день. Без времени окончания — закрываем в конце дня смены.
         case 'dbAutoClosePastVacancies': {
             $today = date('Y-m-d');
-            $cutoff = time() + 30 * 60;
-            $rows = sb_select('jm_vacancies', ['status' => 'eq.open', 'date' => 'lte.' . $today], 'id,date,time_start');
-            $toClose = array_filter($rows, function($v) use ($today, $cutoff) {
-                if ($v['date'] < $today) return true;
-                if (empty($v['time_start'])) return false;
-                $startTs = strtotime($v['date'] . ' ' . $v['time_start'] . ':00');
-                return $startTs !== false && $startTs <= $cutoff;
+            $yesterday = date('Y-m-d', time() - 86400);
+            $now = time();
+            $rows = sb_select('jm_vacancies', ['status' => 'eq.open', 'date' => 'lte.' . $today], 'id,date,time_start,time_end');
+            $toClose = array_filter($rows, function($v) use ($now, $yesterday) {
+                $d = $v['date'] ?? '';
+                if ($d === '') return false;
+                $ts = $v['time_start'] ?? '';
+                $te = $v['time_end'] ?? '';
+                if ($te !== '') {
+                    $end = strtotime($d . ' ' . $te . ':00');
+                    if ($end === false) return $d < $yesterday;
+                    if ($ts !== '' && $te <= $ts) $end += 86400; // смена через полночь
+                    return $end <= $now;
+                }
+                $eod = strtotime($d . ' 23:59:59');
+                return $eod !== false && $eod <= $now;
             });
             foreach ($toClose as $row) {
                 sb_update('jm_vacancies', ['id' => 'eq.' . $row['id']], ['status' => 'closed']);
