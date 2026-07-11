@@ -10,14 +10,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { Like, Vacancy } from '@/constants/types';
+import { Like, Vacancy, PermApplication, PermVacancy, Chat } from '@/constants/types';
 import { formatDate, getInitials, nameColorFromString } from '@/services/storage';
-import { dbUpsertLike, dbCheckAndCreateMatch, dbConfirmShift } from '@/services/db';
+import {
+  dbUpsertLike, dbCheckAndCreateMatch, dbConfirmShift,
+  dbSetPermApplicationStatus, dbCreateChat,
+} from '@/services/db';
 import { NotifBell } from '@/components/ui/NotifBell';
 import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 import {
   notifyWorkerShiftConfirmedByEmployer,
   notifyWorkerGotMatch,
+  notifyWorkerPermApplicationApproved,
+  notifyWorkerPermApplicationRejected,
 } from '@/services/notifications';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
@@ -346,9 +351,14 @@ function WorkerMatches() {
 // ─────────────────────────────────────────────────
 // EMPLOYER VIEW
 // ─────────────────────────────────────────────────
+type EmployerMatchItem = { kind: 'like'; like: Like } | { kind: 'permApp'; app: PermApplication };
+
 function EmployerMatches() {
   const router = useRouter();
-  const { currentUser, likes, vacancies, users, chats, refreshAll, showToast } = useApp();
+  const {
+    currentUser, likes, vacancies, users, chats, refreshAll, showToast,
+    permApplications, permVacancies, refreshPermApplications, refreshChats,
+  } = useApp();
   const [actionLoading, setLoading] = useState<string | null>(null);
   const [tab, setTab] = useState<'pending' | 'matched' | 'completed'>('pending');
   const [refreshing, setRefreshing] = useState(false);
@@ -369,8 +379,24 @@ function EmployerMatches() {
   const matched = allLikes.filter(l => l.isMatch && !l.shiftCompleted);
   const completed = allLikes.filter(l => l.isMatch && l.shiftCompleted);
 
+  // Отклики на постоянные вакансии — тоже сюда, а не только на карточку вакансии
+  const myPermApps: PermApplication[] = permApplications.filter((a: PermApplication) => a.employerId === currentUser.id);
+  const permPending = myPermApps.filter(a => a.status === 'pending');
+  const permApproved = myPermApps.filter(a => a.status === 'approved');
+
   const needsConfirm = matched.filter(l => !l.employerConfirmed).length;
-  const shown = tab === 'pending' ? pending : tab === 'matched' ? matched : completed;
+  const shown: EmployerMatchItem[] =
+    tab === 'pending'
+      ? [
+          ...permPending.map(app => ({ kind: 'permApp' as const, app })),
+          ...pending.map((like: Like) => ({ kind: 'like' as const, like })),
+        ]
+      : tab === 'matched'
+      ? [
+          ...permApproved.map(app => ({ kind: 'permApp' as const, app })),
+          ...matched.map((like: Like) => ({ kind: 'like' as const, like })),
+        ]
+      : completed.map((like: Like) => ({ kind: 'like' as const, like }));
 
   const getVacancy = (id: string) => vacancies.find(v => v.id === id);
   const getWorker = (id: string) => users.find(u => u.id === id);
@@ -460,7 +486,173 @@ function EmployerMatches() {
     }
   };
 
-  const renderItem = ({ item: like }: { item: Like }) => {
+  const approvePermApp = async (app: PermApplication) => {
+    const vacancy = permVacancies.find((v: PermVacancy) => v.id === app.vacancyId);
+    if (!vacancy) return;
+    setLoading(app.id);
+    try {
+      await dbSetPermApplicationStatus(app.id, 'approved');
+      notifyWorkerPermApplicationApproved(app.workerId, vacancy.company, vacancy.title).catch(() => {});
+      const chatId = await dbCreateChat(
+        app.workerId,
+        currentUser.id,
+        app.vacancyId,
+        vacancy.title,
+        vacancy.company,
+        `🎉 Поздравляем! Вы одобрены на вакансию «${vacancy.title}». Свяжитесь с кандидатом для уточнения деталей.`,
+        1,
+        0,
+      );
+      await refreshPermApplications();
+      await refreshChats(currentUser);
+      showToast('Одобрено! Чат открыт 🎉', 'match');
+      router.push({ pathname: '/chat-room', params: { chatId } });
+    } catch {
+      showToast('Ошибка', 'error');
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const rejectPermApp = async (app: PermApplication) => {
+    const vacancy = permVacancies.find((v: PermVacancy) => v.id === app.vacancyId);
+    setLoading(app.id + '_d');
+    try {
+      await dbSetPermApplicationStatus(app.id, 'rejected');
+      if (vacancy) {
+        notifyWorkerPermApplicationRejected(app.workerId, vacancy.company, vacancy.title).catch(() => {});
+      }
+      await refreshPermApplications();
+      showToast('Отклонено', 'success');
+    } catch {
+      showToast('Ошибка', 'error');
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const renderPermApp = (app: PermApplication) => {
+    const vacancy = permVacancies.find((v: PermVacancy) => v.id === app.vacancyId);
+    const worker = getWorker(app.workerId);
+    const workerName = worker
+      ? `${worker.firstName} ${worker.lastName}`.trim() || 'Работник'
+      : 'Работник';
+    const workerColor = nameColorFromString(worker?.id ?? app.workerId);
+    const isLoading = actionLoading === app.id;
+    const isDLoading = actionLoading === app.id + '_d';
+    const isApproved = app.status === 'approved';
+
+    return (
+      <View style={[s.card, isApproved && s.matchedCard]}>
+        <View style={[s.statusBadge, { backgroundColor: isApproved ? '#D1FAE5' : '#EEF2FF' }]}>
+          <Ionicons
+            name={isApproved ? 'checkmark-circle' : 'briefcase-outline'}
+            size={14}
+            color={isApproved ? Colors.green : '#4F46E5'}
+          />
+          <Text style={[s.statusTxt, { color: isApproved ? Colors.green : '#4F46E5' }]}>
+            {isApproved ? 'Одобрен на вакансию' : 'Отклик на вакансию'}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={s.workerRow}
+          onPress={() => worker
+            ? router.push({ pathname: '/user-profile', params: { userId: worker.id } })
+            : null}
+          activeOpacity={0.8}
+        >
+          {worker?.avatarUrl ? (
+            <Image source={{ uri: worker.avatarUrl }} style={s.avatar} contentFit="cover" transition={150} />
+          ) : (
+            <View style={[s.avatar, { backgroundColor: workerColor, alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={s.avatarTxt}>{getInitials(workerName)}</Text>
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={s.workerName}>{workerName}</Text>
+            {worker?.age ? <Text style={s.profileSub}>{worker.age} лет</Text> : null}
+            {worker?.metroStation ? (
+              <View style={s.metroRow}>
+                <Ionicons name="subway-outline" size={12} color={Colors.textMuted} />
+                <Text style={s.profileSub}> {worker.metroStation}</Text>
+              </View>
+            ) : null}
+            {(worker?.avgRating ?? 0) > 0 ? (
+              <View style={s.ratingRow}>
+                <Ionicons name="star" size={12} color="#FBBF24" />
+                <Text style={s.profileSub}> {(worker?.avgRating ?? 0).toFixed(1)} ({worker?.ratingCount} отз.)</Text>
+              </View>
+            ) : null}
+          </View>
+          {isApproved && worker?.phone ? (
+            <View style={{ alignItems: 'flex-end', gap: 4 }}>
+              <View style={s.phoneTag}><Text style={s.phoneTxt}>{worker.phone}</Text></View>
+              <Text style={s.profileArrow}>Профиль ›</Text>
+            </View>
+          ) : (
+            <View style={{ alignItems: 'flex-end', gap: 4 }}>
+              {worker ? <Text style={s.profileArrow}>Профиль ›</Text> : null}
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <Text style={s.vacLabel}>{vacancy?.title ?? 'Вакансия'} · Постоянная работа</Text>
+
+        {isApproved ? (
+          <View style={s.actionRow}>
+            <TouchableOpacity
+              style={s.chatBtn}
+              onPress={() => {
+                const c = chats.find((c: Chat) => c.vacancyId === app.vacancyId && c.workerId === app.workerId);
+                if (c) router.push({ pathname: '/chat-room', params: { chatId: c.id } });
+                else router.push({ pathname: '/(tabs)/chats' });
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble-outline" size={15} color="#fff" />
+              <Text style={s.chatBtnTxt}>Чат</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={s.actionRow}>
+            <TouchableOpacity
+              style={[s.rejectBtn, isDLoading && { opacity: 0.5 }]}
+              onPress={() => rejectPermApp(app)}
+              disabled={!!actionLoading}
+              activeOpacity={0.8}
+            >
+              {isDLoading
+                ? <ActivityIndicator size="small" color={Colors.red} />
+                : (
+                  <>
+                    <Ionicons name="close" size={15} color={Colors.red} />
+                    <Text style={s.rejectBtnTxt}>Не подходит</Text>
+                  </>
+                )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.acceptBtn, isLoading && { opacity: 0.5 }]}
+              onPress={() => approvePermApp(app)}
+              disabled={!!actionLoading}
+              activeOpacity={0.8}
+            >
+              {isLoading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={15} color="#fff" />
+                    <Text style={s.acceptBtnTxt}>Подходит!</Text>
+                  </>
+                )}
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderLike = (like: Like) => {
     const vac = getVacancy(like.vacancyId);
     const worker = getWorker(like.workerId);
     if (!vac) return null;
@@ -638,6 +830,9 @@ function EmployerMatches() {
     );
   };
 
+  const renderItem = ({ item }: { item: EmployerMatchItem }) =>
+    item.kind === 'permApp' ? renderPermApp(item.app) : renderLike(item.like);
+
   const emptyIcon: Record<typeof tab, React.ComponentProps<typeof Ionicons>['name']> = {
     pending: 'inbox-outline',
     matched: 'people-outline',
@@ -662,8 +857,8 @@ function EmployerMatches() {
 
       <View style={s.tabStrip}>
         {([
-          { key: 'pending',   label: 'Отклики',    count: pending.length },
-          { key: 'matched',   label: 'Мэтчи',      count: matched.length },
+          { key: 'pending',   label: 'Отклики',    count: permPending.length + pending.length },
+          { key: 'matched',   label: 'Мэтчи',      count: permApproved.length + matched.length },
           { key: 'completed', label: 'Завершённые', count: completed.length },
         ] as const).map(t => (
           <TouchableOpacity
@@ -697,7 +892,7 @@ function EmployerMatches() {
       ) : (
         <FlatList
           data={shown}
-          keyExtractor={l => l.id}
+          keyExtractor={item => item.kind === 'permApp' ? item.app.id : item.like.id}
           contentContainerStyle={[s.list, { paddingBottom: tabBarHeight + 16 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
