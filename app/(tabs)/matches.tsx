@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, RefreshControl,
@@ -363,6 +363,26 @@ function EmployerMatches() {
   const [tab, setTab] = useState<'pending' | 'matched' | 'completed'>('pending');
   const [refreshing, setRefreshing] = useState(false);
   const tabBarHeight = useBottomTabBarHeight();
+  const tabTouched = useRef(false);
+  const autoSwitched = useRef(false);
+
+  // Если новых откликов нет, а одобренные кандидаты есть — открываем сразу «Мэтчи»,
+  // иначе директор видит пустые «Отклики» и думает, что кандидатов нет вовсе
+  useEffect(() => {
+    if (!currentUser || tabTouched.current || autoSwitched.current) return;
+    const myIds = vacancies.filter((v: Vacancy) => v.employerId === currentUser.id).map((v: Vacancy) => v.id);
+    const myLikes = likes.filter((l: Like) => myIds.includes(l.vacancyId) && l.workerLiked);
+    const pendingCount =
+      myLikes.filter((l: Like) => !l.isMatch && l.employerLiked !== false).length +
+      permApplications.filter((a: PermApplication) => a.employerId === currentUser.id && a.status === 'pending').length;
+    const matchedCount =
+      myLikes.filter((l: Like) => l.isMatch && !l.shiftCompleted).length +
+      permApplications.filter((a: PermApplication) => a.employerId === currentUser.id && a.status === 'approved').length;
+    if (pendingCount === 0 && matchedCount > 0) {
+      autoSwitched.current = true;
+      setTab('matched');
+    }
+  }, [likes, permApplications, vacancies, currentUser]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -864,7 +884,7 @@ function EmployerMatches() {
           <TouchableOpacity
             key={t.key}
             style={s.tabItem}
-            onPress={() => setTab(t.key)}
+            onPress={() => { tabTouched.current = true; setTab(t.key); }}
             activeOpacity={0.8}
           >
             <Text style={[s.tabLabel, tab === t.key && s.tabLabelActive]}>
@@ -883,7 +903,9 @@ function EmployerMatches() {
           </Text>
           <Text style={s.emptySub}>
             {tab === 'pending'
-              ? 'Когда работники откликнутся — они появятся здесь'
+              ? (permApproved.length + matched.length > 0
+                  ? 'Новых откликов нет. Одобренные кандидаты — во вкладке «Мэтчи»'
+                  : 'Когда работники откликнутся — они появятся здесь')
               : tab === 'matched'
               ? 'Мэтчи появятся после взаимного подтверждения'
               : 'Здесь будет история завершённых смен'}
