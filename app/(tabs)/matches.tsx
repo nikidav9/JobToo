@@ -604,6 +604,7 @@ function EmployerMatches() {
                 <Text style={s.profileSub}> {(worker?.avgRating ?? 0).toFixed(1)} ({worker?.ratingCount} отз.)</Text>
               </View>
             ) : null}
+            {!worker ? <Text style={s.profileSub}>Загрузка…</Text> : null}
           </View>
           {isApproved && worker?.phone ? (
             <View style={{ alignItems: 'flex-end', gap: 4 }}>

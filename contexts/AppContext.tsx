@@ -268,7 +268,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           _setCurrentUser(sessionUser);
 
           // Restore cached data instantly
-          const [cachedVac, cachedLikes, cachedChats, cachedPermVac, cachedPermApps, cachedStats, cachedNotifs] = await Promise.all([
+          const [cachedVac, cachedLikes, cachedChats, cachedPermVac, cachedPermApps, cachedStats, cachedNotifs, cachedUsers] = await Promise.all([
             loadCache<Vacancy[]>(CACHE_KEYS.vacancies),
             loadCache<Like[]>(CACHE_KEYS.likes(sessionUser.id)),
             loadCache<Chat[]>(CACHE_KEYS.chats(sessionUser.id)),
@@ -276,6 +276,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             loadCache<PermApplication[]>(CACHE_KEYS.permApps(sessionUser.id)),
             loadCache<Record<string, VacancyStats>>(CACHE_KEYS.allVacancyStats),
             loadCache<AppNotification[]>(CACHE_KEYS.notifications(sessionUser.id)),
+            loadCache<User[]>(CACHE_KEYS.users),
           ]);
 
           if (cancelled) return;
@@ -284,6 +285,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (cachedChats) setChats(cachedChats);
           if (cachedPermVac) setPermVacancies(cachedPermVac);
           if (cachedPermApps) setPermApplications(cachedPermApps);
+          if (cachedUsers) setUsers(cachedUsers);
           if (cachedStats) setVacancyStatsMap(cachedStats);
           if (cachedNotifs) setNotifications(cachedNotifs);
 
@@ -563,6 +565,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const refreshUsers = async () => {
     const data = await dbGetUsers();
     setUsers(data);
+    saveCache(CACHE_KEYS.users, data).catch(() => {});
     _setCurrentUser(prev => {
       if (!prev) return prev;
       const fresh = data.find(u => u.id === prev.id);

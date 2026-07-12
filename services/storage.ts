@@ -122,6 +122,7 @@ export function extractPhoneDigits(formatted: string): string {
 
 export const CACHE_KEYS = {
   vacancies:       'jm_c1_vac',
+  users:           'jm_c1_users',
   likes:           (uid: string) => `jm_c1_likes_${uid}`,
   chats:           (uid: string) => `jm_c1_chats_${uid}`,
   permVac:         (uid: string) => `jm_c1_pvac_${uid}`,
