@@ -950,6 +950,12 @@ try {
             // Пост в группу — ПЕРВЫМ (одна быстрая операция): длинные циклы
             // рассылки ниже могут упереться в лимит времени PHP
             $groupHtml = (string)($args[4] ?? '');
+            // Старые клиенты не шлют groupHtml — собираем пост из tgHtml,
+            // чтобы группа получала ВСЕ вакансии независимо от версии приложения
+            if ($groupHtml === '' && (string)($args[2] ?? '') !== '') {
+                $groupHtml = (string)$args[2]
+                    . "\n\n⚡ В приложении смены появляются раньше — откликайся первым 👇";
+            }
             $groupOk = false;
             if ($groupHtml !== '' && TG_GROUP_CHAT_ID !== 0) {
                 $groupOk = tg_send_message(TG_GROUP_CHAT_ID, $groupHtml, $btnUrl);
