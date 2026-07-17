@@ -1484,7 +1484,7 @@ export async function fetchExecutiveSummary() {
     supabase.from('jm_vacancies').select('id,employer_id,status,created_at,workers_needed,workers_found'),
     supabase.from('jm_perm_vacancies').select('id,employer_id,status,created_at'),
     supabase.from('jm_likes').select('id,vacancy_id,worker_id,worker_liked,is_match,shift_completed,created_at'),
-    supabase.from('jm_perm_applications').select('id,vacancy_id,worker_id,created_at'),
+    supabase.from('jm_perm_applications').select('id,vacancy_id,worker_id,status,created_at'),
     supabase.from('jm_chats').select('id,created_at'),
     supabase.from('jm_messages').select('id,chat_id,sender_id,created_at'),
     supabase.from('jm_ratings').select('id,rating'),
@@ -1619,7 +1619,32 @@ export async function fetchExecutiveSummary() {
     }
   })
 
+  // ── Сезонные метрики: мэтчи/нед и директора-паблишеры/нед против целей ──
+  const d14 = new Date(now - 14 * 864e5).toISOString()
+  const inRange = (iso: string | undefined, from: string, to?: string) =>
+    !!iso && iso > from && (!to || iso <= to)
+  const matches7 =
+    lk.filter(x => x.is_match && inRange(x.created_at, d7)).length +
+    ap.filter(x => x.status === 'approved' && inRange(x.created_at, d7)).length
+  const matchesPrev7 =
+    lk.filter(x => x.is_match && inRange(x.created_at, d14, d7)).length +
+    ap.filter(x => x.status === 'approved' && inRange(x.created_at, d14, d7)).length
+  const pubs7 = new Set([
+    ...(t as any[]).filter(x => inRange(x.created_at, d7)).map(x => x.employer_id),
+    ...(p as any[]).filter(x => inRange(x.created_at, d7)).map(x => x.employer_id),
+  ].filter(Boolean)).size
+  const pubsPrev7 = new Set([
+    ...(t as any[]).filter(x => inRange(x.created_at, d14, d7)).map(x => x.employer_id),
+    ...(p as any[]).filter(x => inRange(x.created_at, d14, d7)).map(x => x.employer_id),
+  ].filter(Boolean)).size
+  const newWorkers7 = workers.filter((x: any) => inRange(x.created_at, d7)).length
+
   return {
+    season: {
+      matches7, matchesPrev7, targetMatches: 15,
+      pubs7, pubsPrev7, targetPubs: 15,
+      newWorkers7,
+    },
     kpi: {
       totalUsers: u.length, workers: workers.length, employers: employers.length,
       newUsers30, userGrowthMoM, mau, wau,

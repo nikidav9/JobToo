@@ -31,12 +31,37 @@ export default function SummaryPage() {
 
   if (loading || !d) return <Loader />
   const k = d.kpi
+  const s = d.season
+  const wkDelta = (cur: number, prev: number) =>
+    prev > 0 || cur > 0 ? `${cur - prev >= 0 ? '+' : ''}${cur - prev} к прошлой нед.` : undefined
 
   return (
     <div>
       <PageHeader title="Сводка" intervalSec={60} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
 
       <div className="page-content">
+
+        <SectionTitle>Сезон · цели к концу сентября</SectionTitle>
+        <div className="g-4">
+          <KpiCard
+            label="Мэтчей за 7 дней"
+            value={`${s.matches7} / ${s.targetMatches}`}
+            sub="смены + одобренные заявки · цель в неделю"
+            sparkColor={PALETTE.orange}
+            delta={wkDelta(s.matches7, s.matchesPrev7)}
+            deltaTone={s.matches7 >= s.matchesPrev7 ? 'pos' : 'neg'}
+          />
+          <KpiCard
+            label="Директоров публиковали"
+            value={`${s.pubs7} / ${s.targetPubs}`}
+            sub="за 7 дней · цель в неделю"
+            sparkColor={PALETTE.purple}
+            delta={wkDelta(s.pubs7, s.pubsPrev7)}
+            deltaTone={s.pubs7 >= s.pubsPrev7 ? 'pos' : 'neg'}
+          />
+          <KpiCard label="Привязано Telegram" value={k.tgLinked} sub={`из них работников: ${k.tgLinkedWorkers}`} sparkColor={PALETTE.cyan} />
+          <KpiCard label="Новых работников · 7 дн" value={s.newWorkers7} sparkColor={PALETTE.green} />
+        </div>
 
         <SectionTitle>Рост</SectionTitle>
         <div className="g-4">
