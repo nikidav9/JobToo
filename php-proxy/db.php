@@ -467,6 +467,25 @@ try {
                 $result['autoRejected']++;
             }
 
+            // ── 1в. То же для откликов на смены: 7+ дней без решения директора ──
+            $staleLikes = sb_select('jm_likes', [
+                'worker_liked' => 'eq.true',
+                'is_match' => 'eq.false',
+                'employer_liked' => 'is.null',
+                'created_at' => 'lt.' . $cut7d,
+            ], 'id,worker_id,vacancy_id');
+            $result['autoRejectedShifts'] = 0;
+            foreach ($staleLikes as $lrow) {
+                sb_update('jm_likes', ['id' => 'eq.' . $lrow['id']], ['employer_liked' => false]);
+                $svac = sb_single('jm_vacancies', ['id' => 'eq.' . $lrow['vacancy_id']], 'title');
+                $st = $svac ? $svac['title'] : 'смену';
+                $wTitle = 'Отклик закрыт без ответа';
+                $wBody = "Директор не ответил на ваш отклик на смену «{$st}» за 7 дней. "
+                    . 'Посмотрите свежие смены рядом — отклик в два тапа.';
+                sb_insert('jm_notifications', ['user_id' => $lrow['worker_id'], 'title' => $wTitle, 'body' => $wBody]);
+                $result['autoRejectedShifts']++;
+            }
+
             // ── 2. Директорам: пора размещать (раз в 3 дня) ──
             if ($dayIdx % 3 === 0) {
                 $cut3d = gmdate('Y-m-d\TH:i:s\Z', time() - 3 * 86400);
