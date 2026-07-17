@@ -1,0 +1,26 @@
+name: Evening Digest
+
+# Вечерний дайджест смен на завтра в группу. Спящее условие внутри
+# cronEveningDigest: постит только при 3+ сменах от 2+ лавок.
+on:
+  schedule:
+    # 16:00 UTC = 19:00 МСК, каждый день
+    - cron: '0 16 * * *'
+  workflow_dispatch:
+
+jobs:
+  digest:
+    name: Post tomorrow shifts digest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call cronEveningDigest
+        env:
+          APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+        run: |
+          SECRET="${APP_SECRET:-ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6}"
+          RESP=$(curl -s -X POST "https://jobtoo.ru/api/db.php" \
+            -H "Content-Type: application/json" \
+            -H "X-App-Secret: $SECRET" \
+            -d '{"fn":"cronEveningDigest","args":[]}')
+          echo "Response: $RESP"
+          echo "$RESP" | grep -q '"data"' || { echo "cronEveningDigest failed"; exit 1; }

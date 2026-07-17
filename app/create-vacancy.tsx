@@ -17,6 +17,7 @@ import { notifyWorkersNearVacancy } from '@/services/notifications';
 import { Vacancy, WorkType } from '@/constants/types';
 import { METRO_LINES } from '@/constants/metro';
 import { WorkTypeSelector, WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
+import { TelegramLinkBanner } from '@/components/TelegramLinkBanner';
 import { Ionicons } from '@expo/vector-icons';
 
 function pad2(n: number) { return n.toString().padStart(2, '0'); }
@@ -73,11 +74,14 @@ type PickerMode = 'date' | 'endDate' | 'timeStart' | 'timeEnd' | null;
 
 export default function CreateVacancy() {
   const router = useRouter();
-  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const { editId, copyId } = useLocalSearchParams<{ editId?: string; copyId?: string }>();
   const { currentUser, vacancies, refreshVacancies, showToast, optimisticAddVacancy, optimisticUpdateVacancy } = useApp();
 
   const existing = editId ? vacancies.find(v => v.id === editId) : undefined;
   const isEdit = !!existing;
+  // «Повторить смену»: копируем все поля из исходной, дата — завтра
+  const source = !isEdit && copyId ? vacancies.find(v => v.id === copyId) : undefined;
+  const isCopy = !!source;
 
   const [loadingInit, setLoadingInit] = useState(isEdit);
   const [selectedWorkType, setSelectedWorkType] = useState<WorkType>(existing?.workType ?? 'stocker');
@@ -120,6 +124,36 @@ export default function CreateVacancy() {
     setNoExp(existing.noExperienceNeeded);
     setLoadingInit(false);
   }, [existing?.id]);
+
+  useEffect(() => {
+    if (!source) return;
+    setSelectedWorkType(source.workType ?? 'stocker');
+    setAddress(source.address ?? '');
+    setMetroLineId(source.metroLineId ?? '');
+    setMetroStation(source.metroStation ?? '');
+    const ln = METRO_LINES.find(l => l.id === source.metroLineId);
+    setMetroLineName(ln?.name ?? '');
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    setSelectedDate(tomorrow);
+    setSelectedEndDate(tomorrow);
+    if (source.timeStart) setSelectedTimeStart(parseTimeToDate(source.timeStart));
+    if (source.timeEnd) setSelectedTimeEnd(parseTimeToDate(source.timeEnd));
+    setWorkersNeeded(source.workersNeeded);
+    setIsUrgent(source.isUrgent);
+    setNoExp(source.noExperienceNeeded);
+    if (source.salary) setFixedSalary(String(source.salary));
+    if (source.normsAndPay) {
+      const next: Norms = { ...DEFAULT_NORMS };
+      let found = false;
+      for (const f of NORM_FIELDS) {
+        const m = source.normsAndPay.match(new RegExp(`— ${f.label}: ([0-9.]+)`));
+        if (m) { next[f.key] = m[1]; found = true; }
+      }
+      if (found) setNorms(next);
+    }
+  }, [source?.id]);
 
   const line = METRO_LINES.find(l => l.id === metroLineId);
 
@@ -329,12 +363,13 @@ export default function CreateVacancy() {
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.backText}>← Назад</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isEdit ? 'Редактировать' : 'Новая вакансия'}</Text>
+        <Text style={styles.headerTitle}>{isEdit ? 'Редактировать' : isCopy ? 'Повтор смены' : 'Новая вакансия'}</Text>
         <View style={{ width: 70 }} />
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <TelegramLinkBanner />
 
           {/* Work type */}
           <View style={styles.fieldGroup}>

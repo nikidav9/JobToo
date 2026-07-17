@@ -361,6 +361,33 @@ try {
         // 1) напоминания директорам о необработанных заявках (каждый день)
         // 2) «разместите смену/вакансию» директорам (раз в 3 дня)
         // 3) «посмотрите новые смены» работникам (раз в 3 дня, со сдвигом)
+        case 'cronEveningDigest': {
+            // Вечерний дайджест смен на завтра в группу «ПОДРАБОТКИ».
+            // Спящее условие: постим только когда на завтра 3+ открытых смены от 2+ лавок.
+            $tomorrowMsk = gmdate('Y-m-d', time() + 3 * 3600 + 86400);
+            $rows = sb_select('jm_vacancies', ['status' => 'eq.open', 'date' => 'eq.' . $tomorrowMsk],
+                'id,employer_id,title,metro_station,time_start,time_end,salary');
+            $emps = [];
+            foreach ($rows as $r) if (!empty($r['employer_id'])) $emps[$r['employer_id']] = true;
+            $data = ['posted' => false, 'shifts' => count($rows), 'lavkas' => count($emps)];
+            if (count($rows) >= 3 && count($emps) >= 2) {
+                $lines = [];
+                foreach (array_slice($rows, 0, 10) as $r) {
+                    $sal = ((float)($r['salary'] ?? 0)) > 0
+                        ? number_format((float)$r['salary'], 0, ',', ' ') . ' ₽'
+                        : 'сдельные нормативы';
+                    $lines[] = "• {$r['title']} · м. {$r['metro_station']} · {$r['time_start']}–{$r['time_end']} · {$sal}";
+                }
+                $more = count($rows) > 10 ? "\n…и ещё " . (count($rows) - 10) : '';
+                $txt = "⚡ <b>Смены на завтра</b> — " . count($rows) . " в " . count($emps) . " лавках:\n\n"
+                    . implode("\n", $lines) . $more
+                    . "\n\nОткликнись первым — прямо в Телеграме 👇";
+                tg_send_message((int)TG_GROUP_CHAT_ID, $txt, true);
+                $data['posted'] = true;
+            }
+            break;
+        }
+
         case 'cronDailyNudges': {
             @set_time_limit(300);
             @ignore_user_abort(true);
@@ -390,6 +417,54 @@ try {
                         'sound' => 'default', 'priority' => 'high', 'channelId' => 'matches', 'data' => ['type' => 'pending_apps'] ]]);
                 }
                 $result['pendingReminders']++;
+            }
+
+            // ── 0. Понедельник: сезонная сводка владельцу в Telegram ──
+            if ((int)date('N') === 1) {
+                $cutW = gmdate('Y-m-d\TH:i:s\Z', time() - 7 * 86400);
+                $shiftMatches = count(sb_select('jm_likes', ['is_match' => 'eq.true', 'created_at' => 'gte.' . $cutW], 'id'));
+                $permApproved = count(sb_select('jm_perm_applications', ['status' => 'eq.approved', 'created_at' => 'gte.' . $cutW], 'id'));
+                $wtv = sb_select('jm_vacancies', ['created_at' => 'gte.' . $cutW], 'employer_id');
+                $wpv = sb_select('jm_perm_vacancies', ['created_at' => 'gte.' . $cutW], 'employer_id');
+                $wPubs = [];
+                foreach (array_merge($wtv, $wpv) as $r) if (!empty($r['employer_id'])) $wPubs[$r['employer_id']] = true;
+                $tgTotal = count(sb_select_all('jm_users', ['telegram_id' => 'not.is.null'], 'id'));
+                $newWorkers = count(sb_select('jm_users', ['role' => 'eq.worker', 'created_at' => 'gte.' . $cutW], 'id'));
+                $newApps = count(sb_select('jm_perm_applications', ['created_at' => 'gte.' . $cutW], 'id'));
+                $matches = $shiftMatches + $permApproved;
+                $sum = "📊 <b>JobToo — сводка за неделю</b>\n\n"
+                    . "🤝 Мэтчей: <b>{$matches}</b> (цель 15) — смены {$shiftMatches}, вакансии {$permApproved}\n"
+                    . "📦 Публиковали: <b>" . count($wPubs) . "</b> директоров (цель 15)\n"
+                    . "📨 Новых откликов: {$newApps}\n"
+                    . "✈️ Telegram привязан: {$tgTotal} чел (всего)\n"
+                    . "🆕 Новых работников за неделю: {$newWorkers}";
+                tg_send_message(1172082720, $sum, false);
+                $result['weeklySummary'] = true;
+            }
+
+            // ── 1б. Авто-отклонение заявок, висящих без ответа 7+ дней ──
+            $cut7d = gmdate('Y-m-d\TH:i:s\Z', time() - 7 * 86400);
+            $stale = sb_select('jm_perm_applications', [
+                'status' => 'eq.pending',
+                'created_at' => 'lt.' . $cut7d,
+            ], 'id,worker_id,vacancy_id');
+            $result['autoRejected'] = 0;
+            foreach ($stale as $srow) {
+                sb_update('jm_perm_applications', ['id' => 'eq.' . $srow['id']], ['status' => 'rejected']);
+                $vac = sb_single('jm_perm_vacancies', ['id' => 'eq.' . $srow['vacancy_id']], 'title');
+                $vt = $vac ? $vac['title'] : 'вакансию';
+                $wTitle = 'Отклик закрыт без ответа';
+                $wBody = "Директор не ответил на ваш отклик на «{$vt}» за 7 дней. "
+                    . 'Не ждите — посмотрите другие вакансии и смены рядом, отклик в два тапа.';
+                sb_insert('jm_notifications', ['user_id' => $srow['worker_id'], 'title' => $wTitle, 'body' => $wBody]);
+                $wu = sb_single('jm_users', ['id' => 'eq.' . $srow['worker_id']], 'telegram_id,push_token');
+                if ($wu && !empty($wu['telegram_id'])) {
+                    tg_send_message((int)$wu['telegram_id'], $wTitle . "\n\n" . $wBody, true);
+                } elseif ($wu && !empty($wu['push_token'])) {
+                    expo_push([[ 'to' => $wu['push_token'], 'title' => $wTitle, 'body' => $wBody,
+                        'sound' => 'default', 'priority' => 'default', 'channelId' => 'matches', 'data' => ['type' => 'app_auto_rejected'] ]]);
+                }
+                $result['autoRejected']++;
             }
 
             // ── 2. Директорам: пора размещать (раз в 3 дня) ──

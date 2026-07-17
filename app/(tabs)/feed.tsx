@@ -1809,6 +1809,14 @@ function EmployerHome() {
                   </View>
                   <View style={styles.vacTopRight}>
                     <TouchableOpacity
+                      style={[styles.editBtn, { borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' }]}
+                      onPress={() => router.push({ pathname: '/create-vacancy', params: { copyId: v.id } })}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="repeat" size={16} color={Colors.green} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
                       style={styles.editBtn}
                       onPress={() => router.push({ pathname: '/create-vacancy', params: { editId: v.id } })}
                       activeOpacity={0.7}
