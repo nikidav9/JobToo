@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
+import { getOnboardingTarget, subscribeOnboardingTargets } from '@/lib/onboardingTargets';
 
 const KEY = (uid: string) => `jm_onboarding_done_${uid}`;
 
@@ -36,6 +37,10 @@ export function OnboardingOverlay() {
 
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
+  const [, force] = useState(0);
+
+  // Перерисовка, когда элементы сообщают свои измеренные позиции
+  useEffect(() => subscribeOnboardingTargets(() => force(n => n + 1)), []);
 
   useEffect(() => {
     if (!user) { setVisible(false); return; }
@@ -55,12 +60,15 @@ export function OnboardingOverlay() {
   const tabBarH = (Platform.OS === 'web' ? 76 : insets.bottom + 64 + 12);
   const seg = (W - 32) / 5;
 
-  // Реальные позиции элементов на стартовом экране (лента)
-  const rSwitcher: Rect = { x: 14, y: top + 96, w: W - 28, h: 48 };
-  const rTelegram: Rect = { x: W - 104, y: top + 4, w: 84, h: 44 };
-  const rCard: Rect = { x: 16, y: top + 156, w: W - 32, h: H * 0.42 };
-  const rMatchesTab: Rect = { x: 16 + seg, y: H - tabBarH - 4, w: seg, h: 64 };
-  const rFab: Rect = { x: W - 16 - 60, y: H - tabBarH - 14 - 60, w: 62, h: 62 };
+  // Измеренные позиции элементов (приходят из feed.tsx через реестр),
+  // с запасным вычислением по геометрии экрана, если замер ещё не пришёл
+  const pad = (r: Rect, p: number): Rect => ({ x: r.x - p, y: r.y - p, w: r.w + p * 2, h: r.h + p * 2 });
+  const rSwitcher: Rect = pad(getOnboardingTarget('switcher') ?? { x: 14, y: top + 52, w: W - 28, h: 48 }, 6);
+  const rCard: Rect = pad(getOnboardingTarget('card') ?? { x: 16, y: top + 150, w: W - 32, h: H * 0.4 }, 4);
+  const rFab: Rect = pad(getOnboardingTarget('fab') ?? { x: W - 16 - 60, y: H - tabBarH - 14 - 60, w: 62, h: 62 }, 6);
+  // Верхняя кнопка Telegram (в шапке) и вкладка «Мэтчи» — по геометрии, они стабильны
+  const rTelegram: Rect = { x: W - 108, y: top + 2, w: 92, h: 46 };
+  const rMatchesTab: Rect = { x: 16 + seg, y: H - tabBarH - 2, w: seg, h: 62 };
 
   const steps: Step[] = isWorker
     ? [

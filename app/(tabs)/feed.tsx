@@ -39,6 +39,7 @@ import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials, normalizeCompany } from '@/services/storage';
 import { NotifBell } from '@/components/ui/NotifBell';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
+import { setOnboardingTarget } from '@/lib/onboardingTargets';
 import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
 
@@ -238,8 +239,14 @@ const metroPickerSt = StyleSheet.create({
 type AppMode = 'shift' | 'perm';
 
 function ModeSwitcher({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode) => void }) {
+  const ref = useRef<View>(null);
+  const measure = () => {
+    ref.current?.measureInWindow((x, y, w, h) => {
+      if (w > 0) setOnboardingTarget('switcher', { x, y, w, h });
+    });
+  };
   return (
-    <View style={ms.container}>
+    <View ref={ref} onLayout={measure} style={ms.container}>
       <TouchableOpacity
         style={[ms.btn, mode === 'shift' && ms.btnActive]}
         onPress={() => onChange('shift')}
@@ -780,6 +787,7 @@ function WorkerFeed() {
   const [filterPicker, setFilterPicker] = useState(false);
 
   const pan = useRef(new Animated.ValueXY()).current;
+  const cardAreaRef = useRef<View>(null);
   const pendingLikeIds = useRef<Set<string>>(new Set());
   const swipingRef = useRef(false);
   const messagingRef = useRef(false);
@@ -1059,7 +1067,15 @@ function WorkerFeed() {
       </View>
 
       {/* Card area */}
-      <View style={styles.cardArea}>
+      <View
+        ref={cardAreaRef}
+        style={styles.cardArea}
+        onLayout={() => {
+          cardAreaRef.current?.measureInWindow((x, y, w, h) => {
+            if (w > 0) setOnboardingTarget('card', { x, y, w, h: Math.min(h, 360) });
+          });
+        }}
+      >
         {!currentCard ? (
           <View style={styles.emptyState} pointerEvents="none">
             <View style={styles.emptyCharContainer}>
@@ -1642,6 +1658,7 @@ function EmployerHome() {
   const router = useRouter();
   const { currentUser, vacancies, likes, permVacancies, permApplications, refreshVacancies, refreshPermVacancies, refreshPermApplications, refreshLikes, refreshAll, showToast, vacancyStatsMap, permVacancyViewsMap } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
+  const fabRef = useRef<View>(null);
   const [mode, setMode] = useState<AppMode>('shift');
   const [tab, setTab] = useState<'active' | 'closed'>('active');
   const [confirmClose, setConfirmClose] = useState<string | null>(null);
@@ -2001,6 +2018,8 @@ function EmployerHome() {
 
       {/* Плавающая кнопка создания — видна и когда вакансии уже есть */}
       <TouchableOpacity
+        ref={fabRef}
+        onLayout={() => fabRef.current?.measureInWindow((x, y, w, h) => { if (w > 0) setOnboardingTarget('fab', { x, y, w, h }); })}
         style={[
           styles.fab,
           { bottom: tabBarHeight + 14, backgroundColor: mode === 'shift' ? Colors.primary : '#7C3AED' },
