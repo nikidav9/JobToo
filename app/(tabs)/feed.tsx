@@ -1772,7 +1772,7 @@ function EmployerHome() {
           <Text style={styles.logoO}>Too</Text>
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <TelegramConnectButton size={22} pad={4} />
+          <TelegramConnectButton size={22} pad={4} onboardingAnchor />
           <NotifBell />
         </View>
       </View>
@@ -2050,7 +2050,7 @@ function WorkerHome() {
           <Text style={styles.logoO}>Too</Text>
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <TelegramConnectButton size={22} pad={4} />
+          <TelegramConnectButton size={22} pad={4} onboardingAnchor />
           <NotifBell />
         </View>
       </View>

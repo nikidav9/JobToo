@@ -37,7 +37,7 @@ function TelegramLogo({ size }: { size: number }) {
 // Постоянная кнопка в шапке: логотип Telegram → модалка подключения уведомлений.
 // Не исчезает после подключения — через неё же можно отключить или открыть бота.
 // size/pad подбираются под соседний колокольчик конкретной шапки.
-export function TelegramConnectButton({ size = 24, pad = 6 }: { size?: number; pad?: number }) {
+export function TelegramConnectButton({ size = 24, pad = 6, onboardingAnchor = false }: { size?: number; pad?: number; onboardingAnchor?: boolean }) {
   const app = useApp();
   const userId = app?.currentUser?.id ?? null;
   const isEmployer = app?.currentUser?.role === 'employer';
@@ -98,7 +98,7 @@ export function TelegramConnectButton({ size = 24, pad = 6 }: { size?: number; p
     <>
       <TouchableOpacity
         ref={btnRef}
-        onLayout={() => btnRef.current?.measureInWindow((x, y, w, h) => { if (w > 0) setOnboardingTarget('telegram', { x, y, w, h }); })}
+        onLayout={onboardingAnchor ? () => btnRef.current?.measureInWindow((x, y, w, h) => { if (w > 0) setOnboardingTarget('telegram', { x, y, w, h }); }) : undefined}
         style={{ position: 'relative', padding: pad }}
         onPress={() => { setOpen(true); refreshStatus(); }}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

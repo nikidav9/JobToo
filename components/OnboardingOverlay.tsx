@@ -105,16 +105,15 @@ export function OnboardingOverlay() {
   };
   const next = () => { if (isLast) finish(); else setStep(step + 1); };
 
-  // Карточка-подсказка: над или под подсветкой, с зажимом в границах экрана
+  // Карточка-подсказка: над или под подсветкой, не перекрывая подсвеченный элемент.
+  // Для 'above' прижимаем НИЗ карточки к элементу (высота карточки динамическая — так надёжнее).
   const cardW = W - 40;
-  let cardTop: number;
-  if (!s.spot || s.hint === 'center') {
-    cardTop = H / 2 - 150;
-  } else if (s.hint === 'below') {
-    cardTop = Math.min(s.spot.y + s.spot.h + 16, H - 260);
-  } else {
-    cardTop = Math.max(s.spot.y - 210, top + 20);
-  }
+  const cardPos: { top?: number; bottom?: number } =
+    (!s.spot || s.hint === 'center')
+      ? { top: H / 2 - 150 }
+      : s.hint === 'below'
+      ? { top: Math.min(s.spot.y + s.spot.h + 16, H - 260) }
+      : { bottom: Math.max(H - (s.spot.y - 16), 20) };
 
   // Затемнение с «дыркой»: 4 прямоугольника вокруг подсветки
   const dim = 'rgba(17,17,17,0.72)';
@@ -149,7 +148,7 @@ export function OnboardingOverlay() {
       </TouchableOpacity>
 
       {/* Карточка-подсказка */}
-      <View style={[st.card, { top: cardTop, left: 20, width: cardW }]}>
+      <View style={[st.card, { left: 20, width: cardW, ...cardPos }]}>
         <View style={st.iconWrap}><Ionicons name={s.icon} size={22} color="#fff" /></View>
         <Text style={st.title}>{s.title}</Text>
         <Text style={st.body}>{s.body}</Text>
