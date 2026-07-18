@@ -126,10 +126,6 @@ export function OnboardingOverlay() {
         <View style={{ position: 'absolute', left: 0, top: y, width: x, height: h, backgroundColor: dim }} />
         <View style={{ position: 'absolute', left: x + w, top: y, right: 0, height: h, backgroundColor: dim }} />
         <View style={{ position: 'absolute', left: 0, top: y + h, right: 0, bottom: 0, backgroundColor: dim }} />
-        <View pointerEvents="none" style={{
-          position: 'absolute', left: x - 3, top: y - 3, width: w + 6, height: h + 6,
-          borderRadius: 16, borderWidth: 2.5, borderColor: '#fff',
-        }} />
       </>
     );
   };
