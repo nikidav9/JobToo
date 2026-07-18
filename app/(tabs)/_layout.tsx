@@ -14,6 +14,7 @@ import { useApp } from '@/hooks/useApp';
 import NotificationPermissionSheet from '@/components/NotificationPermissionSheet';
 import EntryTransition from '@/components/EntryTransition';
 import { OnboardingOverlay } from '@/components/OnboardingOverlay';
+import { setOnboardingTarget } from '@/lib/onboardingTargets';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -141,7 +142,15 @@ function FloatingTabBar({
             const routeIndex = state.routes.findIndex((r: any) => r.name === tab.route);
             const focused = routeIndex >= 0 && state.index === routeIndex;
             return (
-              <View key={tab.route} style={fS.tabItem}>
+              <View
+                key={tab.route}
+                style={fS.tabItem}
+                onLayout={tab.route === 'matches' ? (e) => {
+                  (e.currentTarget as any)?.measureInWindow?.((x: number, y: number, w: number, h: number) => {
+                    if (w > 0) setOnboardingTarget('matchesTab', { x, y, w, h });
+                  });
+                } : undefined}
+              >
                 <View>
                   <Ionicons
                     name={focused ? tab.iconFilled : tab.iconOutline}

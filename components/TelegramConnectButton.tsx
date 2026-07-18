@@ -9,6 +9,7 @@ import { Colors, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { dbGetUserById, dbUnbindTelegram } from '@/services/db';
 import { isTelegramMiniApp } from '@/lib/telegram';
+import { setOnboardingTarget } from '@/lib/onboardingTargets';
 
 const TG_BLUE = '#2AABEE';
 const BOT_URL = 'https://t.me/JobToo_bot';
@@ -46,6 +47,7 @@ export function TelegramConnectButton({ size = 24, pad = 6 }: { size?: number; p
     app?.currentUser?.telegramId ? true : null,
   );
   const [busy, setBusy] = useState(false);
+  const btnRef = useRef<View>(null);
   const openRef = useRef(false);
   openRef.current = open;
 
@@ -95,6 +97,8 @@ export function TelegramConnectButton({ size = 24, pad = 6 }: { size?: number; p
   return (
     <>
       <TouchableOpacity
+        ref={btnRef}
+        onLayout={() => btnRef.current?.measureInWindow((x, y, w, h) => { if (w > 0) setOnboardingTarget('telegram', { x, y, w, h }); })}
         style={{ position: 'relative', padding: pad }}
         onPress={() => { setOpen(true); refreshStatus(); }}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

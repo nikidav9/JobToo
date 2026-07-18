@@ -66,9 +66,9 @@ export function OnboardingOverlay() {
   const rSwitcher: Rect = pad(getOnboardingTarget('switcher') ?? { x: 14, y: top + 52, w: W - 28, h: 48 }, 6);
   const rCard: Rect = pad(getOnboardingTarget('card') ?? { x: 16, y: top + 150, w: W - 32, h: H * 0.4 }, 4);
   const rFab: Rect = pad(getOnboardingTarget('fab') ?? { x: W - 16 - 60, y: H - tabBarH - 14 - 60, w: 62, h: 62 }, 6);
-  // Верхняя кнопка Telegram (в шапке) и вкладка «Мэтчи» — по геометрии, они стабильны
-  const rTelegram: Rect = { x: W - 108, y: top + 2, w: 92, h: 46 };
-  const rMatchesTab: Rect = { x: 16 + seg, y: H - tabBarH - 2, w: seg, h: 62 };
+  // Верхняя кнопка Telegram и вкладка «Мэтчи» — тоже по замеру, с запасным расчётом
+  const rTelegram: Rect = pad(getOnboardingTarget('telegram') ?? { x: W - 108, y: top + 2, w: 92, h: 46 }, 6);
+  const rMatchesTab: Rect = pad(getOnboardingTarget('matchesTab') ?? { x: 16 + seg, y: H - tabBarH - 2, w: seg, h: 62 }, 4);
 
   const steps: Step[] = isWorker
     ? [
