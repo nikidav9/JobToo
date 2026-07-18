@@ -17,6 +17,7 @@ import { useApp } from '@/hooks/useApp';
 import { getInitials, nameColorFromString } from '@/services/storage';
 import { dbGetRatingsForUser, UserRating } from '@/services/db';
 import { getSupabaseClient } from '@/template';
+import { resetOnboarding } from '@/components/OnboardingOverlay';
 import { AppInput } from '@/components/ui/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { MetroPicker } from '@/components/feature/MetroPicker';
@@ -633,6 +634,18 @@ export default function ProfileScreen() {
               <Text style={styles.docRowArrow}>›</Text>
             </TouchableOpacity>
           ))}
+          <TouchableOpacity
+            style={styles.docRow}
+            onPress={async () => {
+              if (currentUser) { await resetOnboarding(currentUser.id); }
+              showToast('Обучение появится при возврате на главную', 'success');
+              router.push('/(tabs)/feed');
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.docRowLabel}>Показать обучение снова</Text>
+            <Text style={styles.docRowArrow}>↻</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.docRow}
             onPress={() => setShowConfirmDelete(true)}

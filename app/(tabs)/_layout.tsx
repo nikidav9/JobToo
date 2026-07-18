@@ -13,6 +13,7 @@ import { Colors } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import NotificationPermissionSheet from '@/components/NotificationPermissionSheet';
 import EntryTransition from '@/components/EntryTransition';
+import { OnboardingOverlay } from '@/components/OnboardingOverlay';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -273,6 +274,7 @@ export default function TabLayout() {
       </Tabs>
       <NotificationPermissionSheet />
       <EntryTransition />
+      <OnboardingOverlay />
     </View>
   );
 }
