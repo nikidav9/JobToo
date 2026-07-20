@@ -21,3 +21,16 @@ export function subscribeOnboardingTargets(fn: () => void): () => void {
   subs.add(fn);
   return () => { subs.delete(fn); };
 }
+
+// Булевы флаги состояния экрана (например, есть ли реальная карточка смены)
+const flags: Record<string, boolean> = {};
+
+export function setOnboardingFlag(key: string, val: boolean) {
+  if (flags[key] === val) return;
+  flags[key] = val;
+  subs.forEach(fn => fn());
+}
+
+export function getOnboardingFlag(key: string): boolean | undefined {
+  return flags[key];
+}

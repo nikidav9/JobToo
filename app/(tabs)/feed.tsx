@@ -39,7 +39,7 @@ import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials, normalizeCompany } from '@/services/storage';
 import { NotifBell } from '@/components/ui/NotifBell';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
-import { setOnboardingTarget } from '@/lib/onboardingTargets';
+import { setOnboardingTarget, setOnboardingFlag } from '@/lib/onboardingTargets';
 import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
 
@@ -835,6 +835,8 @@ function WorkerFeed() {
 
   const currentCard = cards[0];
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;
+  // Онбордингу: есть ли реальная карточка (иначе он покажет демо-карточку)
+  useEffect(() => { setOnboardingFlag('hasShiftCard', !!currentCard); }, [currentCard]);
   const dateHistory = history[selectedDate] ?? [];
   const vacancyStats = currentCard
     ? (vacancyStatsMap[currentCard.id] ?? { applicants: 0, rejected: 0, views: 0 })
