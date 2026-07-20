@@ -101,6 +101,7 @@ export async function fetchOverview() {
     { data: chats },
     { data: messages },
     { data: ratings },
+    { data: permApps },
   ] = await Promise.all([
     supabase.from('jm_users').select('id,role,created_at,is_blocked'),
     supabase.from('jm_vacancies').select('id,status,work_type,created_at,workers_needed,workers_found'),
@@ -109,6 +110,7 @@ export async function fetchOverview() {
     supabase.from('jm_chats').select('id,created_at'),
     supabase.from('jm_messages').select('id,created_at'),
     supabase.from('jm_ratings').select('id,rating'),
+    supabase.from('jm_perm_applications').select('id,status,created_at'),
   ])
 
   const u = users ?? []
@@ -118,10 +120,17 @@ export async function fetchOverview() {
   const ch = chats ?? []
   const ms = messages ?? []
   const rt = ratings ?? []
+  const pa = permApps ?? []
 
   const workers = u.filter((x: any) => x.role === 'worker')
   const employers = u.filter((x: any) => x.role === 'employer')
-  const matches = lk.filter((x: any) => x.is_match)
+  // Мэтч = совпадение по смене (is_match) ИЛИ одобренный отклик на вакансию
+  const shiftMatches = lk.filter((x: any) => x.is_match)
+  const permApproved = pa.filter((x: any) => x.status === 'approved')
+  const matches = [
+    ...shiftMatches.map((x: any) => ({ at: x.matched_at ?? x.created_at })),
+    ...permApproved.map((x: any) => ({ at: x.created_at })),
+  ]
   const confirmed = lk.filter((x: any) => x.worker_confirmed && x.employer_confirmed)
   const completed = lk.filter((x: any) => x.shift_completed)
 
@@ -132,15 +141,12 @@ export async function fetchOverview() {
   const newUsersWeek = u.filter((x: any) => x.created_at > w7).length
   const newUsersMonth = u.filter((x: any) => x.created_at > w30).length
   const newVacsMonth = tv.filter((x: any) => x.created_at > w30).length
-  const newMatchesMonth = matches.filter((x: any) => (x.matched_at ?? x.created_at) > w30).length
+  const newMatchesMonth = matches.filter((x) => x.at > w30).length
 
   // prev month for trend
   const w60 = subDays(now, 60).toISOString()
   const prevUsersMonth = u.filter((x: any) => x.created_at > w60 && x.created_at <= w30).length
-  const prevMatchesMonth = matches.filter((x: any) => {
-    const d = x.matched_at ?? x.created_at
-    return d > w60 && d <= w30
-  }).length
+  const prevMatchesMonth = matches.filter((x) => x.at > w60 && x.at <= w30).length
 
   // 30-day daily data
   const days30 = dayRange(30)
@@ -149,7 +155,7 @@ export async function fetchOverview() {
   const employersByDay = groupByDate(employers, 'created_at')
   const vacsByDay = groupByDate(tv, 'created_at')
   const matchesByDay = groupByDate(
-    matches.map((x: any) => ({ ...x, created_at: x.matched_at ?? x.created_at })),
+    matches.map((x) => ({ created_at: x.at })),
     'created_at'
   )
 
@@ -202,7 +208,8 @@ export async function fetchOverview() {
       openPerm: pv.filter((x: any) => x.status === 'open').length,
       totalLikes: lk.length,
       totalMatches: matches.length,
-      matchRate: lk.length > 0 ? ((matches.length / lk.length) * 100).toFixed(1) : '0',
+      // конверсия «отклик → мэтч»: все отклики = свайпы по сменам + заявки на вакансии
+      matchRate: (lk.length + pa.length) > 0 ? ((matches.length / (lk.length + pa.length)) * 100).toFixed(1) : '0',
       confirmed: confirmed.length,
       completed: completed.length,
       chats: ch.length,
@@ -1614,7 +1621,8 @@ export async function fetchExecutiveSummary() {
     ? Math.round((Object.values(postsByDirector).filter(n => n >= 2).length / directorsActed) * 100) : 0
 
   // ── Вовлечённость и охват ──
-  const matches = lk.filter(x => x.is_match).length
+  // Мэтч = совпадение по смене + одобренный отклик на постоянную вакансию
+  const matches = lk.filter(x => x.is_match).length + ap.filter((x: any) => x.status === 'approved').length
   const avgMsgsPerChat = ch.length > 0 ? Math.round((ms.length / ch.length) * 10) / 10 : 0
   const avgRating = rt.length > 0 ? Math.round((rt.reduce((s, x) => s + (x.rating ?? 0), 0) / rt.length) * 10) / 10 : 0
   const webSubIds = new Set(ws.map(x => x.user_id))
