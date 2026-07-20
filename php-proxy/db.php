@@ -190,6 +190,66 @@ function expo_push(array $messages): void {
 }
 
 /**
+ * Понедельничный пост в группу «ПОДРАБОТКИ»: актуальные постоянные вакансии,
+ * сгруппированные по роли и отсортированные по убыванию зарплаты. Каждая
+ * станция — ссылка, открывающая вакансию в мини-аппе. Возвращает bool.
+ */
+function post_weekly_perm_digest(): bool {
+    $rows = sb_select('jm_perm_vacancies', ['status' => 'eq.open'],
+        'id,title,work_type,metro_station,salary');
+    if (empty($rows)) return false;
+
+    // Группы: кладовщики → старшие смены → прочие
+    $groups = [
+        'stocker' => ['label' => '📦 Кладовщики', 'items' => []],
+        'shift_supervisor' => ['label' => '👔 Старшие смены', 'items' => []],
+        'picker' => ['label' => '🧺 Сборщики', 'items' => []],
+        'other' => ['label' => '🔧 Другие вакансии', 'items' => []],
+    ];
+    foreach ($rows as $r) {
+        $wt = $r['work_type'] ?? '';
+        $key = isset($groups[$wt]) ? $wt : 'other';
+        $groups[$key]['items'][] = $r;
+    }
+
+    $lines = [];
+    $total = count($rows);
+    $lines[] = "💼 <b>Постоянная работа в Лавках — {$total} " . plural_vac($total) . "</b>";
+    $lines[] = "";
+    $lines[] = "👉 <b>Просто нажми на нужную вакансию — и она сразу откроется у тебя прямо в Telegram.</b> Дальше откликнись в два тапа.";
+
+    foreach ($groups as $g) {
+        if (empty($g['items'])) continue;
+        usort($g['items'], fn($a, $b) => (float)($b['salary'] ?? 0) <=> (float)($a['salary'] ?? 0));
+        $lines[] = "";
+        $lines[] = "<b>{$g['label']}:</b>";
+        foreach ($g['items'] as $v) {
+            $metro = $v['metro_station'] ?: ($v['title'] ?? 'Вакансия');
+            $sal = ((float)($v['salary'] ?? 0)) > 0
+                ? number_format((float)$v['salary'], 0, '', ' ') . ' ₽'
+                : 'по договорённости';
+            $url = 'https://t.me/JobToo_bot/app?startapp=vacancy_' . $v['id'];
+            $lines[] = '🚇 <a href="' . $url . '">' . htmlspecialchars($metro) . ' — ' . $sal . '</a>';
+        }
+    }
+
+    $lines[] = "";
+    $lines[] = "Есть и подработка на день — раздел «Смены» в приложении 👇";
+
+    $text = implode("\n", $lines);
+    if (TG_GROUP_CHAT_ID === 0) return false;
+    return tg_send_message(TG_GROUP_CHAT_ID, $text, true);
+}
+
+/** Склонение слова «вакансия» по числу. */
+function plural_vac(int $n): string {
+    $n10 = $n % 10; $n100 = $n % 100;
+    if ($n10 === 1 && $n100 !== 11) return 'вакансия';
+    if ($n10 >= 2 && $n10 <= 4 && ($n100 < 12 || $n100 > 14)) return 'вакансии';
+    return 'вакансий';
+}
+
+/**
  * Broadcasts a new-job notification to ALL workers:
  * Expo push to everyone with a push token + Telegram message (with app button)
  * to everyone with a linked telegram_id.
@@ -440,6 +500,9 @@ try {
                     . "🆕 Новых работников за неделю: {$newWorkers}";
                 tg_send_message(1172082720, $sum, false);
                 $result['weeklySummary'] = true;
+
+                // Понедельничный пост в группу: актуальные постоянные вакансии со ссылками
+                $result['weeklyPermDigest'] = post_weekly_perm_digest();
             }
 
             // ── 1б. Авто-отклонение заявок, висящих без ответа 7+ дней ──
