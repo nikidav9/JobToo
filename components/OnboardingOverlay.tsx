@@ -168,13 +168,15 @@ export function OnboardingOverlay() {
       ) : null}
 
       {/* Пропустить */}
-      <TouchableOpacity
-        style={[st.skip, { top: top + 8 }]}
-        onPress={finish}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Text style={st.skipTxt}>Пропустить</Text>
-      </TouchableOpacity>
+      <View style={[st.skipWrap, { top: top + 8 }]} pointerEvents="box-none">
+        <TouchableOpacity
+          style={st.skip}
+          onPress={finish}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={st.skipTxt}>Пропустить</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Карточка-подсказка */}
       <View style={[st.card, { left: 20, width: cardW, ...cardPos }]}>
@@ -218,9 +220,9 @@ const dc = StyleSheet.create({
 });
 
 const st = StyleSheet.create({
+  skipWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   skip: {
-    position: 'absolute', right: 16,
-    paddingHorizontal: 12, paddingVertical: 6,
+    paddingHorizontal: 16, paddingVertical: 6,
     backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 100,
   },
   skipTxt: { color: '#fff', fontSize: 13, fontWeight: '600' },

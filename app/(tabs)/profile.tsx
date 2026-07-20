@@ -18,6 +18,7 @@ import { getInitials, nameColorFromString } from '@/services/storage';
 import { dbGetRatingsForUser, UserRating } from '@/services/db';
 import { getSupabaseClient } from '@/template';
 import { resetOnboarding } from '@/components/OnboardingOverlay';
+import { TabHeader } from '@/components/ui/TabHeader';
 import { AppInput } from '@/components/ui/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { MetroPicker } from '@/components/feature/MetroPicker';
@@ -468,29 +469,23 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.logo}>
-            <Text style={styles.logoBlack}>Job</Text>
-            <Text style={styles.logoOrange}>Too</Text>
-          </Text>
-          <View style={styles.headerActions}>
-            <TelegramConnectButton />
-            <TouchableOpacity onPress={() => setShowNotifications(true)} style={styles.headerBtn}>
-              <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
-              {unreadCount > 0 && (
-                <View style={styles.notifBadge}>
-                  <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerBtn} onPress={() => setShowSettings(true)}>
-              <Ionicons name="settings-outline" size={24} color={Colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
+      <TabHeader right={
+        <View style={styles.headerActions}>
+          <TelegramConnectButton size={22} pad={4} />
+          <TouchableOpacity onPress={() => setShowNotifications(true)} style={styles.headerBtn}>
+            <Ionicons name="notifications-outline" size={22} color={Colors.textPrimary} />
+            {unreadCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => setShowSettings(true)}>
+            <Ionicons name="settings-outline" size={22} color={Colors.textPrimary} />
+          </TouchableOpacity>
         </View>
+      } />
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         {/* User card — horizontal layout */}
         <View style={styles.userCard}>

@@ -37,10 +37,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials, normalizeCompany } from '@/services/storage';
-import { NotifBell } from '@/components/ui/NotifBell';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
+import { TabHeader } from '@/components/ui/TabHeader';
 import { setOnboardingTarget, setOnboardingFlag } from '@/lib/onboardingTargets';
-import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
 
 // ─── Web push permission banner (iOS PWA requires user gesture) ───────────────
@@ -1768,16 +1767,7 @@ function EmployerHome() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <Text style={styles.logo}>
-          <Text style={styles.logoB}>Job</Text>
-          <Text style={styles.logoO}>Too</Text>
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <TelegramConnectButton size={22} pad={4} onboardingAnchor />
-          <NotifBell />
-        </View>
-      </View>
+      <TabHeader tgAnchor />
 
       <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
         <ModeSwitcher mode={mode} onChange={setMode} />
@@ -2046,16 +2036,7 @@ function WorkerHome() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <Text style={styles.logo}>
-          <Text style={styles.logoB}>Job</Text>
-          <Text style={styles.logoO}>Too</Text>
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <TelegramConnectButton size={22} pad={4} onboardingAnchor />
-          <NotifBell />
-        </View>
-      </View>
+      <TabHeader tgAnchor />
       <View style={styles.modeSwitcherRow}>
         <ModeSwitcher mode={mode} onChange={setMode} />
       </View>

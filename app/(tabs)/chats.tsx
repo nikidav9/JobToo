@@ -13,8 +13,7 @@ import { useApp } from '@/hooks/useApp';
 import { Chat } from '@/constants/types';
 import { nameColorFromString, getInitials } from '@/services/storage';
 import { dbDeleteChat } from '@/services/db';
-import { NotifBell } from '@/components/ui/NotifBell';
-import { TelegramConnectButton } from '@/components/TelegramConnectButton';
+import { TabHeader } from '@/components/ui/TabHeader';
 
 const { width: SW } = Dimensions.get('window');
 const DELETE_THRESHOLD = -80;
@@ -175,13 +174,7 @@ export default function ChatsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
-        <Text style={styles.title}>Сообщения</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <TelegramConnectButton size={22} pad={4} />
-          <NotifBell />
-        </View>
-      </View>
+      <TabHeader title="Сообщения" />
 
       <View style={styles.searchWrap}>
         <View style={styles.searchInner}>

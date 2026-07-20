@@ -16,8 +16,7 @@ import {
   dbUpsertLike, dbCheckAndCreateMatch, dbConfirmShift,
   dbSetPermApplicationStatus, dbCreateChat,
 } from '@/services/db';
-import { NotifBell } from '@/components/ui/NotifBell';
-import { TelegramConnectButton } from '@/components/TelegramConnectButton';
+import { TabHeader } from '@/components/ui/TabHeader';
 import {
   notifyWorkerShiftConfirmedByEmployer,
   notifyWorkerGotMatch,
@@ -288,13 +287,7 @@ function WorkerMatches() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
-      <View style={s.header}>
-        <Text style={s.title}>Мои отклики</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <TelegramConnectButton size={22} pad={4} />
-          <NotifBell />
-        </View>
-      </View>
+      <TabHeader title="Мои отклики" />
 
       <View style={s.tabStrip}>
         {TABS.map(t => (
@@ -862,19 +855,15 @@ function EmployerMatches() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
-      <View style={s.header}>
-        <Text style={s.title}>Мэтчи</Text>
-        {needsConfirm > 0 ? (
+      <TabHeader
+        title="Мэтчи"
+        badge={needsConfirm > 0 ? (
           <View style={s.urgentBadge}>
             <Ionicons name="time-outline" size={13} color="#92400E" />
             <Text style={s.urgentBadgeTxt}>{needsConfirm} ждут</Text>
           </View>
         ) : null}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <TelegramConnectButton size={22} pad={4} />
-          <NotifBell />
-        </View>
-      </View>
+      />
 
       <View style={s.tabStrip}>
         {([

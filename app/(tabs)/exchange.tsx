@@ -14,8 +14,7 @@ import { dbRespondToBulletin, dbCreateBulletin, dbCloseBulletin, dbIncrementBull
 import { notifyAllWorkersNewBulletin, notifyEmployerNewMessage, notifyWorkerNewMessage } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { METRO_LINES } from '@/constants/metro';
-import { NotifBell } from '@/components/ui/NotifBell';
-import { TelegramConnectButton } from '@/components/TelegramConnectButton';
+import { TabHeader } from '@/components/ui/TabHeader';
 import { WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
 
 // ─── Date/time helpers ────────────────────────────────────────────────────────
@@ -736,13 +735,7 @@ export default function ExchangeScreen() {
 
   return (
     <SafeAreaView style={xS.safe} edges={['top', 'left', 'right']}>
-      <View style={xS.header}>
-        <Text style={xS.headerTitle}>Биржа</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <TelegramConnectButton size={22} pad={4} />
-          <NotifBell />
-        </View>
-      </View>
+      <TabHeader title="Биржа" />
       {currentUser.role === 'worker' ? <WorkerExchange /> : <EmployerExchange />}
     </SafeAreaView>
   );
