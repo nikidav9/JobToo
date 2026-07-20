@@ -199,16 +199,17 @@ function post_weekly_perm_digest(): bool {
         'id,title,work_type,metro_station,salary');
     if (empty($rows)) return false;
 
-    // Группы: кладовщики → старшие смены → прочие
+    // Группы в порядке вывода. Все типы работ учтены, плюс запасная «Другие».
     $groups = [
         'stocker' => ['label' => '📦 Кладовщики', 'items' => []],
+        'cook' => ['label' => '👨‍🍳 Повара', 'items' => []],
         'shift_supervisor' => ['label' => '👔 Старшие смены', 'items' => []],
         'picker' => ['label' => '🧺 Сборщики', 'items' => []],
-        'other' => ['label' => '🔧 Другие вакансии', 'items' => []],
+        'other' => ['label' => '💼 Другие вакансии', 'items' => []],
     ];
     foreach ($rows as $r) {
-        $wt = $r['work_type'] ?? '';
-        $key = isset($groups[$wt]) ? $wt : 'other';
+        $key = classify_work_type($r['work_type'] ?? '', $r['title'] ?? '');
+        if (!isset($groups[$key])) $key = 'other';
         $groups[$key]['items'][] = $r;
     }
 
@@ -239,6 +240,21 @@ function post_weekly_perm_digest(): bool {
     $text = implode("\n", $lines);
     if (TG_GROUP_CHAT_ID === 0) return false;
     return tg_send_message(TG_GROUP_CHAT_ID, $text, true);
+}
+
+/**
+ * Определяет тип работы: сначала по полю work_type, а если оно пустое
+ * (старые вакансии) — по названию. Так ни одна вакансия не выпадает.
+ */
+function classify_work_type(string $wt, string $title): string {
+    $known = ['stocker', 'cook', 'shift_supervisor', 'picker'];
+    if (in_array($wt, $known, true)) return $wt;
+    $t = mb_strtolower($title);
+    if (mb_strpos($t, 'повар') !== false) return 'cook';
+    if (mb_strpos($t, 'сборщик') !== false) return 'picker';
+    if (mb_strpos($t, 'старш') !== false) return 'shift_supervisor';
+    if (mb_strpos($t, 'кладовщик') !== false) return 'stocker';
+    return 'other';
 }
 
 /** Склонение слова «вакансия» по числу. */
