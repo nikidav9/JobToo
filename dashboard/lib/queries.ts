@@ -1,6 +1,22 @@
 import { supabase, supabaseAdmin } from './supabase'
 import { subDays, format, eachDayOfInterval, parseISO, startOfDay } from 'date-fns'
 
+// Supabase режет выборку до 1000 строк. Для полных агрегатов (просмотры и т.п.)
+// тянем всю таблицу постранично, иначе счётчики занижаются.
+async function selectAll(table: string, columns: string): Promise<any[]> {
+  const page = 1000
+  let from = 0
+  const all: any[] = []
+  for (;;) {
+    const { data, error } = await supabase.from(table).select(columns).range(from, from + page - 1)
+    if (error || !data || data.length === 0) break
+    all.push(...data)
+    if (data.length < page) break
+    from += page
+  }
+  return all
+}
+
 // ─── constants ───────────────────────────────────────────────────────────────
 
 export const WORK_TYPE_LABELS: Record<string, string> = {
@@ -57,6 +73,21 @@ export function pct(a: number, b: number): string {
 export function trend(current: number, prev: number): number {
   if (prev === 0) return current > 0 ? 100 : 0
   return Math.round(((current - prev) / prev) * 100)
+}
+
+// Готовый «чип» изменения для KPI: на малой базе показываем абсолютную разницу
+// (процент от 1→7 = 600% — бессмыслен), иначе процент со знаком и цветом.
+// Возвращает null, если изменения нет.
+export function growthChip(current: number, prev: number): { text: string; tone: 'pos' | 'neg' } | null {
+  const diff = current - prev
+  if (diff === 0) return null
+  const tone: 'pos' | 'neg' = diff > 0 ? 'pos' : 'neg'
+  const sign = diff > 0 ? '+' : '−'
+  const mag = Math.abs(diff)
+  // Малая база (или ноль) — процент не показателен, даём абсолютное изменение
+  if (prev < 5) return { text: `${sign}${mag}`, tone }
+  const p = Math.min(999, Math.round((mag / prev) * 100))
+  return { text: `${sign}${p}%`, tone }
 }
 
 // ─── overview ────────────────────────────────────────────────────────────────
@@ -182,8 +213,8 @@ export async function fetchOverview() {
       newUsersMonth,
       newVacsMonth,
       newMatchesMonth,
-      trendUsers: trend(newUsersMonth, prevUsersMonth),
-      trendMatches: trend(newMatchesMonth, prevMatchesMonth),
+      usersDelta: growthChip(newUsersMonth, prevUsersMonth),
+      matchesDelta: growthChip(newMatchesMonth, prevMatchesMonth),
     },
     dailyUsers,
     dailyVacs,
@@ -315,14 +346,14 @@ async function autoCloseStaleVacancies() {
 
 export async function fetchVacancies() {
   await autoCloseStaleVacancies()
-  const [{ data: tv }, { data: pv }, { data: apps }, { data: users }, { data: likes }, { data: tvViews }, { data: pvViews }] = await Promise.all([
+  const [{ data: tv }, { data: pv }, { data: apps }, { data: users }, { data: likes }, tvViews, pvViews] = await Promise.all([
     supabase.from('jm_vacancies').select('id,status,work_type,work_type_label,created_at,employer_id,salary,workers_needed,workers_found,is_urgent,no_experience_needed,company,date,address,metro_station,time_start,time_end'),
     supabase.from('jm_perm_vacancies').select('id,title,status,created_at,employer_id,salary,company,metro_station,address,description,schedule,work_type'),
     supabase.from('jm_perm_applications').select('id,vacancy_id,worker_id,status,created_at').order('created_at', { ascending: false }),
     supabase.from('jm_users').select('id,first_name,last_name,phone'),
     supabase.from('jm_likes').select('id,vacancy_id,worker_id,is_match,worker_liked,employer_liked,worker_skipped,created_at').order('created_at', { ascending: false }),
-    supabase.from('jm_vacancy_views').select('vacancy_id,viewed_at'),
-    supabase.from('jm_perm_vacancy_views').select('vacancy_id,viewed_at'),
+    selectAll('jm_vacancy_views', 'vacancy_id,viewed_at'),
+    selectAll('jm_perm_vacancy_views', 'vacancy_id,viewed_at'),
   ])
 
   const t = tv ?? []
@@ -1447,9 +1478,9 @@ export async function fetchExchange() {
       newBulletinsMonth,
       newChatsMonth,
       newSlotsMonth,
-      bulletinsTrend: trend(newBulletinsMonth, prevBulletinsMonth),
-      chatsTrend: trend(newChatsMonth, prevChatsMonth),
-      slotsTrend: trend(newSlotsMonth, prevSlotsMonth),
+      bulletinsDelta: growthChip(newBulletinsMonth, prevBulletinsMonth),
+      chatsDelta: growthChip(newChatsMonth, prevChatsMonth),
+      slotsDelta: growthChip(newSlotsMonth, prevSlotsMonth),
     },
     daily30,
     workTypeDist,
@@ -1513,7 +1544,7 @@ export async function fetchExecutiveSummary() {
   // ── Рост ──
   const newUsers30 = u.filter((x: any) => x.created_at > d30).length
   const prevUsers30 = u.filter((x: any) => x.created_at > d60 && x.created_at <= d30).length
-  const userGrowthMoM = prevUsers30 > 0 ? Math.round(((newUsers30 - prevUsers30) / prevUsers30) * 100) : 100
+  const userGrowthDelta = growthChip(newUsers30, prevUsers30)
 
   // ── Активные (MAU/WAU): любой, кто совершил действие ──
   function actorsSince(since: string): Set<string> {
@@ -1550,7 +1581,8 @@ export async function fetchExecutiveSummary() {
   const closedShifts = (t as any[]).filter(x => x.status === 'closed')
   const needed = closedShifts.reduce((s, x) => s + (x.workers_needed ?? 0), 0)
   const found = closedShifts.reduce((s, x) => s + (x.workers_found ?? 0), 0)
-  const fillRatePct = needed > 0 ? Math.round((found / needed) * 100) : 0
+  // Ограничиваем 100%: workers_found иногда превышает workers_needed
+  const fillRatePct = needed > 0 ? Math.min(100, Math.round((found / needed) * 100)) : 0
 
   // Медиана времени до первого отклика (часы)
   const vacCreated: Record<string, string> = {}
@@ -1647,7 +1679,7 @@ export async function fetchExecutiveSummary() {
     },
     kpi: {
       totalUsers: u.length, workers: workers.length, employers: employers.length,
-      newUsers30, userGrowthMoM, mau, wau,
+      newUsers30, userGrowthDelta, mau, wau,
       totalResponses: realLikes.length + ap.length,
       responses30: realLikes.filter(x => x.created_at > d30).length + ap.filter(x => x.created_at > d30).length,
       shifts30, perm30, activeDirectors30,

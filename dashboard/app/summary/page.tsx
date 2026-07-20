@@ -70,8 +70,8 @@ export default function SummaryPage() {
             value={k.totalUsers}
             sub={`${k.workers} работников · ${k.employers} директоров`}
             sparkColor={PALETTE.orange}
-            delta={k.userGrowthMoM !== 0 ? `${k.userGrowthMoM > 0 ? '+' : ''}${k.userGrowthMoM}% MoM` : undefined}
-            deltaTone={k.userGrowthMoM > 0 ? 'pos' : k.userGrowthMoM < 0 ? 'neg' : undefined}
+            delta={k.userGrowthDelta ? `${k.userGrowthDelta.text} за месяц` : undefined}
+            deltaTone={k.userGrowthDelta?.tone}
           />
           <KpiCard label="Новых за 30 дней" value={k.newUsers30} sparkColor={PALETTE.amber} />
           <KpiCard label="MAU" value={k.mau} sub="совершили действие за 30 дней" sparkColor={PALETTE.blue} />

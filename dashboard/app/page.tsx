@@ -32,12 +32,12 @@ export default function OverviewPage() {
         <div className="g-4">
           <KpiCard label="Всего пользователей" value={d.kpi.totalUsers}
             sub={`+${d.kpi.newUsersWeek} за 7 дней`}
-            delta={d.kpi.trendUsers ? `+${d.kpi.trendUsers}%` : undefined} deltaTone="pos" />
+            delta={d.kpi.usersDelta?.text} deltaTone={d.kpi.usersDelta?.tone} />
           <KpiCard label="Вакансии" value={d.kpi.tempVacancies + d.kpi.permVacancies}
             sub={`${d.kpi.openTemp + d.kpi.openPerm} открыто`} sparkColor={PALETTE.green} />
           <KpiCard label="Совпадений" value={d.kpi.totalMatches}
             sub={`${d.kpi.matchRate}% конверсия`}
-            delta={d.kpi.trendMatches ? `+${d.kpi.trendMatches}%` : undefined} deltaTone="pos" />
+            delta={d.kpi.matchesDelta?.text} deltaTone={d.kpi.matchesDelta?.tone} />
           <KpiCard label="Средний рейтинг" value={d.kpi.avgRating}
             sub={`${d.kpi.chats} чатов`} sparkColor={PALETTE.amber} />
         </div>

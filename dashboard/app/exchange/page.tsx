@@ -35,16 +35,16 @@ export default function ExchangePage() {
             value={d.kpi.totalBulletins}
             sub={`${d.kpi.openBulletins} открыто · ${d.kpi.closedBulletins} закрыто`}
             sparkColor={PALETTE.orange}
-            delta={d.kpi.bulletinsTrend !== 0 ? `${d.kpi.bulletinsTrend > 0 ? '+' : ''}${d.kpi.bulletinsTrend}%` : undefined}
-            deltaTone={d.kpi.bulletinsTrend > 0 ? 'pos' : d.kpi.bulletinsTrend < 0 ? 'neg' : undefined}
+            delta={d.kpi.bulletinsDelta?.text}
+            deltaTone={d.kpi.bulletinsDelta?.tone}
           />
           <KpiCard
             label="Откликов (чатов)"
             value={d.kpi.totalChats}
             sub={`+${d.kpi.newChatsMonth} за месяц`}
             sparkColor={PALETTE.blue}
-            delta={d.kpi.chatsTrend !== 0 ? `${d.kpi.chatsTrend > 0 ? '+' : ''}${d.kpi.chatsTrend}%` : undefined}
-            deltaTone={d.kpi.chatsTrend > 0 ? 'pos' : d.kpi.chatsTrend < 0 ? 'neg' : undefined}
+            delta={d.kpi.chatsDelta?.text}
+            deltaTone={d.kpi.chatsDelta?.tone}
           />
           <KpiCard
             label="Просмотров объявлений"
@@ -57,8 +57,8 @@ export default function ExchangePage() {
             value={d.kpi.totalSlots}
             sub={`${d.kpi.openSlots} открыто · ${d.kpi.closedSlots} закрыто`}
             sparkColor={PALETTE.green}
-            delta={d.kpi.slotsTrend !== 0 ? `${d.kpi.slotsTrend > 0 ? '+' : ''}${d.kpi.slotsTrend}%` : undefined}
-            deltaTone={d.kpi.slotsTrend > 0 ? 'pos' : d.kpi.slotsTrend < 0 ? 'neg' : undefined}
+            delta={d.kpi.slotsDelta?.text}
+            deltaTone={d.kpi.slotsDelta?.tone}
           />
         </div>
 
