@@ -39,6 +39,7 @@ import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials, normalizeCompany } from '@/services/storage';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
 import { TabHeader } from '@/components/ui/TabHeader';
+import { MetroMap, StationCount } from '@/components/feature/MetroMap';
 import { setOnboardingTarget, setOnboardingFlag } from '@/lib/onboardingTargets';
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
 
@@ -784,6 +785,21 @@ function WorkerFeed() {
   const [detailEmployer, setDetailEmployer] = useState<User | null>(null);
   const [filterStation, setFilterStation] = useState<string | null>(null);
   const [filterPicker, setFilterPicker] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+
+  // Число смен у каждой станции на выбранную дату (для меток на карте)
+  const stationCounts: StationCount[] = useMemo(() => {
+    if (!currentUser) return [];
+    const m: Record<string, number> = {};
+    for (const v of vacancies) {
+      if (v.status !== 'open') continue;
+      if (v.date !== selectedDate) continue;
+      if (!currentUser.workTypes?.includes(v.workType)) continue;
+      if (!v.metroStation) continue;
+      m[v.metroStation] = (m[v.metroStation] ?? 0) + 1;
+    }
+    return Object.entries(m).map(([station, count]) => ({ station, count }));
+  }, [vacancies, selectedDate, currentUser]);
 
   const pan = useRef(new Animated.ValueXY()).current;
   const cardAreaRef = useRef<View>(null);
@@ -1053,19 +1069,35 @@ function WorkerFeed() {
           </ScrollView>
           <TouchableOpacity
             style={[pS.inlineFilter, filterStation ? pS.inlineFilterActive : null]}
-            onPress={() => setFilterPicker(true)}
+            onPress={() => setMapOpen(true)}
             activeOpacity={0.8}
           >
             {filterStation && activeStationLine ? (
               <View style={[pS.filterLineDot, { backgroundColor: activeStationLine.color }]} />
             ) : (
               <View style={pS.metroIconWrap}>
-                <Text style={pS.metroIconText}>М</Text>
+                <Ionicons name="map" size={18} color={Colors.primary} />
               </View>
             )}
           </TouchableOpacity>
         </View>
       </View>
+
+      {filterStation ? (
+        <TouchableOpacity style={styles.activeStationChip} onPress={() => setFilterStation(null)} activeOpacity={0.8}>
+          <Ionicons name="location" size={13} color={Colors.primary} />
+          <Text style={styles.activeStationTxt}>м. {filterStation}</Text>
+          <Ionicons name="close" size={14} color={Colors.textMuted} />
+        </TouchableOpacity>
+      ) : null}
+
+      <MetroMap
+        visible={mapOpen}
+        title="Смены на карте"
+        points={stationCounts}
+        onSelect={(st) => { setFilterStation(st); setMapOpen(false); }}
+        onClose={() => setMapOpen(false)}
+      />
 
       {/* Card area */}
       <View
@@ -1293,6 +1325,17 @@ function WorkerPermMode() {
   const [minSalary, setMinSalary] = useState(0);
   const [applying, setApplying] = useState<string | null>(null);
   const [chatLoading, setChatLoading] = useState<string | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
+
+  // Число открытых постоянных вакансий у каждой станции (для меток на карте)
+  const permStationCounts: StationCount[] = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const v of permVacancies) {
+      if (v.status !== 'open' || !v.metroStation) continue;
+      m[v.metroStation] = (m[v.metroStation] ?? 0) + 1;
+    }
+    return Object.entries(m).map(([station, count]) => ({ station, count }));
+  }, [permVacancies]);
 
   const viewedPermIds = useRef(new Set<string>());
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 });
@@ -1568,20 +1611,36 @@ function WorkerPermMode() {
           ) : null}
         </View>
         <TouchableOpacity
-          style={[pS.filtersBtn, (filterStation || minSalary > 0) ? pS.filtersBtnActive : null]}
-          onPress={() => setFilterPicker(true)}
+          style={[pS.filtersBtn, filterStation ? pS.filtersBtnActive : null]}
+          onPress={() => setMapOpen(true)}
           activeOpacity={0.8}
         >
           <Ionicons
-            name="options-outline"
+            name="map"
             size={16}
-            color={(filterStation || minSalary > 0) ? Colors.primary : Colors.textSecondary}
+            color={filterStation ? Colors.primary : Colors.textSecondary}
           />
-          <Text style={[pS.filtersBtnTxt, (filterStation || minSalary > 0) ? pS.filtersBtnTxtActive : null]}>
-            Фильтры
+          <Text style={[pS.filtersBtnTxt, filterStation ? pS.filtersBtnTxtActive : null]}>
+            Карта
           </Text>
         </TouchableOpacity>
       </View>
+
+      {filterStation ? (
+        <TouchableOpacity style={pS.activeStationChip} onPress={() => setFilterStation(null)} activeOpacity={0.8}>
+          <Ionicons name="location" size={13} color={Colors.primary} />
+          <Text style={pS.activeStationTxt}>м. {filterStation}</Text>
+          <Ionicons name="close" size={14} color={Colors.textMuted} />
+        </TouchableOpacity>
+      ) : null}
+
+      <MetroMap
+        visible={mapOpen}
+        title="Вакансии на карте"
+        points={permStationCounts}
+        onSelect={(st) => { setFilterStation(st); setMapOpen(false); }}
+        onClose={() => setMapOpen(false)}
+      />
 
       {/* Tab chips */}
       <ScrollView
@@ -2079,6 +2138,12 @@ const pS = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 7, backgroundColor: Colors.bg,
   },
   filtersBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  activeStationChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+    marginHorizontal: 16, marginBottom: 4,
+    backgroundColor: Colors.primaryLight, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  activeStationTxt: { fontSize: 13, fontWeight: '700', color: Colors.primary },
   filtersBtnTxt: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
   filtersBtnTxtActive: { color: Colors.primary },
 
@@ -2231,6 +2296,12 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: Colors.primary, borderRadius: 100, paddingHorizontal: 16, paddingVertical: 8 },
   addBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   dateStrip: { borderBottomWidth: 1, borderBottomColor: Colors.divider, backgroundColor: Colors.bg },
+  activeStationChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+    marginHorizontal: 16, marginTop: 10,
+    backgroundColor: Colors.primaryLight, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  activeStationTxt: { fontSize: 13, fontWeight: '700', color: Colors.primary },
   dateStripInner: { flexDirection: 'row', alignItems: 'center' },
   dateRow: { paddingHorizontal: 12, paddingVertical: 10, gap: 8, flexDirection: 'row' },
   modeSwitcherRow: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.divider },
