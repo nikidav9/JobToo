@@ -10,6 +10,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius } from '@/constants/theme';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { MetroPicker } from '@/components/feature/MetroPicker';
+import { AddressSuggestField } from '@/components/feature/AddressSuggestField';
 import { useApp } from '@/hooks/useApp';
 import { uid, nowISO } from '@/services/storage';
 import { dbUpsertVacancy, dbUpsertVacancyBatch } from '@/services/db';
@@ -87,6 +88,8 @@ export default function CreateVacancy() {
   const [loadingInit, setLoadingInit] = useState(isEdit);
   const [selectedWorkType, setSelectedWorkType] = useState<WorkType>(existing?.workType ?? 'stocker');
   const [address, setAddress] = useState('');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
   const [metroLineId, setMetroLineId] = useState('');
   const [metroLineName, setMetroLineName] = useState('');
   const [metroStation, setMetroStation] = useState('');
@@ -113,6 +116,8 @@ export default function CreateVacancy() {
     if (!existing) { setLoadingInit(false); return; }
     setSelectedWorkType(existing.workType ?? 'stocker');
     setAddress(existing.address ?? '');
+    setLat(existing.lat ?? null);
+    setLng(existing.lng ?? null);
     setMetroLineId(existing.metroLineId ?? '');
     setMetroStation(existing.metroStation ?? '');
     const ln = METRO_LINES.find(l => l.id === existing.metroLineId);
@@ -130,6 +135,8 @@ export default function CreateVacancy() {
     if (!source) return;
     setSelectedWorkType(source.workType ?? 'stocker');
     setAddress(source.address ?? '');
+    setLat(source.lat ?? null);
+    setLng(source.lng ?? null);
     setMetroLineId(source.metroLineId ?? '');
     setMetroStation(source.metroStation ?? '');
     const ln = METRO_LINES.find(l => l.id === source.metroLineId);
@@ -263,6 +270,8 @@ export default function CreateVacancy() {
       metroLineId,
       metroStation,
       address,
+      lat: lat ?? undefined,
+      lng: lng ?? undefined,
       timeStart: formatTime(selectedTimeStart),
       timeEnd: formatTime(selectedTimeEnd),
       salary: isStorcker ? 0 : parseFloat(fixedSalary),
@@ -382,12 +391,11 @@ export default function CreateVacancy() {
           {/* Address */}
           <View style={styles.fieldGroup}>
             <Text style={styles.sectionLabel}>Адрес *</Text>
-            <TextInput
-              style={[styles.input, errors.address ? styles.inputError : null]}
+            <AddressSuggestField
               value={address}
-              onChangeText={setAddress}
+              error={!!errors.address}
               placeholder="ул. Складская, д. 5, Москва"
-              placeholderTextColor={Colors.textMuted}
+              onChange={(addr, la, ln) => { setAddress(addr); setLat(la); setLng(ln); }}
             />
             {errors.address ? <Text style={styles.errMsg}>{errors.address}</Text> : null}
           </View>

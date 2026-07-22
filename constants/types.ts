@@ -36,6 +36,8 @@ export interface Vacancy {
   salary: number;
   normsAndPay: string;
   address?: string;
+  lat?: number;
+  lng?: number;
   workersNeeded: number;
   workersFound: number;
   isUrgent: boolean;
@@ -95,6 +97,8 @@ export interface Bulletin {
   timeEnd: string;
   metro: string;
   address: string;
+  lat?: number;
+  lng?: number;
   comment?: string;
   status: 'open' | 'closed';
   views: number;
@@ -139,6 +143,8 @@ export interface PermVacancy {
   metroLineId?: string;
   metroStation?: string;
   address?: string;
+  lat?: number;
+  lng?: number;
   salary: number;
   schedule: string;
   description?: string;

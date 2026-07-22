@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius } from '@/constants/theme';
 import { MetroPicker } from '@/components/feature/MetroPicker';
+import { AddressSuggestField } from '@/components/feature/AddressSuggestField';
 import { useApp } from '@/hooks/useApp';
 import { uid, nowISO } from '@/services/storage';
 import { dbUpsertPermVacancy, dbGetPermVacanciesByEmployer } from '@/services/db';
@@ -29,6 +30,8 @@ export default function CreatePermVacancy() {
   const [workType, setWorkType] = useState<WorkType>(existing?.workType ?? 'stocker');
   const title = WORK_TYPE_META[workType].label;
   const [address, setAddress] = useState(existing?.address ?? '');
+  const [lat, setLat] = useState<number | null>(existing?.lat ?? null);
+  const [lng, setLng] = useState<number | null>(existing?.lng ?? null);
   const [metroLineId, setMetroLineId] = useState(existing?.metroLineId ?? '');
   const [metroLineName, setMetroLineName] = useState('');
   const [metroStation, setMetroStation] = useState(existing?.metroStation ?? '');
@@ -72,6 +75,8 @@ export default function CreatePermVacancy() {
         metroLineId,
         metroStation,
         address: address.trim(),
+        lat: lat ?? undefined,
+        lng: lng ?? undefined,
         salary: parseInt(salary, 10),
         schedule: schedule.trim(),
         description: description.trim() || undefined,
@@ -156,12 +161,11 @@ export default function CreatePermVacancy() {
           {/* Address */}
           <View style={styles.fieldGroup}>
             <Text style={styles.sectionLabel}>Адрес *</Text>
-            <TextInput
-              style={[styles.input, errors.address ? styles.inputError : null]}
+            <AddressSuggestField
               value={address}
-              onChangeText={setAddress}
+              error={!!errors.address}
               placeholder="ул. Складская, д. 5, Москва"
-              placeholderTextColor={Colors.textMuted}
+              onChange={(addr, la, ln) => { setAddress(addr); setLat(la); setLng(ln); }}
             />
             {errors.address ? <Text style={styles.errMsg}>{errors.address}</Text> : null}
           </View>

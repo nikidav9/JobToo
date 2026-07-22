@@ -178,6 +178,8 @@ function rowToVacancy(r: any): Vacancy {
     salary: r.salary,
     normsAndPay: r.norms_and_pay ?? '',
     address: r.address ?? '',
+    lat: r.lat ?? undefined,
+    lng: r.lng ?? undefined,
     workersNeeded: r.workers_needed,
     workersFound: r.workers_found,
     isUrgent: r.is_urgent,
@@ -204,6 +206,8 @@ function vacancyToRow(v: Vacancy) {
     salary: v.salary,
     norms_and_pay: v.normsAndPay || null,
     address: v.address || null,
+    lat: v.lat ?? null,
+    lng: v.lng ?? null,
     workers_needed: v.workersNeeded,
     workers_found: v.workersFound,
     is_urgent: v.isUrgent,
@@ -720,6 +724,8 @@ function rowToPermVacancy(r: any): PermVacancy {
     metroLineId: r.metro_line_id ?? undefined,
     metroStation: r.metro_station ?? undefined,
     address: r.address ?? undefined,
+    lat: r.lat ?? undefined,
+    lng: r.lng ?? undefined,
     salary: r.salary,
     schedule: r.schedule ?? '',
     description: r.description ?? undefined,
@@ -751,6 +757,7 @@ export async function dbUpsertPermVacancy(v: PermVacancy): Promise<void> {
     id: v.id, employer_id: v.employerId, company: v.company, title: v.title,
     work_type: v.workType ?? null, metro_line_id: v.metroLineId ?? null,
     metro_station: v.metroStation ?? null, address: v.address ?? null,
+    lat: v.lat ?? null, lng: v.lng ?? null,
     salary: v.salary, schedule: v.schedule, description: v.description ?? null,
     status: v.status, created_at: v.createdAt,
   };
@@ -1054,6 +1061,8 @@ function rowToBulletin(r: any): Bulletin {
     timeEnd: r.time_end,
     metro: r.metro,
     address: r.address,
+    lat: r.lat ?? undefined,
+    lng: r.lng ?? undefined,
     comment: r.comment ?? undefined,
     status: r.status,
     views: r.views ?? 0,
@@ -1070,6 +1079,8 @@ export async function dbCreateBulletin(params: {
   timeEnd: string;
   metro: string;
   address: string;
+  lat?: number | null;
+  lng?: number | null;
   comment?: string;
 }): Promise<string> {
   return proxy<string>('dbCreateBulletin', [params]);

@@ -1139,13 +1139,25 @@ try {
         case 'dbCreateBulletin': {
             $p = $args[0];
             $id = uid();
-            sb_insert('jm_bulletins', [
+            $row = [
                 'id' => $id, 'employer_id' => $p['employerId'], 'company' => $p['company'],
                 'work_type' => $p['workType'], 'date' => $p['date'],
                 'time_start' => $p['timeStart'], 'time_end' => $p['timeEnd'],
                 'metro' => $p['metro'], 'address' => $p['address'],
+                'lat' => $p['lat'] ?? null, 'lng' => $p['lng'] ?? null,
                 'comment' => $p['comment'] ?? null, 'status' => 'open', 'created_at' => now_iso(),
-            ]);
+            ];
+            try {
+                sb_insert('jm_bulletins', $row);
+            } catch (\Throwable $e) {
+                // Колонок lat/lng может ещё не быть — публикуем без координат
+                if (stripos($e->getMessage(), 'lat') !== false || stripos($e->getMessage(), 'lng') !== false) {
+                    unset($row['lat'], $row['lng']);
+                    sb_insert('jm_bulletins', $row);
+                } else {
+                    throw $e;
+                }
+            }
             $data = $id; break;
         }
 

@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { METRO_LINES } from '@/constants/metro';
 import { TabHeader } from '@/components/ui/TabHeader';
 import { WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
+import { AddressSuggestField } from '@/components/feature/AddressSuggestField';
 
 // ─── Date/time helpers ────────────────────────────────────────────────────────
 
@@ -342,6 +343,8 @@ function EmployerExchange() {
   const [selectedTimeEnd, setSelectedTimeEnd] = useState<Date>(() => { const d = new Date(); d.setHours(17, 0, 0, 0); return d; });
   const [metro, setMetro] = useState('');
   const [address, setAddress] = useState('');
+  const [addrLat, setAddrLat] = useState<number | null>(null);
+  const [addrLng, setAddrLng] = useState<number | null>(null);
   const [comment, setComment] = useState('');
 
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
@@ -394,7 +397,7 @@ function EmployerExchange() {
     setSelectedDate(new Date());
     setSelectedTimeStart(() => { const d = new Date(); d.setHours(8, 0, 0, 0); return d; });
     setSelectedTimeEnd(() => { const d = new Date(); d.setHours(17, 0, 0, 0); return d; });
-    setMetro(''); setAddress(''); setComment('');
+    setMetro(''); setAddress(''); setAddrLat(null); setAddrLng(null); setComment('');
   };
 
   const submitBulletin = async () => {
@@ -417,6 +420,8 @@ function EmployerExchange() {
         timeEnd: tsEnd,
         metro: metro.trim(),
         address: address.trim(),
+        lat: addrLat,
+        lng: addrLng,
         comment: comment.trim() || undefined,
       });
       await refreshBulletins();
@@ -580,8 +585,11 @@ function EmployerExchange() {
                   </Text>
                 </TouchableOpacity>
                 <Text style={xS.formLabel}>Адрес *</Text>
-                <TextInput style={xS.formInput} value={address} onChangeText={setAddress}
-                  placeholder="Улица, дом..." placeholderTextColor={Colors.textMuted} />
+                <AddressSuggestField
+                  value={address}
+                  placeholder="Улица, дом..."
+                  onChange={(addr, la, ln) => { setAddress(addr); setAddrLat(la); setAddrLng(ln); }}
+                />
                 <Text style={xS.formLabel}>Комментарий (необязательно)</Text>
                 <TextInput style={[xS.formInput, { minHeight: 60, textAlignVertical: 'top' }]}
                   value={comment} onChangeText={setComment}
