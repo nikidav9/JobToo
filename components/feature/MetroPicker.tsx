@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, Platform } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius } from '@/constants/theme';
 import { METRO_LINES } from '@/constants/metro';
 
@@ -11,12 +12,25 @@ interface Props {
   selectedStation?: string;
 }
 
+// Плоский индекс всех станций по всем линиям — для поиска «начал вводить».
+type FlatStation = { station: string; lineId: string; lineName: string; color: string };
+const ALL_STATIONS: FlatStation[] = METRO_LINES.flatMap(l =>
+  l.stations.map(st => ({ station: st, lineId: l.id, lineName: l.name, color: l.color }))
+);
+
+// Убираем диакритику/ё и регистр, чтобы «сокол», «Сокол», «щелк» находились
+function norm(s: string): string {
+  return s.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+}
+
 export function MetroPicker({ visible, onClose, onSelect, selectedLineId, selectedStation }: Props) {
   const [selectedLine, setSelectedLine] = useState<typeof METRO_LINES[0] | null>(null);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     if (visible) {
       setSelectedLine(selectedLineId ? METRO_LINES.find(l => l.id === selectedLineId) ?? null : null);
+      setQuery('');
     }
   }, [visible]);
 
@@ -29,15 +43,84 @@ export function MetroPicker({ visible, onClose, onSelect, selectedLineId, select
     }
   };
 
+  const handleFlatTap = (f: FlatStation) => {
+    onSelect(f.lineId, f.lineName, f.station);
+    onClose();
+  };
+
+  // Результаты поиска: станции, чьё название содержит запрос. Совпадение с начала — выше.
+  const results = useMemo(() => {
+    const q = norm(query);
+    if (!q) return [];
+    const matched = ALL_STATIONS.filter(f => norm(f.station).includes(q));
+    matched.sort((a, b) => {
+      const as = norm(a.station).startsWith(q) ? 0 : 1;
+      const bs = norm(b.station).startsWith(q) ? 0 : 1;
+      if (as !== bs) return as - bs;
+      return a.station.localeCompare(b.station, 'ru');
+    });
+    return matched;
+  }, [query]);
+
+  const searching = query.trim().length > 0;
+
   return (
     <Modal visible={visible} animationType="none" transparent statusBarTranslucent>
       <View style={styles.overlay} onStartShouldSetResponder={() => true}>
         <View style={styles.sheet}>
           <View style={styles.handle} />
 
-          {!selectedLine ? (
+          {/* Поиск по станции — работает всегда, сверху */}
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={18} color={Colors.textMuted} />
+            <TextInput
+              style={styles.searchInput}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Введите станцию…"
+              placeholderTextColor={Colors.textMuted}
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+            {query.length > 0 ? (
+              <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
+                <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {searching ? (
+            <FlatList
+              data={results}
+              keyExtractor={(item) => item.lineId + '::' + item.station}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => {
+                const isSelected = item.station === selectedStation && item.lineId === selectedLineId;
+                return (
+                  <TouchableOpacity
+                    style={[styles.resultRow, isSelected && styles.resultRowActive]}
+                    onPress={() => handleFlatTap(item)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.lineDot, { backgroundColor: item.color }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.resultStation}>{item.station}</Text>
+                      <Text style={styles.resultLine}>{item.lineName}</Text>
+                    </View>
+                    {isSelected ? <Ionicons name="checkmark" size={18} color={Colors.primary} /> : null}
+                  </TouchableOpacity>
+                );
+              }}
+              ListEmptyComponent={
+                <Text style={styles.emptyTxt}>Станция не найдена. Проверьте написание.</Text>
+              }
+              showsVerticalScrollIndicator={false}
+              style={styles.list}
+              nestedScrollEnabled
+            />
+          ) : !selectedLine ? (
             <>
-              <Text style={styles.title}>Выберите линию</Text>
+              <Text style={styles.title}>Или выберите линию</Text>
               <FlatList
                 data={METRO_LINES}
                 keyExtractor={item => item.id}
@@ -116,6 +199,19 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginVertical: 12,
   },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.inputBorder,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  searchInput: { flex: 1, fontSize: 15, color: Colors.textPrimary, padding: 0 },
   title: {
     fontSize: 18,
     fontWeight: '700',
@@ -125,6 +221,18 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
   },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+  },
+  resultRowActive: { backgroundColor: Colors.primaryLight, borderRadius: 10 },
+  resultStation: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
+  resultLine: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  emptyTxt: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', paddingVertical: 24 },
   lineRow: {
     flexDirection: 'row',
     alignItems: 'center',
