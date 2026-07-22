@@ -1066,21 +1066,11 @@ try {
 
         // args: [company, workType, date, metro] — биржа: объявление всем работникам
         case 'dbNotifyAllWorkersNewBulletin': {
-            @set_time_limit(300);
-            @ignore_user_abort(true);
+            // Только личка/пуш/колокольчик работникам — в группу объявления биржи НЕ постим
             $company = (string)$args[0]; $wt = (string)$args[1]; $date = (string)$args[2]; $metro = (string)$args[3];
             $body = "$company — «$wt», $date" . ($metro !== '' ? ", м. $metro" : '');
             $tgHtml = "📣 <b>Новое объявление на бирже!</b>\n\n👷 $wt — $company\n📅 $date" . ($metro !== '' ? "\n🚇 м. $metro" : '') . "\n\nУспей откликнуться 👇";
-            // Пост в группу — ПЕРВЫМ (у объявлений биржи нет своей ссылки → обычная кнопка приложения)
-            $groupHtml = "📣 <b>Новое объявление на бирже!</b>\n\n👷 $wt — $company\n📅 $date"
-                . ($metro !== '' ? "\n🚇 м. $metro" : '')
-                . "\n\n⚡ В приложении объявления появляются раньше — откликайся первым 👇";
-            $groupOk = false;
-            if (TG_GROUP_CHAT_ID !== 0) {
-                $groupOk = tg_send_message(TG_GROUP_CHAT_ID, $groupHtml, true);
-            }
             $data = broadcast_workers('📣 Новое объявление на бирже!', $body, $tgHtml, 'nearby_shift');
-            $data['group'] = $groupOk;
             break;
         }
 
