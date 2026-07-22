@@ -122,10 +122,12 @@ export function OnboardingOverlay() {
       ? { top: Math.min(s.spot.y + s.spot.h + 16, H - 260) }
       : { bottom: Math.max(H - (s.spot.y - 16), 20) };
 
-  // Затемнение с «дыркой»: 4 прямоугольника вокруг подсветки
+  // Затемнение с «дыркой»: 4 прямоугольника вокруг подсветки.
+  // В демо-режиме (нет реальной карточки) «дырку» не режем — затемняем весь фон,
+  // чтобы за демо-карточкой не просвечивал персонаж пустого состояния.
   const dim = 'rgba(17,17,17,0.72)';
   const Spot = () => {
-    if (!s.spot) return <View style={[StyleSheet.absoluteFill, { backgroundColor: dim }]} />;
+    if (!s.spot || s.demo) return <View style={[StyleSheet.absoluteFill, { backgroundColor: dim }]} />;
     const { x, y, w, h } = s.spot;
     return (
       <>
