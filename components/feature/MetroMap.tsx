@@ -11,7 +11,10 @@ import { METRO_COORDS, MOSCOW_CENTER, YANDEX_MAPS_API_KEY } from '@/constants/me
 export type StationCount = { station: string; count: number };
 
 // Собираем HTML с картой Яндекса и метками-кружками (число смен/вакансий у станции).
-function buildHtml(points: { station: string; count: number; lat: number; lng: number }[]): string {
+// У станций с известными координатами (lat/lng) метка ставится сразу; у остальных
+// координаты определяются геокодером Яндекса прямо в браузере (JS-API, тем же ключом),
+// чтобы на карте появилась ЛЮБАЯ станция, где разместили вакансию.
+function buildHtml(points: { station: string; count: number; lat: number | null; lng: number | null }[]): string {
   const markers = JSON.stringify(points);
   const center = JSON.stringify(MOSCOW_CENTER);
   return `<!DOCTYPE html><html><head>
@@ -32,12 +35,21 @@ var PTS=${markers};
 ymaps.ready(function(){
   var map=new ymaps.Map('map',{center:${center},zoom:10,controls:['zoomControl','geolocationControl']},{suppressMapOpenBlock:true});
   var coords=[];
-  PTS.forEach(function(p){
-    var pm=new ymaps.Placemark([p.lat,p.lng],{iconContent:String(p.count),hintContent:p.station,balloonContent:p.station+' — '+p.count},
+  function addMarker(p,c){
+    var pm=new ymaps.Placemark(c,{iconContent:String(p.count),hintContent:p.station,balloonContent:p.station+' — '+p.count},
       {preset:'islands#violetCircleIcon',iconColor:'#7C3AED'});
     pm.events.add('click',function(){send(p.station);});
     map.geoObjects.add(pm);
-    coords.push([p.lat,p.lng]);
+  }
+  PTS.forEach(function(p){
+    if(p.lat!=null&&p.lng!=null){ addMarker(p,[p.lat,p.lng]); coords.push([p.lat,p.lng]); }
+    else {
+      // Координат нет — определяем через геокодер Яндекса по названию станции
+      ymaps.geocode('Москва, метро '+p.station,{results:1}).then(function(res){
+        var obj=res.geoObjects.get(0);
+        if(obj){ addMarker(p,obj.geometry.getCoordinates()); }
+      }).catch(function(){});
+    }
   });
   if(coords.length===1){map.setCenter(coords[0],13);}
   else if(coords.length>1){
@@ -57,13 +69,12 @@ export function MetroMap({
   onSelect: (station: string) => void;
   onClose: () => void;
 }) {
-  // Оставляем только станции с известными координатами
-  const mapped = points
-    .map(p => {
-      const c = METRO_COORDS[p.station];
-      return c ? { station: p.station, count: p.count, lat: c[0], lng: c[1] } : null;
-    })
-    .filter(Boolean) as { station: string; count: number; lat: number; lng: number }[];
+  // Все станции: у известных берём зашитые координаты, у остальных — null
+  // (их геокодит сам Яндекс в HTML, чтобы появилась любая станция).
+  const mapped = points.map(p => {
+    const c = METRO_COORDS[p.station];
+    return { station: p.station, count: p.count, lat: c ? c[0] : null, lng: c ? c[1] : null };
+  });
 
   const html = buildHtml(mapped);
 

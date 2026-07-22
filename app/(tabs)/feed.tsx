@@ -1076,7 +1076,7 @@ function WorkerFeed() {
               <View style={[pS.filterLineDot, { backgroundColor: activeStationLine.color }]} />
             ) : (
               <View style={pS.metroIconWrap}>
-                <Ionicons name="map" size={18} color={Colors.primary} />
+                <Ionicons name="location" size={18} color={Colors.primary} />
               </View>
             )}
           </TouchableOpacity>
@@ -1616,7 +1616,7 @@ function WorkerPermMode() {
           activeOpacity={0.8}
         >
           <Ionicons
-            name="map"
+            name="location"
             size={16}
             color={filterStation ? Colors.primary : Colors.textSecondary}
           />
