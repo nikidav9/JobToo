@@ -118,6 +118,7 @@ function sb_rpc(string $fn, array $params = []): mixed {
 define('TG_BOT_TOKEN', getenv('TG_BOT_TOKEN') ?: '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug');
 define('DASHBOARD_URL', getenv('DASHBOARD_URL') ?: 'https://dashboard-nujus-projects.vercel.app');
 define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025)); // группа «ПОДРАБОТКИ»
+define('YANDEX_SUGGEST_KEY', getenv('YANDEX_SUGGEST_KEY') ?: '44152824-d925-46ab-b464-3ce4d9fd50c7'); // Suggest API (адреса)
 
 /**
  * Validates Telegram WebApp initData signature (HMAC per official spec).
@@ -1082,6 +1083,37 @@ try {
             }
             $data = broadcast_workers('📣 Новое объявление на бирже!', $body, $tgHtml, 'nearby_shift');
             $data['group'] = $groupOk;
+            break;
+        }
+
+        case 'yandexSuggest': {
+            // Подсказки адресов Яндекса (ключ Suggest — только на сервере)
+            $text = trim((string)($args[0] ?? ''));
+            $data = [];
+            if ($text !== '' && YANDEX_SUGGEST_KEY !== '') {
+                $q = http_build_query([
+                    'apikey' => YANDEX_SUGGEST_KEY,
+                    'text' => $text,
+                    'lang' => 'ru_RU',
+                    'results' => 6,
+                    'print_address' => 1,
+                    'types' => 'geo,house',
+                    'll' => '37.618,55.751',   // центр Москвы — приоритет ближайшим
+                    'spn' => '1.4,0.9',
+                ]);
+                $ch = curl_init('https://suggest-maps.yandex.ru/v1/suggest?' . $q);
+                curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_SSL_VERIFYPEER => true]);
+                $resp = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+                $dec = json_decode($resp ?: 'null', true);
+                if ($code === 200 && isset($dec['results'])) {
+                    foreach ($dec['results'] as $r) {
+                        $title = $r['title']['text'] ?? '';
+                        $sub = $r['subtitle']['text'] ?? '';
+                        $full = $r['address']['formatted_address'] ?? trim(($sub !== '' ? $sub . ', ' : '') . $title);
+                        if ($title !== '') $data[] = ['title' => $title, 'subtitle' => $sub, 'full' => $full];
+                    }
+                }
+            }
             break;
         }
 
