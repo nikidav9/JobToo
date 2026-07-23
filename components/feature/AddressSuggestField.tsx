@@ -1,15 +1,18 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, FlatList, ActivityIndicator,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { dbAddressSuggest, AddressSuggestion } from '@/services/db';
 
 // Поле адреса с подсказками. Подсказки приходят с нашего сервера
 // (jobtoo.ru/api → OpenStreetMap/Nominatim), поэтому не нужен ни ключ, ни WebView.
-// При выборе возвращаем и адрес, и координаты (Nominatim отдаёт их сразу).
+// Пользователь печатает/выбирает подсказку сверху, внизу — кнопка «Подтвердить».
+// При выборе подсказки сохраняем координаты; при ручном вводе координат нет.
 export function AddressSuggestField({
   value, onChange, placeholder, error,
 }: {
@@ -23,6 +26,7 @@ export function AddressSuggestField({
   const [results, setResults] = useState<AddressSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [picked, setPicked] = useState<AddressSuggestion | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reqId = useRef(0);
 
@@ -30,31 +34,49 @@ export function AddressSuggestField({
     setQuery(value || '');
     setResults([]);
     setTouched(false);
+    setPicked(null);
     setOpen(true);
   };
 
-  const pick = useCallback((addr: string, lat: number | null, lng: number | null) => {
-    onChange(addr, lat, lng);
+  const confirm = useCallback(() => {
+    const addr = query.trim();
+    if (!addr) return;
+    // координаты берём, только если текст всё ещё совпадает с выбранной подсказкой
+    const coordsOk = picked && picked.name === addr;
+    onChange(addr, coordsOk ? picked!.lat : null, coordsOk ? picked!.lng : null);
     setOpen(false);
-  }, [onChange]);
+  }, [query, picked, onChange]);
+
+  const onPick = (item: AddressSuggestion) => {
+    setPicked(item);
+    setQuery(item.name);
+    setResults([]);        // список сворачиваем — адрес выбран
+    setTouched(false);
+  };
+
+  const onType = (t: string) => {
+    setQuery(t);
+    if (picked && picked.name !== t) setPicked(null); // текст изменили — координаты сбрасываем
+  };
 
   // Дебаунс + защита от устаревших ответов (гонки)
   useEffect(() => {
     if (!open) return;
     if (timer.current) clearTimeout(timer.current);
     const q = query.trim();
-    if (q.length < 3) { setResults([]); setLoading(false); return; }
+    // если только что выбрали подсказку — не ищем снова
+    if (q.length < 3 || (picked && picked.name === q)) { setResults([]); setLoading(false); return; }
     setLoading(true);
     const my = ++reqId.current;
     timer.current = setTimeout(async () => {
       const r = await dbAddressSuggest(q);
-      if (my !== reqId.current) return; // пришёл старый ответ
+      if (my !== reqId.current) return;
       setResults(r);
       setLoading(false);
       setTouched(true);
     }, 450);
     return () => { if (timer.current) clearTimeout(timer.current); };
-  }, [query, open]);
+  }, [query, open, picked]);
 
   const trimmed = query.trim();
 
@@ -81,70 +103,79 @@ export function AddressSuggestField({
             </TouchableOpacity>
           </View>
 
-          <View style={s.searchBox}>
-            <Ionicons name="search" size={18} color={Colors.textMuted} />
-            <TextInput
-              style={s.searchInput}
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Начните вводить адрес…"
-              placeholderTextColor={Colors.textMuted}
-              autoFocus
-              autoCorrect={false}
-              returnKeyType="search"
-            />
-            {query.length > 0 ? (
-              <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          <FlatList
-            data={results}
-            keyExtractor={(item, i) => item.name + '::' + i}
-            keyboardShouldPersistTaps="handled"
-            renderItem={({ item }) => {
-              const short = item.name.split(',').slice(0, 2).join(',').trim();
-              return (
-                <TouchableOpacity style={s.row} onPress={() => pick(item.name, item.lat, item.lng)} activeOpacity={0.7}>
-                  <Ionicons name="location-sharp" size={18} color={Colors.primary} style={{ marginTop: 2 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.rowHead}>{short}</Text>
-                    <Text style={s.rowSub} numberOfLines={1}>{item.name}</Text>
-                  </View>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <View style={s.searchBox}>
+              <Ionicons name="search" size={18} color={Colors.textMuted} />
+              <TextInput
+                style={s.searchInput}
+                value={query}
+                onChangeText={onType}
+                placeholder="Начните вводить адрес…"
+                placeholderTextColor={Colors.textMuted}
+                autoFocus
+                autoCorrect={false}
+                returnKeyType="search"
+              />
+              {query.length > 0 ? (
+                <TouchableOpacity onPress={() => { setQuery(''); setPicked(null); }} hitSlop={8}>
+                  <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
                 </TouchableOpacity>
-              );
-            }}
-            ListHeaderComponent={
-              loading ? (
-                <View style={s.statusRow}>
-                  <ActivityIndicator size="small" color={Colors.primary} />
-                  <Text style={s.statusTxt}>Ищем адрес…</Text>
-                </View>
-              ) : null
-            }
-            ListEmptyComponent={
-              loading ? null : (
-                <Text style={s.hint}>
-                  {trimmed.length < 3
-                    ? 'Введите улицу и дом — подскажем адрес'
-                    : touched
-                      ? 'Ничего не нашлось. Проверьте написание или впишите вручную ниже.'
-                      : 'Введите улицу и дом — подскажем адрес'}
-                </Text>
-              )
-            }
-            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4 }}
-          />
+              ) : null}
+            </View>
 
-          {/* Ручной ввод — принять как есть, без координат */}
-          {trimmed.length > 0 ? (
-            <TouchableOpacity style={s.manualRow} onPress={() => pick(trimmed, null, null)} activeOpacity={0.8}>
-              <Ionicons name="create-outline" size={18} color={Colors.textSecondary} />
-              <Text style={s.manualTxt} numberOfLines={1}>Использовать: «{trimmed}»</Text>
-            </TouchableOpacity>
-          ) : null}
+            {picked && picked.name === trimmed ? (
+              <View style={s.pickedRow}>
+                <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
+                <Text style={s.pickedTxt}>Адрес найден на карте — координаты сохранятся</Text>
+              </View>
+            ) : null}
+
+            <FlatList
+              data={results}
+              keyExtractor={(item, i) => item.name + '::' + i}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => {
+                const short = item.name.split(',').slice(0, 2).join(',').trim();
+                return (
+                  <TouchableOpacity style={s.row} onPress={() => onPick(item)} activeOpacity={0.7}>
+                    <Ionicons name="location-sharp" size={18} color={Colors.primary} style={{ marginTop: 2 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.rowHead}>{short}</Text>
+                      <Text style={s.rowSub} numberOfLines={1}>{item.name}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+              ListHeaderComponent={
+                loading ? (
+                  <View style={s.statusRow}>
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                    <Text style={s.statusTxt}>Ищем адрес…</Text>
+                  </View>
+                ) : null
+              }
+              ListEmptyComponent={
+                loading || (picked && picked.name === trimmed) ? null : (
+                  <Text style={s.hint}>
+                    {trimmed.length < 3
+                      ? 'Введите улицу и дом — подскажем адрес'
+                      : touched
+                        ? 'Ничего не нашлось. Можно подтвердить адрес как есть.'
+                        : 'Введите улицу и дом — подскажем адрес'}
+                  </Text>
+                )
+              }
+              contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4 }}
+              style={{ flex: 1 }}
+            />
+
+            <View style={s.footer}>
+              <PrimaryButton label="Подтвердить" onPress={confirm} disabled={trimmed.length === 0} />
+            </View>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
     </>
@@ -179,6 +210,11 @@ const s = StyleSheet.create({
     marginHorizontal: 16, marginTop: 12, marginBottom: 6,
   },
   searchInput: { flex: 1, fontSize: 16, color: Colors.textPrimary, padding: 0 },
+  pickedRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 18, paddingBottom: 6,
+  },
+  pickedTxt: { fontSize: 12.5, color: Colors.primary, fontWeight: '600' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 },
   statusTxt: { fontSize: 14, color: Colors.textMuted },
   row: {
@@ -188,10 +224,9 @@ const s = StyleSheet.create({
   rowHead: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
   rowSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   hint: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', paddingVertical: 24, paddingHorizontal: 8 },
-  manualRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+  footer: {
+    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10,
     borderTopWidth: 1, borderTopColor: Colors.divider,
-    paddingHorizontal: 16, paddingVertical: 14,
+    backgroundColor: Colors.bg,
   },
-  manualTxt: { flex: 1, fontSize: 15, fontWeight: '600', color: Colors.textSecondary },
 });
