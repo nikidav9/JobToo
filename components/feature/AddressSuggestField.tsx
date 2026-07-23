@@ -51,38 +51,44 @@ ymaps.ready(function(){
   var q=document.getElementById('q');
   var list=document.getElementById('list');
   var hint=document.getElementById('hint');
-  var timer=null;
+  var timer=null, reqId=0;
   q.focus();
-  function render(items){
+  function setHint(t){ hint.textContent=t; hint.style.display='block'; }
+  // Геокодер отдаёт и адрес, и координаты сразу — второй запрос при выборе не нужен.
+  function render(objs){
     list.innerHTML='';
-    if(!items||!items.length){ hint.style.display='block'; return; }
+    if(!objs||!objs.length){ setHint('Ничего не нашлось. Уточните улицу и дом.'); return; }
     hint.style.display='none';
-    items.forEach(function(it){
+    objs.forEach(function(obj){
+      var name = obj.getAddressLine ? obj.getAddressLine() : (obj.properties.get('text')||'');
+      var c = obj.geometry.getCoordinates();
+      var short = name.replace(/^Россия,\\s*/,'').replace(/^Москва,\\s*/,'');
       var d=document.createElement('div');
       d.className='item';
-      var parts=it.displayName.split(',');
-      var head=parts.slice(-2).join(',').trim();
-      d.innerHTML='<span>'+head+'</span><small>'+it.displayName+'</small>';
-      d.addEventListener('click',function(){ pick(it.value,it.displayName); });
+      d.innerHTML='<span>'+short+'</span><small>'+name+'</small>';
+      d.addEventListener('click',function(){
+        send({address:name, lat:c?c[0]:null, lng:c?c[1]:null});
+      });
       list.appendChild(d);
     });
   }
-  function pick(value,display){
-    hint.textContent='Определяем координаты…'; hint.style.display='block'; list.innerHTML='';
-    ymaps.geocode(value,{results:1}).then(function(res){
-      var obj=res.geoObjects.get(0);
-      var c=obj?obj.geometry.getCoordinates():null;
-      var name=obj?(obj.getAddressLine?obj.getAddressLine():display):display;
-      send({address:name,lat:c?c[0]:null,lng:c?c[1]:null});
-    }).catch(function(){ send({address:display,lat:null,lng:null}); });
+  function search(v){
+    var my=++reqId;
+    setHint('Ищем адрес…');
+    ymaps.geocode('Москва, '+v, {results:7, boundedBy:[[55.14,36.80],[56.02,37.97]]}).then(function(res){
+      if(my!==reqId) return; // пришёл устаревший ответ — игнорируем
+      var objs=[]; res.geoObjects.each(function(o){ objs.push(o); });
+      render(objs);
+    }).catch(function(e){
+      if(my!==reqId) return;
+      setHint('Не удалось загрузить подсказки. Впишите адрес вручную ниже.');
+    });
   }
   q.addEventListener('input',function(){
     clearTimeout(timer);
     var v=q.value.trim();
-    if(v.length<3){ list.innerHTML=''; hint.style.display='block'; hint.textContent='Введите улицу и дом — подскажем адрес'; return; }
-    timer=setTimeout(function(){
-      ymaps.suggest('Москва, '+v,{results:8}).then(render).catch(function(){});
-    },250);
+    if(v.length<3){ list.innerHTML=''; setHint('Введите улицу и дом — подскажем адрес'); return; }
+    timer=setTimeout(function(){ search(v); },350);
   });
 });
 </script>
