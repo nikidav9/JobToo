@@ -147,7 +147,7 @@ function tg_validate_init_data(string $initData): ?array {
  * Sends a message to a Telegram user via Bot API. Never throws.
  * $withAppButton: true — кнопка на главную мини-аппа; string — свой URL кнопки.
  */
-function tg_send_message(int $chatId, string $text, bool|string $withAppButton = false): bool {
+function tg_send_message(int $chatId, string $text, bool|string $withAppButton = false, string $btnText = '🚀 Откликнуться в JobToo'): bool {
     if (TG_BOT_TOKEN === '') return false;
     $payload = [
         'chat_id' => $chatId,
@@ -158,7 +158,7 @@ function tg_send_message(int $chatId, string $text, bool|string $withAppButton =
     if ($withAppButton !== false) {
         $url = is_string($withAppButton) ? $withAppButton : 'https://t.me/JobToo_bot/app';
         $payload['reply_markup'] = ['inline_keyboard' => [[
-            ['text' => '🚀 Откликнуться в JobToo', 'url' => $url],
+            ['text' => $btnText, 'url' => $url],
         ]]];
     }
     $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendMessage');
@@ -649,8 +649,9 @@ try {
         // args: [userId, text] — message the user's linked Telegram account
         case 'tgNotifyUser': {
             $u = sb_single('jm_users', ['id' => 'eq.' . $args[0]], 'telegram_id');
+            $btn = isset($args[2]) && $args[2] ? true : false; // показать кнопку «Открыть JobToo»
             $data = ($u && !empty($u['telegram_id']))
-                ? tg_send_message((int)$u['telegram_id'], (string)$args[1])
+                ? tg_send_message((int)$u['telegram_id'], (string)$args[1], $btn, '🚀 Открыть JobToo')
                 : false;
             break;
         }

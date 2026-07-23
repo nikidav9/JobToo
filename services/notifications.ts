@@ -205,6 +205,26 @@ async function sendWebPushTo(
 
 // ─── Internal helper ──────────────────────────────────────────────────────────
 
+// Экранируем HTML для parse_mode=HTML в Telegram (имена/компании могут содержать < > &)
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Зеркалим уведомление в Telegram, если пользователь привязал аккаунт.
+// Сервер сам находит telegram_id по userId (эндпоинт tgNotifyUser).
+async function sendTelegramTo(recipientUserId: string, title: string, body: string): Promise<void> {
+  try {
+    const html = `<b>${escapeHtml(title)}</b>\n\n${escapeHtml(body)}`;
+    await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
+      body: JSON.stringify({ fn: 'tgNotifyUser', args: [recipientUserId, html, true] }),
+    });
+  } catch {
+    // Never crash due to a Telegram notification failure
+  }
+}
+
 async function pushTo(
   recipientUserId: string,
   title: string,
@@ -212,11 +232,14 @@ async function pushTo(
   type: string,
   channelId = 'default',
   data: Record<string, unknown> = {},
+  sendTelegram = true,
 ): Promise<void> {
   // Save in-app notification so the bell always shows it
   dbSaveNotification(recipientUserId, title, body).catch(() => {});
   // Fire-and-forget web push alongside Expo push
   sendWebPushTo(recipientUserId, title, body, { type, ...data }).catch(() => {});
+  // Mirror to Telegram (bell + push + web push + Telegram — все каналы)
+  if (sendTelegram) sendTelegramTo(recipientUserId, title, body).catch(() => {});
   try {
     const token = await dbGetPushToken(recipientUserId);
     if (!token) return;
@@ -411,6 +434,7 @@ export async function notifyEmployerNewPermApplicant(
     '📥 Новая заявка!',
     `${workerName} откликнулся на вакансию «${vacancyTitle}». Посмотрите кандидата!`,
     'new_perm_applicant', 'matches',
+    {}, false, // Telegram шлём отдельной карточкой ниже — не дублируем
   );
   // Telegram-карточка с кнопками «Одобрить/Отклонить» прямо в чате директора
   if (workerId && vacancyId) {
