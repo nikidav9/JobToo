@@ -1086,31 +1086,45 @@ try {
             break;
         }
 
-        case 'yandexSuggest': {
-            // Подсказки адресов Яндекса (ключ Suggest — только на сервере)
+        case 'addressSuggest': {
+            // Подсказки адресов через OpenStreetMap/Nominatim (бесплатно, без ключа,
+            // работает и с сервера — в отличие от Яндекс Suggest/Geocoder).
             $text = trim((string)($args[0] ?? ''));
             $data = [];
-            if ($text !== '' && YANDEX_SUGGEST_KEY !== '') {
+            if (mb_strlen($text) >= 3) {
                 $q = http_build_query([
-                    'apikey' => YANDEX_SUGGEST_KEY,
-                    'text' => $text,
-                    'lang' => 'ru_RU',
-                    'results' => 6,
-                    'print_address' => 1,
-                    'types' => 'geo,house',
-                    'll' => '37.618,55.751',   // центр Москвы — приоритет ближайшим
-                    'spn' => '1.4,0.9',
+                    'q' => $text . ', Москва',
+                    'format' => 'jsonv2',
+                    'addressdetails' => 1,
+                    'limit' => 7,
+                    'accept-language' => 'ru',
+                    'countrycodes' => 'ru',
+                    // приоритет Москве и области, но не жёстко (bounded=0)
+                    'viewbox' => '36.80,56.02,37.97,55.14',
+                    'bounded' => 0,
                 ]);
-                $ch = curl_init('https://suggest-maps.yandex.ru/v1/suggest?' . $q);
-                curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_SSL_VERIFYPEER => true]);
+                $ch = curl_init('https://nominatim.openstreetmap.org/search?' . $q);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 8,
+                    CURLOPT_SSL_VERIFYPEER => true,
+                    // Nominatim требует идентифицирующий User-Agent
+                    CURLOPT_HTTPHEADER => ['User-Agent: JobToo/1.0 (+https://jobtoo.ru)', 'Accept: application/json'],
+                ]);
                 $resp = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
                 $dec = json_decode($resp ?: 'null', true);
-                if ($code === 200 && isset($dec['results'])) {
-                    foreach ($dec['results'] as $r) {
-                        $title = $r['title']['text'] ?? '';
-                        $sub = $r['subtitle']['text'] ?? '';
-                        $full = $r['address']['formatted_address'] ?? trim(($sub !== '' ? $sub . ', ' : '') . $title);
-                        if ($title !== '') $data[] = ['title' => $title, 'subtitle' => $sub, 'full' => $full];
+                if ($code === 200 && is_array($dec)) {
+                    foreach ($dec as $r) {
+                        $name = $r['display_name'] ?? '';
+                        if ($name === '') continue;
+                        // Убираем хвост «, Россия» и почтовый индекс — короче и чище
+                        $name = preg_replace('/,\s*Россия$/u', '', $name);
+                        $name = preg_replace('/,\s*\d{6}(?=,|$)/u', '', $name);
+                        $data[] = [
+                            'name' => $name,
+                            'lat' => isset($r['lat']) ? (float)$r['lat'] : null,
+                            'lng' => isset($r['lon']) ? (float)$r['lon'] : null,
+                        ];
                     }
                 }
             }

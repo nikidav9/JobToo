@@ -1086,6 +1086,18 @@ export async function dbCreateBulletin(params: {
   return proxy<string>('dbCreateBulletin', [params]);
 }
 
+// ─── Address suggestions (OpenStreetMap/Nominatim via proxy) ──────────────────
+export type AddressSuggestion = { name: string; lat: number | null; lng: number | null };
+
+export async function dbAddressSuggest(query: string): Promise<AddressSuggestion[]> {
+  if (query.trim().length < 3) return [];
+  try {
+    return await withTimeout(proxy<AddressSuggestion[]>('addressSuggest', [query]), 9000);
+  } catch {
+    return [];
+  }
+}
+
 export async function dbGetActiveBulletins(): Promise<Bulletin[]> {
   const d = await proxy<any[]>('dbGetActiveBulletins');
   return d.map(rowToBulletin);
