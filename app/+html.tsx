@@ -54,17 +54,19 @@ export default function Root({ children }: PropsWithChildren) {
             animation: sp-draw var(--d) linear var(--dl) forwards;
           }
           @keyframes sp-draw { to { stroke-dashoffset: 0; } }
+          /* Место под логотип зарезервировано всегда — счётчик не подпрыгивает */
           #splash-bottom {
             display: flex; flex-direction: column; align-items: center;
-            margin-top: 26px; opacity: 0;
-            animation: sp-fade 0.5s ease 1265ms forwards;
+            margin-top: 26px;
           }
           @keyframes sp-fade { to { opacity: 1; } }
           #splash-name {
             font-size: 34px; font-weight: 800; letter-spacing: -0.8px;
-            color: #fff;
+            color: #fff; opacity: 0;
+            animation: sp-fade 0.5s ease 1265ms forwards;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           }
+          /* Счётчик виден с первого кадра — отсчёт начинается с единицы */
           #splash-pct {
             margin-top: 10px; font-size: 17px; font-weight: 700;
             font-style: italic; letter-spacing: 1.5px;
@@ -73,7 +75,7 @@ export default function Root({ children }: PropsWithChildren) {
           }
           @media (prefers-reduced-motion: reduce) {
             .sp { animation: none; stroke-dashoffset: 0; }
-            #splash-bottom { animation: none; opacity: 1; }
+            #splash-name { animation: none; opacity: 1; }
           }
         `}</style>
       </head>
@@ -116,19 +118,23 @@ export default function Root({ children }: PropsWithChildren) {
           (function() {
             var splash = document.getElementById('splash');
             var pctEl = document.getElementById('splash-pct');
-            var done = false, ready = false, pct = 0;
-            var start = Date.now(), DRAW = 2300;
+            var done = false, ready = false, pct = 1;
+            var start = Date.now(), DRAW = 2300, TAIL = 700;
 
-            // Счётчик ползёт до 95 %, а когда приложение готово — добегает до 100 %.
+            // 1 → 95 % равномерно, затем 96..99 медленно, и до 100 % когда готово.
             var tick = setInterval(function() {
+              if (pct >= 100) { clearInterval(tick); return; }
               if (ready) {
                 pct = Math.min(100, pct + 7);
               } else {
-                var t = Math.min(1, (Date.now() - start) / DRAW);
-                pct = Math.max(pct, Math.round((1 - Math.pow(1 - t, 2.2)) * 95));
+                var elapsed = Date.now() - start;
+                if (elapsed < DRAW) {
+                  pct = Math.max(pct, Math.round(1 + (elapsed / DRAW) * 94));
+                } else {
+                  pct = Math.max(pct, Math.min(99, 95 + Math.floor((elapsed - DRAW) / TAIL)));
+                }
               }
               if (pctEl) pctEl.textContent = pct + '%';
-              if (pct >= 100) clearInterval(tick);
             }, 45);
 
             function finish() {

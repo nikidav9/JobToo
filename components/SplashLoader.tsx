@@ -87,11 +87,16 @@ function DrawnStroke({ stroke, progress }: { stroke: Stroke; progress: Animated.
 }
 
 /**
- * Процент загрузки: плавно ползёт до 95 % за minMs, а когда данные готовы —
- * добегает до 100 %. Так счётчик отражает реальную загрузку, а не таймер.
+ * Процент загрузки. Три фазы, чтобы счёт выглядел живым и честным:
+ *   1) 1 → 95 % равномерно за minMs, пока рисуется корзина;
+ *   2) 95 → 99 % по одному проценту раз в TAIL_STEP_MS, если данные ещё едут
+ *      (видно, что приложение не зависло, но и до 100 % не врём);
+ *   3) данные готовы → быстро добегаем до 100 %.
  */
+const TAIL_STEP_MS = 700;
+
 export function useLoadingPercent(ready: boolean, minMs = DRAW_MS): number {
-  const [percent, setPercent] = useState(0);
+  const [percent, setPercent] = useState(1);
   const start = useRef(Date.now());
   const readyRef = useRef(ready);
   readyRef.current = ready;
@@ -99,11 +104,16 @@ export function useLoadingPercent(ready: boolean, minMs = DRAW_MS): number {
   useEffect(() => {
     const id = setInterval(() => {
       setPercent(prev => {
+        if (prev >= 100) return prev;
         if (readyRef.current) return Math.min(100, prev + 7);
-        const t = Math.min(1, (Date.now() - start.current) / minMs);
-        // ease-out: в начале быстро, ближе к 95 % замедляется
-        const eased = 1 - Math.pow(1 - t, 2.2);
-        return Math.max(prev, Math.round(eased * 95));
+        const elapsed = Date.now() - start.current;
+        if (elapsed < minMs) {
+          // равномерный подъём 1 → 95: пользователь видит счёт с самого начала
+          return Math.max(prev, Math.round(1 + (elapsed / minMs) * 94));
+        }
+        // хвост: 96, 97, 98, 99 — заметно медленнее
+        const extra = Math.floor((elapsed - minMs) / TAIL_STEP_MS);
+        return Math.max(prev, Math.min(99, 95 + extra));
       });
     }, 45);
     return () => clearInterval(id);
@@ -112,9 +122,9 @@ export function useLoadingPercent(ready: boolean, minMs = DRAW_MS): number {
   return percent;
 }
 
-export default function SplashLoader({ percent = 0 }: { percent?: number }) {
+export default function SplashLoader({ percent = 1 }: { percent?: number }) {
   const progress = useRef(new Animated.Value(0)).current;
-  const fade = useRef(new Animated.Value(0)).current;
+  const logoFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(progress, {
@@ -123,8 +133,8 @@ export default function SplashLoader({ percent = 0 }: { percent?: number }) {
       easing: Easing.linear,
       useNativeDriver: false, // strokeDashoffset — не нативное свойство
     }).start();
-    // Логотип и счётчик проявляются, когда корзина уже нарисована
-    Animated.timing(fade, {
+    // Логотип проявляется, когда корзина уже нарисована
+    Animated.timing(logoFade, {
       toValue: 1,
       duration: 500,
       delay: DRAW_MS * 0.55,
@@ -143,10 +153,13 @@ export default function SplashLoader({ percent = 0 }: { percent?: number }) {
         </Svg>
       </View>
 
-      <Animated.View style={[styles.bottom, { opacity: fade }]}>
-        <Text style={styles.logo}>JobToo</Text>
+      {/* Место под логотип зарезервировано всегда — счётчик не подпрыгивает,
+          когда логотип проявляется */}
+      <View style={styles.bottom}>
+        <Animated.Text style={[styles.logo, { opacity: logoFade }]}>JobToo</Animated.Text>
+        {/* Счётчик виден с первого кадра — отсчёт начинается с единицы */}
         <Text style={styles.percent}>{Math.round(percent)}%</Text>
-      </Animated.View>
+      </View>
     </View>
   );
 }
