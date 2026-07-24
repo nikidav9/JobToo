@@ -1,18 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated,
-  ScrollView, Image, Dimensions, Platform,
+  ScrollView, Dimensions, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Star } from 'lucide-react-native';
-import { Asset } from 'expo-asset';
 import * as SplashScreen from 'expo-splash-screen';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import SplashLoader, { useLoadingPercent } from '@/components/SplashLoader';
+import SplashLoader, { useLoadingPercent, DrawnArt } from '@/components/SplashLoader';
+import { ICON_WORKER, ICON_EMPLOYER } from '@/constants/roleIcons';
 import { hideWebSplash } from '@/lib/webSplash';
 
 const USER_COUNT_KEY = 'cached_user_count';
@@ -21,22 +20,6 @@ const { width: SW, height: SH } = Dimensions.get('window');
 const sc = Math.min(SW / 390, SH / 844);
 const r = (n: number) => Math.round(n * sc);
 
-// Figma: фрейм 265px → телефон 390px → масштаб 1.474
-// Карточки в Figma: 211×94px
-const CARD_H = r(156);
-
-// Персонаж работодателя: 77×104 в Figma, right-отступ 42px
-const EMPL_W     = r(119);
-const EMPL_H     = r(169);
-const EMPL_RIGHT = r(62);
-
-// Персонаж работника: 78×98 в Figma, right-отступ 35px
-const WORK_W     = r(123);
-const WORK_H     = r(160);
-const WORK_RIGHT = r(52);
-
-// Зазор между карточками: 12px + overflow 4px = 16px × 1.474
-const CARD2_MT = r(18);
 
 
 export default function RootScreen() {
@@ -48,18 +31,20 @@ export default function RootScreen() {
   const [ready, setReady] = useState(false);
   // Счётчик на загрузочном экране: добегает до 100 %, когда стартовые данные готовы
   const bootPercent = useLoadingPercent(!loading);
+  // Текст и второстепенные блоки проявляются, пока рисуются иконки ролей
+  const introFade = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!ready) return;
+    Animated.timing(introFade, {
+      toValue: 1, duration: 420, delay: 80, useNativeDriver: true,
+    }).start();
+  }, [ready]);
   const [userCount, setUserCount] = useState<number | null>(null);
   const [userCountReady, setUserCountReady] = useState(false);
   // Always holds latest currentUser — avoids stale closure inside animation callback
   const currentUserRef = useRef(currentUser);
   currentUserRef.current = currentUser;
-
-  useEffect(() => {
-    Asset.loadAsync([
-      require('../assets/images/char-employer-crop.png'),
-      require('../assets/images/char-worker-crop.png'),
-    ]);
-  }, []);
 
   useEffect(() => {
     // Показываем кэшированное значение сразу
@@ -121,146 +106,108 @@ export default function RootScreen() {
         bounces={false}
         scrollEnabled={false}
       >
-        {/* Спейсер вверху — на больших экранах отступ идёт над логотипом */}
         <View style={{ minHeight: r(8) }} />
 
         {/* ── Лого ── */}
-        <View style={styles.logoRow}>
-          <Text style={styles.logo}>
-            <Text style={styles.logoBlack}>Job</Text>
-            <Text style={styles.logoOrange}>Too</Text>
-          </Text>
+        <Animated.View style={[styles.logoRow, { opacity: introFade }]}>
+          <Text style={styles.logo}>JobToo</Text>
           <Text style={styles.tagline}>Подработки на складах в Москве</Text>
-        </View>
+        </Animated.View>
 
         {/* ── Заголовок ── */}
-        <View style={styles.headlineBlock}>
+        <Animated.View style={[styles.headlineBlock, { opacity: introFade }]}>
           <Text style={styles.headline}>{'Выберите,\nкто вы'}</Text>
           <Text style={styles.headlineSub}>{'Мы адаптируем приложение\nпод ваши задачи'}</Text>
-        </View>
+        </Animated.View>
 
-        {/* ══ Карточка 1: Ищу подработку (оранжевая) ══ */}
+        {/* ══ Карточка 1: Ищу подработку ══ */}
         <TouchableOpacity
           style={styles.card}
-          activeOpacity={0.9}
+          activeOpacity={0.85}
           onPress={() => router.push('/register-worker')}
         >
-          <View style={[StyleSheet.absoluteFill, styles.bgOrange]} />
-
-          <Image
-            source={require('../assets/images/char-employer-crop.png')}
-            style={[styles.charImg, { width: EMPL_W, height: EMPL_H, right: EMPL_RIGHT }]}
-            resizeMode="contain"
-          />
-
-          <View style={styles.cardLeft}>
-            <Text style={styles.cardTitle}>Ищу{'\n'}подработку</Text>
-            <Text style={[styles.cardSub, styles.cardSubOrange]}>
-              {'Находите подработки\nна складах'}
-            </Text>
+          <View style={styles.cardIcon}>
+            <DrawnArt
+              strokes={ICON_WORKER}
+              viewBox="0 0 100 100"
+              width={r(72)}
+              height={r(72)}
+              duration={900}
+              delay={120}
+            />
           </View>
-
-          <View style={[styles.arrowBtn, { right: r(13) }]}>
+          <View style={styles.cardTextWrap}>
+            <Text style={styles.cardTitle}>Ищу подработку</Text>
+            <Text style={styles.cardSub}>{'Смены на складах —\nвыходите когда удобно'}</Text>
+          </View>
+          <View style={styles.arrowBtn}>
             <Text style={styles.arrowTxt}>›</Text>
           </View>
         </TouchableOpacity>
 
-        {/* ══ Карточка 2: Ищу работника (тёмная) ══ */}
+        {/* ══ Карточка 2: Ищу работника ══ */}
         <TouchableOpacity
-          style={[styles.card, { marginTop: CARD2_MT }]}
-          activeOpacity={0.9}
+          style={[styles.card, { marginTop: r(16) }]}
+          activeOpacity={0.85}
           onPress={() => router.push('/register-employer')}
         >
-          <View style={[StyleSheet.absoluteFill, styles.bgDark]} />
-
-          <Image
-            source={require('../assets/images/char-worker-crop.png')}
-            style={[styles.charImg, { width: WORK_W, height: WORK_H, right: WORK_RIGHT }]}
-            resizeMode="contain"
-          />
-
-          <View style={styles.cardLeft}>
-            <Text style={styles.cardTitle}>Ищу{'\n'}работника</Text>
+          <View style={styles.cardIcon}>
+            <DrawnArt
+              strokes={ICON_EMPLOYER}
+              viewBox="0 0 100 100"
+              width={r(72)}
+              height={r(72)}
+              duration={900}
+              delay={560}
+            />
+          </View>
+          <View style={styles.cardTextWrap}>
+            <Text style={styles.cardTitle}>Ищу работника</Text>
             <Text style={styles.cardSub}>{'Размещайте вакансии\nи находите сотрудников'}</Text>
           </View>
-
-          <View style={[styles.arrowBtn, { right: r(8) }]}>
+          <View style={styles.arrowBtn}>
             <Text style={styles.arrowTxt}>›</Text>
           </View>
         </TouchableOpacity>
 
         {/* ── Преимущества ── */}
-        <View style={styles.featuresRow}>
-          <View style={styles.feature}>
-            <Image
-              source={require('../assets/images/icon-security.png')}
-              style={styles.featureIcon}
-              resizeMode="contain"
-            />
-            <Text style={styles.featureTitle}>Безопасно</Text>
-            <Text style={styles.featureSub}>{'Проверенные\nкомпании'}</Text>
-          </View>
-
-          <View style={styles.feature}>
-            <Image
-              source={require('../assets/images/icon-flash.png')}
-              style={styles.featureIcon}
-              resizeMode="contain"
-            />
-            <Text style={styles.featureTitle}>Быстро</Text>
-            <Text style={styles.featureSub}>{'Отклики и подбор\nза 1 день'}</Text>
-          </View>
-
-          <View style={styles.feature}>
-            <Star size={r(20)} color={Colors.primary} fill={Colors.primary} />
-            <Text style={styles.featureTitle}>Надёжно</Text>
-            <Text style={styles.featureSub}>{'Поддержка\n24/7'}</Text>
-          </View>
-        </View>
+        <Animated.View style={[styles.featuresRow, { opacity: introFade }]}>
+          <Text style={styles.featureTxt}>Проверенные компании</Text>
+          <Text style={styles.featureDot}>·</Text>
+          <Text style={styles.featureTxt}>Подбор за день</Text>
+          <Text style={styles.featureDot}>·</Text>
+          <Text style={styles.featureTxt}>Поддержка 24/7</Text>
+        </Animated.View>
 
         {/* ── Счётчик пользователей ── */}
-        <View style={styles.userCountCard}>
-          <View style={styles.avatarsStack}>
-            {[
-              { color: '#FF6B1A', letter: 'А' },
-              { color: '#2563EB', letter: 'М' },
-              { color: '#16A34A', letter: 'К' },
-              { color: '#7C3AED', letter: 'Д' },
-            ].map((a, i) => (
-              <View key={i} style={[styles.avatarCircle, { backgroundColor: a.color, left: i * r(16) }]}>
-                <Text style={styles.avatarLetter}>{a.letter}</Text>
-              </View>
-            ))}
-          </View>
+        <Animated.View style={[styles.userCountCard, { opacity: introFade }]}>
           <Text style={styles.userCountTxt}>
             {userCountReady && userCount != null
               ? <>Более <Text style={styles.userCountNum}>{userCount.toLocaleString('ru')}</Text> пользователей уже с нами!</>
               : 'Уже тысячи с нами!'
             }
           </Text>
-        </View>
+        </Animated.View>
 
-        {/* Спейсер — прижимает логин и версию к низу экрана */}
         <View style={{ flex: 1, minHeight: r(12) }} />
 
         {/* ── Вход ── */}
-        <View style={styles.loginCard}>
+        <Animated.View style={[styles.loginCard, { opacity: introFade }]}>
           <Text style={styles.loginGray}>Уже есть аккаунт? </Text>
           <TouchableOpacity onPress={() => router.push('/login')}>
             <Text style={styles.loginLink}>Войти</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
-        <Text style={styles.version}>JobToo v3.0</Text>
+        <Animated.Text style={[styles.version, { opacity: introFade }]}>JobToo v3.0</Animated.Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F5F7FA' },
-
-  splashCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  // Тот же фирменный оранжевый, что и на загрузочном экране — переход бесшовный
+  safe: { flex: 1, backgroundColor: '#FF6B1A' },
 
   scroll: {
     flexGrow: 1,
@@ -272,72 +219,54 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
 
-  logoRow: { marginBottom: r(16) },
-  logo: { fontSize: r(37) },
-  logoBlack: { fontWeight: '800', color: '#111111' },
-  logoOrange: { fontWeight: '800', color: Colors.primary },
-  tagline: { fontSize: r(15), color: Colors.textSecondary, marginTop: r(4) },
+  logoRow: { marginBottom: r(14) },
+  logo: { fontSize: r(34), fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.8 },
+  tagline: { fontSize: r(14), color: 'rgba(255,255,255,0.8)', marginTop: r(4) },
 
-  headlineBlock: { marginBottom: r(20) },
+  headlineBlock: { marginBottom: r(18) },
   headline: {
-    fontSize: r(42), fontWeight: '800', color: '#111111', lineHeight: r(48),
+    fontSize: r(38), fontWeight: '800', color: '#FFFFFF', lineHeight: r(44),
   },
   headlineSub: {
-    fontSize: r(16), color: Colors.textSecondary,
-    marginTop: r(8), lineHeight: r(22),
+    fontSize: r(15), color: 'rgba(255,255,255,0.8)',
+    marginTop: r(8), lineHeight: r(21),
   },
 
+  // Карточка-обводка: белая линия по оранжевому — как весь рисованный стиль
   card: {
-    height: CARD_H,
-    overflow: 'visible',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: r(14),
+    borderWidth: 1.6,
+    borderColor: 'rgba(255,255,255,0.85)',
+    borderRadius: r(20),
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    paddingVertical: r(22),
+    paddingLeft: r(16),
+    paddingRight: r(12),
   },
-
-  bgOrange: { backgroundColor: '#FF5500', borderRadius: r(20), overflow: 'hidden' },
-  bgDark:   { backgroundColor: '#1E2225', borderRadius: r(20), overflow: 'hidden' },
-
-  charImg: {
-    position: 'absolute',
-    bottom: 0,
-  },
-
-  cardLeft: {
-    position: 'absolute',
-    left: r(18),
-    top: r(0),
-    bottom: r(0),
-    right: r(185),
-    justifyContent: 'center',
-  },
-
+  cardIcon: { width: r(72), height: r(72), alignItems: 'center', justifyContent: 'center' },
+  cardTextWrap: { flex: 1 },
   cardTitle: {
-    fontSize: r(22), fontWeight: '800', color: '#FFFFFF',
-    lineHeight: r(27), marginBottom: r(5),
+    fontSize: r(20), fontWeight: '800', color: '#FFFFFF', marginBottom: r(4),
   },
   cardSub: {
-    fontSize: r(13), color: 'rgba(255,255,255,0.65)', lineHeight: r(18),
+    fontSize: r(13), color: 'rgba(255,255,255,0.8)', lineHeight: r(18),
   },
-  cardSubOrange: {
-    color: '#FFC69C',
-  },
-
   arrowBtn: {
-    position: 'absolute',
-    top: CARD_H / 2 - r(18),
-    width: r(36), height: r(36), borderRadius: r(18),
+    width: r(34), height: r(34), borderRadius: r(17),
     backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
-    zIndex: 2,
   },
-  arrowTxt: { fontSize: r(21), color: '#111111', lineHeight: r(26), marginLeft: 2 },
+  arrowTxt: { fontSize: r(20), color: Colors.primary, lineHeight: r(24), marginLeft: 2, fontWeight: '700' },
 
   featuresRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    marginTop: r(14), marginBottom: r(10),
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    flexWrap: 'wrap', gap: r(6),
+    marginTop: r(16),
   },
-  feature: { flex: 1, alignItems: 'center', paddingHorizontal: r(4), gap: r(3) },
-  featureIcon: { width: r(20), height: r(20) },
-  featureTitle: { fontSize: r(12), fontWeight: '700', color: '#111111' },
-  featureSub: { fontSize: r(10), color: Colors.textSecondary, textAlign: 'center', lineHeight: r(14) },
+  featureTxt: { fontSize: r(11.5), color: 'rgba(255,255,255,0.85)' },
+  featureDot: { fontSize: r(11.5), color: 'rgba(255,255,255,0.55)' },
 
   loginCard: {
     backgroundColor: '#FFFFFF', borderRadius: r(14),
@@ -348,30 +277,15 @@ const styles = StyleSheet.create({
   loginGray: { fontSize: r(15), color: '#111111' },
   loginLink: { fontSize: r(15), fontWeight: '900', color: Colors.primary },
 
-  version: { textAlign: 'center', fontSize: r(12), color: '#6B7280' },
+  version: { textAlign: 'center', fontSize: r(12), color: 'rgba(255,255,255,0.7)' },
   userCountCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     alignSelf: 'center',
-    marginTop: r(10), marginBottom: r(2),
-    paddingVertical: r(5), paddingHorizontal: r(10),
-    backgroundColor: '#FFFFFF',
+    marginTop: r(10),
+    paddingVertical: r(6), paddingHorizontal: r(14),
     borderRadius: r(20),
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    gap: r(7),
+    borderColor: 'rgba(255,255,255,0.5)',
   },
-  avatarsStack: {
-    position: 'relative',
-    width: r(16) * 3 + r(24),
-    height: r(24),
-  },
-  avatarCircle: {
-    position: 'absolute',
-    width: r(24), height: r(24), borderRadius: r(12),
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: '#fff',
-  },
-  avatarLetter: { fontSize: r(9), fontWeight: '700', color: '#fff' },
-  userCountTxt: { fontSize: r(12), color: Colors.textSecondary },
-  userCountNum: { fontWeight: '700', color: Colors.primary },
+  userCountTxt: { fontSize: r(12), color: 'rgba(255,255,255,0.9)' },
+  userCountNum: { fontWeight: '800', color: '#FFFFFF' },
 });

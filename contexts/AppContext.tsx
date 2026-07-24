@@ -242,13 +242,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         .catch(() => {});
 
       try {
-        // On Android, AsyncStorage may return null on cold start if read too early.
-        // On web, localStorage is synchronous so no delay needed.
-        if (Platform.OS !== 'web') {
-          await new Promise<void>(r => setTimeout(r, 1000));
+        // Читаем сессию сразу. На Android AsyncStorage изредка отдаёт null,
+        // если прочитать слишком рано, — поэтому при промахе делаем несколько
+        // коротких повторов вместо безусловной секундной паузы: иначе гость,
+        // которому грузить нечего, зря смотрит на загрузочный экран.
+        let sessionUser = await getSessionUser().catch(() => null);
+        if (!sessionUser && Platform.OS === 'android') {
+          for (let i = 0; i < 3 && !sessionUser; i++) {
+            await new Promise<void>(r => setTimeout(r, 200));
+            if (cancelled) return;
+            sessionUser = await getSessionUser().catch(() => null);
+          }
         }
         if (cancelled) return;
-        let sessionUser = await getSessionUser().catch(() => null);
 
         // Telegram Mini App: auto-login via signed initData — no password needed
         if (!sessionUser && isTelegramMiniApp()) {

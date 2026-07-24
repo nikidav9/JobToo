@@ -25,7 +25,7 @@ const DRAW_MS = 2300;
 
 // Штрихи арта. from/to — окно прорисовки внутри общего прогресса 0→1,
 // len — приблизительная длина пути (для strokeDasharray).
-type Stroke = { d: string; len: number; from: number; to: number; w?: number; t?: string };
+export type Stroke = { d: string; len: number; from: number; to: number; w?: number; t?: string };
 
 const STROKES: Stroke[] = [
   // ── Складской стеллаж ──
@@ -91,7 +91,9 @@ const STROKES: Stroke[] = [
   { d: 'M 154 108 L 162 104', len: 9, from: 0.97, to: 1.00, w: 2.4 },
 ];
 
-function DrawnStroke({ stroke, progress }: { stroke: Stroke; progress: Animated.Value }) {
+function DrawnStroke({ stroke, progress, color = WHITE, scale = 1 }: {
+  stroke: Stroke; progress: Animated.Value; color?: string; scale?: number;
+}) {
   const offset = progress.interpolate({
     inputRange: [stroke.from, stroke.to],
     outputRange: [stroke.len, 0],
@@ -101,14 +103,50 @@ function DrawnStroke({ stroke, progress }: { stroke: Stroke; progress: Animated.
     <AnimatedPath
       d={stroke.d}
       transform={stroke.t}
-      stroke={WHITE}
-      strokeWidth={stroke.w ?? 3.4}
+      stroke={color}
+      strokeWidth={(stroke.w ?? 3.4) * scale}
       strokeLinecap="round"
       strokeLinejoin="round"
       fill="none"
       strokeDasharray={[stroke.len, stroke.len]}
       strokeDashoffset={offset as unknown as number}
     />
+  );
+}
+
+/**
+ * Переиспользуемый «рисующийся» арт: линии прорисовываются по своим окнам
+ * внутри общего прогресса. Используется и на загрузочном экране, и в
+ * иконках выбора роли, чтобы стиль везде был один.
+ */
+export function DrawnArt({
+  strokes, viewBox, width, height, color = WHITE, delay = 0, duration = DRAW_MS, strokeScale = 1,
+}: {
+  strokes: Stroke[];
+  viewBox: string;
+  width: number;
+  height: number;
+  color?: string;
+  delay?: number;
+  duration?: number;
+  strokeScale?: number;
+}) {
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: 1, duration, delay,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
+  return (
+    <Svg width={width} height={height} viewBox={viewBox}>
+      {strokes.map((s, i) => (
+        <DrawnStroke key={i} stroke={s} progress={progress} color={color} scale={strokeScale} />
+      ))}
+    </Svg>
   );
 }
 
@@ -121,9 +159,19 @@ function DrawnStroke({ stroke, progress }: { stroke: Stroke; progress: Animated.
  */
 const TAIL_STEP_MS = 700;
 
+// Момент начала загрузки, общий на всё приложение. Загрузочный экран
+// показывается дважды подряд (сначала в index.tsx, затем оверлеем
+// EntryTransition при входе во вкладки) — без общего старта прорисовка и
+// счётчик сбрасывались бы на второй раз. Держим их непрерывными.
+let bootStartedAt: number | null = null;
+function bootStart(): number {
+  if (bootStartedAt == null) bootStartedAt = Date.now();
+  return bootStartedAt;
+}
+
 export function useLoadingPercent(ready: boolean, minMs = DRAW_MS): number {
   const [percent, setPercent] = useState(1);
-  const start = useRef(Date.now());
+  const start = useRef(bootStart());
   const readyRef = useRef(ready);
   readyRef.current = ready;
 
@@ -153,20 +201,32 @@ export default function SplashLoader({ percent = 1 }: { percent?: number }) {
   const logoFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: DRAW_MS,
-      easing: Easing.linear,
-      useNativeDriver: false, // strokeDashoffset — не нативное свойство
-    }).start();
+    // Продолжаем с того места, где остановился предыдущий показ, а не с нуля
+    const elapsed = Date.now() - bootStart();
+    const done = Math.min(1, elapsed / DRAW_MS);
+    progress.setValue(done);
+    if (done < 1) {
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: DRAW_MS * (1 - done),
+        easing: Easing.linear,
+        useNativeDriver: false, // strokeDashoffset — не нативное свойство
+      }).start();
+    }
+
     // Логотип проявляется, когда корзина уже нарисована
-    Animated.timing(logoFade, {
-      toValue: 1,
-      duration: 500,
-      delay: DRAW_MS * 0.55,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }).start();
+    const logoAt = DRAW_MS * 0.55;
+    if (elapsed >= logoAt + 500) {
+      logoFade.setValue(1);
+    } else {
+      Animated.timing(logoFade, {
+        toValue: 1,
+        duration: 500,
+        delay: Math.max(0, logoAt - elapsed),
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start();
+    }
   }, []);
 
   return (
