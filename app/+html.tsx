@@ -84,33 +84,45 @@ export default function Root({ children }: PropsWithChildren) {
           <div
             id="splash-art"
             dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 200 250" xmlns="http://www.w3.org/2000/svg">
-<path class="sp" d="M 68 148 Q 70 100 100 98 Q 130 100 132 148" stroke-width="3.4" style="--l:136;--d:276ms;--dl:0ms"/>
-<path class="sp" d="M 28 150 Q 100 137 172 150" stroke-width="3.4" style="--l:150;--d:276ms;--dl:184ms"/>
-<path class="sp" d="M 28 150 Q 100 163 172 150" stroke-width="3.4" style="--l:150;--d:253ms;--dl:322ms"/>
-<path class="sp" d="M 34 153 L 55 231 Q 57 240 67 240 L 133 240 Q 143 240 145 231 L 166 153" stroke-width="3.4" style="--l:264;--d:552ms;--dl:414ms"/>
-<path class="sp" d="M 60 160 L 70 236" stroke-width="2.6" style="--l:78;--d:207ms;--dl:828ms"/>
-<path class="sp" d="M 86 158 L 90 239" stroke-width="2.6" style="--l:82;--d:207ms;--dl:897ms"/>
-<path class="sp" d="M 114 158 L 110 239" stroke-width="2.6" style="--l:82;--d:207ms;--dl:966ms"/>
-<path class="sp" d="M 140 160 L 130 236" stroke-width="2.6" style="--l:78;--d:207ms;--dl:1035ms"/>
-<path class="sp" d="M 44 196 Q 100 205 156 196" stroke-width="2.6" style="--l:116;--d:207ms;--dl:1150ms"/>
-<path class="sp" d="M 100 40 A 18 18 0 1 1 99.99 40" stroke-width="3.4" style="--l:114;--d:299ms;--dl:1288ms"/>
-<path class="sp" d="M 100 41 L 103 28" stroke-width="2.8" style="--l:14;--d:115ms;--dl:1541ms"/>
-<path class="sp" d="M 103 32 Q 115 26 117 36 Q 107 40 103 32 Z" stroke-width="2.8" style="--l:34;--d:138ms;--dl:1610ms"/>
-<path class="sp" transform="rotate(-16 46 88)" d="M 38 108 L 36 84 Q 35 77 40 74 L 40 64 L 54 64 L 54 74 Q 59 77 58 84 L 56 108 Q 47 112 38 108 Z" stroke-width="3.4" style="--l:138;--d:345ms;--dl:1426ms"/>
-<path class="sp" transform="rotate(-16 46 88)" d="M 40 70 L 54 70" stroke-width="2.8" style="--l:15;--d:92ms;--dl:1725ms"/>
-<path class="sp" transform="rotate(14 154 86)" d="M 136 94 Q 134 76 154 74 Q 174 76 172 94 Q 170 104 154 104 Q 138 104 136 94 Z" stroke-width="3.4" style="--l:116;--d:322ms;--dl:1564ms"/>
-<path class="sp" transform="rotate(14 154 86)" d="M 145 83 L 151 89" stroke-width="2.6" style="--l:9;--d:115ms;--dl:1840ms"/>
-<path class="sp" transform="rotate(14 154 86)" d="M 156 81 L 162 87" stroke-width="2.6" style="--l:9;--d:115ms;--dl:1886ms"/>
-<path class="sp" d="M 22 116 L 12 106" stroke-width="2.6" style="--l:15;--d:138ms;--dl:1932ms"/>
-<path class="sp" d="M 178 114 L 188 104" stroke-width="2.6" style="--l:15;--d:138ms;--dl:2001ms"/>
-<path class="sp" d="M 100 18 L 100 8" stroke-width="2.6" style="--l:11;--d:138ms;--dl:2070ms"/>
-<path class="sp" d="M 58 40 L 51 32" stroke-width="2.6" style="--l:11;--d:138ms;--dl:2116ms"/>
-<path class="sp" d="M 146 38 L 154 30" stroke-width="2.6" style="--l:11;--d:138ms;--dl:2162ms"/>
+<path class="sp" d="M 12 24 L 118 24" stroke-width="3.4" style="--l:106;--d:92ms;--dl:0ms"/>
+<path class="sp" d="M 20 24 L 20 190" stroke-width="3.4" style="--l:166;--d:115ms;--dl:69ms"/>
+<path class="sp" d="M 110 24 L 110 190" stroke-width="3.4" style="--l:166;--d:115ms;--dl:115ms"/>
+<path class="sp" d="M 12 78 L 118 78" stroke-width="3.4" style="--l:106;--d:92ms;--dl:207ms"/>
+<path class="sp" d="M 12 134 L 118 134" stroke-width="3.4" style="--l:106;--d:69ms;--dl:276ms"/>
+<path class="sp" d="M 12 190 L 118 190" stroke-width="3.4" style="--l:106;--d:92ms;--dl:322ms"/>
+<path class="sp" d="M 24 77 L 24 50 L 34 40 L 44 50 L 44 77 Z" stroke-width="2.8" style="--l:100;--d:115ms;--dl:414ms"/>
+<path class="sp" d="M 48 77 L 48 54 L 68 54 L 68 77 Z" stroke-width="2.8" style="--l:86;--d:92ms;--dl:506ms"/>
+<path class="sp" d="M 48 62 L 68 62" stroke-width="2.4" style="--l:20;--d:60ms;--dl:598ms"/>
+<path class="sp" d="M 74 77 L 72 58 L 86 58 L 84 77 Z" stroke-width="2.8" style="--l:66;--d:69ms;--dl:621ms"/>
+<path class="sp" d="M 71 55 L 87 55" stroke-width="2.4" style="--l:16;--d:60ms;--dl:690ms"/>
+<path class="sp" d="M 94 77 L 94 60 Q 94 55 97 53 L 97 47 L 103 47 L 103 53 Q 106 55 106 60 L 106 77 Z" stroke-width="2.8" style="--l:78;--d:92ms;--dl:713ms"/>
+<path class="sp" d="M 24 133 L 24 108 L 52 108 L 52 133 Z" stroke-width="2.8" style="--l:106;--d:115ms;--dl:782ms"/>
+<path class="sp" d="M 38 108 L 38 133" stroke-width="2.4" style="--l:25;--d:60ms;--dl:897ms"/>
+<path class="sp" d="M 58 133 L 58 116 L 80 116 L 80 133 Z" stroke-width="2.8" style="--l:78;--d:92ms;--dl:920ms"/>
+<path class="sp" d="M 62 116 L 62 100 L 78 100 L 78 116" stroke-width="2.8" style="--l:48;--d:69ms;--dl:1012ms"/>
+<path class="sp" d="M 86 133 L 88 108 Q 88 104 92 104 L 104 104 Q 108 104 108 108 L 108 133 Z" stroke-width="2.8" style="--l:92;--d:92ms;--dl:1058ms"/>
+<path class="sp" d="M 24 189 L 24 158 L 54 158 L 54 189 Z" stroke-width="2.8" style="--l:122;--d:115ms;--dl:1127ms"/>
+<path class="sp" d="M 39 158 L 39 189" stroke-width="2.4" style="--l:31;--d:60ms;--dl:1242ms"/>
+<path class="sp" d="M 60 189 L 60 164 L 84 164 L 84 189 Z" stroke-width="2.8" style="--l:98;--d:92ms;--dl:1265ms"/>
+<path class="sp" d="M 92 189 L 92 168 Q 92 163 95 161 L 95 155 L 103 155 L 103 161 Q 106 163 106 168 L 106 189 Z" stroke-width="2.8" style="--l:88;--d:92ms;--dl:1334ms"/>
+<path class="sp" d="M 118 170 Q 157 162 196 170" stroke-width="3.4" style="--l:80;--d:92ms;--dl:1403ms"/>
+<path class="sp" d="M 118 170 Q 157 178 196 170" stroke-width="3.4" style="--l:80;--d:92ms;--dl:1472ms"/>
+<path class="sp" d="M 122 174 L 131 219 Q 132 226 139 226 L 175 226 Q 182 226 183 219 L 192 174" stroke-width="3.4" style="--l:148;--d:207ms;--dl:1541ms"/>
+<path class="sp" d="M 137 177 L 142 223" stroke-width="2.4" style="--l:46;--d:69ms;--dl:1725ms"/>
+<path class="sp" d="M 157 176 L 157 225" stroke-width="2.4" style="--l:49;--d:69ms;--dl:1771ms"/>
+<path class="sp" d="M 177 177 L 172 223" stroke-width="2.4" style="--l:46;--d:69ms;--dl:1817ms"/>
+<path class="sp" d="M 126 190 Q 157 197 188 190" stroke-width="2.4" style="--l:63;--d:69ms;--dl:1863ms"/>
+<path class="sp" d="M 130 207 Q 157 213 184 207" stroke-width="2.4" style="--l:55;--d:69ms;--dl:1909ms"/>
+<path class="sp" d="M 116 88 Q 132 82 140 92" stroke-width="2.4" style="--l:30;--d:92ms;--dl:1978ms"/>
+<path class="sp" d="M 128 116 L 126 100 L 146 96 L 148 112 Z" stroke-width="2.8" style="--l:72;--d:115ms;--dl:2024ms"/>
+<path class="sp" d="M 133 122 Q 138 142 145 158" stroke-width="2.4" style="--l:40;--d:92ms;--dl:2116ms"/>
+<path class="sp" d="M 152 90 L 160 84" stroke-width="2.4" style="--l:10;--d:69ms;--dl:2185ms"/>
+<path class="sp" d="M 154 108 L 162 104" stroke-width="2.4" style="--l:9;--d:69ms;--dl:2231ms"/>
 </svg>` }}
           />
           <div id="splash-bottom">
             <div id="splash-name">JobToo</div>
-            <div id="splash-pct">0%</div>
+            <div id="splash-pct">1%</div>
           </div>
         </div>
         {children}
