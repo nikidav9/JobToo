@@ -62,6 +62,7 @@ export interface Like {
   workerRated?: boolean;
   employerRated?: boolean;
   shiftCompleted?: boolean;
+  cancelled?: boolean;
 }
 
 export interface Message {

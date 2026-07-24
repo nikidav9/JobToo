@@ -334,6 +334,20 @@ export async function notifyWorkerShiftConfirmedByEmployer(
   );
 }
 
+export async function notifyWorkerShiftCancelled(
+  workerId: string,
+  companyName: string,
+  vacancyTitle: string,
+): Promise<void> {
+  await pushTo(
+    workerId,
+    '❌ Смена отменена',
+    `${companyName} отменил смену «${vacancyTitle}». Загляните в приложение — там много других подработок!`,
+    'shift_cancelled',
+    'matches',
+  );
+}
+
 export async function notifyWorkerNewMessage(
   workerId: string,
   senderName: string,

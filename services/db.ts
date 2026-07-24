@@ -271,6 +271,7 @@ function rowToLike(r: any): Like {
     workerRated: r.worker_rated ?? false,
     employerRated: r.employer_rated ?? false,
     shiftCompleted: r.shift_completed ?? false,
+    cancelled: r.cancelled ?? false,
   };
 }
 
@@ -912,6 +913,15 @@ export async function dbConfirmShift(likeId: string, _role: 'employer'): Promise
     }).eq('id', likeId)
   );
   return { bothConfirmed: true };
+}
+
+// Директор отменяет смену (работник пропал и т.п.). Мэтч уходит в «Завершённые»
+// со статусом «Отменена», но НЕ помечается как завершённая смена.
+export async function dbCancelShift(likeId: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbCancelShift', [likeId]); return; }
+  await withTimeout(
+    supabase.from('jm_likes').update({ cancelled: true }).eq('id', likeId)
+  );
 }
 
 // ─── Rating & match deletion ──────────────────────────────────────────────────

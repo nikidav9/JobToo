@@ -961,6 +961,11 @@ try {
                 ['employer_confirmed' => true, 'worker_confirmed' => true, 'shift_completed' => true]);
             $data = ['bothConfirmed' => true]; break;
 
+        case 'dbCancelShift':
+            // Отмена смены директором — мэтч уходит в «Завершённые» как отменённый
+            sb_update('jm_likes', ['id' => 'eq.' . $args[0]], ['cancelled' => true]);
+            $data = true; break;
+
         // ── Rating + match cleanup ─────────────────────────────────────────────
         case 'dbSubmitRatingAndMaybeDelete': {
             $p = $args[0];

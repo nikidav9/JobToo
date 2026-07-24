@@ -13,12 +13,13 @@ import { useApp } from '@/hooks/useApp';
 import { Like, Vacancy, PermApplication, PermVacancy, Chat } from '@/constants/types';
 import { formatDate, getInitials, nameColorFromString } from '@/services/storage';
 import {
-  dbUpsertLike, dbCheckAndCreateMatch, dbConfirmShift,
+  dbUpsertLike, dbCheckAndCreateMatch, dbConfirmShift, dbCancelShift,
   dbSetPermApplicationStatus, dbCreateChat,
 } from '@/services/db';
 import { TabHeader } from '@/components/ui/TabHeader';
 import {
   notifyWorkerShiftConfirmedByEmployer,
+  notifyWorkerShiftCancelled,
   notifyWorkerGotMatch,
   notifyWorkerPermApplicationApproved,
   notifyWorkerPermApplicationRejected,
@@ -28,6 +29,14 @@ import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function MatchStatus({ like, isWorker }: { like: Like; isWorker: boolean }) {
+  if (like.cancelled) {
+    return (
+      <View style={[s.statusBadge, { backgroundColor: '#FEE2E2' }]}>
+        <Ionicons name="close-circle" size={14} color={Colors.red} />
+        <Text style={[s.statusTxt, { color: Colors.red }]}>Смена отменена</Text>
+      </View>
+    );
+  }
   if (like.shiftCompleted) {
     return (
       <View style={[s.statusBadge, { backgroundColor: '#D1FAE5' }]}>
@@ -85,8 +94,13 @@ function MatchStatus({ like, isWorker }: { like: Like; isWorker: boolean }) {
 }
 
 // ─── Confirm shift banner (employer only) with confirmation dialog ─────────────
-function ConfirmBanner({ onConfirm, loading }: { onConfirm: () => void; loading: boolean }) {
+function ConfirmBanner({ onConfirm, onCancelShift, loading }: {
+  onConfirm: () => void;
+  onCancelShift: () => void;
+  loading: boolean;
+}) {
   const [showDialog, setShowDialog] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
 
   return (
     <>
@@ -94,8 +108,16 @@ function ConfirmBanner({ onConfirm, loading }: { onConfirm: () => void; loading:
         <Ionicons name="time-outline" size={22} color="#92400E" />
         <View style={{ flex: 1 }}>
           <Text style={s.confirmBannerTitle}>Подтвердите смену</Text>
-          <Text style={s.confirmBannerSub}>Нажмите кнопку, чтобы завершить смену</Text>
+          <Text style={s.confirmBannerSub}>Смена состоялась — подтвердите, или отмените, если сорвалась</Text>
         </View>
+        <TouchableOpacity
+          style={s.cancelBannerBtn}
+          onPress={() => setShowCancel(true)}
+          disabled={loading}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="close" size={18} color={Colors.red} />
+        </TouchableOpacity>
         <TouchableOpacity
           style={s.confirmBannerBtn}
           onPress={() => setShowDialog(true)}
@@ -135,6 +157,34 @@ function ConfirmBanner({ onConfirm, loading }: { onConfirm: () => void; loading:
           </View>
         </View>
       ) : null}
+
+      {showCancel ? (
+        <View style={s.dialogOverlay}>
+          <View style={s.dialogCard}>
+            <Text style={s.dialogTitle}>Отменить смену?</Text>
+            <Text style={s.dialogBody}>
+              Смена уйдёт в «Завершённые» со статусом «Отменена». Работник получит
+              уведомление об отмене. Оценивать никого не нужно.
+            </Text>
+            <View style={s.dialogBtns}>
+              <TouchableOpacity
+                style={s.dialogCancelBtn}
+                onPress={() => setShowCancel(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={s.dialogCancelTxt}>Назад</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.dialogDangerBtn}
+                onPress={() => { setShowCancel(false); onCancelShift(); }}
+                activeOpacity={0.8}
+              >
+                <Text style={s.dialogConfirmTxt}>Отменить смену</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ) : null}
     </>
   );
 }
@@ -162,9 +212,9 @@ function WorkerMatches() {
 
   const getVacancy = (id: string) => vacancies.find(v => v.id === id);
 
-  const activeItems = myLikes.filter(l => !l.shiftCompleted && l.employerLiked !== false);
+  const activeItems = myLikes.filter(l => !l.shiftCompleted && !l.cancelled && l.employerLiked !== false);
   const rejectedItems = myLikes.filter(l => l.employerLiked === false);
-  const completedItems = myLikes.filter(l => l.shiftCompleted);
+  const completedItems = myLikes.filter(l => l.shiftCompleted || l.cancelled);
 
   const shownItems =
     tab === 'active' ? activeItems :
@@ -177,10 +227,12 @@ function WorkerMatches() {
     const employer = users.find(u => u.id === like.employerId);
     const isMatch = like.isMatch;
     const isCompleted = like.shiftCompleted;
+    const isCancelled = like.cancelled;
+    const isFinished = isCompleted || isCancelled;
     const canRate = isCompleted && !like.workerRated;
 
     return (
-      <View style={[s.card, isMatch && !isCompleted && s.matchedCard, isCompleted && s.completedCard]}>
+      <View style={[s.card, isMatch && !isFinished && s.matchedCard, isFinished && s.completedCard]}>
         <MatchStatus like={like} isWorker={true} />
 
         <TouchableOpacity activeOpacity={0.8} onPress={() => setDetailVacancy(vac)}>
@@ -261,7 +313,12 @@ function WorkerMatches() {
                 <Ionicons name="checkmark" size={14} color={Colors.textMuted} />
                 <Text style={s.waitBtnTxt}>Отзыв оставлен</Text>
               </View>
-            ) : !isCompleted ? (
+            ) : isCancelled ? (
+              <View style={s.waitBtn}>
+                <Ionicons name="close-circle-outline" size={14} color={Colors.red} />
+                <Text style={[s.waitBtnTxt, { color: Colors.red }]}>Смена отменена</Text>
+              </View>
+            ) : !isFinished ? (
               <View style={s.waitBtn}>
                 <Ionicons name="time-outline" size={14} color={Colors.textMuted} />
                 <Text style={s.waitBtnTxt}>Ждём подтверждения</Text>
@@ -389,8 +446,8 @@ function EmployerMatches() {
   const allLikes = likes.filter(l => myVacIds.includes(l.vacancyId) && l.workerLiked);
 
   const pending = allLikes.filter(l => !l.isMatch && l.employerLiked !== false);
-  const matched = allLikes.filter(l => l.isMatch && !l.shiftCompleted);
-  const completed = allLikes.filter(l => l.isMatch && l.shiftCompleted);
+  const matched = allLikes.filter(l => l.isMatch && !l.shiftCompleted && !l.cancelled);
+  const completed = allLikes.filter(l => l.isMatch && (l.shiftCompleted || l.cancelled));
 
   // Отклики на постоянные вакансии — тоже сюда, а не только на карточку вакансии
   const myPermApps: PermApplication[] = permApplications.filter((a: PermApplication) => a.employerId === currentUser.id);
@@ -492,6 +549,26 @@ function EmployerMatches() {
           },
         });
       }
+    } catch {
+      showToast('Ошибка', 'error');
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const cancelShift = async (like: Like) => {
+    const key = like.id + '_shift';
+    setLoading(key);
+    try {
+      await dbCancelShift(like.id);
+      refreshAll().catch(() => {});
+      const worker = getWorker(like.workerId);
+      const vac = getVacancy(like.vacancyId);
+      const company = currentUser.company ?? `${currentUser.firstName} ${currentUser.lastName}`;
+      if (worker && vac) {
+        notifyWorkerShiftCancelled(worker.id, company, vac.title).catch(() => {});
+      }
+      showToast('Смена отменена', 'success');
     } catch {
       showToast('Ошибка', 'error');
     } finally {
@@ -680,11 +757,15 @@ function EmployerMatches() {
 
     if (like.isMatch) {
       return (
-        <View style={[s.card, like.shiftCompleted ? s.completedCard : s.matchedCard]}>
+        <View style={[s.card, (like.shiftCompleted || like.cancelled) ? s.completedCard : s.matchedCard]}>
           <MatchStatus like={like} isWorker={false} />
 
-          {!like.shiftCompleted && !like.employerConfirmed ? (
-            <ConfirmBanner onConfirm={() => confirmShift(like)} loading={isShiftLoading} />
+          {!like.shiftCompleted && !like.cancelled && !like.employerConfirmed ? (
+            <ConfirmBanner
+              onConfirm={() => confirmShift(like)}
+              onCancelShift={() => cancelShift(like)}
+              loading={isShiftLoading}
+            />
           ) : null}
 
           <TouchableOpacity
@@ -1033,6 +1114,11 @@ const s = StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: Colors.green, alignItems: 'center', justifyContent: 'center',
   },
+  cancelBannerBtn: {
+    width: 36, height: 36, borderRadius: 18, marginRight: 8,
+    backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FECACA',
+    alignItems: 'center', justifyContent: 'center',
+  },
   dialogOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100,
@@ -1055,6 +1141,10 @@ const s = StyleSheet.create({
     borderRadius: 100, paddingVertical: 12, alignItems: 'center',
   },
   dialogConfirmTxt: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  dialogDangerBtn: {
+    flex: 1, backgroundColor: Colors.red,
+    borderRadius: 100, paddingVertical: 12, alignItems: 'center',
+  },
   empty: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 32, paddingBottom: 80,
