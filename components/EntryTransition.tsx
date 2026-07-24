@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Platform } from 'react-native';
 import { useApp } from '@/hooks/useApp';
 import { hideWebSplash } from '@/lib/webSplash';
+import SplashLoader, { useLoadingPercent } from '@/components/SplashLoader';
 
 // Sorce-style entry: logo on white with playful bouncing dots. The overlay
 // stays up while real data loads (dataReady from AppContext), then dissolves.
@@ -12,7 +13,7 @@ const DOTS = [
   { color: '#FF8A47', delay: 240 },
 ];
 
-const MIN_SHOW_MS = 2000;  // never dissolve before this
+const MIN_SHOW_MS = 2600;  // never dissolve before this (даём дорисоваться корзине)
 const MAX_SHOW_MS = 5000;  // dissolve even if data is still loading
 const FADE_MS = 450;
 
@@ -67,6 +68,7 @@ export function LogoDots() {
 export default function EntryTransition() {
   const app = useApp();
   const dataReady = app?.dataReady ?? false;
+  const percent = useLoadingPercent(dataReady);
 
   const [done, setDone] = useState(false);
   const [minPassed, setMinPassed] = useState(Platform.OS === 'web');
@@ -103,7 +105,7 @@ export default function EntryTransition() {
 
   return (
     <Animated.View style={[styles.overlay, { opacity: overlay }]} pointerEvents="none">
-      <LogoDots />
+      <SplashLoader percent={percent} />
     </Animated.View>
   );
 }
@@ -111,7 +113,7 @@ export default function EntryTransition() {
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FF6B1A',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999,

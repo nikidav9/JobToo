@@ -12,7 +12,7 @@ import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LogoDots } from '@/components/EntryTransition';
+import SplashLoader, { useLoadingPercent } from '@/components/SplashLoader';
 import { hideWebSplash } from '@/lib/webSplash';
 
 const USER_COUNT_KEY = 'cached_user_count';
@@ -46,6 +46,8 @@ export default function RootScreen() {
   // true if loading was already false when this component mounted (post-logout navigation)
   const skipSplash = useRef(!loading);
   const [ready, setReady] = useState(false);
+  // Счётчик на загрузочном экране: добегает до 100 %, когда стартовые данные готовы
+  const bootPercent = useLoadingPercent(!loading);
   const [userCount, setUserCount] = useState<number | null>(null);
   const [userCountReady, setUserCountReady] = useState(false);
   // Always holds latest currentUser — avoids stale closure inside animation callback
@@ -108,13 +110,7 @@ export default function RootScreen() {
     // Web: the static HTML splash (app/+html.tsx) is the single loading
     // screen — render nothing so there is no second screen behind it.
     if (Platform.OS === 'web') return null;
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.splashCenter}>
-          <LogoDots />
-        </View>
-      </SafeAreaView>
-    );
+    return <SplashLoader percent={bootPercent} />;
   }
 
   return (

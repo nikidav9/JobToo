@@ -32,58 +32,111 @@ export default function Root({ children }: PropsWithChildren) {
 
         <ScrollViewStyleReset />
 
-        {/* Static splash — same visual as LogoDots (components/EntryTransition.tsx),
-            so the pre-hydration screen and the in-app loader read as one screen */}
+        {/* Static splash — same visual as the native loader (components/SplashLoader.tsx):
+            белая «нарисованная от руки» корзина на фирменном оранжевом, счётчик
+            процентов. Пути и тайминги совпадают с нативной версией один в один,
+            поэтому веб/Telegram Mini App и приложение читаются как один экран. */}
         <style>{`
           #splash {
             position: fixed; inset: 0;
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            background: #fff; z-index: 9999;
+            background: #FF6B1A; z-index: 9999;
             transition: opacity 0.35s ease;
           }
           #splash.hidden { opacity: 0; pointer-events: none; }
+          #splash-art { width: min(62vw, 34vh); }
+          #splash-art svg { width: 100%; height: auto; display: block; }
+          .sp {
+            fill: none; stroke: #fff;
+            stroke-linecap: round; stroke-linejoin: round;
+            stroke-dasharray: var(--l); stroke-dashoffset: var(--l);
+            animation: sp-draw var(--d) linear var(--dl) forwards;
+          }
+          @keyframes sp-draw { to { stroke-dashoffset: 0; } }
+          #splash-bottom {
+            display: flex; flex-direction: column; align-items: center;
+            margin-top: 26px; opacity: 0;
+            animation: sp-fade 0.5s ease 1265ms forwards;
+          }
+          @keyframes sp-fade { to { opacity: 1; } }
           #splash-name {
-            font-size: 40px; font-weight: 800; letter-spacing: -1px;
-            color: #111111;
+            font-size: 34px; font-weight: 800; letter-spacing: -0.8px;
+            color: #fff;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           }
-          #splash-name span { color: #FF6B1A; }
-          #splash-dots {
-            display: flex; gap: 8px; margin-top: 22px;
-            height: 20px; align-items: flex-end;
+          #splash-pct {
+            margin-top: 10px; font-size: 17px; font-weight: 700;
+            font-style: italic; letter-spacing: 1.5px;
+            color: rgba(255,255,255,0.85);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           }
-          .splash-dot {
-            width: 9px; height: 9px; border-radius: 5px;
-            animation: splash-bounce 1.04s ease-in-out infinite;
-          }
-          .splash-dot:nth-child(1) { background: #FF6B1A; animation-delay: 0s; }
-          .splash-dot:nth-child(2) { background: #FFB27A; animation-delay: 0.12s; }
-          .splash-dot:nth-child(3) { background: #FF8A47; animation-delay: 0.24s; }
-          @keyframes splash-bounce {
-            0%, 50%, 100% { transform: translateY(0); }
-            25% { transform: translateY(-9px); }
+          @media (prefers-reduced-motion: reduce) {
+            .sp { animation: none; stroke-dashoffset: 0; }
+            #splash-bottom { animation: none; opacity: 1; }
           }
         `}</style>
       </head>
       <body>
         <div id="splash">
-          <div id="splash-name">Job<span>Too</span></div>
-          <div id="splash-dots">
-            <div className="splash-dot" />
-            <div className="splash-dot" />
-            <div className="splash-dot" />
+          <div
+            id="splash-art"
+            dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 200 250" xmlns="http://www.w3.org/2000/svg">
+<path class="sp" d="M 68 148 Q 70 100 100 98 Q 130 100 132 148" stroke-width="3.4" style="--l:136;--d:276ms;--dl:0ms"/>
+<path class="sp" d="M 28 150 Q 100 137 172 150" stroke-width="3.4" style="--l:150;--d:276ms;--dl:184ms"/>
+<path class="sp" d="M 28 150 Q 100 163 172 150" stroke-width="3.4" style="--l:150;--d:253ms;--dl:322ms"/>
+<path class="sp" d="M 34 153 L 55 231 Q 57 240 67 240 L 133 240 Q 143 240 145 231 L 166 153" stroke-width="3.4" style="--l:264;--d:552ms;--dl:414ms"/>
+<path class="sp" d="M 60 160 L 70 236" stroke-width="2.6" style="--l:78;--d:207ms;--dl:828ms"/>
+<path class="sp" d="M 86 158 L 90 239" stroke-width="2.6" style="--l:82;--d:207ms;--dl:897ms"/>
+<path class="sp" d="M 114 158 L 110 239" stroke-width="2.6" style="--l:82;--d:207ms;--dl:966ms"/>
+<path class="sp" d="M 140 160 L 130 236" stroke-width="2.6" style="--l:78;--d:207ms;--dl:1035ms"/>
+<path class="sp" d="M 44 196 Q 100 205 156 196" stroke-width="2.6" style="--l:116;--d:207ms;--dl:1150ms"/>
+<path class="sp" d="M 100 40 A 18 18 0 1 1 99.99 40" stroke-width="3.4" style="--l:114;--d:299ms;--dl:1288ms"/>
+<path class="sp" d="M 100 41 L 103 28" stroke-width="2.8" style="--l:14;--d:115ms;--dl:1541ms"/>
+<path class="sp" d="M 103 32 Q 115 26 117 36 Q 107 40 103 32 Z" stroke-width="2.8" style="--l:34;--d:138ms;--dl:1610ms"/>
+<path class="sp" transform="rotate(-16 46 88)" d="M 38 108 L 36 84 Q 35 77 40 74 L 40 64 L 54 64 L 54 74 Q 59 77 58 84 L 56 108 Q 47 112 38 108 Z" stroke-width="3.4" style="--l:138;--d:345ms;--dl:1426ms"/>
+<path class="sp" transform="rotate(-16 46 88)" d="M 40 70 L 54 70" stroke-width="2.8" style="--l:15;--d:92ms;--dl:1725ms"/>
+<path class="sp" transform="rotate(14 154 86)" d="M 136 94 Q 134 76 154 74 Q 174 76 172 94 Q 170 104 154 104 Q 138 104 136 94 Z" stroke-width="3.4" style="--l:116;--d:322ms;--dl:1564ms"/>
+<path class="sp" transform="rotate(14 154 86)" d="M 145 83 L 151 89" stroke-width="2.6" style="--l:9;--d:115ms;--dl:1840ms"/>
+<path class="sp" transform="rotate(14 154 86)" d="M 156 81 L 162 87" stroke-width="2.6" style="--l:9;--d:115ms;--dl:1886ms"/>
+<path class="sp" d="M 22 116 L 12 106" stroke-width="2.6" style="--l:15;--d:138ms;--dl:1932ms"/>
+<path class="sp" d="M 178 114 L 188 104" stroke-width="2.6" style="--l:15;--d:138ms;--dl:2001ms"/>
+<path class="sp" d="M 100 18 L 100 8" stroke-width="2.6" style="--l:11;--d:138ms;--dl:2070ms"/>
+<path class="sp" d="M 58 40 L 51 32" stroke-width="2.6" style="--l:11;--d:138ms;--dl:2116ms"/>
+<path class="sp" d="M 146 38 L 154 30" stroke-width="2.6" style="--l:11;--d:138ms;--dl:2162ms"/>
+</svg>` }}
+          />
+          <div id="splash-bottom">
+            <div id="splash-name">JobToo</div>
+            <div id="splash-pct">0%</div>
           </div>
         </div>
         {children}
         <script>{`
           (function() {
             var splash = document.getElementById('splash');
-            var done = false;
+            var pctEl = document.getElementById('splash-pct');
+            var done = false, ready = false, pct = 0;
+            var start = Date.now(), DRAW = 2300;
+
+            // Счётчик ползёт до 95 %, а когда приложение готово — добегает до 100 %.
+            var tick = setInterval(function() {
+              if (ready) {
+                pct = Math.min(100, pct + 7);
+              } else {
+                var t = Math.min(1, (Date.now() - start) / DRAW);
+                pct = Math.max(pct, Math.round((1 - Math.pow(1 - t, 2.2)) * 95));
+              }
+              if (pctEl) pctEl.textContent = pct + '%';
+              if (pct >= 100) clearInterval(tick);
+            }, 45);
 
             function finish() {
               if (done) return;
               done = true;
+              ready = true;
+              if (pctEl) pctEl.textContent = '100%';
+              clearInterval(tick);
               if (splash) {
                 splash.classList.add('hidden');
                 setTimeout(function() { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 400);
