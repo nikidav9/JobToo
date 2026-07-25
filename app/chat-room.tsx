@@ -7,6 +7,9 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
@@ -19,13 +22,24 @@ import { getSupabaseClient } from '@/template';
 
 const POLL_INTERVAL = 8000;
 
+// Поле ввода растёт вместе с текстом, но не выше этого — дальше текст
+// прокручивается внутри, как в Telegram.
+const INPUT_MIN_H = 22;
+const INPUT_MAX_H = 108;
+
+// Фото передаём тем же текстовым полем сообщения: URL с меткой.
+// Так не нужна миграция таблицы сообщений.
+const IMG_PREFIX = '[img]';
+const isImageMessage = (t: string) => t.startsWith(IMG_PREFIX);
+const imageUrlOf = (t: string) => t.slice(IMG_PREFIX.length);
+
 // Module-level message cache — survives navigation but cleared on app restart
 const msgCache = new Map<string, Message[]>();
 
 export default function ChatRoom() {
   const router = useRouter();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
-  const { currentUser, users, chats, vacancies, refreshChats, refreshLikes, likes, optimisticUpdateLike } = useApp();
+  const { currentUser, users, chats, vacancies, refreshChats, refreshLikes, likes, optimisticUpdateLike, showToast } = useApp();
   // Track whether this chat screen is currently visible — used to suppress
   // push notifications when the user is already reading the conversation.
   const isFocused = useIsFocused();
@@ -43,6 +57,8 @@ export default function ChatRoom() {
   const [loadingMessages, setLoadingMessages] = useState(!hasCachedRef.current && !!chatId);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [inputH, setInputH] = useState(INPUT_MIN_H);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [decidingLike, setDecidingLike] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [likeStatus, setLikeStatus] = useState<'pending' | 'approved' | 'rejected' | null>(null);
@@ -285,11 +301,82 @@ export default function ChatRoom() {
   // Chat is locked for bulletin closure or rejected for vacancy
   const isChatBlocked = likeStatus === 'rejected' || (chat?.isLocked ?? false);
 
+  // ── Отправка фото ────────────────────────────────────────────────────────
+  const base64ToUint8Array = (base64: string): Uint8Array => {
+    const bin = globalThis.atob(base64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr;
+  };
+
+  const sendImage = async (uri: string) => {
+    if (!chat || !currentUser || uploadingImage) return;
+    setUploadingImage(true);
+    try {
+      // Сжимаем перед отправкой — иначе фото с камеры весит несколько мегабайт
+      const processed = await ImageManipulator.manipulateAsync(
+        uri, [{ resize: { width: 1280 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      const base64Data = await FileSystem.readAsStringAsync(processed.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const sb = getSupabaseClient();
+      const fileName = `chat/${chat.id}_${Date.now()}.jpg`;
+      const { error: upErr } = await sb.storage.from('avatars').upload(
+        fileName, base64ToUint8Array(base64Data),
+        { contentType: 'image/jpeg', upsert: true, cacheControl: '3600' },
+      );
+      if (upErr) console.warn('[ChatRoom] image upload warning', upErr.message);
+      const { data: urlData } = sb.storage.from('avatars').getPublicUrl(fileName);
+
+      const msg = await dbInsertMessage(chat.id, currentUser.id, IMG_PREFIX + urlData.publicUrl);
+      setMessages(prev => {
+        const next = [...prev, msg];
+        msgCache.set(chat.id, next);
+        return next;
+      });
+      lastCountRef.current += 1;
+      const forRole = currentUser.role === 'worker' ? 'employer' : 'worker';
+      dbIncrementUnread(chat.id, forRole).catch(() => {});
+      const senderName = `${currentUser.firstName} ${currentUser.lastName}`;
+      // В уведомлении вместо ссылки — понятная подпись
+      if (currentUser.role === 'worker') {
+        notifyEmployerNewMessage(chat.employerId, senderName, '📷 Фото', chat.id).catch(() => {});
+      } else {
+        notifyWorkerNewMessage(chat.workerId, senderName, '📷 Фото', chat.id).catch(() => {});
+      }
+      refreshChats().catch(() => {});
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+    } catch (e) {
+      console.error('[ChatRoom] sendImage error', e);
+      showToast('Не удалось отправить фото', 'error');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const pickImage = async () => {
+    if (isChatBlocked || uploadingImage) return;
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') { showToast('Нет доступа к галерее', 'error'); return; }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 1,
+      });
+      if (!res.canceled && res.assets?.[0]?.uri) await sendImage(res.assets[0].uri);
+    } catch (e) {
+      console.error('[ChatRoom] pickImage error', e);
+    }
+  };
+
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || sending || !chat || !currentUser || isChatBlocked) return;
     setSending(true);
     setInput('');
+    setInputH(INPUT_MIN_H);
     try {
       const msg = await dbInsertMessage(chat.id, currentUser.id, text);
       setMessages(prev => {
@@ -386,8 +473,21 @@ export default function ChatRoom() {
             </View>
           )
         ) : null}
-        <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-          <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>{item.text}</Text>
+        <View style={[
+          styles.bubble,
+          isMe ? styles.bubbleMe : styles.bubbleThem,
+          isImageMessage(item.text) && styles.bubbleImage,
+        ]}>
+          {isImageMessage(item.text) ? (
+            <Image
+              source={{ uri: imageUrlOf(item.text) }}
+              style={styles.msgImage}
+              contentFit="cover"
+              transition={150}
+            />
+          ) : (
+            <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>{item.text}</Text>
+          )}
           <Text style={[styles.timestamp, isMe && styles.timestampMe]}>{formatTime(item.timestamp)}</Text>
         </View>
       </View>
@@ -561,24 +661,48 @@ export default function ChatRoom() {
 
         {/* Input bar */}
         <View style={styles.inputBar}>
-          <TextInput
-            style={[styles.textInput, isChatBlocked && { opacity: 0.4 }]}
-            value={input}
-            onChangeText={isChatBlocked ? undefined : setInput}
-            placeholder={isChatBlocked ? 'Чат закрыт' : 'Написать сообщение...'}
-            placeholderTextColor={Colors.textMuted}
-            multiline
-            maxLength={1000}
-            blurOnSubmit={false}
-            editable={!isChatBlocked}
-          />
+          {/* Вложение — слева, как в мессенджерах */}
+          <TouchableOpacity
+            style={styles.attachBtn}
+            onPress={pickImage}
+            disabled={isChatBlocked || uploadingImage}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            {uploadingImage
+              ? <ActivityIndicator size="small" color={Colors.textMuted} />
+              : <Ionicons name="add" size={24} color={isChatBlocked ? Colors.textMuted : Colors.textSecondary} />}
+          </TouchableOpacity>
+
+          {/* Поле растёт до INPUT_MAX_H, дальше текст прокручивается внутри */}
+          <View style={[styles.inputWrap, isChatBlocked && { opacity: 0.5 }]}>
+            <TextInput
+              style={[styles.textInput, { height: inputH }]}
+              value={input}
+              onChangeText={isChatBlocked ? undefined : setInput}
+              onContentSizeChange={e => {
+                const h = e.nativeEvent.contentSize.height;
+                setInputH(Math.max(INPUT_MIN_H, Math.min(INPUT_MAX_H, h)));
+              }}
+              placeholder={isChatBlocked ? 'Чат закрыт' : 'Сообщение'}
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              maxLength={1000}
+              blurOnSubmit={false}
+              editable={!isChatBlocked}
+              scrollEnabled={inputH >= INPUT_MAX_H}
+            />
+          </View>
+
           <TouchableOpacity
             style={[styles.sendBtn, (!input.trim() || sending || isChatBlocked) && styles.sendBtnDisabled]}
             onPress={sendMessage}
             disabled={!input.trim() || sending || isChatBlocked}
             activeOpacity={0.8}
           >
-            <Text style={styles.sendIcon}>➤</Text>
+            {sending
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Ionicons name="arrow-up" size={20} color="#fff" />}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -656,13 +780,30 @@ const styles = StyleSheet.create({
   bubbleMe: { backgroundColor: Colors.primary, borderBottomRightRadius: 4 },
   bubbleThem: { backgroundColor: Colors.surface, borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: 14, color: Colors.textPrimary, lineHeight: 20 },
+  bubbleImage: { padding: 3, overflow: 'hidden' },
+  msgImage: { width: 208, height: 208, borderRadius: 15, backgroundColor: Colors.divider },
   bubbleTextMe: { color: '#fff' },
   timestamp: { fontSize: 10, color: Colors.textMuted, marginTop: 4 },
   timestampMe: { color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
   inputBar: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 10,
-    paddingHorizontal: 14, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+    paddingHorizontal: 10, paddingVertical: 8,
     borderTopWidth: 1, borderTopColor: Colors.divider, backgroundColor: Colors.bg,
+  },
+  // Кнопки одного размера и по нижнему краю — поле растёт вверх, они стоят ровно
+  attachBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  inputWrap: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    borderWidth: 1, borderColor: Colors.inputBorder,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    minHeight: 38,
   },
   safetyMsg: {
     marginHorizontal: 12, marginVertical: 10,
@@ -708,12 +849,16 @@ const styles = StyleSheet.create({
   },
   vacancyIcon: { fontSize: 12 },
   vacancyText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500', maxWidth: 160 },
+  // Фон и скругление — у обёртки; само поле прозрачное, чтобы высота
+  // считалась только по тексту и рост был плавным
   textInput: {
-    flex: 1, backgroundColor: Colors.surface, borderRadius: 22,
-    paddingHorizontal: 16, paddingVertical: 10,
-    fontSize: 15, color: Colors.textPrimary, maxHeight: 80,
+    fontSize: 15, color: Colors.textPrimary,
+    padding: 0, margin: 0,
+    textAlignVertical: 'top',
   },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  sendBtnDisabled: { opacity: 0.4 },
-  sendIcon: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  sendBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
+  },
+  sendBtnDisabled: { opacity: 0.35 },
 });
