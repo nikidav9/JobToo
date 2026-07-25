@@ -4,6 +4,7 @@ import {
   Dimensions, Platform, Easing, Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isOnboardingDone, onOnboardingDone } from '@/components/OnboardingOverlay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
@@ -46,6 +47,7 @@ export default function NotificationPermissionSheet() {
     // Inside the Telegram Mini App notifications arrive via the bot — no sheet
     if (isTelegramMiniApp()) return;
     let cancelled = false;
+    let unsubOnboarding: (() => void) | null = null;
 
     (async () => {
       try {
@@ -76,11 +78,16 @@ export default function NotificationPermissionSheet() {
           }
         }
 
-        setTimeout(() => { if (!cancelled) open(); }, SHOW_DELAY_MS);
+        // Обучение и это окно раньше показывались одновременно и наезжали
+        // друг на друга при первом входе. Ждём, пока человек пройдёт или
+        // пропустит обучение, и только потом предлагаем уведомления.
+        const show = () => setTimeout(() => { if (!cancelled) open(); }, SHOW_DELAY_MS);
+        if (await isOnboardingDone(userId)) { show(); return; }
+        unsubOnboarding = onOnboardingDone(() => { if (!cancelled) show(); });
       } catch {}
     })();
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; unsubOnboarding?.(); };
   }, [userId]);
 
   // ─── Open / close animations ───────────────────────────────────────────────

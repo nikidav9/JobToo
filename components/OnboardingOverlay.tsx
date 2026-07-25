@@ -16,6 +16,21 @@ const KEY = (uid: string) => `jm_onboarding_done_${uid}`;
 // Подписка, чтобы «Показать обучение снова» из профиля мгновенно перезапускало оверлей
 const replayListeners = new Set<() => void>();
 
+// Кто ждёт окончания обучения. Предложение включить уведомления показывается
+// только после него — иначе два окна наезжают друг на друга при первом входе.
+const doneListeners = new Set<() => void>();
+
+/** Обучение уже пройдено этим пользователем? */
+export async function isOnboardingDone(uid: string): Promise<boolean> {
+  try { return (await AsyncStorage.getItem(KEY(uid))) === '1'; } catch { return true; }
+}
+
+/** Позвать, когда обучение завершится. Возвращает функцию отписки. */
+export function onOnboardingDone(cb: () => void): () => void {
+  doneListeners.add(cb);
+  return () => doneListeners.delete(cb);
+}
+
 // Внешний ключ — сбрасывает флаг и просит смонтированный оверлей показаться заново
 export async function resetOnboarding(uid: string) {
   try { await AsyncStorage.removeItem(KEY(uid)); } catch {}
@@ -186,6 +201,7 @@ export function OnboardingOverlay() {
   const finish = () => {
     AsyncStorage.setItem(KEY(user.id), '1').catch(() => {});
     setVisible(false);
+    doneListeners.forEach(fn => fn());
   };
   const next = () => { if (isLast) finish(); else setStep(step + 1); };
 

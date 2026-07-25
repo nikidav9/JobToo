@@ -11,6 +11,7 @@ import { METRO_LINES } from '@/constants/metro';
 import { METRO_COORDS, MOSCOW_CENTER, YANDEX_MAPS_API_KEY } from '@/constants/metroCoords';
 import { LAVKA_LOGO_DATA_URI } from '@/constants/lavkaLogoData';
 import { dbAddressSuggest } from '@/services/db';
+import { normalizeCompany } from '@/services/storage';
 
 // Одна карточка в шторке над картой: минимум полей, чтобы список
 // одинаково собирался и для смен, и для постоянных вакансий.
@@ -61,24 +62,24 @@ function buildHtml(places: Place[]): string {
 <style>
 html,body,#map{margin:0;padding:0;width:100%;height:100%;}
 .pin{
-  position:relative;display:flex;align-items:center;gap:5px;
+  position:relative;display:flex;align-items:center;gap:8px;
   background:#fff;border:1px solid #E5E7EB;border-radius:100px;
-  padding:4px 10px 4px 4px;white-space:nowrap;
-  box-shadow:0 2px 6px rgba(0,0,0,0.18);
-  font:600 12px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  padding:5px 14px 5px 5px;white-space:nowrap;
+  box-shadow:0 2px 8px rgba(0,0,0,0.2);
+  font:600 14px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   color:#111;transform:translate(-50%,-100%);
 }
 /* Хвостик вниз — чтобы «таблетка» читалась как метка, а не как ярлык */
 .pin::after{
-  content:'';position:absolute;left:50%;bottom:-6px;z-index:-1;
-  width:12px;height:12px;background:#fff;
+  content:'';position:absolute;left:50%;bottom:-7px;z-index:-1;
+  width:14px;height:14px;background:#fff;
   border-right:1px solid #E5E7EB;border-bottom:1px solid #E5E7EB;
   transform:translateX(-50%) rotate(45deg);
 }
-.pin img{width:18px;height:18px;border-radius:9px;display:block;}
+.pin img{width:45px;height:45px;border-radius:23px;display:block;}
 .pin .n{
   background:${Colors.primary};color:#fff;border-radius:100px;
-  padding:1px 6px;font-size:11px;font-weight:700;
+  padding:2px 9px;font-size:13px;font-weight:700;
 }
 </style>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=${YANDEX_MAPS_API_KEY}&lang=ru_RU"></script>
@@ -122,7 +123,7 @@ ymaps.ready(function(){
       {iconLayout:PinLayout,
        // Область метки нужна, иначе Яндекс не знает её размеров и клик
        // не попадает по «таблетке»
-       iconShape:{type:'Rectangle',coordinates:[[-70,-34],[70,0]]}});
+       iconShape:{type:'Rectangle',coordinates:[[-95,-62],[95,0]]}});
     pm.events.add('click',function(){send(p.key);});
     marks.push(pm);
     coords.push([p.lat,p.lng]);
@@ -169,12 +170,19 @@ export function MetroMap({
         if (found.lat == null && i.lat != null) { found.lat = i.lat; found.lng = i.lng ?? null; }
         continue;
       }
-      const fallback = extra[key] ?? (i.station ? METRO_COORDS[i.station] : undefined);
+      // Метро — запасной вариант ТОЛЬКО когда адреса нет вовсе. Раньше
+      // вакансия с адресом, но без координат, сразу садилась на станцию,
+      // и геокодер до неё уже не доходил — метка навсегда оставалась у метро.
+      const hasAddress = !!i.address?.trim();
+      const fallback = extra[key]
+        ?? (!hasAddress && i.station ? METRO_COORDS[i.station] : undefined);
       m.set(key, {
         key,
         address: i.address?.trim() || (i.station ? `м. ${i.station}` : ''),
         station: i.station,
-        company: i.company,
+        // В базе у части вакансий в company лежит имя директора —
+        // на карте всегда показываем название сети
+        company: normalizeCompany(i.company),
         count: 1,
         lat: i.lat ?? (fallback ? fallback[0] : null),
         lng: i.lng ?? (fallback ? fallback[1] : null),
@@ -394,7 +402,7 @@ export function MetroMap({
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={s.rowTitle} numberOfLines={1}>{it.title}</Text>
-                      <Text style={s.rowCompany} numberOfLines={1}>{it.company}</Text>
+                      <Text style={s.rowCompany} numberOfLines={1}>{normalizeCompany(it.company)}</Text>
                       {it.meta ? <Text style={s.rowMeta} numberOfLines={1}>{it.meta}</Text> : null}
                     </View>
                     {it.pay ? <Text style={s.rowPay}>{it.pay}</Text> : null}
