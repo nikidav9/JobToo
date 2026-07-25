@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, Platform, ActivityIndicator,
 } from 'react-native';
@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { Colors } from '@/constants/theme';
 import { METRO_COORDS, MOSCOW_CENTER, YANDEX_MAPS_API_KEY } from '@/constants/metroCoords';
+import { dbAddressSuggest } from '@/services/db';
 
 export type StationCount = { station: string; count: number };
 
@@ -41,15 +42,10 @@ ymaps.ready(function(){
     pm.events.add('click',function(){send(p.station);});
     map.geoObjects.add(pm);
   }
+  // Координаты приходят готовыми: геокодер Яндекса у нашего ключа недоступен,
+  // поэтому всё определяется заранее на стороне приложения
   PTS.forEach(function(p){
     if(p.lat!=null&&p.lng!=null){ addMarker(p,[p.lat,p.lng]); coords.push([p.lat,p.lng]); }
-    else {
-      // Координат нет — определяем через геокодер Яндекса по названию станции
-      ymaps.geocode('Москва, метро '+p.station,{results:1}).then(function(res){
-        var obj=res.geoObjects.get(0);
-        if(obj){ addMarker(p,obj.geometry.getCoordinates()); }
-      }).catch(function(){});
-    }
   });
   if(coords.length===1){map.setCenter(coords[0],13);}
   else if(coords.length>1){
@@ -69,10 +65,30 @@ export function MetroMap({
   onSelect: (station: string) => void;
   onClose: () => void;
 }) {
-  // Все станции: у известных берём зашитые координаты, у остальных — null
-  // (их геокодит сам Яндекс в HTML, чтобы появилась любая станция).
+  // Координаты станций, которых нет в справочнике, — догружаем через наш
+  // сервер (OpenStreetMap). Так на карте окажется даже станция, добавленная
+  // впервые: полагаться на геокодер Яндекса нельзя, он у ключа не подключён.
+  const [extra, setExtra] = useState<Record<string, [number, number]>>({});
+
+  useEffect(() => {
+    if (!visible) return;
+    const unknown = points.map(p => p.station).filter(st => !METRO_COORDS[st] && !extra[st]);
+    if (unknown.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const found: Record<string, [number, number]> = {};
+      for (const st of unknown) {
+        const res = await dbAddressSuggest(`метро ${st}, Москва`);
+        const hit = res.find(r => r.lat != null && r.lng != null);
+        if (hit) found[st] = [hit.lat as number, hit.lng as number];
+      }
+      if (!cancelled && Object.keys(found).length) setExtra(prev => ({ ...prev, ...found }));
+    })();
+    return () => { cancelled = true; };
+  }, [visible, points]);
+
   const mapped = points.map(p => {
-    const c = METRO_COORDS[p.station];
+    const c = METRO_COORDS[p.station] ?? extra[p.station];
     return { station: p.station, count: p.count, lat: c ? c[0] : null, lng: c ? c[1] : null };
   });
 
