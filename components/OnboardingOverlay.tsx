@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform,
 } from 'react-native';
@@ -41,8 +41,31 @@ export function OnboardingOverlay() {
   const [step, setStep] = useState(0);
   const [, force] = useState(0);
 
+  // Элементы сообщают геометрию через measureInWindow — это координаты ОКНА
+  // (со статус-баром и т.п.), а оверлей живёт внутри контейнера вкладок со
+  // своим нулём. Разница зависит от устройства, поэтому меряем собственное
+  // положение и вычитаем его — так подсветка совпадает на любом экране.
+  const rootRef = useRef<View>(null);
+  const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null);
+  const measureSelf = () => {
+    rootRef.current?.measureInWindow((x, y, w, h) => {
+      if (w > 0 && h > 0) {
+        setOrigin(prev => (prev && prev.x === x && prev.y === y ? prev : { x, y }));
+      }
+    });
+  };
+
   // Перерисовка, когда элементы сообщают свои измеренные позиции
   useEffect(() => subscribeOnboardingTargets(() => force(n => n + 1)), []);
+
+  // Перемеряем себя на каждом шаге и чуть позже после появления: на Android
+  // первый onLayout иногда приходит до того, как система применит отступы.
+  useEffect(() => {
+    if (!visible) return;
+    measureSelf();
+    const t = setTimeout(measureSelf, 250);
+    return () => clearTimeout(t);
+  }, [visible, step]);
 
   useEffect(() => {
     if (!user) { setVisible(false); return; }
@@ -65,17 +88,24 @@ export function OnboardingOverlay() {
   // Измеренные позиции элементов (приходят из feed.tsx через реестр),
   // с запасным вычислением по геометрии экрана, если замер ещё не пришёл
   const pad = (r: Rect, p: number): Rect => ({ x: r.x - p, y: r.y - p, w: r.w + p * 2, h: r.h + p * 2 });
-  const rSwitcher: Rect = pad(getOnboardingTarget('switcher') ?? { x: 14, y: top + 52, w: W - 28, h: 48 }, 6);
-  const cardTarget = getOnboardingTarget('card') ?? { x: 16, y: top + 150, w: W - 32, h: H * 0.4 };
+  // Замер приводим к системе координат оверлея; запасные значения уже в ней
+  const measured = (key: string): Rect | null => {
+    const t = getOnboardingTarget(key);
+    if (!t) return null;
+    const o = origin ?? { x: 0, y: 0 };
+    return { x: t.x - o.x, y: t.y - o.y, w: t.w, h: t.h };
+  };
+  const rSwitcher: Rect = pad(measured('switcher') ?? { x: 14, y: top + 52, w: W - 28, h: 48 }, 6);
+  const cardTarget = measured('card') ?? { x: 16, y: top + 150, w: W - 32, h: H * 0.4 };
   // Есть ли реальная карточка смены. Если нет — покажем демо-карточку компактнее.
   const hasRealCard = getOnboardingFlag('hasShiftCard') !== false;
   const rCard: Rect = hasRealCard
     ? pad(cardTarget, 4)
     : { x: cardTarget.x + 8, y: cardTarget.y + 8, w: cardTarget.w - 16, h: 208 };
-  const rFab: Rect = pad(getOnboardingTarget('fab') ?? { x: W - 16 - 60, y: H - tabBarH - 14 - 60, w: 62, h: 62 }, 6);
+  const rFab: Rect = pad(measured('fab') ?? { x: W - 16 - 60, y: H - tabBarH - 14 - 60, w: 62, h: 62 }, 6);
   // Верхняя кнопка Telegram и вкладка «Мэтчи» — тоже по замеру, с запасным расчётом
-  const rTelegram: Rect = pad(getOnboardingTarget('telegram') ?? { x: W - 108, y: top + 2, w: 92, h: 46 }, 6);
-  const rMatchesTab: Rect = pad(getOnboardingTarget('matchesTab') ?? { x: 16 + seg, y: H - tabBarH - 2, w: seg, h: 62 }, 4);
+  const rTelegram: Rect = pad(measured('telegram') ?? { x: W - 108, y: top + 2, w: 92, h: 46 }, 6);
+  const rMatchesTab: Rect = pad(measured('matchesTab') ?? { x: 16 + seg, y: H - tabBarH - 2, w: seg, h: 62 }, 4);
 
   const steps: Step[] = isWorker
     ? [
@@ -140,7 +170,12 @@ export function OnboardingOverlay() {
   };
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="auto">
+    <View
+      ref={rootRef}
+      style={StyleSheet.absoluteFill}
+      pointerEvents="auto"
+      onLayout={measureSelf}
+    >
       <Spot />
 
       {/* Демо-карточка смены — когда на выбранную дату реальных смен нет */}
