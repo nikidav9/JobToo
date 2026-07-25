@@ -122,6 +122,14 @@ const dayLabel = (ts: string) => {
   return d.getFullYear() === now.getFullYear() ? base : `${base} ${d.getFullYear()}`;
 };
 
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+// Системные сообщения раньше начинались с эмодзи прямо в тексте. Текст лежит
+// в базе, старые записи не переписать — поэтому эмодзи срезаем при показе,
+// а роль сообщения показываем иконкой.
+const EMOJI_HEAD = /^[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2B00}-\u{2BFF}\s]+/u;
+export const stripLeadingEmoji = (t: string) => t.replace(EMOJI_HEAD, '').trimStart();
+
 const fmtDuration = (sec: number) =>
   `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 
@@ -410,7 +418,7 @@ export default function ChatRoom() {
         await dbSetPermApplicationStatus(permApp.id, 'approved');
         setLikeStatus('approved');
         const okMsg: Message = { id: uid(), senderId: 'system',
-          text: '✅ Кандидат одобрен на вакансию. Обсудите детали выхода.', timestamp: nowISO() };
+          text: 'Кандидат одобрен на вакансию. Обсудите детали выхода.', timestamp: nowISO() };
         appendMessages([okMsg]);
         dbInsertMessage(chat.id, 'system', okMsg.text).catch(() => {});
         notifyWorkerPermApplicationApproved(workerId, permVacancy.company, permVacancy.title).catch(() => {});
@@ -423,8 +431,8 @@ export default function ChatRoom() {
       const result = await dbCheckAndCreateMatch(vacId, workerId);
       setLikeStatus('approved');
       if (result.matched) {
-        const matchMsg: Message = { id: uid(), senderId: 'system', text: '🎉 У вас мэтч! Вы подошли друг другу. Познакомьтесь и обсудите детали!', timestamp: nowISO() };
-        const safetyMsg: Message = { id: uid(), senderId: 'system_safety', text: '🔒 Рекомендуем не переводить общение в сторонние мессенджеры или почту, а продолжить его в чате JobToo: так у мошенников будет меньше шансов вас обмануть.\n\nГде бы вы ни общались — не сообщайте свой CVV-код, код из SMS и не вводите данные карты по ссылке.', timestamp: nowISO() };
+        const matchMsg: Message = { id: uid(), senderId: 'system', text: 'У вас мэтч! Вы подошли друг другу. Познакомьтесь и обсудите детали!', timestamp: nowISO() };
+        const safetyMsg: Message = { id: uid(), senderId: 'system_safety', text: 'Рекомендуем не переводить общение в сторонние мессенджеры или почту, а продолжить его в чате JobToo: так у мошенников будет меньше шансов вас обмануть.\n\nГде бы вы ни общались — не сообщайте свой CVV-код, код из SMS и не вводите данные карты по ссылке.', timestamp: nowISO() };
         appendMessages([matchMsg, safetyMsg]);
         notifyWorkerGotMatch(chat.workerId, chat.companyName, chat.vacTitle).catch(() => {});
         const existingLike = likes.find(l => l.vacancyId === vacId && l.workerId === workerId);
@@ -700,8 +708,14 @@ export default function ChatRoom() {
     ) : null;
 
     if (item.senderId === 'system') {
-      const isMatch = item.text.includes('мэтч') || item.text.includes('Мэтч');
-      const isReject = item.text.includes('не подошли') || item.text.includes('закрыт');
+      const body = stripLeadingEmoji(item.text);
+      const isMatch = body.includes('мэтч') || body.includes('Мэтч');
+      const isReject = body.includes('не подошли') || body.includes('закрыт');
+      const isOk = body.includes('одобрен');
+      const icon: IconName = isMatch ? 'sparkles'
+        : isReject ? 'close-circle'
+        : isOk ? 'checkmark-circle' : 'information-circle';
+      const tint = isMatch ? Colors.green : isReject ? Colors.red : Colors.textSecondary;
       return (
         <>
         {daySeparator}
@@ -710,11 +724,12 @@ export default function ChatRoom() {
           isMatch && styles.systemMsgMatch,
           isReject && styles.systemMsgReject,
         ]}>
+          <Ionicons name={icon} size={15} color={tint} style={{ marginTop: 1 }} />
           <Text style={[
             styles.systemText,
             isMatch && styles.systemTextMatch,
             isReject && styles.systemTextReject,
-          ]}>{item.text}</Text>
+          ]}>{body}</Text>
         </View>
         </>
       );
@@ -726,10 +741,12 @@ export default function ChatRoom() {
         {daySeparator}
         <View style={styles.safetyMsg}>
           <View style={styles.safetyHeader}>
-            <Text style={styles.safetyIcon}>🔒</Text>
+            <View style={styles.safetyIconWrap}>
+              <Ionicons name="shield-checkmark" size={14} color="#92400E" />
+            </View>
             <Text style={styles.safetyTitle}>Безопасность</Text>
           </View>
-          <Text style={styles.safetyText}>{item.text}</Text>
+          <Text style={styles.safetyText}>{stripLeadingEmoji(item.text)}</Text>
         </View>
         </>
       );
@@ -859,8 +876,8 @@ export default function ChatRoom() {
         <View style={styles.blockedBar}>
           <Text style={styles.blockedBarTxt}>
             {chat?.isLocked
-              ? '🔒 Объявление закрыто — работника уже нашли'
-              : (isEmployer ? '🚫 Чат закрыт — кандидат отклонён' : '🚫 Чат закрыт — работодатель отклонил кандидатуру')}
+              ? 'Объявление закрыто — работника уже нашли'
+              : (isEmployer ? 'Чат закрыт — кандидат отклонён' : 'Чат закрыт — работодатель отклонил кандидатуру')}
           </Text>
         </View>
       ) : null}
@@ -912,25 +929,25 @@ export default function ChatRoom() {
         <View style={styles.vacancyBar}>
           {chat.vacTitle ? (
             <View style={styles.vacancyItem}>
-              <Text style={styles.vacancyIcon}>💼</Text>
+              <Ionicons name="briefcase-outline" size={13} color={Colors.textMuted} />
               <Text style={styles.vacancyText} numberOfLines={1}>{chat.vacTitle}</Text>
             </View>
           ) : null}
           {vacancy?.date ? (
             <View style={styles.vacancyItem}>
-              <Text style={styles.vacancyIcon}>📅</Text>
+              <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
               <Text style={styles.vacancyText}>{formatDate(vacancy.date)}</Text>
             </View>
           ) : null}
           {vacancy?.timeStart && vacancy?.timeEnd ? (
             <View style={styles.vacancyItem}>
-              <Text style={styles.vacancyIcon}>⏰</Text>
+              <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
               <Text style={styles.vacancyText}>{vacancy.timeStart}–{vacancy.timeEnd}</Text>
             </View>
           ) : null}
           {vacancy?.address ? (
             <View style={styles.vacancyItem}>
-              <Text style={styles.vacancyIcon}>📍</Text>
+              <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
               <Text style={styles.vacancyText} numberOfLines={1}>{vacancy.address}</Text>
             </View>
           ) : null}
@@ -1132,11 +1149,13 @@ const styles = StyleSheet.create({
   msgList: { padding: 16, gap: 8, paddingBottom: 8 },
   systemMsg: {
     alignSelf: 'center', backgroundColor: Colors.primaryLight,
-    borderRadius: 100, paddingHorizontal: 14, paddingVertical: 6, marginVertical: 8,
+    borderRadius: 100, paddingHorizontal: 14, paddingVertical: 7, marginVertical: 8,
+    // Иконка и текст в строку — эмодзи из текста убраны
+    flexDirection: 'row', alignItems: 'flex-start', gap: 7, maxWidth: '88%',
   },
   systemMsgMatch: { backgroundColor: '#D1FAE5', borderRadius: 12 },
   systemMsgReject: { backgroundColor: '#FEE2E2', borderRadius: 12 },
-  systemText: { fontSize: 13, color: Colors.primary, fontWeight: '600', textAlign: 'center' },
+  systemText: { flexShrink: 1, fontSize: 13, color: Colors.primary, fontWeight: '600' },
   systemTextMatch: { color: Colors.green },
   systemTextReject: { color: Colors.red },
   msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginVertical: 2 },
@@ -1201,7 +1220,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   safetyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  safetyIcon: { fontSize: 15 },
+  safetyIconWrap: {
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: '#FDE9C8', alignItems: 'center', justifyContent: 'center',
+  },
   safetyTitle: { fontSize: 13, fontWeight: '700', color: '#92400E' },
   safetyText: { fontSize: 12, color: '#78350F', lineHeight: 17 },
   // Rejection confirmation modal
@@ -1235,7 +1257,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4,
     borderWidth: 1, borderColor: Colors.divider,
   },
-  vacancyIcon: { fontSize: 12 },
+
   vacancyText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500', maxWidth: 160 },
   // Фон и скругление — у обёртки; само поле прозрачное, чтобы высота
   // считалась только по тексту и рост был плавным
