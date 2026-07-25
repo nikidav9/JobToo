@@ -3,6 +3,9 @@ name: Deploy to Reg.ru (jobtoo.ru)
 on:
   push:
     branches: [main]
+  # Ручной запуск: пригодится, когда меняются не файлы, а секреты — тогда
+  # выкладку надо повторить, а коммитить нечего.
+  workflow_dispatch:
 
 jobs:
   deploy:
