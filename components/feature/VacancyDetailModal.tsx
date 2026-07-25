@@ -27,15 +27,17 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
   const companyName = normalizeCompany(employer?.company || vacancy.company);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
       <View style={styles.overlay}>
+        {/* Затемнение над шторкой тоже закрывает: не единственный способ выйти */}
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
         <View style={[styles.sheet, { paddingBottom: insets.bottom }]}>
           {/* Handle */}
           <View style={styles.handle} />
 
           {/* Close */}
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="close" size={18} color={Colors.textMuted} />
+          <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="close" size={20} color={Colors.textPrimary} />
           </TouchableOpacity>
 
           <ScrollView
@@ -128,14 +130,17 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
     paddingTop: 12,
   },
+  // Ручка и крестик были почти в цвет шторки — закрыть окно было нечем.
   handle: {
-    width: 38, height: 4, backgroundColor: Colors.inputBorder,
-    borderRadius: 2, alignSelf: 'center', marginBottom: 8,
+    width: 44, height: 5, backgroundColor: '#C7CBD1',
+    borderRadius: 3, alignSelf: 'center', marginBottom: 8,
   },
   closeBtn: {
-    position: 'absolute', top: 18, right: 20, zIndex: 10,
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center',
+    position: 'absolute', top: 16, right: 16, zIndex: 10,
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: '#EDEFF2',
+    borderWidth: 1, borderColor: '#DDE1E6',
+    alignItems: 'center', justifyContent: 'center',
   },
   body: { padding: 20, paddingTop: 8, gap: 10, paddingBottom: 24 },
   companyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 },
