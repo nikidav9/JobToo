@@ -633,7 +633,7 @@ export default function ProfileScreen() {
             style={styles.docRow}
             onPress={async () => {
               if (currentUser) { await resetOnboarding(currentUser.id); }
-              showToast('Обучение появится при возврате на главную', 'success');
+              // Без уведомления: обучение и так открывается сразу на главной
               router.push('/(tabs)/feed');
             }}
             activeOpacity={0.7}
