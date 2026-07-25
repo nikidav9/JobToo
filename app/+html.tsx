@@ -33,10 +33,10 @@ export default function Root({ children }: PropsWithChildren) {
         <ScrollViewStyleReset />
 
         {/* Static splash — same visual as the native loader (components/SplashLoader.tsx):
-            логотип JobToo прописывается белой линией на фирменном оранжевом,
-            снизу счётчик процентов. Пути и тайминги совпадают с нативной
-            версией один в один, поэтому веб/Telegram Mini App и приложение
-            читаются как один экран. */}
+            корзина рисуется белой линией на фирменном оранжевом, в неё плавно
+            опускаются продукты, снизу — название и счётчик. Пути и тайминги
+            совпадают с нативной версией один в один, поэтому веб/Telegram
+            Mini App и приложение читаются как один экран. */}
         <style>{`
           #splash {
             position: fixed; inset: 0;
@@ -46,7 +46,7 @@ export default function Root({ children }: PropsWithChildren) {
             transition: opacity 0.35s ease;
           }
           #splash.hidden { opacity: 0; pointer-events: none; }
-          #splash-art { width: min(72vw, 320px); }
+          #splash-art { width: min(62vw, 30vh); }
           #splash-art svg { width: 100%; height: auto; display: block; }
           .sp {
             fill: none; stroke: #fff;
@@ -55,9 +55,23 @@ export default function Root({ children }: PropsWithChildren) {
             animation: sp-draw var(--d) linear var(--dl) forwards;
           }
           @keyframes sp-draw { to { stroke-dashoffset: 0; } }
+          /* товары опускаются в корзину */
+          .pr { opacity: 0; animation: sp-fall 430ms cubic-bezier(.22,.61,.36,1) var(--dl) forwards; }
+          .pr path { fill: none; stroke: #fff; stroke-linecap: round; stroke-linejoin: round; }
+          @keyframes sp-fall {
+            from { opacity: 0; transform: translateY(-46px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
           #splash-bottom {
             display: flex; flex-direction: column; align-items: center;
-            margin-top: 22px;
+            margin-top: 24px;
+          }
+          @keyframes sp-fade { to { opacity: 1; } }
+          #splash-name {
+            font-size: 32px; font-weight: 800; letter-spacing: -0.8px;
+            color: #fff; opacity: 0;
+            animation: sp-fade 0.45s ease 1270ms forwards;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           }
           /* Счётчик виден с первого кадра — отсчёт начинается с единицы */
           #splash-pct {
@@ -68,6 +82,8 @@ export default function Root({ children }: PropsWithChildren) {
           }
           @media (prefers-reduced-motion: reduce) {
             .sp { animation: none; stroke-dashoffset: 0; }
+            .pr { animation: none; opacity: 1; transform: none; }
+            #splash-name { animation: none; opacity: 1; }
           }
         `}</style>
       </head>
@@ -75,19 +91,25 @@ export default function Root({ children }: PropsWithChildren) {
         <div id="splash">
           <div
             id="splash-art"
-            dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg">
-<path class="sp" d="M 46 20 L 46 62 Q 46 80 28 80 Q 14 80 12 66" stroke-width="8" style="--l:82;--d:322ms;--dl:0ms"/>
-<path class="sp" d="M 74 43 A 18 18 0 1 1 73.99 43" stroke-width="8" style="--l:114;--d:368ms;--dl:299ms"/>
-<path class="sp" d="M 104 18 L 104 80" stroke-width="8" style="--l:62;--d:207ms;--dl:644ms"/>
-<path class="sp" d="M 104 61 A 18 18 0 1 1 103.99 61" stroke-width="8" style="--l:114;--d:345ms;--dl:828ms"/>
-<path class="sp" d="M 150 20 L 192 20" stroke-width="8" style="--l:42;--d:184ms;--dl:1150ms"/>
-<path class="sp" d="M 171 20 L 171 80" stroke-width="8" style="--l:60;--d:207ms;--dl:1311ms"/>
-<path class="sp" d="M 218 43 A 18 18 0 1 1 217.99 43" stroke-width="8" style="--l:114;--d:345ms;--dl:1495ms"/>
-<path class="sp" d="M 262 43 A 18 18 0 1 1 261.99 43" stroke-width="8" style="--l:114;--d:322ms;--dl:1817ms"/>
-<path class="sp" d="M 20 98 Q 150 108 282 96" stroke-width="5" style="--l:264;--d:230ms;--dl:2070ms"/>
+            dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 200 210" xmlns="http://www.w3.org/2000/svg">
+<g transform="translate(34 86)"><g class="pr" style="--dl:950ms"><path d="M 2 44 L 2 16 L 13 4 L 24 16 L 24 44 Z" stroke-width="3"/><path d="M 2 16 L 24 16" stroke-width="2.4"/></g></g>
+<g transform="translate(64 100)"><g class="pr" style="--dl:1200ms"><path d="M 14 8 A 11 11 0 1 1 13.99 8" stroke-width="3"/><path d="M 14 8 L 16 2" stroke-width="2.4"/><path d="M 16 4 Q 22 1 23 6 Q 18 8 16 4" stroke-width="2.4"/></g></g>
+<g transform="translate(94 82)"><g class="pr" style="--dl:1450ms"><path d="M 3 48 L 3 22 Q 3 15 7 13 L 7 4 L 15 4 L 15 13 Q 19 15 19 22 L 19 48 Z" stroke-width="3"/><path d="M 7 9 L 15 9" stroke-width="2.4"/></g></g>
+<g transform="translate(116 98)"><g class="pr" style="--dl:1700ms"><path d="M 2 32 L 2 4 L 28 4 L 28 32 Z" stroke-width="3"/><path d="M 15 4 L 15 32" stroke-width="2.4"/></g></g>
+<g transform="translate(150 102)"><g class="pr" style="--dl:1950ms"><path d="M 4 28 L 2 8 L 20 8 L 18 28 Z" stroke-width="3"/><path d="M 1 5 L 21 5" stroke-width="2.4"/></g></g>
+<path class="sp" d="M 26 130 Q 100 121 174 130" stroke-width="3.4" style="--l:150;--d:230ms;--dl:0ms"/>
+<path class="sp" d="M 26 130 Q 100 139 174 130" stroke-width="3.4" style="--l:150;--d:230ms;--dl:184ms"/>
+<path class="sp" d="M 30 134 L 42 186 Q 43 194 51 194 L 149 194 Q 157 194 158 186 L 170 134" stroke-width="3.4" style="--l:232;--d:414ms;--dl:368ms"/>
+<path class="sp" d="M 52 138 L 60 190" stroke-width="2.4" style="--l:53;--d:115ms;--dl:736ms"/>
+<path class="sp" d="M 78 136 L 80 192" stroke-width="2.4" style="--l:56;--d:115ms;--dl:782ms"/>
+<path class="sp" d="M 122 136 L 120 192" stroke-width="2.4" style="--l:56;--d:115ms;--dl:828ms"/>
+<path class="sp" d="M 148 138 L 140 190" stroke-width="2.4" style="--l:53;--d:115ms;--dl:874ms"/>
+<path class="sp" d="M 36 156 Q 100 165 164 156" stroke-width="2.4" style="--l:130;--d:115ms;--dl:943ms"/>
+<path class="sp" d="M 41 176 Q 100 184 159 176" stroke-width="2.4" style="--l:120;--d:138ms;--dl:1012ms"/>
 </svg>` }}
           />
           <div id="splash-bottom">
+            <div id="splash-name">JobToo</div>
             <div id="splash-pct">1%</div>
           </div>
         </div>
@@ -97,7 +119,7 @@ export default function Root({ children }: PropsWithChildren) {
             var splash = document.getElementById('splash');
             var pctEl = document.getElementById('splash-pct');
             var done = false, ready = false, pct = 1;
-            var start = Date.now(), DRAW = 2300, TAIL = 700;
+            var start = Date.now(), DRAW = 2600, TAIL = 700;
 
             // 1 → 95 % равномерно, затем 96..99 медленно, и до 100 % когда готово.
             var tick = setInterval(function() {

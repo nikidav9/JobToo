@@ -2,12 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Animated, Easing, Platform } from 'react-native';
 import { useApp } from '@/hooks/useApp';
 import { hideWebSplash } from '@/lib/webSplash';
-import SplashLoader, { useLoadingPercent, bootElapsed } from '@/components/SplashLoader';
+import SplashLoader, { useLoadingPercent, bootElapsed, SPLASH_MIN_MS } from '@/components/SplashLoader';
 
 // Оверлей поверх вкладок: тот же загрузочный экран, что и при старте, держится
 // пока подгружаются реальные данные (dataReady из AppContext), затем растворяется.
 
-const MIN_SHOW_MS = 2580;  // never dissolve before this (даём дорисоваться логотипу)
+// Тот же минимум, что и у стартового экрана — чтобы анимация докрутилась
+const MIN_SHOW_MS = SPLASH_MIN_MS;
 const MAX_SHOW_MS = 5000;  // dissolve even if data is still loading
 const FADE_MS = 450;
 
