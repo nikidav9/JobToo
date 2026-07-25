@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, StyleSheet, TextInput,
   TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -134,6 +134,11 @@ export default function ChatRoom() {
   const router = useRouter();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const { currentUser, users, chats, vacancies, refreshChats, refreshLikes, likes, optimisticUpdateLike, showToast } = useApp();
+  const insets = useSafeAreaInsets();
+  // Низ строки ввода задаём сами: SafeAreaView отдаёт нижний край нам,
+  // а минимум в 10 px держит поле на отступе от края даже там, где
+  // системной панели нет
+  const barPadBottom = Math.max(insets.bottom, 10);
   // Track whether this chat screen is currently visible — used to suppress
   // push notifications when the user is already reading the conversation.
   const isFocused = useIsFocused();
@@ -688,7 +693,7 @@ export default function ChatRoom() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       {/* Rejection confirmation modal */}
       {showRejectConfirm ? (
         <View style={styles.confirmOverlay}>
@@ -854,7 +859,7 @@ export default function ChatRoom() {
 
         {/* Идёт запись — строка ввода заменяется счётчиком */}
         {recorderState.isRecording ? (
-          <View style={styles.inputBar}>
+          <View style={[styles.inputBar, { paddingBottom: barPadBottom }]}>
             <TouchableOpacity
               style={styles.attachBtn}
               onPress={cancelRecording}
@@ -878,7 +883,7 @@ export default function ChatRoom() {
           </View>
         ) : (
         /* Input bar */
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, { paddingBottom: barPadBottom }]}>
           {/* Вложение — слева, как в мессенджерах */}
           <TouchableOpacity
             style={styles.attachBtn}

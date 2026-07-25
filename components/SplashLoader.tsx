@@ -106,6 +106,9 @@ const TAIL_STEP_MS = 250;
 // показывается дважды подряд (сначала в index.tsx, затем оверлеем
 // EntryTransition при входе во вкладки) — без общего старта прорисовка и
 // счётчик сбрасывались бы на второй раз. Держим их непрерывными.
+// Достигнутый процент — общий для обоих показов экрана. Без него второй
+// показ (оверлей поверх вкладок) начинал считать заново и откатывал 100 → 99.
+let lastPercent = 1;
 let bootStartedAt: number | null = null;
 function bootStart(): number {
   if (bootStartedAt == null) bootStartedAt = Date.now();
@@ -126,29 +129,31 @@ export function bootElapsed(): number {
 export const SPLASH_MIN_MS = DRAW_MS + 280;  // ≈1.56 c: хватает и на добег 95→100
 
 export function useLoadingPercent(ready: boolean, minMs = DRAW_MS): number {
-  const [percent, setPercent] = useState(1);
+  const [percent, setPercent] = useState(lastPercent);
   const start = useRef(bootStart());
   const readyRef = useRef(ready);
   readyRef.current = ready;
 
   useEffect(() => {
     const id = setInterval(() => {
-      setPercent(prev => {
-        if (prev >= 100) return prev;
+      setPercent(prevState => {
+        // Считаем от общего достигнутого значения, а не от локального
+        const prev = Math.max(prevState, lastPercent);
+        if (prev >= 100) { lastPercent = 100; return 100; }
         if (readyRef.current) {
           // Добегаем до 100 плавно: у финиша — по проценту за тик, чтобы
           // 96, 97, 98, 99 успели показаться, а не перескочили одним кадром
           const left = 100 - prev;
-          return Math.min(100, prev + (left > 12 ? Math.ceil(left / 8) : 1));
+          return (lastPercent = Math.min(100, prev + (left > 12 ? Math.ceil(left / 8) : 1)));
         }
         const elapsed = Date.now() - start.current;
         if (elapsed < minMs) {
           // равномерный подъём 1 → 95: пользователь видит счёт с самого начала
-          return Math.max(prev, Math.round(1 + (elapsed / minMs) * 94));
+          return (lastPercent = Math.max(prev, Math.round(1 + (elapsed / minMs) * 94)));
         }
         // хвост: 96, 97, 98, 99 — заметно медленнее
         const extra = Math.floor((elapsed - minMs) / TAIL_STEP_MS);
-        return Math.max(prev, Math.min(99, 95 + extra));
+        return (lastPercent = Math.max(prev, Math.min(99, 95 + extra)));
       });
     }, 45);
     return () => clearInterval(id);

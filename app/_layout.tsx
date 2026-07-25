@@ -3,7 +3,7 @@ import React, { useEffect, useRef } from 'react';
 import { Platform, AppState } from 'react-native';
 import * as Updates from 'expo-updates';
 import { Stack, useRouter, usePathname } from 'expo-router';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
@@ -179,7 +179,9 @@ export default function RootLayout() {
 
   return (
     <AlertProvider>
-      <SafeAreaProvider>
+      {/* initialMetrics — чтобы безопасные отступы были известны сразу,
+          иначе на первом кадре они нулевые и низ экрана дёргается */}
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <AppProvider>
           <StatusBar style="dark" />
           <WebSplashController />
