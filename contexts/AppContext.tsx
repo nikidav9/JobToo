@@ -36,6 +36,7 @@ import {
   dbGetPermVacanciesByEmployer,
   dbGetPermApplications,
   dbGetPermSaved,
+  dbTouchLastSeen,
   dbGetNotifications,
   dbMarkNotifRead,
   dbMarkAllNotifsRead,
@@ -52,6 +53,9 @@ import { isTelegramMiniApp, getTelegramInitData } from '@/lib/telegram';
 
 // Polling interval for native (Realtime is primary, polling is fallback)
 const NATIVE_POLL_INTERVAL = 8_000;
+// Отметку «был в сети» чаще обновлять незачем: в чате «в сети» держится
+// три минуты, так что двух минут между отметками достаточно.
+const LAST_SEEN_INTERVAL = 120_000;
 // Polling interval for web (Supabase realtime may be blocked in Russia)
 const WEB_POLL_INTERVAL = 10_000;
 
@@ -461,14 +465,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Poll on interval
     const interval = setInterval(poll, NATIVE_POLL_INTERVAL);
 
+    // Отметка «был в сети»: при запуске, при возврате из фона и раз в
+    // несколько минут, пока приложение открыто. Из неё собирается статус
+    // в шапке чата и раздел активности в дашборде.
+    const touch = () => { if (user?.id) dbTouchLastSeen(user.id); };
+    touch();
+    const seenInterval = setInterval(touch, LAST_SEEN_INTERVAL);
+
     // Also poll immediately when app returns to foreground
     const handleAppState = (state: AppStateStatus) => {
-      if (state === 'active') poll();
+      if (state === 'active') { poll(); touch(); }
     };
     const sub = AppState.addEventListener('change', handleAppState);
 
     return () => {
       clearInterval(interval);
+      clearInterval(seenInterval);
       sub.remove();
     };
   }, [currentUser?.id]);

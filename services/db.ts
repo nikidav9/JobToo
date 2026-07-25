@@ -62,6 +62,7 @@ function rowToUser(r: any): User {
     password: r.password ?? '',
     bio: r.bio ?? undefined,
     telegramId: r.telegram_id ?? undefined,
+    lastSeenAt: r.last_seen_at ?? undefined,
   };
 }
 // NB: telegram_id намеренно НЕ входит в userToRow — привязка живёт только
@@ -1026,6 +1027,17 @@ export async function dbSaveNotification(
 ): Promise<void> {
   if (IS_NATIVE) { await proxy('dbSaveNotification', [userId, title, body, type ?? null, payload ?? null]); return; }
   await withTimeout(supabase.from('jm_notifications').insert({ user_id: userId, title, body, type, payload }));
+}
+
+/** Отметить, что пользователь сейчас в приложении. Ошибки глушим: это
+ *  фоновая отметка, ради неё нельзя ломать экран. */
+export async function dbTouchLastSeen(userId: string): Promise<void> {
+  try {
+    if (IS_NATIVE) { await proxy('dbTouchLastSeen', [userId]); return; }
+    await withTimeout(supabase.from('jm_users').update({ last_seen_at: new Date().toISOString() }).eq('id', userId));
+  } catch {
+    // колонки может ещё не быть — молчим
+  }
 }
 
 export async function dbGetNotifications(userId: string): Promise<{ id: string; title: string; body: string; is_read: boolean; created_at: string; type?: string | null; payload?: any }[]> {

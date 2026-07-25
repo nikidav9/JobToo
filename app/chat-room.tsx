@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import {
   View, Text, StyleSheet, TextInput, ScrollView,
@@ -25,6 +25,7 @@ import { notifyWorkerGotMatch, notifyWorkerNewMessage, notifyEmployerNewMessage 
 import { useIsFocused } from '@react-navigation/native';
 import { getSupabaseClient } from '@/template';
 import { getChatSuggestions } from '@/constants/chatSuggestions';
+import { isOnline, lastSeenLabel } from '@/services/presence';
 
 const POLL_INTERVAL = 8000;
 
@@ -243,6 +244,14 @@ export default function ChatRoom() {
     ? `${other.firstName} ${other.lastName}`.trim()
     : (chat?.companyName ?? '');
   const otherColor = nameColorFromString(otherId || otherName);
+  // Пересчитываем раз в минуту, иначе «5 мин назад» застывает на экране
+  const [presenceTick, setPresenceTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setPresenceTick(x => x + 1), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  const online = useMemo(() => isOnline(other?.lastSeenAt), [other?.lastSeenAt, presenceTick]);
+  const presence = useMemo(() => lastSeenLabel(other?.lastSeenAt), [other?.lastSeenAt, presenceTick]);
   const otherAvatarUrl = other?.avatarUrl;
 
   // Fetch like status (for employer decision bar — not applicable for bulletin/slot chats)
@@ -830,7 +839,18 @@ export default function ChatRoom() {
           )}
           <View>
             <Text style={styles.headerName}>{otherName}</Text>
-            <Text style={styles.headerSub} numberOfLines={1}>{chat.vacTitle}</Text>
+            {/* Под именем — присутствие, как в мессенджерах. Название
+                вакансии переехало в полосу ниже, чтобы не потеряться. */}
+            {presence ? (
+              <View style={styles.presenceRow}>
+                {online ? <View style={styles.onlineDot} /> : null}
+                <Text style={[styles.headerSub, online && styles.headerSubOnline]} numberOfLines={1}>
+                  {presence}
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.headerSub} numberOfLines={1}>{chat.vacTitle}</Text>
+            )}
           </View>
           <Text style={{ fontSize: 16, color: Colors.textMuted, marginLeft: 4 }}>›</Text>
         </TouchableOpacity>
@@ -838,21 +858,27 @@ export default function ChatRoom() {
       </View>
 
       {/* Vacancy info block */}
-      {vacancy ? (
+      {vacancy || chat.vacTitle ? (
         <View style={styles.vacancyBar}>
-          {vacancy.date ? (
+          {chat.vacTitle ? (
+            <View style={styles.vacancyItem}>
+              <Text style={styles.vacancyIcon}>💼</Text>
+              <Text style={styles.vacancyText} numberOfLines={1}>{chat.vacTitle}</Text>
+            </View>
+          ) : null}
+          {vacancy?.date ? (
             <View style={styles.vacancyItem}>
               <Text style={styles.vacancyIcon}>📅</Text>
               <Text style={styles.vacancyText}>{formatDate(vacancy.date)}</Text>
             </View>
           ) : null}
-          {vacancy.timeStart && vacancy.timeEnd ? (
+          {vacancy?.timeStart && vacancy?.timeEnd ? (
             <View style={styles.vacancyItem}>
               <Text style={styles.vacancyIcon}>⏰</Text>
               <Text style={styles.vacancyText}>{vacancy.timeStart}–{vacancy.timeEnd}</Text>
             </View>
           ) : null}
-          {vacancy.address ? (
+          {vacancy?.address ? (
             <View style={styles.vacancyItem}>
               <Text style={styles.vacancyIcon}>📍</Text>
               <Text style={styles.vacancyText} numberOfLines={1}>{vacancy.address}</Text>
@@ -1050,6 +1076,9 @@ const styles = StyleSheet.create({
   headerAvatarText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   headerName: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
   headerSub: { fontSize: 11, color: Colors.textMuted, maxWidth: 160 },
+  headerSubOnline: { color: Colors.green, fontWeight: '600' },
+  presenceRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  onlineDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.green },
   msgList: { padding: 16, gap: 8, paddingBottom: 8 },
   systemMsg: {
     alignSelf: 'center', backgroundColor: Colors.primaryLight,

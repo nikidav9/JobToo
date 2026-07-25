@@ -19,6 +19,8 @@ export interface User {
   ratingCount?: number;
   bio?: string;
   telegramId?: number;
+  /** Когда пользователь последний раз был в приложении */
+  lastSeenAt?: string;
 }
 
 export interface Vacancy {

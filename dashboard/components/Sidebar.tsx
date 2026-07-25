@@ -7,6 +7,7 @@ const NAV = [
   { href: '/',            icon: IconGrid,     label: 'Обзор' },
   { href: '/summary',     icon: IconSummary,  label: 'Сводка' },
   { href: '/users',       icon: IconUsers,    label: 'Пользователи' },
+  { href: '/last-seen',   icon: IconClock,    label: 'Последний вход' },
   { href: '/vacancies',   icon: IconJobs,     label: 'Вакансии' },
   { href: '/matching',    icon: IconMatch,    label: 'Совпадения' },
   { href: '/engagement',  icon: IconPulse,    label: 'Активность' },
@@ -176,6 +177,9 @@ function IconJobs({ style }: { style?: React.CSSProperties }) {
 }
 function IconMatch({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"><path d="M8 13.5 3 9a3 3 0 0 1 5-3 3 3 0 0 1 5 3l-5 4.5z"/></svg>
+}
+function IconClock({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><circle cx="8" cy="8" r="5.8"/><path d="M8 4.6V8l2.4 1.6"/></svg>
 }
 function IconPulse({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M2 8h2.5l1.5-4 2 8 1.5-4H14"/></svg>

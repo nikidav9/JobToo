@@ -346,6 +346,14 @@ try {
         case 'dbGetUsers':
             $data = sb_select('jm_users', [], '*', 'created_at.asc'); break;
 
+        // Отметка «был в сети». Колонки может ещё не быть — тогда просто молчим:
+        // ради фоновой отметки нельзя возвращать клиенту ошибку.
+        case 'dbTouchLastSeen':
+            try {
+                sb_update('jm_users', ['id' => 'eq.' . $args[0]], ['last_seen_at' => now_iso()]);
+            } catch (\Throwable $e) { /* колонки нет — не беда */ }
+            break;
+
         case 'dbUpsertUser':
             sb_upsert('jm_users', $args[0], 'id'); break;
 
