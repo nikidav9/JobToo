@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import {
-  View, Text, StyleSheet, TextInput,
+  View, Text, StyleSheet, TextInput, ScrollView,
   TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -24,6 +24,7 @@ import { dbGetMessages, dbInsertMessage, dbMarkRead, dbIncrementUnread, dbGetLik
 import { notifyWorkerGotMatch, notifyWorkerNewMessage, notifyEmployerNewMessage } from '@/services/notifications';
 import { useIsFocused } from '@react-navigation/native';
 import { getSupabaseClient } from '@/template';
+import { getChatSuggestions } from '@/constants/chatSuggestions';
 
 const POLL_INTERVAL = 8000;
 
@@ -160,6 +161,7 @@ export default function ChatRoom() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [inputH, setInputH] = useState(INPUT_MIN_H);
+  const inputRef = useRef<TextInput>(null);
   // Клавиатура открыта — прижимаем строку к ней; закрыта — держим постоянный
   // отступ от края экрана. Слушатель клавиатуры надёжнее, чем отступы,
   // которые на Android доезжают с задержкой.
@@ -419,6 +421,14 @@ export default function ChatRoom() {
 
   // Chat is locked for bulletin closure or rejected for vacancy
   const isChatBlocked = likeStatus === 'rejected' || (chat?.isLocked ?? false);
+
+  // Готовые фразы показываем, пока человек ещё ничего не написал в этот чат
+  // и не начал печатать своё: дальше они только мешают.
+  const suggestions = getChatSuggestions(isEmployer ? 'employer' : 'worker', vacancy);
+  const iAlreadyWrote = messages.some(m => m.senderId === currentUser?.id);
+  const showSuggestions =
+    suggestions.length > 0 && !iAlreadyWrote && !input.trim() &&
+    !isChatBlocked && !recorderState.isRecording;
 
   // ── Отправка фото ────────────────────────────────────────────────────────
   const base64ToUint8Array = (base64: string): Uint8Array => {
@@ -873,6 +883,30 @@ export default function ChatRoom() {
           />
         )}
 
+        {/* Подсказки: сразу после мэтча поле пустое и обе стороны молчат.
+            Нажатие подставляет текст в поле, не отправляя его. Лента уходит,
+            как только человек начал печатать или уже что-то написал в чат. */}
+        {showSuggestions ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            style={styles.suggestScroll}
+            contentContainerStyle={styles.suggestRow}
+          >
+            {suggestions.map(sg => (
+              <TouchableOpacity
+                key={sg.id}
+                style={styles.suggestChip}
+                activeOpacity={0.8}
+                onPress={() => { setInput(sg.text); inputRef.current?.focus(); }}
+              >
+                <Text style={styles.suggestChipTxt}>{sg.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : null}
+
         {/* Идёт запись — строка ввода заменяется счётчиком */}
         {recorderState.isRecording ? (
           <View style={[styles.inputBar, { paddingBottom: barPad }]}>
@@ -916,6 +950,7 @@ export default function ChatRoom() {
           {/* Поле растёт до INPUT_MAX_H, дальше текст прокручивается внутри */}
           <View style={[styles.inputWrap, isChatBlocked && { opacity: 0.5 }]}>
             <TextInput
+              ref={inputRef}
               style={[styles.textInput, { height: inputH }]}
               value={input}
               onChangeText={isChatBlocked ? undefined : setInput}
@@ -1047,6 +1082,18 @@ const styles = StyleSheet.create({
   },
   timestamp: { fontSize: 10, color: Colors.textMuted, marginTop: 4 },
   timestampMe: { color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
+  suggestScroll: {
+    flexGrow: 0,
+    borderTopWidth: 1, borderTopColor: Colors.divider,
+    backgroundColor: Colors.bg,
+  },
+  suggestRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  suggestChip: {
+    borderWidth: 1, borderColor: Colors.primaryBorder,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 100, paddingHorizontal: 14, paddingVertical: 8,
+  },
+  suggestChipTxt: { fontSize: 13.5, fontWeight: '600', color: Colors.primary },
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 8,
     paddingHorizontal: 10, paddingVertical: 8,
