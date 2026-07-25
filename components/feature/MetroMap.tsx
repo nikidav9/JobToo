@@ -315,11 +315,10 @@ export function MetroMap({
   }, [visible, items, sheetKey]);
 
   return (
-    <Modal
+    <Modal statusBarTranslucent navigationBarTranslucent
       visible={visible}
       animationType="slide"
       onRequestClose={() => { if (sheetKey) closeSheet(); else onClose(); }}
-      statusBarTranslucent
     >
       <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
         <View style={s.header}>

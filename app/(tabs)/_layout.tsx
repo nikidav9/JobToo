@@ -4,6 +4,7 @@ import {
   Platform, View, Text, StyleSheet, PanResponder, Dimensions, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { bottomSafe } from '@/lib/androidInsets';
 import { useNavigation } from '@react-navigation/native';
 import { StackActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,6 +44,10 @@ function FloatingTabBar({
   tabs: TabDef[];
 }) {
   const insets = useSafeAreaInsets();
+  // На части прошивок insets.bottom приходит нулём, хотя панель кнопок
+  // есть — меряем её отдельно, иначе плашка вкладок садится под
+  // системные «назад/домой».
+  const safeBottom = bottomSafe(insets.bottom);
   const screenWidth = Dimensions.get('window').width;
   const [pillWidth, setPillWidth] = useState(0);
 
@@ -109,15 +114,15 @@ function FloatingTabBar({
   return (
     <>
     {/* White background covering safe-area gap under the pill */}
-    {insets.bottom > 0 && (
+    {safeBottom > 0 && (
       <View style={{
         position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: insets.bottom + 12, backgroundColor: '#fff',
+        height: safeBottom + 12, backgroundColor: '#fff',
       }} />
     )}
     {/* Outer: shadow (overflow:hidden would clip Android elevation) */}
     <View
-      style={[fS.pillShadow, { bottom: insets.bottom + 12 }]}
+      style={[fS.pillShadow, { bottom: safeBottom + 12 }]}
       onLayout={(e) => setPillWidth(e.nativeEvent.layout.width)}
       {...panResponder.panHandlers}
       {...webHandlers}
@@ -245,7 +250,7 @@ export default function TabLayout() {
   // ─── Tab bar height (keeps useBottomTabBarHeight working in screens) ──────
   const tabBarHeight = Platform.select({
     ios: insets.bottom + 64 + 12,
-    android: insets.bottom + 64 + 12,
+    android: bottomSafe(insets.bottom) + 64 + 12,
     default: 76,
   });
 

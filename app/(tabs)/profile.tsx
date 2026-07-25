@@ -152,7 +152,7 @@ function RatingsModal({ userId, users, onClose }: { userId: string; users: any[]
   };
 
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={rmS.overlay}>
         <View style={rmS.sheet}>
           <View style={rmS.handle} />
@@ -738,7 +738,7 @@ export default function ProfileScreen() {
       ) : null}
 
       {/* Edit modal */}
-      <Modal visible={!!editSection} animationType="slide" transparent>
+      <Modal statusBarTranslucent navigationBarTranslucent visible={!!editSection} animationType="slide" transparent>
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.modalSheet}>
             <View style={styles.handle} />
@@ -856,7 +856,7 @@ export default function ProfileScreen() {
       ) : null}
 
       {/* Notifications modal */}
-      <Modal visible={showNotifications} transparent animationType="slide" onRequestClose={() => setShowNotifications(false)}>
+      <Modal statusBarTranslucent navigationBarTranslucent visible={showNotifications} transparent animationType="slide" onRequestClose={() => setShowNotifications(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowNotifications(false)}>
           <View style={styles.modalSheet} onStartShouldSetResponder={() => true}>
             <View style={styles.handle} />
@@ -878,7 +878,7 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* Change password modal */}
-      <Modal visible={showSettings} transparent animationType="slide" onRequestClose={() => setShowSettings(false)}>
+      <Modal statusBarTranslucent navigationBarTranslucent visible={showSettings} transparent animationType="slide" onRequestClose={() => setShowSettings(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowSettings(false)} />
           <View style={styles.modalSheet}>

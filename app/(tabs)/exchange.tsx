@@ -56,7 +56,7 @@ function MetroStationPicker({
   }, [query]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={xS.overlay}>
         <View style={xS.sheet}>
           <View style={xS.sheetHeader}>
@@ -119,7 +119,7 @@ function WorkTypePicker({
   onClose: () => void;
 }) {
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={xS.overlay}>
         <View style={xS.sheet}>
           <View style={xS.sheetHeader}>
@@ -697,7 +697,7 @@ function EmployerExchange() {
       />
 
       {Platform.OS === 'ios' && (
-        <Modal visible={iosPickerVisible} transparent animationType="slide">
+        <Modal statusBarTranslucent navigationBarTranslucent visible={iosPickerVisible} transparent animationType="slide">
           <View style={xS.iosOverlay}>
             <View style={xS.iosSheet}>
               <View style={xS.iosSheetHeader}>

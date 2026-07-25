@@ -12,7 +12,7 @@ export function NotificationBell() {
         <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
       </TouchableOpacity>
 
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}>
+      <Modal statusBarTranslucent navigationBarTranslucent visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}>
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setVisible(false)}>
           <View style={styles.sheet} onStartShouldSetResponder={() => true}>
             <View style={styles.handle} />

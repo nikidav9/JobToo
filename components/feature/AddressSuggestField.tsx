@@ -94,7 +94,7 @@ export function AddressSuggestField({
         <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
       </TouchableOpacity>
 
-      <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)} statusBarTranslucent>
+      <Modal statusBarTranslucent navigationBarTranslucent visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
         <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
           <View style={s.header}>
             <Text style={s.title} numberOfLines={1}>Адрес</Text>

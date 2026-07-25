@@ -15,7 +15,7 @@ interface Props {
 
 export function ConfirmDialog({ visible, title, body, confirmLabel = 'Подтвердить', danger, onCancel, onConfirm }: Props) {
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>

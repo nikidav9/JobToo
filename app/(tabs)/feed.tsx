@@ -337,7 +337,7 @@ function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId
   };
 
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={wS.modalContainer}>
         <View style={wS.modalHeader}>
           <Text style={wS.modalTitle}>Просмотрели вакансию</Text>
@@ -604,7 +604,7 @@ function WorkerListModal({
   };
 
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={wS.overlay}>
         <View style={wS.sheet}>
           <View style={wS.handle} />

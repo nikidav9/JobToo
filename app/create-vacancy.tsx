@@ -651,7 +651,7 @@ export default function CreateVacancy() {
 
       {/* iOS date/time picker modal */}
       {Platform.OS === 'ios' ? (
-        <Modal visible={iosPickerVisible} transparent animationType="slide">
+        <Modal statusBarTranslucent navigationBarTranslucent visible={iosPickerVisible} transparent animationType="slide">
           <View style={styles.iosOverlay}>
             <View style={styles.iosSheet}>
               <View style={styles.iosSheetHeader}>

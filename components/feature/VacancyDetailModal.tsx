@@ -27,7 +27,7 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
   const companyName = normalizeCompany(employer?.company || vacancy.company);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
       <View style={styles.overlay}>
         {/* Затемнение над шторкой тоже закрывает: не единственный способ выйти */}
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />

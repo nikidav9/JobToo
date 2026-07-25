@@ -65,7 +65,7 @@ export function MetroPicker({ visible, onClose, onSelect, selectedLineId, select
   const searching = query.trim().length > 0;
 
   return (
-    <Modal visible={visible} animationType="none" transparent statusBarTranslucent>
+    <Modal visible={visible} animationType="none" transparent statusBarTranslucent navigationBarTranslucent>
       <View style={styles.overlay} onStartShouldSetResponder={() => true}>
         <View style={styles.sheet}>
           <View style={styles.handle} />

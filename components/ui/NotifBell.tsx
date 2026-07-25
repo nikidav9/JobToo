@@ -133,7 +133,7 @@ export function NotifBell() {
         )}
       </TouchableOpacity>
 
-      <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
+      <Modal statusBarTranslucent navigationBarTranslucent visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
         <SafeAreaView style={s.sheet}>
           <View style={s.header}>
             <Text style={s.title}>Уведомления</Text>

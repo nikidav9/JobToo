@@ -87,7 +87,7 @@ export default function PermVacancyDetailScreen() {
     : null;
 
   const authModalJSX = (
-    <Modal
+    <Modal statusBarTranslucent navigationBarTranslucent
       visible={showAuthModal}
       transparent
       animationType="slide"

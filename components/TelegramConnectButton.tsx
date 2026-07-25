@@ -5,6 +5,8 @@ import {
 } from 'react-native';
 import Svg, { Circle, Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { bottomSafe } from '@/lib/androidInsets';
 import { Colors, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { dbGetUserById, dbUnbindTelegram } from '@/services/db';
@@ -39,6 +41,7 @@ function TelegramLogo({ size }: { size: number }) {
 // size/pad подбираются под соседний колокольчик конкретной шапки.
 export function TelegramConnectButton({ size = 24, pad = 6, onboardingAnchor = false }: { size?: number; pad?: number; onboardingAnchor?: boolean }) {
   const app = useApp();
+  const insets = useSafeAreaInsets();
   const userId = app?.currentUser?.id ?? null;
   const isEmployer = app?.currentUser?.role === 'employer';
 
@@ -107,10 +110,12 @@ export function TelegramConnectButton({ size = 24, pad = 6, onboardingAnchor = f
         {linked === false && <View style={st.attentionDot} />}
       </TouchableOpacity>
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+      <Modal statusBarTranslucent navigationBarTranslucent visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={st.backdrop}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setOpen(false)} />
-          <View style={st.sheet}>
+          {/* Отступ снизу считаем от системной панели: на Android с тремя
+              кнопками фиксированные 34 не спасают — подсказка уезжает под них */}
+          <View style={[st.sheet, { paddingBottom: bottomSafe(insets.bottom, 34) }]}>
             <View style={st.grabber} />
 
             <View style={st.titleRow}>
@@ -200,7 +205,7 @@ const st = StyleSheet.create({
   sheet: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingTop: 10, paddingBottom: 34,
+    paddingHorizontal: 20, paddingTop: 10,
   },
   grabber: {
     alignSelf: 'center', width: 40, height: 4, borderRadius: 2,

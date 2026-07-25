@@ -6,6 +6,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isOnboardingDone, onOnboardingDone } from '@/components/OnboardingOverlay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { bottomSafe } from '@/lib/androidInsets';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { Colors, Radius } from '@/constants/theme';
@@ -191,7 +192,8 @@ export default function NotificationPermissionSheet() {
       <Animated.View
         style={[
           st.sheet,
-          { paddingBottom: insets.bottom + 16 },
+          // На Android панель кнопок иногда не попадает в insets — меряем сами
+          { paddingBottom: bottomSafe(insets.bottom) + 16 },
           { transform: [{ translateY: Animated.add(slideY, dragY) }] },
         ]}
         onLayout={e => { sheetHeightRef.current = e.nativeEvent.layout.height; }}
