@@ -10,7 +10,7 @@ import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import SplashLoader, { useLoadingPercent, DrawnArt } from '@/components/SplashLoader';
+import SplashLoader, { useLoadingPercent, DrawnArt, bootElapsed, SPLASH_MIN_MS } from '@/components/SplashLoader';
 import { ICON_WORKER, ICON_EMPLOYER } from '@/constants/roleIcons';
 import { hideWebSplash } from '@/lib/webSplash';
 
@@ -78,17 +78,23 @@ export default function RootScreen() {
 
     if (loading || finishing.current) return;
     finishing.current = true;
-    // Read from ref so we get the committed value, not a stale closure
-    if (currentUserRef.current) {
-      // Loading screen hides once tabs are mounted and data is ready:
-      // native — EntryTransition overlay, web — the static HTML splash.
-      router.replace('/(tabs)');
-    } else {
-      // No tabs will mount — hide splash now and show the welcome screen
-      SplashScreen.hideAsync().catch(() => {});
-      hideWebSplash();
-      setReady(true);
-    }
+    // Даже если грузить нечего, даём логотипу дорисоваться, а счётчику —
+    // добежать до 100 %: иначе экран мелькает и пропадает недорисованным.
+    const wait = Math.max(0, SPLASH_MIN_MS - bootElapsed());
+    const t = setTimeout(() => {
+      // Read from ref so we get the committed value, not a stale closure
+      if (currentUserRef.current) {
+        // Loading screen hides once tabs are mounted and data is ready:
+        // native — EntryTransition overlay, web — the static HTML splash.
+        router.replace('/(tabs)');
+      } else {
+        // No tabs will mount — hide splash now and show the welcome screen
+        SplashScreen.hideAsync().catch(() => {});
+        hideWebSplash();
+        setReady(true);
+      }
+    }, wait);
+    return () => clearTimeout(t);
   }, [loading, currentUser]);
 
   if (!ready) {

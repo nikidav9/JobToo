@@ -107,6 +107,19 @@ function bootStart(): number {
   return bootStartedAt;
 }
 
+/** Сколько миллисекунд прошло с начала загрузки приложения. */
+export function bootElapsed(): number {
+  return Date.now() - bootStart();
+}
+
+/**
+ * Минимальное время показа загрузочного экрана: полная прорисовка логотипа
+ * плюс небольшой запас, чтобы счётчик успел добежать до 100 %. Без него при
+ * быстром старте (например, у гостя, которому нечего грузить) экран улетал
+ * недорисованным.
+ */
+export const SPLASH_MIN_MS = DRAW_MS + 280;
+
 export function useLoadingPercent(ready: boolean, minMs = DRAW_MS): number {
   const [percent, setPercent] = useState(1);
   const start = useRef(bootStart());
