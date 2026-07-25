@@ -33,9 +33,10 @@ export default function Root({ children }: PropsWithChildren) {
         <ScrollViewStyleReset />
 
         {/* Static splash — same visual as the native loader (components/SplashLoader.tsx):
-            белая «нарисованная от руки» корзина на фирменном оранжевом, счётчик
-            процентов. Пути и тайминги совпадают с нативной версией один в один,
-            поэтому веб/Telegram Mini App и приложение читаются как один экран. */}
+            логотип JobToo прописывается белой линией на фирменном оранжевом,
+            снизу счётчик процентов. Пути и тайминги совпадают с нативной
+            версией один в один, поэтому веб/Telegram Mini App и приложение
+            читаются как один экран. */}
         <style>{`
           #splash {
             position: fixed; inset: 0;
@@ -45,7 +46,7 @@ export default function Root({ children }: PropsWithChildren) {
             transition: opacity 0.35s ease;
           }
           #splash.hidden { opacity: 0; pointer-events: none; }
-          #splash-art { width: min(62vw, 34vh); }
+          #splash-art { width: min(72vw, 320px); }
           #splash-art svg { width: 100%; height: auto; display: block; }
           .sp {
             fill: none; stroke: #fff;
@@ -54,17 +55,9 @@ export default function Root({ children }: PropsWithChildren) {
             animation: sp-draw var(--d) linear var(--dl) forwards;
           }
           @keyframes sp-draw { to { stroke-dashoffset: 0; } }
-          /* Место под логотип зарезервировано всегда — счётчик не подпрыгивает */
           #splash-bottom {
             display: flex; flex-direction: column; align-items: center;
-            margin-top: 26px;
-          }
-          @keyframes sp-fade { to { opacity: 1; } }
-          #splash-name {
-            font-size: 34px; font-weight: 800; letter-spacing: -0.8px;
-            color: #fff; opacity: 0;
-            animation: sp-fade 0.5s ease 1265ms forwards;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin-top: 22px;
           }
           /* Счётчик виден с первого кадра — отсчёт начинается с единицы */
           #splash-pct {
@@ -75,7 +68,6 @@ export default function Root({ children }: PropsWithChildren) {
           }
           @media (prefers-reduced-motion: reduce) {
             .sp { animation: none; stroke-dashoffset: 0; }
-            #splash-name { animation: none; opacity: 1; }
           }
         `}</style>
       </head>
@@ -83,45 +75,19 @@ export default function Root({ children }: PropsWithChildren) {
         <div id="splash">
           <div
             id="splash-art"
-            dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 200 250" xmlns="http://www.w3.org/2000/svg">
-<path class="sp" d="M 12 24 L 118 24" stroke-width="3.4" style="--l:106;--d:92ms;--dl:0ms"/>
-<path class="sp" d="M 20 24 L 20 190" stroke-width="3.4" style="--l:166;--d:115ms;--dl:69ms"/>
-<path class="sp" d="M 110 24 L 110 190" stroke-width="3.4" style="--l:166;--d:115ms;--dl:115ms"/>
-<path class="sp" d="M 12 78 L 118 78" stroke-width="3.4" style="--l:106;--d:92ms;--dl:207ms"/>
-<path class="sp" d="M 12 134 L 118 134" stroke-width="3.4" style="--l:106;--d:69ms;--dl:276ms"/>
-<path class="sp" d="M 12 190 L 118 190" stroke-width="3.4" style="--l:106;--d:92ms;--dl:322ms"/>
-<path class="sp" d="M 24 77 L 24 50 L 34 40 L 44 50 L 44 77 Z" stroke-width="2.8" style="--l:100;--d:115ms;--dl:414ms"/>
-<path class="sp" d="M 48 77 L 48 54 L 68 54 L 68 77 Z" stroke-width="2.8" style="--l:86;--d:92ms;--dl:506ms"/>
-<path class="sp" d="M 48 62 L 68 62" stroke-width="2.4" style="--l:20;--d:60ms;--dl:598ms"/>
-<path class="sp" d="M 74 77 L 72 58 L 86 58 L 84 77 Z" stroke-width="2.8" style="--l:66;--d:69ms;--dl:621ms"/>
-<path class="sp" d="M 71 55 L 87 55" stroke-width="2.4" style="--l:16;--d:60ms;--dl:690ms"/>
-<path class="sp" d="M 94 77 L 94 60 Q 94 55 97 53 L 97 47 L 103 47 L 103 53 Q 106 55 106 60 L 106 77 Z" stroke-width="2.8" style="--l:78;--d:92ms;--dl:713ms"/>
-<path class="sp" d="M 24 133 L 24 108 L 52 108 L 52 133 Z" stroke-width="2.8" style="--l:106;--d:115ms;--dl:782ms"/>
-<path class="sp" d="M 38 108 L 38 133" stroke-width="2.4" style="--l:25;--d:60ms;--dl:897ms"/>
-<path class="sp" d="M 58 133 L 58 116 L 80 116 L 80 133 Z" stroke-width="2.8" style="--l:78;--d:92ms;--dl:920ms"/>
-<path class="sp" d="M 62 116 L 62 100 L 78 100 L 78 116" stroke-width="2.8" style="--l:48;--d:69ms;--dl:1012ms"/>
-<path class="sp" d="M 86 133 L 88 108 Q 88 104 92 104 L 104 104 Q 108 104 108 108 L 108 133 Z" stroke-width="2.8" style="--l:92;--d:92ms;--dl:1058ms"/>
-<path class="sp" d="M 24 189 L 24 158 L 54 158 L 54 189 Z" stroke-width="2.8" style="--l:122;--d:115ms;--dl:1127ms"/>
-<path class="sp" d="M 39 158 L 39 189" stroke-width="2.4" style="--l:31;--d:60ms;--dl:1242ms"/>
-<path class="sp" d="M 60 189 L 60 164 L 84 164 L 84 189 Z" stroke-width="2.8" style="--l:98;--d:92ms;--dl:1265ms"/>
-<path class="sp" d="M 92 189 L 92 168 Q 92 163 95 161 L 95 155 L 103 155 L 103 161 Q 106 163 106 168 L 106 189 Z" stroke-width="2.8" style="--l:88;--d:92ms;--dl:1334ms"/>
-<path class="sp" d="M 118 170 Q 157 162 196 170" stroke-width="3.4" style="--l:80;--d:92ms;--dl:1403ms"/>
-<path class="sp" d="M 118 170 Q 157 178 196 170" stroke-width="3.4" style="--l:80;--d:92ms;--dl:1472ms"/>
-<path class="sp" d="M 122 174 L 131 219 Q 132 226 139 226 L 175 226 Q 182 226 183 219 L 192 174" stroke-width="3.4" style="--l:148;--d:207ms;--dl:1541ms"/>
-<path class="sp" d="M 137 177 L 142 223" stroke-width="2.4" style="--l:46;--d:69ms;--dl:1725ms"/>
-<path class="sp" d="M 157 176 L 157 225" stroke-width="2.4" style="--l:49;--d:69ms;--dl:1771ms"/>
-<path class="sp" d="M 177 177 L 172 223" stroke-width="2.4" style="--l:46;--d:69ms;--dl:1817ms"/>
-<path class="sp" d="M 126 190 Q 157 197 188 190" stroke-width="2.4" style="--l:63;--d:69ms;--dl:1863ms"/>
-<path class="sp" d="M 130 207 Q 157 213 184 207" stroke-width="2.4" style="--l:55;--d:69ms;--dl:1909ms"/>
-<path class="sp" d="M 116 88 Q 132 82 140 92" stroke-width="2.4" style="--l:30;--d:92ms;--dl:1978ms"/>
-<path class="sp" d="M 128 116 L 126 100 L 146 96 L 148 112 Z" stroke-width="2.8" style="--l:72;--d:115ms;--dl:2024ms"/>
-<path class="sp" d="M 133 122 Q 138 142 145 158" stroke-width="2.4" style="--l:40;--d:92ms;--dl:2116ms"/>
-<path class="sp" d="M 152 90 L 160 84" stroke-width="2.4" style="--l:10;--d:69ms;--dl:2185ms"/>
-<path class="sp" d="M 154 108 L 162 104" stroke-width="2.4" style="--l:9;--d:69ms;--dl:2231ms"/>
+            dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg">
+<path class="sp" d="M 46 20 L 46 62 Q 46 80 28 80 Q 14 80 12 66" stroke-width="8" style="--l:82;--d:322ms;--dl:0ms"/>
+<path class="sp" d="M 74 43 A 18 18 0 1 1 73.99 43" stroke-width="8" style="--l:114;--d:368ms;--dl:299ms"/>
+<path class="sp" d="M 104 18 L 104 80" stroke-width="8" style="--l:62;--d:207ms;--dl:644ms"/>
+<path class="sp" d="M 104 61 A 18 18 0 1 1 103.99 61" stroke-width="8" style="--l:114;--d:345ms;--dl:828ms"/>
+<path class="sp" d="M 150 20 L 192 20" stroke-width="8" style="--l:42;--d:184ms;--dl:1150ms"/>
+<path class="sp" d="M 171 20 L 171 80" stroke-width="8" style="--l:60;--d:207ms;--dl:1311ms"/>
+<path class="sp" d="M 218 43 A 18 18 0 1 1 217.99 43" stroke-width="8" style="--l:114;--d:345ms;--dl:1495ms"/>
+<path class="sp" d="M 262 43 A 18 18 0 1 1 261.99 43" stroke-width="8" style="--l:114;--d:322ms;--dl:1817ms"/>
+<path class="sp" d="M 20 98 Q 150 108 282 96" stroke-width="5" style="--l:264;--d:230ms;--dl:2070ms"/>
 </svg>` }}
           />
           <div id="splash-bottom">
-            <div id="splash-name">JobToo</div>
             <div id="splash-pct">1%</div>
           </div>
         </div>
