@@ -9,9 +9,8 @@ import { WebView } from 'react-native-webview';
 import { Colors } from '@/constants/theme';
 import { METRO_LINES } from '@/constants/metro';
 import { METRO_COORDS, MOSCOW_CENTER, YANDEX_MAPS_API_KEY } from '@/constants/metroCoords';
+import { LAVKA_LOGO_DATA_URI } from '@/constants/lavkaLogoData';
 import { dbAddressSuggest } from '@/services/db';
-
-export type StationCount = { station: string; count: number };
 
 // Одна карточка в шторке над картой: минимум полей, чтобы список
 // одинаково собирался и для смен, и для постоянных вакансий.
@@ -22,6 +21,21 @@ export type MapListItem = {
   company: string;
   pay?: string;
   meta?: string;
+  /** Адрес — к нему и привязана метка; станция остаётся только для фильтра */
+  address?: string;
+  lat?: number;
+  lng?: number;
+};
+
+/** Точка на карте — один адрес со всеми вакансиями, которые на нём висят */
+type Place = {
+  key: string;
+  address: string;
+  station: string;
+  company: string;
+  count: number;
+  lat: number | null;
+  lng: number | null;
 };
 
 const { height: SH } = Dimensions.get('window');
@@ -29,39 +43,94 @@ const { height: SH } = Dimensions.get('window');
 const SHEET_HALF = Math.round(SH * 0.46);
 const SHEET_FULL = Math.round(SH * 0.86);
 
-// Собираем HTML с картой Яндекса и метками-кружками (число смен/вакансий у станции).
-// Координаты приходят готовыми: геокодер Яндекса у нашего ключа не подключён.
-function buildHtml(points: { station: string; count: number; lat: number | null; lng: number | null }[]): string {
-  const markers = JSON.stringify(points);
+/** Ключ места: один адрес — одна метка. Без адреса собираем по станции. */
+function placeKey(i: MapListItem): string {
+  const a = (i.address ?? '').trim().toLowerCase();
+  return a ? `a:${a}` : `s:${i.station}`;
+}
+
+// Карта Яндекса с кластеризацией: издалека точки собираются в кружки с числом,
+// при приближении расходятся на конкретные адреса. Кластеризацию делает штатный
+// ymaps.Clusterer — он же по нажатию на кружок приближает карту к его точкам.
+function buildHtml(places: Place[]): string {
+  const markers = JSON.stringify(places.filter(p => p.lat != null && p.lng != null));
   const center = JSON.stringify(MOSCOW_CENTER);
   return `<!DOCTYPE html><html><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
-<style>html,body,#map{margin:0;padding:0;width:100%;height:100%;}</style>
+<style>
+html,body,#map{margin:0;padding:0;width:100%;height:100%;}
+.pin{
+  position:relative;display:flex;align-items:center;gap:5px;
+  background:#fff;border:1px solid #E5E7EB;border-radius:100px;
+  padding:4px 10px 4px 4px;white-space:nowrap;
+  box-shadow:0 2px 6px rgba(0,0,0,0.18);
+  font:600 12px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  color:#111;transform:translate(-50%,-100%);
+}
+/* Хвостик вниз — чтобы «таблетка» читалась как метка, а не как ярлык */
+.pin::after{
+  content:'';position:absolute;left:50%;bottom:-6px;z-index:-1;
+  width:12px;height:12px;background:#fff;
+  border-right:1px solid #E5E7EB;border-bottom:1px solid #E5E7EB;
+  transform:translateX(-50%) rotate(45deg);
+}
+.pin img{width:18px;height:18px;border-radius:9px;display:block;}
+.pin .n{
+  background:${Colors.primary};color:#fff;border-radius:100px;
+  padding:1px 6px;font-size:11px;font-weight:700;
+}
+</style>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=${YANDEX_MAPS_API_KEY}&lang=ru_RU"></script>
 </head><body>
 <div id="map"></div>
 <script>
-function send(name){
+function send(key){
   try{
-    if(window.ReactNativeWebView&&window.ReactNativeWebView.postMessage){window.ReactNativeWebView.postMessage(name);}
-    else if(window.parent){window.parent.postMessage({jt_station:name},'*');}
+    if(window.ReactNativeWebView&&window.ReactNativeWebView.postMessage){window.ReactNativeWebView.postMessage(key);}
+    else if(window.parent){window.parent.postMessage({jt_place:key},'*');}
   }catch(e){}
 }
 var PTS=${markers};
+var LOGO='${LAVKA_LOGO_DATA_URI}';
 ymaps.ready(function(){
   var map=new ymaps.Map('map',{center:${center},zoom:10,controls:['zoomControl','geolocationControl']},{suppressMapOpenBlock:true});
-  var coords=[];
-  function addMarker(p,c){
-    var pm=new ymaps.Placemark(c,{iconContent:String(p.count),hintContent:p.station,balloonContent:p.station+' — '+p.count},
-      {preset:'islands#violetCircleIcon',iconColor:'#7C3AED'});
-    pm.events.add('click',function(){send(p.station);});
-    map.geoObjects.add(pm);
-  }
-  PTS.forEach(function(p){
-    if(p.lat!=null&&p.lng!=null){ addMarker(p,[p.lat,p.lng]); coords.push([p.lat,p.lng]); }
+
+  // Метка адреса: логотип компании и её название — как договаривались,
+  // без суммы. Если на адресе несколько смен, рядом стоит их число.
+  var PinLayout=ymaps.templateLayoutFactory.createClass(
+    '<div class="pin">' +
+      '<img src="'+LOGO+'"/>' +
+      '<span>$[properties.company]</span>' +
+      '{% if properties.count > 1 %}<span class="n">$[properties.count]</span>{% endif %}' +
+    '</div>'
+  );
+
+  var clusterer=new ymaps.Clusterer({
+    preset:'islands#invertedOrangeClusterIcons',
+    groupByCoordinates:false,
+    clusterDisableClickZoom:false,
+    clusterOpenBalloonOnClick:false,
+    gridSize:72,
+    minClusterSize:2
   });
-  if(coords.length===1){map.setCenter(coords[0],13);}
+
+  var marks=[],coords=[];
+  PTS.forEach(function(p){
+    var pm=new ymaps.Placemark([p.lat,p.lng],
+      {company:p.company,count:p.count,hintContent:p.address},
+      {iconLayout:PinLayout,
+       // Область метки нужна, иначе Яндекс не знает её размеров и клик
+       // не попадает по «таблетке»
+       iconShape:{type:'Rectangle',coordinates:[[-70,-34],[70,0]]}});
+    pm.events.add('click',function(){send(p.key);});
+    marks.push(pm);
+    coords.push([p.lat,p.lng]);
+  });
+  clusterer.add(marks);
+  map.geoObjects.add(clusterer);
+
+  if(coords.length===1){map.setCenter(coords[0],14);}
   else if(coords.length>1){
     try{map.setBounds(ymaps.util.bounds.fromPoints(coords),{checkZoomRange:true,zoomMargin:60});}catch(e){}
   }
@@ -71,63 +140,90 @@ ymaps.ready(function(){
 }
 
 export function MetroMap({
-  visible, title, points, items = [], onSelect, onClose,
+  visible, title, items = [], onSelect, onClose,
 }: {
   visible: boolean;
   title: string;
-  points: StationCount[];
-  /** Вакансии/смены, которые стоят за метками: из них собирается шторка */
+  /** Вакансии/смены: из них собираются и метки, и список в шторке */
   items?: MapListItem[];
   onSelect: (station: string) => void;
   onClose: () => void;
 }) {
-  // Координаты станций, которых нет в справочнике, — догружаем через наш
-  // сервер (OpenStreetMap). Так на карте окажется даже станция, добавленная
-  // впервые: полагаться на геокодер Яндекса нельзя, он у ключа не подключён.
+  // Координаты, которых нет в самой вакансии, — догружаем через наш сервер
+  // (OpenStreetMap). Геокодер Яндекса у нашего ключа не подключён, поэтому
+  // определять адрес прямо в браузере нельзя.
   const [extra, setExtra] = useState<Record<string, [number, number]>>({});
-  // Станция, выбранная на карте. Карта при этом остаётся открытой —
-  // список выезжает шторкой поверх неё, и её всегда можно вернуть.
-  const [sheetStation, setSheetStation] = useState<string | null>(null);
+  // Выбранный адрес. Карта при этом остаётся открытой — список выезжает
+  // шторкой поверх неё, и её всегда можно вернуть.
+  const [sheetKey, setSheetKey] = useState<string | null>(null);
 
+  // Группируем вакансии по адресу: у одного даркстора обычно много смен,
+  // и на карте им положено быть одной меткой.
+  const places = useMemo<Place[]>(() => {
+    const m = new Map<string, Place>();
+    for (const i of items) {
+      const key = placeKey(i);
+      const found = m.get(key);
+      if (found) {
+        found.count += 1;
+        if (found.lat == null && i.lat != null) { found.lat = i.lat; found.lng = i.lng ?? null; }
+        continue;
+      }
+      const fallback = extra[key] ?? (i.station ? METRO_COORDS[i.station] : undefined);
+      m.set(key, {
+        key,
+        address: i.address?.trim() || (i.station ? `м. ${i.station}` : ''),
+        station: i.station,
+        company: i.company,
+        count: 1,
+        lat: i.lat ?? (fallback ? fallback[0] : null),
+        lng: i.lng ?? (fallback ? fallback[1] : null),
+      });
+    }
+    return Array.from(m.values());
+  }, [items, extra]);
+
+  // Догеокодируем адреса, у которых координат так и не нашлось: у вакансий,
+  // созданных до появления подсказок адреса, их просто нет.
   useEffect(() => {
     if (!visible) return;
-    const unknown = points.map(p => p.station).filter(st => !METRO_COORDS[st] && !extra[st]);
+    const unknown = places.filter(p => p.lat == null && !extra[p.key]);
     if (unknown.length === 0) return;
     let cancelled = false;
     (async () => {
       const found: Record<string, [number, number]> = {};
-      for (const st of unknown) {
-        const res = await dbAddressSuggest(`метро ${st}, Москва`);
+      for (const p of unknown) {
+        const query = p.address.startsWith('м. ') ? `метро ${p.station}, Москва` : p.address;
+        if (!query) continue;
+        const res = await dbAddressSuggest(query);
         const hit = res.find(r => r.lat != null && r.lng != null);
-        if (hit) found[st] = [hit.lat as number, hit.lng as number];
+        if (hit) found[p.key] = [hit.lat as number, hit.lng as number];
       }
       if (!cancelled && Object.keys(found).length) setExtra(prev => ({ ...prev, ...found }));
     })();
     return () => { cancelled = true; };
-  }, [visible, points]);
+  }, [visible, places]);
 
-  // Закрыли карту — забываем выбранную станцию, чтобы в следующий раз
+  // Закрыли карту — забываем выбранный адрес, чтобы в следующий раз
   // открылась чистая карта, а не прошлая шторка.
-  useEffect(() => { if (!visible) setSheetStation(null); }, [visible]);
+  useEffect(() => { if (!visible) setSheetKey(null); }, [visible]);
 
-  const mapped = useMemo(() => points.map(p => {
-    const c = METRO_COORDS[p.station] ?? extra[p.station];
-    return { station: p.station, count: p.count, lat: c ? c[0] : null, lng: c ? c[1] : null };
-  }), [points, extra]);
+  const placed = useMemo(() => places.filter(p => p.lat != null && p.lng != null), [places]);
 
   // Источник WebView мемоизируем: иначе любое движение шторки пересоздаёт
   // объект source, и карта перезагружается прямо под пальцем.
   const source = useMemo(
-    () => ({ html: buildHtml(mapped), baseUrl: 'https://jobtoo.ru' }),
-    [mapped],
+    () => ({ html: buildHtml(placed), baseUrl: 'https://jobtoo.ru' }),
+    [placed],
   );
 
-  const stationItems = useMemo(
-    () => (sheetStation ? items.filter(i => i.station === sheetStation) : []),
-    [items, sheetStation],
+  const sheetPlace = sheetKey ? places.find(p => p.key === sheetKey) ?? null : null;
+  const placeItems = useMemo(
+    () => (sheetKey ? items.filter(i => placeKey(i) === sheetKey) : []),
+    [items, sheetKey],
   );
-  const sheetLine = sheetStation
-    ? METRO_LINES.find(l => l.stations.includes(sheetStation)) ?? null
+  const sheetLine = sheetPlace?.station
+    ? METRO_LINES.find(l => l.stations.includes(sheetPlace.station)) ?? null
     : null;
 
   // ── Шторка ───────────────────────────────────────────────────────────
@@ -149,13 +245,13 @@ export function MetroMap({
   const closeSheet = () => {
     baseY.current = HIDDEN;
     Animated.timing(ty, { toValue: HIDDEN, duration: 180, useNativeDriver: true })
-      .start(() => setSheetStation(null));
+      .start(() => setSheetKey(null));
   };
 
-  const openSheet = (st: string) => {
+  const openSheet = (key: string) => {
     ty.setValue(HIDDEN);
     baseY.current = HALF_Y;
-    setSheetStation(st);
+    setSheetKey(key);
     Animated.spring(ty, { toValue: HALF_Y, useNativeDriver: true, bounciness: 0, speed: 12 }).start();
   };
 
@@ -185,38 +281,36 @@ export function MetroMap({
   useEffect(() => {
     if (Platform.OS !== 'android' || !visible) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (sheetStation) { closeSheet(); return true; }
+      if (sheetKey) { closeSheet(); return true; }
       return false;
     });
     return () => sub.remove();
-  }, [visible, sheetStation]);
+  }, [visible, sheetKey]);
 
-  const handleMarker = (st: string) => {
-    if (!st) return;
-    // Если карточек по станции нет (например, список не передали) — работаем
-    // по-старому: применяем фильтр и уходим в список.
-    if (!items.some(i => i.station === st)) { onSelect(st); return; }
-    if (sheetStation === st) return;
-    if (sheetStation) { setSheetStation(st); return; }
-    openSheet(st);
+  const handleMarker = (key: string) => {
+    if (!key) return;
+    if (!items.some(i => placeKey(i) === key)) return;
+    if (sheetKey === key) return;
+    if (sheetKey) { setSheetKey(key); return; }
+    openSheet(key);
   };
 
   // Веб: слушаем postMessage из iframe
   useEffect(() => {
     if (Platform.OS !== 'web' || !visible) return;
     const handler = (e: any) => {
-      const st = e?.data?.jt_station;
-      if (st) handleMarker(st);
+      const key = e?.data?.jt_place;
+      if (key) handleMarker(key);
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [visible, items, sheetStation]);
+  }, [visible, items, sheetKey]);
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
-      onRequestClose={() => { if (sheetStation) closeSheet(); else onClose(); }}
+      onRequestClose={() => { if (sheetKey) closeSheet(); else onClose(); }}
       statusBarTranslucent
     >
       <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
@@ -229,7 +323,7 @@ export function MetroMap({
         </View>
 
         <View style={{ flex: 1 }}>
-          {mapped.length === 0 ? (
+          {placed.length === 0 ? (
             <View style={s.empty}>
               <Ionicons name="map-outline" size={48} color={Colors.textMuted} />
               <Text style={s.emptyTxt}>Пока нет точек на карте</Text>
@@ -257,7 +351,7 @@ export function MetroMap({
 
           {/* Шторка со списком: карта под ней остаётся живой, шторку можно
               смахнуть вниз и снова оказаться на карте */}
-          {sheetStation ? (
+          {sheetPlace ? (
             <Animated.View
               style={[s.sheet, { height: SHEET_FULL, transform: [{ translateY: ty }] }]}
             >
@@ -266,9 +360,10 @@ export function MetroMap({
                 <View style={s.sheetHead}>
                   {sheetLine ? <View style={[s.lineDot, { backgroundColor: sheetLine.color }]} /> : null}
                   <View style={{ flex: 1 }}>
-                    <Text style={s.sheetTitle} numberOfLines={1}>м. {sheetStation}</Text>
+                    <Text style={s.sheetTitle} numberOfLines={2}>{sheetPlace.address}</Text>
                     <Text style={s.sheetSub}>
-                      {stationItems.length} {plural(stationItems.length, 'вариант', 'варианта', 'вариантов')}
+                      {sheetPlace.station ? `м. ${sheetPlace.station} · ` : ''}
+                      {placeItems.length} {plural(placeItems.length, 'вариант', 'варианта', 'вариантов')}
                     </Text>
                   </View>
                   <TouchableOpacity onPress={closeSheet} style={s.sheetClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -279,16 +374,18 @@ export function MetroMap({
 
               {/* Кнопка «все» закреплена сразу под шапкой: в половинном
                   положении низ шторки уходит за край экрана */}
-              <TouchableOpacity style={s.allBtn} activeOpacity={0.85} onPress={() => onSelect(sheetStation)}>
-                <Text style={s.allBtnTxt}>Смотреть все на станции</Text>
-                <Ionicons name="arrow-forward" size={15} color="#fff" />
-              </TouchableOpacity>
+              {sheetPlace.station ? (
+                <TouchableOpacity style={s.allBtn} activeOpacity={0.85} onPress={() => onSelect(sheetPlace.station)}>
+                  <Text style={s.allBtnTxt}>Смотреть все на станции</Text>
+                  <Ionicons name="arrow-forward" size={15} color="#fff" />
+                </TouchableOpacity>
+              ) : null}
 
               <ScrollView
                 contentContainerStyle={s.sheetList}
                 showsVerticalScrollIndicator={false}
               >
-                {stationItems.map(it => (
+                {placeItems.map(it => (
                   <TouchableOpacity
                     key={it.id}
                     style={s.row}
@@ -351,7 +448,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
   lineDot: { width: 10, height: 10, borderRadius: 5 },
-  sheetTitle: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary },
+  sheetTitle: { fontSize: 15, fontWeight: '800', color: Colors.textPrimary, lineHeight: 20 },
   sheetSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   sheetClose: {
     width: 30, height: 30, borderRadius: 15,

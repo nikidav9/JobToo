@@ -41,7 +41,7 @@ import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials, normalizeCompany } from '@/services/storage';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
 import { TabHeader } from '@/components/ui/TabHeader';
-import { MetroMap, StationCount, MapListItem } from '@/components/feature/MetroMap';
+import { MetroMap, MapListItem } from '@/components/feature/MetroMap';
 import { setOnboardingTarget, setOnboardingFlag } from '@/lib/onboardingTargets';
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
 
@@ -789,29 +789,15 @@ function WorkerFeed() {
   const [filterPicker, setFilterPicker] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
 
-  // Число смен у каждой станции на выбранную дату (для меток на карте)
-  const stationCounts: StationCount[] = useMemo(() => {
-    if (!currentUser) return [];
-    const m: Record<string, number> = {};
-    for (const v of vacancies) {
-      if (v.status !== 'open') continue;
-      if (v.date !== selectedDate) continue;
-      if (!currentUser.workTypes?.includes(v.workType)) continue;
-      if (!v.metroStation) continue;
-      m[v.metroStation] = (m[v.metroStation] ?? 0) + 1;
-    }
-    return Object.entries(m).map(([station, count]) => ({ station, count }));
-  }, [vacancies, selectedDate, currentUser]);
-
-  // Те же смены, но списком: их показывает шторка над картой, когда
-  // нажали на метку. Так со станции можно вернуться к карте, не выходя из неё.
+  // Смены для карты: метки ставятся по адресу, поэтому кроме станции
+  // передаём адрес и координаты — по ним карта и группирует точки.
   const mapItems: MapListItem[] = useMemo(() => {
     if (!currentUser) return [];
     return (vacancies as Vacancy[])
       .filter((v: Vacancy) =>
         v.status === 'open' &&
         v.date === selectedDate &&
-        !!v.metroStation &&
+        (!!v.metroStation || !!v.address) &&
         currentUser.workTypes?.includes(v.workType))
       .map((v: Vacancy) => ({
         id: v.id,
@@ -820,6 +806,9 @@ function WorkerFeed() {
         company: v.company,
         pay: v.salary > 0 ? `${v.salary.toLocaleString('ru-RU')} ₽` : undefined,
         meta: `${v.timeStart}–${v.timeEnd}`,
+        address: v.address,
+        lat: v.lat,
+        lng: v.lng,
       }));
   }, [vacancies, selectedDate, currentUser]);
 
@@ -1116,7 +1105,6 @@ function WorkerFeed() {
       <MetroMap
         visible={mapOpen}
         title="Смены на карте"
-        points={stationCounts}
         items={mapItems}
         onSelect={(st) => { setFilterStation(st); setMapOpen(false); }}
         onClose={() => setMapOpen(false)}
@@ -1351,27 +1339,20 @@ function WorkerPermMode() {
   const [chatLoading, setChatLoading] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
 
-  // Число открытых постоянных вакансий у каждой станции (для меток на карте)
-  const permStationCounts: StationCount[] = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const v of permVacancies) {
-      if (v.status !== 'open' || !v.metroStation) continue;
-      m[v.metroStation] = (m[v.metroStation] ?? 0) + 1;
-    }
-    return Object.entries(m).map(([station, count]) => ({ station, count }));
-  }, [permVacancies]);
-
-  // Список для шторки над картой — те же вакансии, что стоят за метками
+  // Вакансии для карты: метка — это адрес, станция остаётся для фильтра
   const permMapItems: MapListItem[] = useMemo(
     () => (permVacancies as PermVacancy[])
-      .filter((v: PermVacancy) => v.status === 'open' && !!v.metroStation)
+      .filter((v: PermVacancy) => v.status === 'open' && (!!v.metroStation || !!v.address))
       .map((v: PermVacancy) => ({
         id: v.id,
-        station: v.metroStation as string,
+        station: (v.metroStation ?? '') as string,
         title: v.title,
         company: v.company,
         pay: v.salary > 0 ? `${v.salary.toLocaleString('ru-RU')} ₽` : undefined,
         meta: v.schedule,
+        address: v.address,
+        lat: v.lat,
+        lng: v.lng,
       })),
     [permVacancies],
   );
@@ -1690,7 +1671,6 @@ function WorkerPermMode() {
       <MetroMap
         visible={mapOpen}
         title="Вакансии на карте"
-        points={permStationCounts}
         items={permMapItems}
         onSelect={(st) => { setFilterStation(st); setMapOpen(false); }}
         onClose={() => setMapOpen(false)}
