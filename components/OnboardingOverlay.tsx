@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform,
+  View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, Animated, Easing,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -30,6 +31,52 @@ type Step = {
   hint: 'below' | 'above' | 'center';
   demo?: boolean;       // шаг про свайп: при отсутствии реальной карточки показываем демо
 };
+
+/**
+ * Плавно пульсирующее кольцо вокруг подсвеченного элемента: расходится и
+ * гаснет, как круги по воде. Один и тот же указатель на всех шагах, чтобы
+ * подсказка читалась одинаково.
+ */
+function PulseRing({ rect, radius }: { rect: Rect; radius: number }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1, duration: 1250, easing: Easing.out(Easing.quad), useNativeDriver: true,
+        }),
+        Animated.delay(220),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  const common = {
+    position: 'absolute' as const,
+    left: rect.x, top: rect.y, width: rect.w, height: rect.h,
+    borderRadius: radius,
+    borderWidth: 2.5,
+    borderColor: Colors.primary,
+  };
+
+  return (
+    // absoluteFill обязателен: у View без размеров Android обрезает
+    // абсолютных детей, выходящих за его границы, — кольцо бы пропало
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* постоянный контур — видно, что именно выделено */}
+      <View style={[common, { opacity: 0.95 }]} />
+      {/* расходящееся кольцо */}
+      <Animated.View
+        style={[common, {
+          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0] }),
+          transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }],
+        }]}
+      />
+    </View>
+  );
+}
 
 export function OnboardingOverlay() {
   const app = useApp();
@@ -152,20 +199,34 @@ export function OnboardingOverlay() {
       ? { top: Math.min(s.spot.y + s.spot.h + 16, H - 260) }
       : { bottom: Math.max(H - (s.spot.y - 16), 20) };
 
-  // Затемнение с «дыркой»: 4 прямоугольника вокруг подсветки.
-  // В демо-режиме (нет реальной карточки) «дырку» не режем — затемняем весь фон,
-  // чтобы за демо-карточкой не просвечивал персонаж пустого состояния.
+  // Радиус подсветки: круглым кнопкам — круг, широким блокам — мягкое скругление
+  const spotRadius = (r: Rect) =>
+    Math.abs(r.w - r.h) < 14 ? Math.max(r.w, r.h) / 2 : 18;
+
+  // Путь скруглённого прямоугольника — им вырезаем «дырку» в затемнении
+  const roundedRect = (x: number, y: number, w: number, h: number, rad: number) => {
+    const r = Math.max(0, Math.min(rad, w / 2, h / 2));
+    return `M${x + r} ${y} H${x + w - r} A${r} ${r} 0 0 1 ${x + w} ${y + r}`
+      + ` V${y + h - r} A${r} ${r} 0 0 1 ${x + w - r} ${y + h}`
+      + ` H${x + r} A${r} ${r} 0 0 1 ${x} ${y + h - r}`
+      + ` V${y + r} A${r} ${r} 0 0 1 ${x + r} ${y} Z`;
+  };
+
+  // Затемнение с вырезом: рисуем одним SVG-путём с правилом evenodd, поэтому
+  // «дырка» получается скруглённой, а не квадратной. В демо-режиме (реальной
+  // карточки нет) выреза не делаем — иначе за демо-карточкой просвечивает фон.
   const dim = 'rgba(17,17,17,0.72)';
   const Spot = () => {
     if (!s.spot || s.demo) return <View style={[StyleSheet.absoluteFill, { backgroundColor: dim }]} />;
     const { x, y, w, h } = s.spot;
     return (
-      <>
-        <View style={{ position: 'absolute', left: 0, top: 0, right: 0, height: y, backgroundColor: dim }} />
-        <View style={{ position: 'absolute', left: 0, top: y, width: x, height: h, backgroundColor: dim }} />
-        <View style={{ position: 'absolute', left: x + w, top: y, right: 0, height: h, backgroundColor: dim }} />
-        <View style={{ position: 'absolute', left: 0, top: y + h, right: 0, bottom: 0, backgroundColor: dim }} />
-      </>
+      <Svg width={W} height={H} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Path
+          d={`M0 0 H${W} V${H} H0 Z ` + roundedRect(x, y, w, h, spotRadius(s.spot))}
+          fill={dim}
+          fillRule="evenodd"
+        />
+      </Svg>
     );
   };
 
@@ -203,6 +264,10 @@ export function OnboardingOverlay() {
           </View>
         </View>
       ) : null}
+
+      {/* Пульсирующее кольцо на элементе — единый указатель «нажми сюда».
+          Рисуем после демо-карточки, иначе она бы его перекрыла. */}
+      {s.spot ? <PulseRing rect={s.spot} radius={spotRadius(s.spot)} /> : null}
 
       {/* Пропустить */}
       <View style={[st.skipWrap, { top: top + 8 }]} pointerEvents="box-none">
