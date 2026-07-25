@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Modal, KeyboardAvoidingView, Platform,
-  ActivityIndicator, FlatList,
+  ActivityIndicator, FlatList, LayoutAnimation, UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -34,6 +34,12 @@ import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 
 type EditSection = 'personal' | 'metro' | 'worktypes' | 'company' | 'bio' | null;
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+// Плавное раскрытие секций. На старой архитектуре Android LayoutAnimation
+// нужно включать вручную, иначе секции просто «прыгают».
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 function StarRating({ rating, count, onPress }: { rating: number; count: number; onPress?: () => void }) {
   const content = (
@@ -235,6 +241,8 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { currentUser, logout, users, showToast, updateUser, unreadCount } = useApp();
   const [editSection, setEditSection] = useState<EditSection>(null);
+  // Раскрыта всегда не больше одной секции: экран остаётся коротким
+  const [openSection, setOpenSection] = useState<string | null>(null);
   const [showRatings, setShowRatings] = useState(false);
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -265,6 +273,14 @@ export default function ProfileScreen() {
   const initials = getInitials(`${currentUser.firstName} ${currentUser.lastName}`);
   const avatarColor = nameColorFromString(currentUser.id);
   const line = METRO_LINES.find(l => l.id === currentUser.metroLineId);
+  const workTypeLabels = (currentUser.workTypes ?? []).map(t => WORK_TYPE_META[t]?.label ?? t);
+
+  const toggleSection = (key: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.create(
+      200, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity,
+    ));
+    setOpenSection(prev => (prev === key ? null : key));
+  };
 
   const openEdit = (section: EditSection) => {
     setEditSection(section);
@@ -480,9 +496,6 @@ export default function ProfileScreen() {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerBtn} onPress={() => setShowSettings(true)}>
-            <Ionicons name="settings-outline" size={22} color={Colors.textPrimary} />
-          </TouchableOpacity>
         </View>
       } />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -526,10 +539,23 @@ export default function ProfileScreen() {
             />
           </View>
 
-          <TouchableOpacity onPress={() => openEdit('personal')} style={styles.userCardArrowBtn}>
-            <Text style={styles.userCardArrow}>›</Text>
-          </TouchableOpacity>
+          {/* Без стрелки: редактирование — через «Личные данные» ниже */}
         </View>
+
+        <SectionCard
+          iconName="person"
+          iconBg={Colors.primary}
+          title="Личные данные"
+          summary={currentUser.phone}
+          open={openSection === 'personal'}
+          onToggle={() => toggleSection('personal')}
+          onEdit={() => openEdit('personal')}
+          rows={[
+            { label: 'Телефон', value: currentUser.phone },
+            { label: 'Фамилия', value: currentUser.lastName },
+            { label: 'Имя', value: currentUser.firstName },
+          ]}
+        />
 
         {currentUser.role === 'worker' ? (
           <>
@@ -537,38 +563,36 @@ export default function ProfileScreen() {
               iconName="briefcase"
               iconBg={Colors.primary}
               title="Специализация"
+              summary={workTypeLabels.length ? workTypeLabels.join(', ') : 'Не указана'}
+              open={openSection === 'worktypes'}
+              onToggle={() => toggleSection('worktypes')}
               onEdit={() => openEdit('worktypes')}
-              rows={[]}
-              chips={(currentUser.workTypes ?? []).map(t => WORK_TYPE_META[t]?.label ?? t)}
-            />
-            <SectionCard
-              iconName="document-text"
-              iconBg={Colors.primary}
-              title="О себе"
-              onEdit={() => openEdit('bio')}
-              rows={currentUser.bio ? [{ label: '', value: currentUser.bio }] : []}
-              placeholder="Расскажите о себе — опыт, навыки, предпочтения"
-            />
-            <SectionCard
-              iconName="person"
-              iconBg={Colors.primary}
-              title="Личные данные"
-              onEdit={() => openEdit('personal')}
-              rows={[
-                { label: 'Телефон', value: currentUser.phone },
-                { label: 'Фамилия', value: currentUser.lastName },
-                { label: 'Имя', value: currentUser.firstName },
-              ]}
+              chips={workTypeLabels}
+              placeholder="Специализация пока не выбрана"
             />
             <SectionCard
               iconName="train"
               iconBg="#1C1C1E"
               title="Метро"
+              summary={currentUser.metroStation ?? 'Не указано'}
+              open={openSection === 'metro'}
+              onToggle={() => toggleSection('metro')}
               onEdit={() => openEdit('metro')}
               rows={[
                 { label: 'Линия', value: line?.name ?? '—', lineColor: line?.color },
                 { label: 'Станция', value: currentUser.metroStation ?? '—' },
               ]}
+            />
+            <SectionCard
+              iconName="document-text"
+              iconBg={Colors.primary}
+              title="О себе"
+              summary={currentUser.bio ? currentUser.bio : 'Не заполнено'}
+              open={openSection === 'bio'}
+              onToggle={() => toggleSection('bio')}
+              onEdit={() => openEdit('bio')}
+              rows={currentUser.bio ? [{ label: '', value: currentUser.bio }] : []}
+              placeholder="Расскажите о себе — опыт, навыки, предпочтения"
             />
           </>
         ) : (
@@ -577,6 +601,9 @@ export default function ProfileScreen() {
               iconName="business"
               iconBg={Colors.primary}
               title="Компания"
+              summary={currentUser.company ?? 'Не указана'}
+              open={openSection === 'company'}
+              onToggle={() => toggleSection('company')}
               onEdit={() => openEdit('company')}
               rows={[{ label: 'Название', value: currentUser.company ?? '—' }]}
             />
@@ -584,36 +611,25 @@ export default function ProfileScreen() {
               iconName="document-text"
               iconBg={Colors.primary}
               title="О компании"
+              summary={currentUser.bio ? currentUser.bio : 'Не заполнено'}
+              open={openSection === 'bio'}
+              onToggle={() => toggleSection('bio')}
               onEdit={() => openEdit('bio')}
               rows={currentUser.bio ? [{ label: '', value: currentUser.bio }] : []}
               placeholder="Расскажите о компании, условиях, коллективе"
             />
-            <SectionCard
-              iconName="person"
-              iconBg={Colors.primary}
-              title="Личные данные"
-              onEdit={() => openEdit('personal')}
-              rows={[
-                { label: 'Телефон', value: currentUser.phone },
-                { label: 'Фамилия', value: currentUser.lastName },
-                { label: 'Имя', value: currentUser.firstName },
-              ]}
-            />
           </>
         )}
 
-        {/* Documents section */}
-        <View style={styles.docsCard}>
-          <View style={styles.docsHeader}>
-            <View style={[sS.iconSquare, { backgroundColor: '#6B7280' }]}>
-              <Ionicons name="document-text" size={18} color="#fff" />
-            </View>
-            <Text style={styles.docsSectionTitle}>Документы</Text>
-            <TouchableOpacity style={styles.logoutLinkRow} onPress={() => setShowConfirmLogout(true)}>
-              <Ionicons name="log-out-outline" size={15} color={Colors.red} />
-              <Text style={styles.logoutLink}>Выйти из аккаунта</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Документы */}
+        <SectionCard
+          iconName="document-text"
+          iconBg="#6B7280"
+          title="Документы"
+          summary="Соглашения и обучение"
+          open={openSection === 'docs'}
+          onToggle={() => toggleSection('docs')}
+        >
           {[
             { label: 'Пользовательское соглашение', doc: 'terms' },
             { label: 'Политика конфиденциальности', doc: 'privacy' },
@@ -621,16 +637,16 @@ export default function ProfileScreen() {
           ].map((item) => (
             <TouchableOpacity
               key={item.doc}
-              style={styles.docRow}
+              style={sS.actionRow}
               onPress={() => router.push({ pathname: '/legal', params: { doc: item.doc } })}
               activeOpacity={0.7}
             >
-              <Text style={styles.docRowLabel}>{item.label}</Text>
-              <Text style={styles.docRowArrow}>›</Text>
+              <Text style={[sS.actionLabel, { flex: 1 }]}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
             </TouchableOpacity>
           ))}
           <TouchableOpacity
-            style={styles.docRow}
+            style={sS.actionRow}
             onPress={async () => {
               if (currentUser) { await resetOnboarding(currentUser.id); }
               // Без уведомления: обучение и так открывается сразу на главной
@@ -638,21 +654,42 @@ export default function ProfileScreen() {
             }}
             activeOpacity={0.7}
           >
-            <Text style={styles.docRowLabel}>Показать обучение снова</Text>
-            <Text style={styles.docRowArrow}>↻</Text>
+            <Text style={[sS.actionLabel, { flex: 1 }]}>Показать обучение снова</Text>
+            <Ionicons name="refresh" size={16} color={Colors.textMuted} />
+          </TouchableOpacity>
+        </SectionCard>
+
+        {/* Аккаунт — все действия с учётной записью в одном месте */}
+        <SectionCard
+          iconName="shield-checkmark"
+          iconBg="#1C1C1E"
+          title="Аккаунт"
+          summary="Пароль, выход, удаление"
+          open={openSection === 'account'}
+          onToggle={() => toggleSection('account')}
+        >
+          <TouchableOpacity style={sS.actionRow} onPress={() => setShowSettings(true)} activeOpacity={0.7}>
+            <Ionicons name="key-outline" size={17} color={Colors.textSecondary} />
+            <Text style={[sS.actionLabel, { flex: 1 }]}>Сменить пароль</Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity style={sS.actionRow} onPress={() => setShowConfirmLogout(true)} activeOpacity={0.7}>
+            <Ionicons name="log-out-outline" size={17} color={Colors.textSecondary} />
+            <Text style={[sS.actionLabel, { flex: 1 }]}>Выйти из аккаунта</Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.docRow}
+            style={sS.actionRow}
             onPress={() => setShowConfirmDelete(true)}
             disabled={deletingAccount}
             activeOpacity={0.7}
           >
-            <Text style={[styles.docRowLabel, { color: '#EF4444' }]}>
+            <Ionicons name="trash-outline" size={17} color={Colors.red} />
+            <Text style={[sS.actionLabel, { flex: 1, color: Colors.red }]}>
               {deletingAccount ? 'Удаление...' : 'Удалить аккаунт'}
             </Text>
           </TouchableOpacity>
-        </View>
-
+        </SectionCard>
         <View style={{ height: 8 }} />
       </ScrollView>
 
@@ -914,43 +951,73 @@ export default function ProfileScreen() {
   );
 }
 
-function SectionCard({ iconName, iconBg, title, onEdit, rows, chips, placeholder }: {
+// Свёрнутая секция — одна строка: иконка, название и короткая сводка.
+// Раскрывается по нажатию; одновременно открыта только одна (см. openSection).
+function SectionCard({
+  iconName, iconBg, title, summary, open, onToggle, onEdit,
+  rows, chips, placeholder, children,
+}: {
   iconName: IoniconName;
   iconBg?: string;
   title: string;
-  onEdit: () => void;
-  rows: { label: string; value: string; lineColor?: string }[];
+  summary?: string;
+  open: boolean;
+  onToggle: () => void;
+  onEdit?: () => void;
+  rows?: { label: string; value: string; lineColor?: string }[];
   chips?: string[];
   placeholder?: string;
+  children?: React.ReactNode;
 }) {
+  const list = rows ?? [];
+  const hasContent = list.length > 0 || (chips?.length ?? 0) > 0;
   return (
     <View style={sS.card}>
-      <View style={sS.header}>
+      <TouchableOpacity style={sS.header} onPress={onToggle} activeOpacity={0.7}>
         <View style={[sS.iconSquare, { backgroundColor: iconBg ?? Colors.primary }]}>
           <Ionicons name={iconName} size={18} color="#fff" />
         </View>
-        <Text style={sS.title}>{title}</Text>
-        <TouchableOpacity onPress={onEdit}><Text style={sS.editLink}>Изменить</Text></TouchableOpacity>
-      </View>
-      {rows.map((r, i) => (
-        r.label ? (
-          <View key={i} style={sS.row}>
-            <Text style={sS.label}>{r.label}</Text>
-            {/* Без стрелки: строка не кликабельна, редактирование —
-                через «Изменить» в шапке карточки */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {r.lineColor ? <View style={[sS.dot, { backgroundColor: r.lineColor }]} /> : null}
-              <Text style={sS.value}>{r.value}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={sS.title}>{title}</Text>
+          {!open && summary ? (
+            <Text style={sS.summary} numberOfLines={1}>{summary}</Text>
+          ) : null}
+        </View>
+        <Ionicons
+          name={open ? 'chevron-up' : 'chevron-down'}
+          size={18}
+          color={Colors.textMuted}
+        />
+      </TouchableOpacity>
+
+      {open ? (
+        <View style={sS.body}>
+          {list.map((r, i) => (
+            r.label ? (
+              <View key={i} style={sS.row}>
+                <Text style={sS.label}>{r.label}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {r.lineColor ? <View style={[sS.dot, { backgroundColor: r.lineColor }]} /> : null}
+                  <Text style={sS.value}>{r.value}</Text>
+                </View>
+              </View>
+            ) : (
+              <Text key={i} style={sS.bioText}>{r.value}</Text>
+            )
+          ))}
+          {!hasContent && placeholder ? <Text style={sS.placeholder}>{placeholder}</Text> : null}
+          {chips && chips.length > 0 ? (
+            <View style={sS.chipsRow}>
+              {chips.map((c, i) => <View key={i} style={sS.chip}><Text style={sS.chipText}>{c}</Text></View>)}
             </View>
-          </View>
-        ) : (
-          <Text key={i} style={sS.bioText}>{r.value}</Text>
-        )
-      ))}
-      {rows.length === 0 && placeholder ? <Text style={sS.placeholder}>{placeholder}</Text> : null}
-      {chips && chips.length > 0 ? (
-        <View style={sS.chipsRow}>
-          {chips.map((c, i) => <View key={i} style={sS.chip}><Text style={sS.chipText}>{c}</Text></View>)}
+          ) : null}
+          {children}
+          {onEdit ? (
+            <TouchableOpacity style={sS.editBtn} onPress={onEdit} activeOpacity={0.8}>
+              <Ionicons name="create-outline" size={16} color={Colors.primary} />
+              <Text style={sS.editBtnTxt}>Изменить</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -958,11 +1025,23 @@ function SectionCard({ iconName, iconBg, title, onEdit, rows, chips, placeholder
 }
 
 const sS = StyleSheet.create({
-  card: { backgroundColor: Colors.bg, borderRadius: 16, padding: 16, ...Shadow.card },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  card: { backgroundColor: Colors.bg, borderRadius: 16, ...Shadow.card, overflow: 'hidden' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
   iconSquare: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
-  editLink: { fontSize: 13, fontWeight: '600', color: Colors.primary },
+  title: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
+  summary: { fontSize: 12.5, color: Colors.textMuted, marginTop: 2 },
+  body: { paddingHorizontal: 16, paddingBottom: 14 },
+  editBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginTop: 12, paddingVertical: 11,
+    borderRadius: 12, backgroundColor: Colors.primaryLight,
+  },
+  editBtnTxt: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+  actionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 13, borderTopWidth: 1, borderTopColor: Colors.divider,
+  },
+  actionLabel: { fontSize: 14, color: Colors.textPrimary, fontWeight: '500' },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.divider },
   label: { fontSize: 13, color: Colors.textMuted },
   value: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
@@ -999,21 +1078,6 @@ const styles = StyleSheet.create({
   roleBadge: { backgroundColor: Colors.primary, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 3, alignSelf: 'flex-start', marginTop: 2 },
   roleText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   phone: { fontSize: 13, color: Colors.textMuted },
-  userCardArrowBtn: { padding: 8 },
-  userCardArrow: { fontSize: 22, color: Colors.textMuted },
-  // Docs card
-  docsCard: { backgroundColor: Colors.bg, borderRadius: 16, ...Shadow.card, overflow: 'hidden' },
-  docsHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, paddingBottom: 12 },
-  docsSectionTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
-  logoutLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  logoutLink: { fontSize: 13, fontWeight: '600', color: Colors.red },
-  docRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: 1, borderTopColor: Colors.divider },
-  docRowLabel: { fontSize: 14, color: Colors.textPrimary, fontWeight: '500' },
-  docRowArrow: { fontSize: 20, color: Colors.textMuted },
-  // Delete account
-  deleteAccountBtn: { backgroundColor: '#FFF1F0', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
-  deleteAccountText: { color: '#EF4444', fontSize: 15, fontWeight: '700' },
-  logoutBtn: { alignItems: 'center', paddingVertical: 14 },
   logoutBtnText: { color: Colors.textMuted, fontSize: 14, fontWeight: '600' },
   // Modals
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
