@@ -65,7 +65,7 @@ export const ART_VB_W = 200;
 export const ART_VB_H = 210;
 
 // Тайминги укладки товаров (мс от начала загрузки)
-export const BASKET_DRAW_MS = 1150;
-export const PROD_FIRST_MS = 950;
-export const PROD_STAGGER_MS = 250;
-export const PROD_FALL_MS = 430;
+export const BASKET_DRAW_MS = 820;
+export const PROD_FIRST_MS = 660;
+export const PROD_STAGGER_MS = 160;
+export const PROD_FALL_MS = 320;

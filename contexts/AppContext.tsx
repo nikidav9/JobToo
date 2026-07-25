@@ -306,13 +306,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           // Register web push for already-logged-in users (web/PWA)
           registerWebPush(sessionUser.id).catch(() => {});
 
-          // Refresh user-specific data in background — vacancies already started above
+          // Refresh user-specific data in background — vacancies already started above.
+          // Загрузочный экран ждёт только то, без чего первый экран неполон:
+          // остальное подтягивается в фоне, а кэш уже показан. Раньше экран
+          // держался до конца всех двенадцати запросов и подолгу висел на 95 %.
           setTimeout(() => {
             if (cancelled) return;
-            Promise.all([
+
+            const critical = Promise.all([
               refreshUsers(),
               refreshLikes(sessionUser),
               refreshChats(sessionUser),
+            ]).catch(() => {});
+            // Потолок ожидания: даже при медленной сети не держим экран дольше
+            const cap = new Promise<void>(r => setTimeout(r, 1200));
+            Promise.race([critical, cap]).finally(() => { if (!cancelled) setDataReady(true); });
+
+            // Фоновая догрузка — загрузочный экран её не ждёт
+            Promise.all([
               refreshSaved(sessionUser),
               refreshPermVacancies(sessionUser),
               refreshPermApplications(sessionUser),
@@ -322,7 +333,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               refreshPermVacancyViews(),
               refreshBulletins(sessionUser),
               refreshWorkerSlots(sessionUser),
-            ]).catch(() => {}).finally(() => { if (!cancelled) setDataReady(true); });
+            ]).catch(() => {});
           }, 100);
 
           // Register/refresh push token on every app open — catches users

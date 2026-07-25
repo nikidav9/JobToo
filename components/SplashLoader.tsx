@@ -26,7 +26,7 @@ const WHITE = '#FFFFFF';
 const ORANGE = '#FF6B1A';
 
 // Длительность полной прорисовки
-const DRAW_MS = 2600;
+const DRAW_MS = 1700;
 
 // Штрихи арта. from/to — окно прорисовки внутри общего прогресса 0→1,
 // len — приблизительная длина пути (для strokeDasharray).
@@ -99,7 +99,7 @@ export function DrawnArt({
  *      (видно, что приложение не зависло, но и до 100 % не врём);
  *   3) данные готовы → быстро добегаем до 100 %.
  */
-const TAIL_STEP_MS = 700;
+const TAIL_STEP_MS = 320;
 
 // Момент начала загрузки, общий на всё приложение. Загрузочный экран
 // показывается дважды подряд (сначала в index.tsx, затем оверлеем
@@ -122,7 +122,7 @@ export function bootElapsed(): number {
  * быстром старте (например, у гостя, которому нечего грузить) экран улетал
  * недорисованным.
  */
-export const SPLASH_MIN_MS = DRAW_MS + 280;  // 2600 + 280 ≈ 2.9 c
+export const SPLASH_MIN_MS = DRAW_MS + 200;  // ≈1.9 c — вся анимация успевает
 
 export function useLoadingPercent(ready: boolean, minMs = DRAW_MS): number {
   const [percent, setPercent] = useState(1);
