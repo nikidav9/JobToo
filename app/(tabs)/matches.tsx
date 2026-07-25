@@ -235,13 +235,21 @@ function WorkerMatches() {
       <View style={[s.card, isMatch && !isFinished && s.matchedCard, isFinished && s.completedCard]}>
         <MatchStatus like={like} isWorker={true} />
 
-        <TouchableOpacity activeOpacity={0.8} onPress={() => setDetailVacancy(vac)}>
-          <Text style={s.jobTitle}>{vac.title}</Text>
-          <View style={s.metroRow}>
-            <Text style={s.subText}>{vac.company}</Text>
-            <Text style={s.subText}> · </Text>
-            <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
-            <Text style={s.subText}> {vac.metroStation}</Text>
+        {/* Что карточку можно раскрыть, по одному заголовку не догадаться —
+            справа стоит явная кнопка, нажимается по-прежнему весь блок */}
+        <TouchableOpacity activeOpacity={0.8} onPress={() => setDetailVacancy(vac)} style={s.titleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.jobTitle}>{vac.title}</Text>
+            <View style={s.metroRow}>
+              <Text style={s.subText}>{vac.company}</Text>
+              <Text style={s.subText}> · </Text>
+              <Ionicons name="subway-outline" size={13} color={Colors.textMuted} />
+              <Text style={s.subText}> {vac.metroStation}</Text>
+            </View>
+          </View>
+          <View style={s.detailsBtn}>
+            <Text style={s.detailsBtnTxt}>Подробнее</Text>
+            <Ionicons name="chevron-forward" size={13} color={Colors.primary} />
           </View>
         </TouchableOpacity>
 
@@ -1054,6 +1062,15 @@ const s = StyleSheet.create({
   metroRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  detailsBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 1, borderColor: Colors.primaryBorder,
+    borderRadius: 100, paddingLeft: 12, paddingRight: 9, paddingVertical: 7,
+    marginTop: 2,
+  },
+  detailsBtnTxt: { fontSize: 12.5, fontWeight: '700', color: Colors.primary },
   addressRow: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 6,
     backgroundColor: '#FFFBEB', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8,
