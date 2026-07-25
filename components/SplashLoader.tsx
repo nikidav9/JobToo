@@ -2,13 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import {
-  BASKET_STROKES, PRODUCTS, ART_VB_W, ART_VB_H,
+  BASKET_STROKES, SPARK_STROKES, PRODUCTS, ART_VB_W, ART_VB_H,
   BASKET_DRAW_MS, PROD_FIRST_MS, PROD_STAGGER_MS, PROD_FALL_MS,
+  SPARKS_AT_MS, SPARKS_MS,
 } from '@/constants/basketArt';
 
-// Загрузочный экран: на фирменном оранжевом линией рисуется корзина, затем в
-// неё один за другим плавно опускаются продукты. Снизу — название и счётчик
-// процентов реальной загрузки.
+// Загрузочный экран: на фирменном оранжевом линией рисуется корзина, затем над
+// ней один за другим плавно опускаются продукты и разлетаются искорки. Снизу —
+// название и счётчик процентов реальной загрузки.
 //
 // Анимация на штатном RN Animated (не reanimated: babel-плагин в проекте не
 // подключён). Линии рисуются через strokeDashoffset, поэтому useNativeDriver
@@ -187,6 +188,7 @@ function FallingProduct({ p, index }: { p: typeof PRODUCTS[number]; index: numbe
           <Path
             key={i}
             d={path.d}
+            transform={path.t}
             stroke={WHITE}
             strokeWidth={path.w ?? 3}
             strokeLinecap="round"
@@ -201,6 +203,7 @@ function FallingProduct({ p, index }: { p: typeof PRODUCTS[number]; index: numbe
 
 export default function SplashLoader({ percent = 1 }: { percent?: number }) {
   const progress = useRef(new Animated.Value(0)).current;
+  const sparks = useRef(new Animated.Value(0)).current;
   const nameFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -215,6 +218,19 @@ export default function SplashLoader({ percent = 1 }: { percent?: number }) {
         duration: BASKET_DRAW_MS * (1 - done),
         easing: Easing.linear,
         useNativeDriver: false, // strokeDashoffset — не нативное свойство
+      }).start();
+    }
+
+    // Искорки — после того, как продукты легли
+    const sDone = Math.min(1, Math.max(0, (elapsed - SPARKS_AT_MS) / SPARKS_MS));
+    sparks.setValue(sDone);
+    if (sDone < 1) {
+      Animated.timing(sparks, {
+        toValue: 1,
+        duration: SPARKS_MS * (1 - sDone),
+        delay: Math.max(0, SPARKS_AT_MS - elapsed),
+        easing: Easing.linear,
+        useNativeDriver: false,
       }).start();
     }
 
@@ -248,6 +264,9 @@ export default function SplashLoader({ percent = 1 }: { percent?: number }) {
         >
           {BASKET_STROKES.map((s, i) => (
             <DrawnStroke key={i} stroke={s} progress={progress} />
+          ))}
+          {SPARK_STROKES.map((s, i) => (
+            <DrawnStroke key={`sp${i}`} stroke={s} progress={sparks} />
           ))}
         </Svg>
       </View>

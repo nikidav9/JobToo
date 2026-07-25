@@ -91,19 +91,24 @@ export default function Root({ children }: PropsWithChildren) {
         <div id="splash">
           <div
             id="splash-art"
-            dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 200 210" xmlns="http://www.w3.org/2000/svg">
-<g transform="translate(55 86)"><g class="pr" style="--dl:660ms"><path d="M 2 44 L 2 16 L 13 4 L 24 16 L 24 44 Z" stroke-width="3"/><path d="M 2 16 L 24 16" stroke-width="2.4"/></g></g>
-<g transform="translate(89 100)"><g class="pr" style="--dl:860ms"><path d="M 14 8 A 11 11 0 1 1 13.99 8" stroke-width="3"/><path d="M 14 8 L 16 2" stroke-width="2.4"/><path d="M 16 4 Q 22 1 23 6 Q 18 8 16 4" stroke-width="2.4"/></g></g>
-<g transform="translate(125 82)"><g class="pr" style="--dl:1060ms"><path d="M 3 48 L 3 22 Q 3 15 7 13 L 7 4 L 15 4 L 15 13 Q 19 15 19 22 L 19 48 Z" stroke-width="3"/><path d="M 7 9 L 15 9" stroke-width="2.4"/></g></g>
-<path class="sp" d="M 26 130 Q 100 121 174 130" stroke-width="3.4" style="--l:150;--d:164ms;--dl:0ms"/>
-<path class="sp" d="M 26 130 Q 100 139 174 130" stroke-width="3.4" style="--l:150;--d:164ms;--dl:131ms"/>
-<path class="sp" d="M 30 134 L 42 186 Q 43 194 51 194 L 149 194 Q 157 194 158 186 L 170 134" stroke-width="3.4" style="--l:232;--d:295ms;--dl:262ms"/>
-<path class="sp" d="M 52 138 L 60 190" stroke-width="2.4" style="--l:53;--d:82ms;--dl:525ms"/>
-<path class="sp" d="M 78 136 L 80 192" stroke-width="2.4" style="--l:56;--d:82ms;--dl:558ms"/>
-<path class="sp" d="M 122 136 L 120 192" stroke-width="2.4" style="--l:56;--d:82ms;--dl:590ms"/>
-<path class="sp" d="M 148 138 L 140 190" stroke-width="2.4" style="--l:53;--d:82ms;--dl:623ms"/>
-<path class="sp" d="M 36 156 Q 100 165 164 156" stroke-width="2.4" style="--l:130;--d:82ms;--dl:672ms"/>
-<path class="sp" d="M 41 176 Q 100 184 159 176" stroke-width="2.4" style="--l:120;--d:98ms;--dl:722ms"/>
+            dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 200 250" xmlns="http://www.w3.org/2000/svg">
+<g transform="translate(32 60)"><g class="pr" style="--dl:660ms"><path d="M 6 48 L 4 24 Q 3 17 8 14 L 8 4 L 22 4 L 22 14 Q 27 17 26 24 L 24 48 Q 15 52 6 48 Z" transform="rotate(-16 14 28)" stroke-width="3"/><path d="M 8 10 L 22 10" transform="rotate(-16 14 28)" stroke-width="2.4"/></g></g>
+<g transform="translate(80 26)"><g class="pr" style="--dl:860ms"><path d="M 20 14 A 18 18 0 1 1 19.99 14" stroke-width="3"/><path d="M 20 15 L 23 2" stroke-width="2.6"/><path d="M 23 6 Q 35 0 37 10 Q 27 14 23 6 Z" stroke-width="2.6"/></g></g>
+<g transform="translate(132 72)"><g class="pr" style="--dl:1060ms"><path d="M 4 22 Q 2 4 22 2 Q 42 4 40 22 Q 38 32 22 32 Q 6 32 4 22 Z" transform="rotate(14 22 14)" stroke-width="3"/><path d="M 13 11 L 19 17" transform="rotate(14 22 14)" stroke-width="2.4"/><path d="M 24 9 L 30 15" transform="rotate(14 22 14)" stroke-width="2.4"/></g></g>
+<path class="sp" d="M 68 148 Q 70 100 100 98 Q 130 100 132 148" stroke-width="3.4" style="--l:136;--d:115ms;--dl:0ms"/>
+<path class="sp" d="M 28 150 Q 100 137 172 150" stroke-width="3.4" style="--l:150;--d:115ms;--dl:98ms"/>
+<path class="sp" d="M 28 150 Q 100 163 172 150" stroke-width="3.4" style="--l:150;--d:98ms;--dl:197ms"/>
+<path class="sp" d="M 34 153 L 55 231 Q 57 240 67 240 L 133 240 Q 143 240 145 231 L 166 153" stroke-width="3.4" style="--l:264;--d:262ms;--dl:279ms"/>
+<path class="sp" d="M 60 160 L 70 236" stroke-width="2.4" style="--l:78;--d:74ms;--dl:517ms"/>
+<path class="sp" d="M 86 158 L 90 239" stroke-width="2.4" style="--l:82;--d:74ms;--dl:549ms"/>
+<path class="sp" d="M 114 158 L 110 239" stroke-width="2.4" style="--l:82;--d:74ms;--dl:582ms"/>
+<path class="sp" d="M 140 160 L 130 236" stroke-width="2.4" style="--l:78;--d:74ms;--dl:615ms"/>
+<path class="sp" d="M 44 196 Q 100 205 156 196" stroke-width="2.4" style="--l:116;--d:148ms;--dl:672ms"/>
+<path class="sp" d="M 22 116 L 12 106" stroke-width="2.6" style="--l:15;--d:78ms;--dl:1400ms"/>
+<path class="sp" d="M 178 114 L 188 104" stroke-width="2.6" style="--l:15;--d:78ms;--dl:1439ms"/>
+<path class="sp" d="M 100 18 L 100 8" stroke-width="2.6" style="--l:11;--d:78ms;--dl:1478ms"/>
+<path class="sp" d="M 58 40 L 51 32" stroke-width="2.6" style="--l:11;--d:78ms;--dl:1517ms"/>
+<path class="sp" d="M 146 38 L 154 30" stroke-width="2.6" style="--l:11;--d:104ms;--dl:1556ms"/>
 </svg>` }}
           />
           <div id="splash-bottom">
