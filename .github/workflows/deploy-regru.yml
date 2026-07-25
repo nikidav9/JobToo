@@ -33,8 +33,37 @@ jobs:
           mkdir -p dist/api
           cp php-proxy/db.php dist/api/db.php
           cp php-proxy/tg.php dist/api/tg.php
+          cp php-proxy/admin.php dist/api/admin.php
           cp assets/images/favicon.ico dist/favicon.ico
           cp public/.htaccess dist/.htaccess
+
+      # Секреты в репозитории не лежат, поэтому файлы для них собираем здесь
+      # из GitHub Secrets. Значения кладём в base64: пароль может содержать
+      # кавычки и слэши, а так экранировать нечего.
+      # Секрет не задан — файл не создаём: тот, что уже лежит на хостинге,
+      # остаётся нетронутым (выкладка ничего лишнего не удаляет).
+      - name: Write server secrets
+        env:
+          SB_SERVICE_KEY: ${{ secrets.SB_SERVICE_KEY }}
+          DASHBOARD_LOGIN: ${{ secrets.DASHBOARD_LOGIN }}
+          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+        run: |
+          if [ -n "$SB_SERVICE_KEY" ]; then
+            B=$(printf '%s' "$SB_SERVICE_KEY" | base64 -w0)
+            printf "<?php return base64_decode('%s');\n" "$B" > dist/api/sb_service_key.php
+            echo "sb_service_key.php: собран"
+          else
+            echo "sb_service_key.php: секрет SB_SERVICE_KEY не задан, пропускаю"
+          fi
+
+          if [ -n "$DASHBOARD_LOGIN" ] && [ -n "$DASHBOARD_PASSWORD" ]; then
+            L=$(printf '%s' "$DASHBOARD_LOGIN" | base64 -w0)
+            P=$(printf '%s' "$DASHBOARD_PASSWORD" | base64 -w0)
+            printf "<?php return ['login' => base64_decode('%s'), 'password' => base64_decode('%s')];\n" "$L" "$P" > dist/api/admin_credentials.php
+            echo "admin_credentials.php: собран"
+          else
+            echo "admin_credentials.php: секреты не заданы, пропускаю"
+          fi
 
       - name: Inject Yandex Metrika into index.html
         run: |
