@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import {
   View, Text, StyleSheet, TextInput,
-  TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator,
+  TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +26,13 @@ import { useIsFocused } from '@react-navigation/native';
 import { getSupabaseClient } from '@/template';
 
 const POLL_INTERVAL = 8000;
+
+// Отступ под строкой ввода считаем ОДИН раз при загрузке модуля и больше не
+// пересчитываем. useSafeAreaInsets() на Android отдаёт нули на первых кадрах
+// и уточняется после первого показа клавиатуры — из-за этого поле сначала
+// липло к краю, а потом подскакивало. Здесь значение постоянное, поэтому
+// строка всегда стоит на одном месте.
+const BAR_PAD_BOTTOM = Math.max(initialWindowMetrics?.insets.bottom ?? 0, 16);
 
 /** Пузырь голосового: кнопка воспроизведения, дорожка и длительность. */
 function VoiceBubble({ url, sec, isMe }: { url: string; sec: number; isMe: boolean }) {
@@ -134,11 +141,7 @@ export default function ChatRoom() {
   const router = useRouter();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const { currentUser, users, chats, vacancies, refreshChats, refreshLikes, likes, optimisticUpdateLike, showToast } = useApp();
-  const insets = useSafeAreaInsets();
-  // Низ строки ввода задаём сами: SafeAreaView отдаёт нижний край нам,
-  // а минимум в 10 px держит поле на отступе от края даже там, где
-  // системной панели нет
-  const barPadBottom = Math.max(insets.bottom, 16);
+
   // Track whether this chat screen is currently visible — used to suppress
   // push notifications when the user is already reading the conversation.
   const isFocused = useIsFocused();
@@ -157,6 +160,19 @@ export default function ChatRoom() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [inputH, setInputH] = useState(INPUT_MIN_H);
+  // Клавиатура открыта — прижимаем строку к ней; закрыта — держим постоянный
+  // отступ от края экрана. Слушатель клавиатуры надёжнее, чем отступы,
+  // которые на Android доезжают с задержкой.
+  const [kbOpen, setKbOpen] = useState(false);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const s1 = Keyboard.addListener(showEvt, () => setKbOpen(true));
+    const s2 = Keyboard.addListener(hideEvt, () => setKbOpen(false));
+    return () => { s1.remove(); s2.remove(); };
+  }, []);
+  const barPad = kbOpen ? 8 : BAR_PAD_BOTTOM;
+
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVoice, setUploadingVoice] = useState(false);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -859,7 +875,7 @@ export default function ChatRoom() {
 
         {/* Идёт запись — строка ввода заменяется счётчиком */}
         {recorderState.isRecording ? (
-          <View style={[styles.inputBar, { paddingBottom: barPadBottom }]}>
+          <View style={[styles.inputBar, { paddingBottom: barPad }]}>
             <TouchableOpacity
               style={styles.attachBtn}
               onPress={cancelRecording}
@@ -883,7 +899,7 @@ export default function ChatRoom() {
           </View>
         ) : (
         /* Input bar */
-        <View style={[styles.inputBar, { paddingBottom: barPadBottom }]}>
+        <View style={[styles.inputBar, { paddingBottom: barPad }]}>
           {/* Вложение — слева, как в мессенджерах */}
           <TouchableOpacity
             style={styles.attachBtn}
