@@ -92,11 +92,9 @@ export default function Root({ children }: PropsWithChildren) {
           <div
             id="splash-art"
             dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 200 210" xmlns="http://www.w3.org/2000/svg">
-<g transform="translate(34 86)"><g class="pr" style="--dl:660ms"><path d="M 2 44 L 2 16 L 13 4 L 24 16 L 24 44 Z" stroke-width="3"/><path d="M 2 16 L 24 16" stroke-width="2.4"/></g></g>
-<g transform="translate(64 100)"><g class="pr" style="--dl:820ms"><path d="M 14 8 A 11 11 0 1 1 13.99 8" stroke-width="3"/><path d="M 14 8 L 16 2" stroke-width="2.4"/><path d="M 16 4 Q 22 1 23 6 Q 18 8 16 4" stroke-width="2.4"/></g></g>
-<g transform="translate(94 82)"><g class="pr" style="--dl:980ms"><path d="M 3 48 L 3 22 Q 3 15 7 13 L 7 4 L 15 4 L 15 13 Q 19 15 19 22 L 19 48 Z" stroke-width="3"/><path d="M 7 9 L 15 9" stroke-width="2.4"/></g></g>
-<g transform="translate(116 98)"><g class="pr" style="--dl:1140ms"><path d="M 2 32 L 2 4 L 28 4 L 28 32 Z" stroke-width="3"/><path d="M 15 4 L 15 32" stroke-width="2.4"/></g></g>
-<g transform="translate(150 102)"><g class="pr" style="--dl:1300ms"><path d="M 4 28 L 2 8 L 20 8 L 18 28 Z" stroke-width="3"/><path d="M 1 5 L 21 5" stroke-width="2.4"/></g></g>
+<g transform="translate(55 86)"><g class="pr" style="--dl:660ms"><path d="M 2 44 L 2 16 L 13 4 L 24 16 L 24 44 Z" stroke-width="3"/><path d="M 2 16 L 24 16" stroke-width="2.4"/></g></g>
+<g transform="translate(89 100)"><g class="pr" style="--dl:860ms"><path d="M 14 8 A 11 11 0 1 1 13.99 8" stroke-width="3"/><path d="M 14 8 L 16 2" stroke-width="2.4"/><path d="M 16 4 Q 22 1 23 6 Q 18 8 16 4" stroke-width="2.4"/></g></g>
+<g transform="translate(125 82)"><g class="pr" style="--dl:1060ms"><path d="M 3 48 L 3 22 Q 3 15 7 13 L 7 4 L 15 4 L 15 13 Q 19 15 19 22 L 19 48 Z" stroke-width="3"/><path d="M 7 9 L 15 9" stroke-width="2.4"/></g></g>
 <path class="sp" d="M 26 130 Q 100 121 174 130" stroke-width="3.4" style="--l:150;--d:164ms;--dl:0ms"/>
 <path class="sp" d="M 26 130 Q 100 139 174 130" stroke-width="3.4" style="--l:150;--d:164ms;--dl:131ms"/>
 <path class="sp" d="M 30 134 L 42 186 Q 43 194 51 194 L 149 194 Q 157 194 158 186 L 170 134" stroke-width="3.4" style="--l:232;--d:295ms;--dl:262ms"/>

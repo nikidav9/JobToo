@@ -29,12 +29,12 @@ export type Product = {
 export const PRODUCTS: Product[] = [
   // пакет молока
   {
-    w: 26, h: 46, left: 34, top: 86,
+    w: 26, h: 46, left: 55, top: 86,
     paths: [{ d: 'M 2 44 L 2 16 L 13 4 L 24 16 L 24 44 Z' }, { d: 'M 2 16 L 24 16', w: 2.4 }],
   },
   // яблоко
   {
-    w: 28, h: 32, left: 64, top: 100,
+    w: 28, h: 32, left: 89, top: 100,
     paths: [
       { d: 'M 14 8 A 11 11 0 1 1 13.99 8' },
       { d: 'M 14 8 L 16 2', w: 2.4 },
@@ -43,21 +43,11 @@ export const PRODUCTS: Product[] = [
   },
   // бутылка
   {
-    w: 20, h: 50, left: 94, top: 82,
+    w: 20, h: 50, left: 125, top: 82,
     paths: [
       { d: 'M 3 48 L 3 22 Q 3 15 7 13 L 7 4 L 15 4 L 15 13 Q 19 15 19 22 L 19 48 Z' },
       { d: 'M 7 9 L 15 9', w: 2.4 },
     ],
-  },
-  // коробка с лентой
-  {
-    w: 30, h: 34, left: 116, top: 98,
-    paths: [{ d: 'M 2 32 L 2 4 L 28 4 L 28 32 Z' }, { d: 'M 15 4 L 15 32', w: 2.4 }],
-  },
-  // стакан йогурта
-  {
-    w: 22, h: 30, left: 150, top: 102,
-    paths: [{ d: 'M 4 28 L 2 8 L 20 8 L 18 28 Z' }, { d: 'M 1 5 L 21 5', w: 2.4 }],
   },
 ];
 
@@ -67,5 +57,5 @@ export const ART_VB_H = 210;
 // Тайминги укладки товаров (мс от начала загрузки)
 export const BASKET_DRAW_MS = 820;
 export const PROD_FIRST_MS = 660;
-export const PROD_STAGGER_MS = 160;
+export const PROD_STAGGER_MS = 200;
 export const PROD_FALL_MS = 320;
