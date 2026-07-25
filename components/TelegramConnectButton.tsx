@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { bottomSafe } from '@/lib/androidInsets';
 import { Colors, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { dbGetUserById, dbUnbindTelegram } from '@/services/db';
+import { dbGetUserById, dbUnbindTelegram, dbTgPrepareLink } from '@/services/db';
 import { isTelegramMiniApp } from '@/lib/telegram';
 import { setOnboardingTarget } from '@/lib/onboardingTargets';
 
@@ -78,7 +78,11 @@ export function TelegramConnectButton({ size = 24, pad = 6, onboardingAnchor = f
   // Внутри Telegram Mini App уведомления и так идут в Телеграм — кнопка не нужна
   if (!userId || isTelegramMiniApp()) return null;
 
-  const connect = () => {
+  const connect = async () => {
+    // Оставляем серверу заявку до перехода: если чат с ботом уже был,
+    // Telegram не донесёт метку из ссылки и пришлёт голый «/start» —
+    // бот привяжет по заявке.
+    await dbTgPrepareLink(userId);
     Linking.openURL(`${BOT_URL}?start=link_${userId}`).catch(() => {});
   };
 

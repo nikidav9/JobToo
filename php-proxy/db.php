@@ -26,6 +26,28 @@ if (!$fn) { http_response_code(400); echo json_encode(['error' => 'Missing fn'])
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// ─── Ожидающие привязки Telegram ─────────────────────────────────────────
+// Ссылка вида t.me/bot?start=link_<id> доносит метку до бота только когда
+// чат с ботом заводится впервые. Если человек уже писал боту раньше,
+// Telegram открывает существующий чат, кнопки START нет, и уходит голый
+// «/start» — привязать не к чему. Поэтому приложение перед переходом
+// оставляет здесь заявку, а бот подхватывает её по голому «/start».
+define('TG_PENDING_FILE', sys_get_temp_dir() . '/jobtoo_tg_pending.json');
+const TG_PENDING_TTL = 900;   // 15 минут
+
+function tg_pending_read(): array {
+    if (!is_file(TG_PENDING_FILE)) return [];
+    $raw = @file_get_contents(TG_PENDING_FILE);
+    $all = $raw ? json_decode($raw, true) : [];
+    if (!is_array($all)) return [];
+    $now = time();
+    return array_filter($all, fn($ts) => is_int($ts) && $now - $ts < TG_PENDING_TTL);
+}
+
+function tg_pending_write(array $all): void {
+    @file_put_contents(TG_PENDING_FILE, json_encode($all), LOCK_EX);
+}
+
 function uid(): string {
     return base_convert(time(), 10, 36) . substr(base_convert(mt_rand(), 10, 36), 2, 5);
 }
@@ -345,6 +367,14 @@ try {
 
         case 'dbGetUsers':
             $data = sb_select('jm_users', [], '*', 'created_at.asc'); break;
+
+        // Заявка на привязку Telegram: живёт 15 минут, бот заберёт её по «/start»
+        case 'tgPrepareLink': {
+            $all = tg_pending_read();
+            $all[(string)$args[0]] = time();
+            tg_pending_write($all);
+            $data = true; break;
+        }
 
         // Отметка «был в сети». Колонки может ещё не быть — тогда просто молчим:
         // ради фоновой отметки нельзя возвращать клиенту ошибку.

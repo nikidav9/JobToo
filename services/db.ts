@@ -1040,6 +1040,16 @@ export async function dbTouchLastSeen(userId: string): Promise<void> {
   }
 }
 
+/**
+ * Сказать серверу, что сейчас будет привязка Telegram. Нужно для случая,
+ * когда чат с ботом уже существует: Telegram тогда не передаёт метку из
+ * ссылки, и бот получает голый «/start». По этой заявке он поймёт, к кому
+ * привязываться. Заявка живёт 15 минут.
+ */
+export async function dbTgPrepareLink(userId: string): Promise<void> {
+  try { await proxy('tgPrepareLink', [userId]); } catch {}
+}
+
 export async function dbGetNotifications(userId: string): Promise<{ id: string; title: string; body: string; is_read: boolean; created_at: string; type?: string | null; payload?: any }[]> {
   if (IS_NATIVE) { return proxy('dbGetNotifications', [userId]); }
   const { data, error } = await withTimeout(

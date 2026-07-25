@@ -229,6 +229,28 @@ if (!$msg || empty($msg['chat']['id'])) { echo json_encode(['ok' => true]); exit
 $chatId = (int)$msg['chat']['id'];
 if (($msg['chat']['type'] ?? '') !== 'private') { echo json_encode(['ok' => true]); exit; }
 
+// ─── Ожидающие привязки Telegram ─────────────────────────────────────────
+// Ссылка вида t.me/bot?start=link_<id> доносит метку до бота только когда
+// чат с ботом заводится впервые. Если человек уже писал боту раньше,
+// Telegram открывает существующий чат, кнопки START нет, и уходит голый
+// «/start» — привязать не к чему. Поэтому приложение перед переходом
+// оставляет здесь заявку, а бот подхватывает её по голому «/start».
+define('TG_PENDING_FILE', sys_get_temp_dir() . '/jobtoo_tg_pending.json');
+const TG_PENDING_TTL = 900;   // 15 минут
+
+function tg_pending_read(): array {
+    if (!is_file(TG_PENDING_FILE)) return [];
+    $raw = @file_get_contents(TG_PENDING_FILE);
+    $all = $raw ? json_decode($raw, true) : [];
+    if (!is_array($all)) return [];
+    $now = time();
+    return array_filter($all, fn($ts) => is_int($ts) && $now - $ts < TG_PENDING_TTL);
+}
+
+function tg_pending_write(array $all): void {
+    @file_put_contents(TG_PENDING_FILE, json_encode($all), LOCK_EX);
+}
+
 $text = trim($msg['text'] ?? '');
 $firstName = $msg['from']['first_name'] ?? '';
 
@@ -255,6 +277,32 @@ if (preg_match('/^\/start\s+link_([a-z0-9]+)$/i', $text, $lm)) {
         ]);
     }
     echo json_encode(['ok' => true]); exit;
+}
+
+// Голый «/start»: метка не дошла (чат с ботом уже существовал). Берём
+// самую свежую заявку, оставленную приложением, и привязываем к ней.
+if (preg_match('/^\/start\s*$/', $text)) {
+    $pending = tg_pending_read();
+    if (!empty($pending)) {
+        arsort($pending);                       // самая свежая — первая
+        $userId = (string)array_key_first($pending);
+        $u = sb_one('jm_users', ['id' => 'eq.' . $userId], 'id,first_name');
+        if ($u) {
+            unset($pending[$userId]);
+            tg_pending_write($pending);
+            sb('PATCH', 'jm_users', ['telegram_id' => 'eq.' . $chatId], ['telegram_id' => null]);
+            sb('PATCH', 'jm_users', ['id' => 'eq.' . $userId], ['telegram_id' => $chatId]);
+            tg('sendMessage', [
+                'chat_id' => $chatId,
+                'text' => "✅ <b>Telegram подключён!</b>\n\nТеперь сюда будут приходить:\n⚡ новые смены и вакансии\n📥 ответы директоров на отклики\n💬 уведомления о сообщениях\n\nМожно вернуться в приложение 👌",
+                'parse_mode' => 'HTML',
+                'reply_markup' => ['inline_keyboard' => [[
+                    ['text' => '🚀 Открыть JobToo', 'url' => 'https://t.me/JobToo_bot/app'],
+                ]]],
+            ]);
+            echo json_encode(['ok' => true]); exit;
+        }
+    }
 }
 
 if (str_starts_with($text, '/start')) {
