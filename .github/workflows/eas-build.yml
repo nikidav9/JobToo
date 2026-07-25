@@ -1,0 +1,45 @@
+name: EAS Build
+
+# Нативная сборка запускается вручную. Нужна только тогда, когда меняется то,
+# что нельзя доставить OTA-обновлением: разрешения, конфиг-плагины, нативные
+# модули, иконка и сплэш.
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Платформа'
+        required: true
+        default: 'android'
+        type: choice
+        options: [android, ios, all]
+
+jobs:
+  build:
+    name: Build ${{ inputs.platform }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas build \
+            --platform ${{ inputs.platform }} \
+            --profile production \
+            --non-interactive \
+            --no-wait
