@@ -32,6 +32,27 @@ export default function Root({ children }: PropsWithChildren) {
 
         <ScrollViewStyleReset />
 
+        {/* Веб/Telegram Mini App: браузер рисует свою рамку фокуса вокруг полей
+            ввода — в нативном приложении её нет, и выглядит она инородно.
+            Убираем только подсветку фокуса; собственные рамки полей, заданные
+            стилями, не трогаем. */}
+        <style>{`
+          input, textarea, select, [contenteditable] {
+            outline: none !important;
+            -webkit-tap-highlight-color: transparent;
+          }
+          input:focus, textarea:focus, select:focus, [contenteditable]:focus,
+          input:focus-visible, textarea:focus-visible {
+            outline: none !important;
+            box-shadow: none !important;
+          }
+          /* iOS Safari подсвечивает поле своим фоном при автозаполнении */
+          input:-webkit-autofill, textarea:-webkit-autofill {
+            -webkit-box-shadow: 0 0 0 1000px transparent inset;
+            transition: background-color 9999s ease-out 0s;
+          }
+        `}</style>
+
         {/* Static splash — same visual as the native loader (components/SplashLoader.tsx):
             корзина рисуется белой линией на фирменном оранжевом, в неё плавно
             опускаются продукты, снизу — название и счётчик. Пути и тайминги
