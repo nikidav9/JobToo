@@ -91,6 +91,27 @@ const voiceOf = (t: string) => {
   const [url, sec] = t.slice(VOICE_PREFIX.length).split('|');
   return { url, sec: Number(sec) || 0 };
 };
+const MONTHS_RU = ['января','февраля','марта','апреля','мая','июня','июля',
+  'августа','сентября','октября','ноября','декабря'];
+
+/** Ключ дня — по нему решаем, нужен ли разделитель между сообщениями */
+const dayKey = (ts: string) => {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+};
+
+/** «Сегодня» / «Вчера» / «24 июля» — как в мессенджерах */
+const dayLabel = (ts: string) => {
+  const d = new Date(ts);
+  const now = new Date();
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round((startOf(now) - startOf(d)) / 86400000);
+  if (diffDays === 0) return 'Сегодня';
+  if (diffDays === 1) return 'Вчера';
+  const base = `${d.getDate()} ${MONTHS_RU[d.getMonth()]}`;
+  return d.getFullYear() === now.getFullYear() ? base : `${base} ${d.getFullYear()}`;
+};
+
 const fmtDuration = (sec: number) =>
   `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 
@@ -577,11 +598,23 @@ export default function ChatRoom() {
     return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
+  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
+    // Разделитель дня — перед первым сообщением и на каждой смене даты
+    const prev = index > 0 ? messages[index - 1] : null;
+    const showDay = item.timestamp
+      && (!prev || !prev.timestamp || dayKey(prev.timestamp) !== dayKey(item.timestamp));
+    const daySeparator = showDay ? (
+      <View style={styles.daySep}>
+        <Text style={styles.daySepTxt}>{dayLabel(item.timestamp)}</Text>
+      </View>
+    ) : null;
+
     if (item.senderId === 'system') {
       const isMatch = item.text.includes('мэтч') || item.text.includes('Мэтч');
       const isReject = item.text.includes('не подошли') || item.text.includes('закрыт');
       return (
+        <>
+        {daySeparator}
         <View style={[
           styles.systemMsg,
           isMatch && styles.systemMsgMatch,
@@ -593,11 +626,14 @@ export default function ChatRoom() {
             isReject && styles.systemTextReject,
           ]}>{item.text}</Text>
         </View>
+        </>
       );
     }
     // Safety advisory message (from system_safety sender)
     if (item.senderId === 'system_safety') {
       return (
+        <>
+        {daySeparator}
         <View style={styles.safetyMsg}>
           <View style={styles.safetyHeader}>
             <Text style={styles.safetyIcon}>🔒</Text>
@@ -605,10 +641,13 @@ export default function ChatRoom() {
           </View>
           <Text style={styles.safetyText}>{item.text}</Text>
         </View>
+        </>
       );
     }
     const isMe = item.senderId === currentUser.id;
     return (
+      <>
+      {daySeparator}
       <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowThem]}>
         {!isMe ? (
           otherAvatarUrl ? (
@@ -644,6 +683,7 @@ export default function ChatRoom() {
           <Text style={[styles.timestamp, isMe && styles.timestampMe]}>{formatTime(item.timestamp)}</Text>
         </View>
       </View>
+      </>
     );
   };
 
@@ -976,6 +1016,14 @@ const styles = StyleSheet.create({
   bubbleImage: { padding: 3, overflow: 'hidden' },
   msgImage: { width: 208, height: 208, borderRadius: 15, backgroundColor: Colors.divider },
   bubbleTextMe: { color: '#fff' },
+  daySep: { alignSelf: 'center', marginVertical: 10 },
+  daySepTxt: {
+    fontSize: 11.5, fontWeight: '600', color: Colors.textSecondary,
+    backgroundColor: Colors.surface,
+    borderWidth: 1, borderColor: Colors.divider,
+    borderRadius: 100, paddingHorizontal: 12, paddingVertical: 4,
+    overflow: 'hidden',
+  },
   timestamp: { fontSize: 10, color: Colors.textMuted, marginTop: 4 },
   timestampMe: { color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
   inputBar: {
