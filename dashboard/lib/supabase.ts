@@ -1,14 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
+import { adminFetch, SUPABASE_STUB_URL } from './adminApi'
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
+// Клиент никуда напрямую не ходит. Адрес здесь подставной, а весь обмен
+// перехватывает adminFetch и уводит на php-proxy/admin.php — там проверяется
+// токен и лежит сервисный ключ. В браузер ключи от базы больше не попадают,
+// поэтому все 108 мест чтения и записи остались как были: меняется только
+// то, куда уходит запрос.
+export const supabase = createClient(SUPABASE_STUB_URL, 'proxied', {
+  auth: { persistSession: false, autoRefreshToken: false },
+  global: { fetch: adminFetch },
+})
 
-// Только публичный ключ. Service-role ключ раньше уезжал в браузер вместе
-// с бандлом и обходил все политики доступа — любой посетитель мог достать
-// его из исходников страницы. Все изменения теперь идут через
-// lib/adminApi.ts на сервер, где ключ и остаётся.
-export const supabase = createClient(url, anonKey)
-
-// Имя сохранено, чтобы не переписывать десятки мест чтения: это тот же
-// публичный клиент, никаких дополнительных прав у него нет.
+// Имя сохранено, чтобы не переписывать десятки мест. Прав у него ровно
+// столько, сколько даёт токен админа, — отдельного клиента с особыми
+// правами больше нет.
 export const supabaseAdmin = supabase

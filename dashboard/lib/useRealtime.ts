@@ -1,15 +1,16 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { supabase } from './supabase'
 
 interface Options {
-  tables: string[]
+  // Осталось от подписок на изменения: вызовов два десятка, ломать их
+  // ради снятого поля незачем. Сейчас ни на что не влияет.
+  tables?: string[]
   intervalSec?: number
 }
 
 export function useRealtime<T>(
   fetcher: () => Promise<T>,
-  { tables, intervalSec = 60 }: Options
+  { intervalSec = 60 }: Options
 ) {
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(true)
@@ -17,7 +18,6 @@ export function useRealtime<T>(
   const [lastUpdated, setLastUpdated] = useState('')
   const [pulse, setPulse] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const instanceId = useRef(Math.random().toString(36).slice(2, 8))
 
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -37,25 +37,14 @@ export function useRealtime<T>(
   }, [fetcher])
 
   useEffect(() => {
+    // Подписок на изменения больше нет. Дашборд ходит в базу через прокси,
+    // а тот работает по обычному HTTP — websocket сквозь него не пройдёт.
+    // Держится всё на опросе: раз в минуту по умолчанию, и кнопка
+    // «обновить» под рукой. Для админки этого достаточно.
     refresh()
     timerRef.current = setInterval(() => refresh(true), intervalSec * 1000)
-    const channels: ReturnType<typeof supabase.channel>[] = []
-    try {
-      tables.forEach(table => {
-        const ch = supabase
-          .channel(`realtime:${table}:${instanceId.current}`)
-          .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
-            refresh(true)
-          })
-          .subscribe()
-        channels.push(ch)
-      })
-    } catch (e) {
-      console.warn('[useRealtime] realtime subscription failed:', e)
-    }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
-      channels.forEach(ch => supabase.removeChannel(ch))
     }
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 

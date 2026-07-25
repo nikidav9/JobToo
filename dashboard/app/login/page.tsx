@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { setAuth, isAuthed } from '@/components/AuthGuard'
+import { login as doLogin, isAuthed } from '@/components/AuthGuard'
 
 function getBasePath() {
   if (typeof window === 'undefined') return ''
@@ -22,19 +22,12 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ login, password }),
-      })
-      if (res.ok) {
-        setAuth(password)
-        window.location.replace(getBasePath() + '/')
-      } else {
-        setError('Неверный логин или пароль')
-      }
-    } catch {
-      setError('Ошибка соединения. Попробуйте ещё раз.')
+      // Логин и пароль проверяет прокси и в ответ выдаёт токен — тот самый,
+      // без которого база теперь ничего не отдаёт.
+      await doLogin(login, password)
+      window.location.replace(getBasePath() + '/')
+    } catch (e: any) {
+      setError(e?.message || 'Ошибка соединения. Попробуйте ещё раз.')
     } finally {
       setLoading(false)
     }

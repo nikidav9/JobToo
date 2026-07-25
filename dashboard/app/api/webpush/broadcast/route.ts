@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import webpush from 'web-push'
-import { createClient } from '@supabase/supabase-js'
+import { serverSupabase } from '@/lib/serverSupabase'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -30,10 +30,12 @@ export async function POST(req: Request) {
     process.env.VAPID_PRIVATE_KEY || 'cH1PAj57qEc7EoaxILsIeAxPyAWWxLO0dUQnIictJgw',
   )
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  )
+  let supabase
+  try {
+    supabase = serverSupabase()
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500, headers: CORS })
+  }
 
   const { data: subs } = await supabase
     .from('jm_web_push_subscriptions')

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { serverSupabase } from '@/lib/serverSupabase'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -22,13 +22,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'company required' }, { status: 400, headers: CORS })
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !key) {
-    return NextResponse.json({ error: 'Supabase not configured' }, { status: 500, headers: CORS })
+  let supabase
+  try {
+    supabase = serverSupabase()
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500, headers: CORS })
   }
-
-  const supabase = createClient(url, key)
 
   const validCompanies = ['Лавка', 'Самокат']
 

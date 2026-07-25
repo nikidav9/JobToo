@@ -1,1 +1,1 @@
-export { setAuth, clearAuth, isAuthed, getStoredPassword } from '@/lib/auth'
+export { login, clearAuth, isAuthed } from '@/lib/auth'

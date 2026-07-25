@@ -16,7 +16,7 @@ export default function LiveBadge({ lastUpdated, pulse, onRefresh }: Props) {
           opacity: pulse ? 1 : undefined,
         }} />
         <style>{`@keyframes livepulse { 0%,100%{opacity:1} 50%{opacity:.35} }`}</style>
-        <span className="mono">{lastUpdated ? `обновлено ${lastUpdated}` : 'Realtime'}</span>
+        <span className="mono">{lastUpdated ? `обновлено ${lastUpdated}` : 'Обновляется'}</span>
       </div>
       <button
         onClick={onRefresh}

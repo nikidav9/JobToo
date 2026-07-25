@@ -49,3 +49,4 @@ supabase/.temp/
 
 # Сервисный ключ Supabase — живёт только на хостинге
 php-proxy/sb_service_key.php
+php-proxy/admin_credentials.php

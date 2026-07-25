@@ -25,7 +25,7 @@ export default function PageHeader({ title, intervalSec, lastUpdated, pulse, onR
               animation: 'livepulse 1.6s infinite', flexShrink: 0,
             }} />
             <style>{`@keyframes livepulse{0%,100%{opacity:1}50%{opacity:.35}}`}</style>
-            Realtime
+            Обновляется
           </span>
           <span style={{ color: 'var(--line-strong)' }}>·</span>
           <span>каждые {intervalSec}с</span>
