@@ -1,0 +1,655 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3640" height="5140" viewBox="0 0 3640 5140" font-family="Inter, -apple-system, Segoe UI, Roboto, sans-serif">
+<rect width="3640" height="5140" fill="#FAFAF8"/>
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#FF6B1A"/></marker><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7C3AED"/></marker></defs>
+<text x="80" y="72" font-size="40" font-weight="800" fill="#111111">JobToo — карта экранов</text>
+<text x="80" y="106" font-size="16" fill="#9CA3AF">22 экранов, 37 переходов. Собрано из кода: app/*.tsx</text>
+<rect x="80" y="126" width="14" height="14" rx="4" fill="#8B5CF6"/>
+<text x="102" y="138" font-size="13" fill="#111111">Вход и регистрация</text>
+<rect x="264" y="126" width="14" height="14" rx="4" fill="#FF6B1A"/>
+<text x="286" y="138" font-size="13" fill="#111111">Основные вкладки</text>
+<rect x="432" y="126" width="14" height="14" rx="4" fill="#2563EB"/>
+<text x="454" y="138" font-size="13" fill="#111111">Вторичные экраны</text>
+<rect x="600" y="126" width="14" height="14" rx="4" fill="#DC2626"/>
+<text x="622" y="138" font-size="13" fill="#111111">Не связаны навигацией</text>
+<line x1="818" y1="133" x2="858" y2="133" stroke="#7C3AED" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#ar2)"/>
+<text x="866" y="138" font-size="13" fill="#111111">замена экрана (назад нельзя)</text>
+<path d="M 470 622.0 L 660 622.0" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="515.6" y="599.0" width="98.8" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="565.0" y="612.0" font-size="11" fill="#FF6B1A" text-anchor="middle">Ищу подработку</text>
+<path d="M 275.0 1044 L 275.0 1078 L 1435.0 1078 L 1435.0 1044" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="808.7" y="1059" width="92.60000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="855.0" y="1072" font-size="11" fill="#FF6B1A" text-anchor="middle">Ищу работника</text>
+<path d="M 275.0 1044 L 275.0 1108 L 2015.0 1108 L 2015.0 1044" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1123.5" y="1089" width="43.0" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1145.0" y="1102" font-size="11" fill="#FF6B1A" text-anchor="middle">Войти</text>
+<path d="M 275.0 1044 L 275.0 1138 L 275.0 1138 L 275.0 1410" fill="none" stroke="#7C3AED" stroke-width="2" opacity="0.8" stroke-dasharray="6 4" stroke-linejoin="round" marker-end="url(#ar2)"/>
+<rect x="241.1" y="1119" width="67.80000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#7C3AED" stroke-opacity="0.35"/>
+<text x="275.0" y="1132" font-size="11" fill="#7C3AED" text-anchor="middle">уже вошёл</text>
+<path d="M 855.0 1044 L 855.0 1168 L 275.0 1168 L 275.0 1410" fill="none" stroke="#7C3AED" stroke-width="2" opacity="0.8" stroke-dasharray="6 4" stroke-linejoin="round" marker-end="url(#ar2)"/>
+<rect x="506.3" y="1149" width="117.4" height="19" rx="9" fill="#FAFAF8" stroke="#7C3AED" stroke-opacity="0.35"/>
+<text x="565.0" y="1162" font-size="11" fill="#7C3AED" text-anchor="middle">после регистрации</text>
+<path d="M 1435.0 1044 L 1435.0 1198 L 275.0 1198 L 275.0 1410" fill="none" stroke="#7C3AED" stroke-width="2" opacity="0.8" stroke-dasharray="6 4" stroke-linejoin="round" marker-end="url(#ar2)"/>
+<rect x="796.3" y="1179" width="117.4" height="19" rx="9" fill="#FAFAF8" stroke="#7C3AED" stroke-opacity="0.35"/>
+<text x="855.0" y="1192" font-size="11" fill="#7C3AED" text-anchor="middle">после регистрации</text>
+<path d="M 855.0 1044 L 855.0 1228 L 2015.0 1228 L 2015.0 1044" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1391.8" y="1209" width="86.4" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1435.0" y="1222" font-size="11" fill="#FF6B1A" text-anchor="middle">есть аккаунт</text>
+<path d="M 1630 622.0 L 1820 622.0" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1681.8" y="599.0" width="86.4" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1725.0" y="612.0" font-size="11" fill="#FF6B1A" text-anchor="middle">есть аккаунт</text>
+<path d="M 855.0 1044 L 855.0 1258 L 1145.0 1258 L 1145.0 3498 L 1435.0 3498 L 1435.0 3830" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="966.1" y="1239" width="67.80000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1000.0" y="1252" font-size="11" fill="#FF6B1A" text-anchor="middle">документы</text>
+<path d="M 1435.0 1044 L 1435.0 1288 L 1725.0 1288 L 1725.0 3528 L 1435.0 3528 L 1435.0 3830" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1546.1" y="1269" width="67.80000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1580.0" y="1282" font-size="11" fill="#FF6B1A" text-anchor="middle">документы</text>
+<path d="M 2015.0 1044 L 2015.0 1318 L 275.0 1318 L 275.0 1410" fill="none" stroke="#7C3AED" stroke-width="2" opacity="0.8" stroke-dasharray="6 4" stroke-linejoin="round" marker-end="url(#ar2)"/>
+<rect x="1098.7" y="1299" width="92.60000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#7C3AED" stroke-opacity="0.35"/>
+<text x="1145.0" y="1312" font-size="11" fill="#7C3AED" text-anchor="middle">вход выполнен</text>
+<path d="M 470 1832.0 L 660 1832.0" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="518.7" y="1809.0" width="92.60000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="565.0" y="1822.0" font-size="11" fill="#FF6B1A" text-anchor="middle">переключатель</text>
+<path d="M 275.0 2254 L 275.0 2288 L 565.0 2288 L 565.0 3558 L 275.0 3558 L 275.0 3830" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="373.7" y="2269" width="92.60000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="420.0" y="2282" font-size="11" fill="#FF6B1A" text-anchor="middle">взаимный лайк</text>
+<path d="M 275.0 2254 L 275.0 2318 L 275.0 2318 L 275.0 2620" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="244.2" y="2299" width="61.6" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="275.0" y="2312" font-size="11" fill="#FF6B1A" text-anchor="middle">написать</text>
+<path d="M 275.0 2254 L 275.0 2348 L 1435.0 2348 L 1435.0 2620" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="808.7" y="2329" width="92.60000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="855.0" y="2342" font-size="11" fill="#FF6B1A" text-anchor="middle">создать смену</text>
+<path d="M 855.0 2254 L 855.0 2378 L 855.0 2378 L 855.0 2620" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="811.8" y="2359" width="86.4" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="855.0" y="2372" font-size="11" fill="#FF6B1A" text-anchor="middle">карточка / ⓘ</text>
+<path d="M 855.0 2254 L 855.0 2408 L 2015.0 2408 L 2015.0 2620" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1379.4" y="2389" width="111.2" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1435.0" y="2402" font-size="11" fill="#FF6B1A" text-anchor="middle">создать вакансию</text>
+<path d="M 855.0 2254 L 855.0 2438 L 2595.0 2438 L 2595.0 2620" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1697.3" y="2419" width="55.4" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1725.0" y="2432" font-size="11" fill="#FF6B1A" text-anchor="middle">отклики</text>
+<path d="M 855.0 2254 L 855.0 2468 L 275.0 2468 L 275.0 2620" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="534.2" y="2449" width="61.6" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="565.0" y="2462" font-size="11" fill="#FF6B1A" text-anchor="middle">написать</text>
+<path d="M 855.0 2254 L 855.0 2498 L 3175.0 2498 L 3175.0 2620" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1987.3" y="2479" width="55.4" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="2015.0" y="2492" font-size="11" fill="#FF6B1A" text-anchor="middle">профиль</text>
+<path d="M 1435.0 2254 L 1435.0 2528 L 275.0 2528 L 275.0 2620" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="839.7" y="2509" width="30.6" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="855.0" y="2522" font-size="11" fill="#FF6B1A" text-anchor="middle">Чат</text>
+<path d="M 1435.0 2254 L 1435.0 2288 L 3175.0 2288 L 3175.0 2620" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="2271.1" y="2269" width="67.80000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="2305.0" y="2282" font-size="11" fill="#FF6B1A" text-anchor="middle">Профиль ›</text>
+<path d="M 1435.0 2254 L 1435.0 2318 L 1145.0 2318 L 1145.0 3588 L 855.0 3588 L 855.0 3830" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1262.3" y="2299" width="55.4" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1290.0" y="2312" font-size="11" fill="#FF6B1A" text-anchor="middle">оценить</text>
+<path d="M 2015.0 2254 L 2015.0 2348 L 275.0 2348 L 275.0 2620" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1120.4" y="2329" width="49.2" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1145.0" y="2342" font-size="11" fill="#FF6B1A" text-anchor="middle">отклик</text>
+<path d="M 2015.0 2254 L 2015.0 2378 L 1435.0 2378 L 1435.0 2620" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1678.7" y="2359" width="92.60000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1725.0" y="2372" font-size="11" fill="#FF6B1A" text-anchor="middle">из объявления</text>
+<path d="M 2595.0 2254 L 2595.0 2408 L 275.0 2408 L 275.0 2620" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1385.6" y="2389" width="98.8" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1435.0" y="2402" font-size="11" fill="#FF6B1A" text-anchor="middle">открыть диалог</text>
+<path d="M 3175.0 2254 L 3175.0 2438 L 1725.0 2438 L 1725.0 3618 L 1435.0 3618 L 1435.0 3830" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="2416.1" y="2419" width="67.80000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="2450.0" y="2432" font-size="11" fill="#FF6B1A" text-anchor="middle">Документы</text>
+<path d="M 3175.0 2254 L 3175.0 2468 L 275.0 2468 L 275.0 2254" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1672.5" y="2449" width="105.0" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1725.0" y="2462" font-size="11" fill="#FF6B1A" text-anchor="middle">обучение заново</text>
+<path d="M 275.0 3464 L 275.0 3648 L 3175.0 3648 L 3175.0 3464" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1684.9" y="3629" width="80.2" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1725.0" y="3642" font-size="11" fill="#FF6B1A" text-anchor="middle">имя в шапке</text>
+<path d="M 855.0 3464 L 855.0 3678 L 3175.0 3678 L 3175.0 3464" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1981.1" y="3659" width="67.80000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="2015.0" y="3672" font-size="11" fill="#FF6B1A" text-anchor="middle">Профиль →</text>
+<path d="M 855.0 2620 L 855.0 2498 L 1725.0 2498 L 1725.0 1078 L 2015.0 1078 L 2015.0 1044" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1253.0" y="2479" width="74.0" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1290.0" y="2492" font-size="11" fill="#FF6B1A" text-anchor="middle">нужен вход</text>
+<path d="M 2595.0 3464 L 2595.0 3708 L 275.0 3708 L 275.0 3464" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="1419.7" y="3689" width="30.6" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="1435.0" y="3702" font-size="11" fill="#FF6B1A" text-anchor="middle">Чат</text>
+<path d="M 2790 3042.0 L 2980 3042.0" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="2851.1" y="3019.0" width="67.80000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="2885.0" y="3032.0" font-size="11" fill="#FF6B1A" text-anchor="middle">Профиль ›</text>
+<path d="M 275.0 3830 L 275.0 3738 L 275.0 3738 L 275.0 3464" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="244.2" y="3719" width="61.6" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="275.0" y="3732" font-size="11" fill="#FF6B1A" text-anchor="middle">Написать</text>
+<path d="M 275.0 3830 L 275.0 3498 L 2305.0 3498 L 2305.0 2528 L 2595.0 2528 L 2595.0 2254" fill="none" stroke="#7C3AED" stroke-width="2" opacity="0.8" stroke-dasharray="6 4" stroke-linejoin="round" marker-end="url(#ar2)"/>
+<rect x="1234.4" y="3479" width="111.2" height="19" rx="9" fill="#FAFAF8" stroke="#7C3AED" stroke-opacity="0.35"/>
+<text x="1290.0" y="3492" font-size="11" fill="#7C3AED" text-anchor="middle">Продолжить поиск</text>
+<path d="M 855.0 3830 L 855.0 3528 L 565.0 3528 L 565.0 2288 L 275.0 2288 L 275.0 2254" fill="none" stroke="#7C3AED" stroke-width="2" opacity="0.8" stroke-dasharray="6 4" stroke-linejoin="round" marker-end="url(#ar2)"/>
+<rect x="666.8" y="3509" width="86.4" height="19" rx="9" fill="#FAFAF8" stroke="#7C3AED" stroke-opacity="0.35"/>
+<text x="710.0" y="3522" font-size="11" fill="#7C3AED" text-anchor="middle">после оценки</text>
+<path d="M 2790 4252.0 L 2980 4252.0" fill="none" stroke="#FF6B1A" stroke-width="2" opacity="0.8" stroke-linejoin="round" marker-end="url(#ar)"/>
+<rect x="2851.1" y="4229.0" width="67.80000000000001" height="19" rx="9" fill="#FAFAF8" stroke="#FF6B1A" stroke-opacity="0.35"/>
+<text x="2885.0" y="4242.0" font-size="11" fill="#FF6B1A" text-anchor="middle">Аналитика</text>
+<g id="index">
+<text x="80" y="170" font-size="17" font-weight="700" fill="#111111">Стартовый экран</text>
+<text x="80" y="188" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/index.tsx</text>
+<rect x="80" y="200" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#8B5CF6" stroke-width="2.5"/>
+<rect x="210" y="212" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="106" y="227" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="98" y="318" font-size="24" font-weight="800" fill="#111111">JobToo</text>
+<text x="98" y="352" font-size="13" fill="#9CA3AF">Подработки на складах в Москве</text>
+<text x="98" y="396" font-size="13" fill="#9CA3AF">Выберите, кто вы</text>
+<rect x="98" y="408" width="354" height="64" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="112" y="434" font-size="14" font-weight="700" fill="#111111">Ищу подработку</text>
+<text x="112" y="456" font-size="12" font-weight="400" fill="#9CA3AF">Смены на складах</text>
+<rect x="98" y="484" width="354" height="64" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="112" y="510" font-size="14" font-weight="700" fill="#111111">Ищу работника</text>
+<text x="112" y="532" font-size="12" font-weight="400" fill="#9CA3AF">Размещайте вакансии</text>
+<text x="98" y="592" font-size="13" fill="#9CA3AF">Уже есть аккаунт? Войти</text>
+</g>
+<g id="register-worker">
+<text x="660" y="170" font-size="17" font-weight="700" fill="#111111">Регистрация работника</text>
+<text x="660" y="188" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/register-worker.tsx</text>
+<rect x="660" y="200" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#8B5CF6" stroke-width="2.5"/>
+<rect x="790" y="212" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="686" y="227" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="678" y="318" font-size="24" font-weight="800" fill="#111111">Регистрация</text>
+<text x="678" y="352" font-size="13" fill="#9CA3AF">Имя, фамилия, телефон</text>
+<rect x="678" y="364" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="690" y="389" font-size="13" fill="#111111">Пароль</text>
+<text x="1016" y="389" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="678" y="412" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="690" y="437" font-size="13" fill="#111111">Метро</text>
+<text x="1016" y="437" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="678" y="460" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="690" y="485" font-size="13" fill="#111111">Специализация</text>
+<text x="1016" y="485" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="678" y="526" width="354" height="44" rx="14" fill="#FF6B1A"/>
+<text x="855.0" y="554" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Зарегистрироваться</text>
+<text x="678" y="594" font-size="13" fill="#9CA3AF">Согласие с документами</text>
+</g>
+<g id="register-employer">
+<text x="1240" y="170" font-size="17" font-weight="700" fill="#111111">Регистрация работодателя</text>
+<text x="1240" y="188" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/register-employer.tsx</text>
+<rect x="1240" y="200" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#8B5CF6" stroke-width="2.5"/>
+<rect x="1370" y="212" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="1266" y="227" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="1258" y="318" font-size="24" font-weight="800" fill="#111111">Регистрация</text>
+<text x="1258" y="352" font-size="13" fill="#9CA3AF">Имя, фамилия, телефон</text>
+<rect x="1258" y="364" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1270" y="389" font-size="13" fill="#111111">Компания</text>
+<text x="1596" y="389" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1258" y="412" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1270" y="437" font-size="13" fill="#111111">Пароль</text>
+<text x="1596" y="437" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1258" y="478" width="354" height="44" rx="14" fill="#FF6B1A"/>
+<text x="1435.0" y="506" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Зарегистрироваться</text>
+<text x="1258" y="546" font-size="13" fill="#9CA3AF">Согласие с документами</text>
+</g>
+<g id="login">
+<text x="1820" y="170" font-size="17" font-weight="700" fill="#111111">Вход</text>
+<text x="1820" y="188" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/login.tsx</text>
+<rect x="1820" y="200" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#8B5CF6" stroke-width="2.5"/>
+<rect x="1950" y="212" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="1846" y="227" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="1838" y="318" font-size="24" font-weight="800" fill="#111111">Вход</text>
+<rect x="1838" y="338" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1850" y="363" font-size="13" fill="#111111">Телефон</text>
+<text x="2176" y="363" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1838" y="386" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1850" y="411" font-size="13" fill="#111111">Пароль</text>
+<text x="2176" y="411" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1838" y="452" width="354" height="44" rx="14" fill="#FF6B1A"/>
+<text x="2015.0" y="480" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Войти</text>
+<text x="1838" y="520" font-size="13" fill="#9CA3AF">Нет аккаунта? Зарегистрироваться</text>
+</g>
+<g id="feed-shift">
+<text x="80" y="1380" font-size="17" font-weight="700" fill="#111111">Поиск · Смены</text>
+<text x="80" y="1398" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/(tabs)/feed.tsx</text>
+<rect x="80" y="1410" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#FF6B1A" stroke-width="2.5"/>
+<rect x="210" y="1422" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="106" y="1437" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="98" y="1528" font-size="24" font-weight="800" fill="#111111">JobToo</text>
+<rect x="98" y="1548" width="46" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="121.0" y="1568" font-size="11.5" fill="#111111" text-anchor="middle">Смены</text>
+<rect x="151" y="1548" width="53" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="177.5" y="1568" font-size="11.5" fill="#111111" text-anchor="middle">Работа</text>
+<rect x="98" y="1588" width="46" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="121.0" y="1608" font-size="11.5" fill="#111111" text-anchor="middle">Пн 27</text>
+<rect x="151" y="1588" width="46" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="174.0" y="1608" font-size="11.5" fill="#111111" text-anchor="middle">Вт 28</text>
+<rect x="204" y="1588" width="46" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="227.0" y="1608" font-size="11.5" fill="#111111" text-anchor="middle">Ср 29</text>
+<rect x="257" y="1588" width="38" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="276.0" y="1608" font-size="11.5" fill="#111111" text-anchor="middle">📍</text>
+<rect x="98" y="1628" width="354" height="130" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="112" y="1654" font-size="14" font-weight="700" fill="#111111">Кладовщик</text>
+<text x="112" y="1676" font-size="12" font-weight="400" fill="#9CA3AF">Лавка · Пятницкое шоссе</text>
+<text x="112" y="1698" font-size="12" font-weight="400" fill="#9CA3AF">07:00–16:00 · Пн 27.07</text>
+<text x="112" y="1720" font-size="12" font-weight="400" fill="#9CA3AF">Отклики 3 · Просмотры 9</text>
+<text x="112" y="1742" font-size="12" font-weight="400" fill="#9CA3AF">Подробности и нормативы</text>
+<rect x="98" y="1770" width="38" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="117.0" y="1790" font-size="11.5" fill="#111111" text-anchor="middle">↩</text>
+<rect x="143" y="1770" width="38" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="162.0" y="1790" font-size="11.5" fill="#111111" text-anchor="middle">✕</text>
+<rect x="188" y="1770" width="38" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="207.0" y="1790" font-size="11.5" fill="#111111" text-anchor="middle">💬</text>
+<rect x="233" y="1770" width="38" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="252.0" y="1790" font-size="11.5" fill="#111111" text-anchor="middle">♥</text>
+<rect x="94" y="2180" width="362" height="58" rx="26" fill="#fff" stroke="#E5E7EB"/>
+<circle cx="130.2" cy="2202" r="7" fill="none" stroke="#FF6B1A" stroke-width="1.6"/>
+<text x="130.2" y="2228" font-size="9.5" fill="#FF6B1A" text-anchor="middle">Поиск</text>
+<circle cx="202.6" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="202.6" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Мэтчи</text>
+<circle cx="275.0" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="275.0" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Биржа</text>
+<circle cx="347.4" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="347.4" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Чаты</text>
+<circle cx="419.8" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="419.8" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Профиль</text>
+</g>
+<g id="feed-perm">
+<text x="660" y="1380" font-size="17" font-weight="700" fill="#111111">Поиск · Работа</text>
+<text x="660" y="1398" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/(tabs)/feed.tsx</text>
+<rect x="660" y="1410" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#FF6B1A" stroke-width="2.5"/>
+<rect x="790" y="1422" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="686" y="1437" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="678" y="1528" font-size="24" font-weight="800" fill="#111111">JobToo</text>
+<rect x="678" y="1548" width="46" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="701.0" y="1568" font-size="11.5" fill="#111111" text-anchor="middle">Смены</text>
+<rect x="731" y="1548" width="53" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="757.5" y="1568" font-size="11.5" fill="#111111" text-anchor="middle">Работа</text>
+<rect x="678" y="1588" width="116" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="736.0" y="1608" font-size="11.5" fill="#111111" text-anchor="middle">Поиск вакансий…</text>
+<rect x="801" y="1588" width="46" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="824.0" y="1608" font-size="11.5" fill="#111111" text-anchor="middle">Карта</text>
+<rect x="678" y="1628" width="72" height="30" rx="15" fill="#FFF3ED" stroke="#FF6B1A"/>
+<text x="714.0" y="1648" font-size="11.5" fill="#FF6B1A" text-anchor="middle">Открытые</text>
+<rect x="757" y="1628" width="100" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="807.0" y="1648" font-size="11.5" fill="#9CA3AF" text-anchor="middle">Откликнулись</text>
+<rect x="864" y="1628" width="79" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="903.5" y="1648" font-size="11.5" fill="#9CA3AF" text-anchor="middle">Избранное</text>
+<rect x="678" y="1668" width="354" height="130" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="692" y="1694" font-size="14" font-weight="700" fill="#111111">Кладовщик</text>
+<text x="692" y="1716" font-size="12" font-weight="400" fill="#9CA3AF">80 000 ₽/мес</text>
+<text x="692" y="1738" font-size="12" font-weight="400" fill="#9CA3AF">м. Пионерская</text>
+<text x="692" y="1760" font-size="12" font-weight="400" fill="#9CA3AF">ул. Полосухина, 1/28</text>
+<text x="692" y="1782" font-size="12" font-weight="400" fill="#9CA3AF">Откликнуться  💬 ↗ ♥</text>
+<rect x="674" y="2180" width="362" height="58" rx="26" fill="#fff" stroke="#E5E7EB"/>
+<circle cx="710.2" cy="2202" r="7" fill="none" stroke="#FF6B1A" stroke-width="1.6"/>
+<text x="710.2" y="2228" font-size="9.5" fill="#FF6B1A" text-anchor="middle">Поиск</text>
+<circle cx="782.6" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="782.6" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Мэтчи</text>
+<circle cx="855.0" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="855.0" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Биржа</text>
+<circle cx="927.4" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="927.4" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Чаты</text>
+<circle cx="999.8" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="999.8" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Профиль</text>
+</g>
+<g id="matches">
+<text x="1240" y="1380" font-size="17" font-weight="700" fill="#111111">Мои отклики</text>
+<text x="1240" y="1398" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/(tabs)/matches.tsx</text>
+<rect x="1240" y="1410" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#FF6B1A" stroke-width="2.5"/>
+<rect x="1370" y="1422" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="1266" y="1437" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="1258" y="1528" font-size="24" font-weight="800" fill="#111111">Мои отклики</text>
+<rect x="1258" y="1548" width="72" height="30" rx="15" fill="#FFF3ED" stroke="#FF6B1A"/>
+<text x="1294.0" y="1568" font-size="11.5" fill="#FF6B1A" text-anchor="middle">Активные</text>
+<rect x="1337" y="1548" width="60" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="1367.0" y="1568" font-size="11.5" fill="#9CA3AF" text-anchor="middle">Отказ</text>
+<rect x="1404" y="1548" width="79" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="1443.5" y="1568" font-size="11.5" fill="#9CA3AF" text-anchor="middle">Завершено</text>
+<rect x="1258" y="1588" width="354" height="174" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="1272" y="1614" font-size="14" font-weight="700" fill="#111111">♥ Мэтч!</text>
+<text x="1272" y="1636" font-size="12" font-weight="400" fill="#9CA3AF">Кладовщик          Подробнее ›</text>
+<text x="1272" y="1658" font-size="12" font-weight="400" fill="#9CA3AF">Лавка · Пятницкое шоссе</text>
+<text x="1272" y="1680" font-size="12" font-weight="400" fill="#9CA3AF">Пн 27.07 · 07:00–16:00</text>
+<text x="1272" y="1702" font-size="12" font-weight="400" fill="#9CA3AF">📍 ул. Полосухина, 1/28</text>
+<text x="1272" y="1724" font-size="12" font-weight="400" fill="#9CA3AF">Лавка ★5.0        Профиль ›</text>
+<text x="1272" y="1746" font-size="12" font-weight="400" fill="#9CA3AF">Чат   Ждём подтверждения</text>
+<rect x="1254" y="2180" width="362" height="58" rx="26" fill="#fff" stroke="#E5E7EB"/>
+<circle cx="1290.2" cy="2202" r="7" fill="none" stroke="#FF6B1A" stroke-width="1.6"/>
+<text x="1290.2" y="2228" font-size="9.5" fill="#FF6B1A" text-anchor="middle">Поиск</text>
+<circle cx="1362.6" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="1362.6" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Мэтчи</text>
+<circle cx="1435.0" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="1435.0" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Биржа</text>
+<circle cx="1507.4" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="1507.4" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Чаты</text>
+<circle cx="1579.8" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="1579.8" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Профиль</text>
+</g>
+<g id="exchange">
+<text x="1820" y="1380" font-size="17" font-weight="700" fill="#111111">Биржа</text>
+<text x="1820" y="1398" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/(tabs)/exchange.tsx</text>
+<rect x="1820" y="1410" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#FF6B1A" stroke-width="2.5"/>
+<rect x="1950" y="1422" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="1846" y="1437" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="1838" y="1528" font-size="24" font-weight="800" fill="#111111">Биржа</text>
+<rect x="1838" y="1548" width="72" height="30" rx="15" fill="#FFF3ED" stroke="#FF6B1A"/>
+<text x="1874.0" y="1568" font-size="11.5" fill="#FF6B1A" text-anchor="middle">Активные</text>
+<rect x="1917" y="1548" width="72" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="1953.0" y="1568" font-size="11.5" fill="#9CA3AF" text-anchor="middle">Закрытые</text>
+<rect x="1838" y="1588" width="354" height="108" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="1852" y="1614" font-size="14" font-weight="700" fill="#111111">Лавка — сборка</text>
+<text x="1852" y="1636" font-size="12" font-weight="400" fill="#9CA3AF">Дата · время</text>
+<text x="1852" y="1658" font-size="12" font-weight="400" fill="#9CA3AF">Метро · адрес</text>
+<text x="1852" y="1680" font-size="12" font-weight="400" fill="#9CA3AF">Откликнуться</text>
+<rect x="1838" y="1726" width="354" height="44" rx="14" fill="#FF6B1A"/>
+<text x="2015.0" y="1754" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Новое объявление</text>
+<rect x="1834" y="2180" width="362" height="58" rx="26" fill="#fff" stroke="#E5E7EB"/>
+<circle cx="1870.2" cy="2202" r="7" fill="none" stroke="#FF6B1A" stroke-width="1.6"/>
+<text x="1870.2" y="2228" font-size="9.5" fill="#FF6B1A" text-anchor="middle">Поиск</text>
+<circle cx="1942.6" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="1942.6" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Мэтчи</text>
+<circle cx="2015.0" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="2015.0" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Биржа</text>
+<circle cx="2087.4" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="2087.4" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Чаты</text>
+<circle cx="2159.8" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="2159.8" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Профиль</text>
+</g>
+<g id="chats">
+<text x="2400" y="1380" font-size="17" font-weight="700" fill="#111111">Сообщения</text>
+<text x="2400" y="1398" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/(tabs)/chats.tsx</text>
+<rect x="2400" y="1410" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#FF6B1A" stroke-width="2.5"/>
+<rect x="2530" y="1422" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="2426" y="1437" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="2418" y="1528" font-size="24" font-weight="800" fill="#111111">Сообщения</text>
+<rect x="2418" y="1548" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="2430" y="1573" font-size="13" fill="#111111">Поиск по чатам…</text>
+<text x="2756" y="1573" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="2418" y="1596" width="354" height="86" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="2432" y="1622" font-size="14" font-weight="700" fill="#111111">Сергей Манолий</text>
+<text x="2432" y="1644" font-size="12" font-weight="400" fill="#9CA3AF">Кладовщик</text>
+<text x="2432" y="1666" font-size="12" font-weight="400" fill="#9CA3AF">Здравствуйте! …</text>
+<rect x="2418" y="1694" width="354" height="86" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="2432" y="1720" font-size="14" font-weight="700" fill="#111111">Лавка</text>
+<text x="2432" y="1742" font-size="12" font-weight="400" fill="#9CA3AF">Комплектовщик</text>
+<text x="2432" y="1764" font-size="12" font-weight="400" fill="#9CA3AF">Смена подтверждена</text>
+<rect x="2414" y="2180" width="362" height="58" rx="26" fill="#fff" stroke="#E5E7EB"/>
+<circle cx="2450.2" cy="2202" r="7" fill="none" stroke="#FF6B1A" stroke-width="1.6"/>
+<text x="2450.2" y="2228" font-size="9.5" fill="#FF6B1A" text-anchor="middle">Поиск</text>
+<circle cx="2522.6" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="2522.6" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Мэтчи</text>
+<circle cx="2595.0" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="2595.0" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Биржа</text>
+<circle cx="2667.4" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="2667.4" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Чаты</text>
+<circle cx="2739.8" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="2739.8" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Профиль</text>
+</g>
+<g id="profile">
+<text x="2980" y="1380" font-size="17" font-weight="700" fill="#111111">Профиль</text>
+<text x="2980" y="1398" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/(tabs)/profile.tsx</text>
+<rect x="2980" y="1410" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#FF6B1A" stroke-width="2.5"/>
+<rect x="3110" y="1422" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="3006" y="1437" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="2998" y="1528" font-size="24" font-weight="800" fill="#111111">Профиль</text>
+<rect x="2998" y="1548" width="354" height="86" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="3012" y="1574" font-size="14" font-weight="700" fill="#111111">Максим Фёдоров</text>
+<text x="3012" y="1596" font-size="12" font-weight="400" fill="#9CA3AF">Работник · +7 …</text>
+<text x="3012" y="1618" font-size="12" font-weight="400" fill="#9CA3AF">★ 5.0 (1 отз.)</text>
+<rect x="2998" y="1646" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="3010" y="1671" font-size="13" fill="#111111">Личные данные</text>
+<text x="3336" y="1671" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="2998" y="1694" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="3010" y="1719" font-size="13" fill="#111111">Специализация</text>
+<text x="3336" y="1719" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="2998" y="1742" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="3010" y="1767" font-size="13" fill="#111111">Метро</text>
+<text x="3336" y="1767" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="2998" y="1790" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="3010" y="1815" font-size="13" fill="#111111">О себе</text>
+<text x="3336" y="1815" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="2998" y="1838" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="3010" y="1863" font-size="13" fill="#111111">Документы</text>
+<text x="3336" y="1863" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="2998" y="1886" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="3010" y="1911" font-size="13" fill="#111111">Аккаунт</text>
+<text x="3336" y="1911" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="2994" y="2180" width="362" height="58" rx="26" fill="#fff" stroke="#E5E7EB"/>
+<circle cx="3030.2" cy="2202" r="7" fill="none" stroke="#FF6B1A" stroke-width="1.6"/>
+<text x="3030.2" y="2228" font-size="9.5" fill="#FF6B1A" text-anchor="middle">Поиск</text>
+<circle cx="3102.6" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="3102.6" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Мэтчи</text>
+<circle cx="3175.0" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="3175.0" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Биржа</text>
+<circle cx="3247.4" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="3247.4" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Чаты</text>
+<circle cx="3319.8" cy="2202" r="7" fill="none" stroke="#9CA3AF" stroke-width="1.6"/>
+<text x="3319.8" y="2228" font-size="9.5" fill="#9CA3AF" text-anchor="middle">Профиль</text>
+</g>
+<g id="chat-room">
+<text x="80" y="2590" font-size="17" font-weight="700" fill="#111111">Чат</text>
+<text x="80" y="2608" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/chat-room.tsx</text>
+<rect x="80" y="2620" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#2563EB" stroke-width="2.5"/>
+<rect x="210" y="2632" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="106" y="2647" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="98" y="2738" font-size="24" font-weight="800" fill="#111111">Сергей Манолий</text>
+<text x="98" y="2772" font-size="13" fill="#9CA3AF">● в сети</text>
+<text x="98" y="2798" font-size="13" fill="#9CA3AF">💼 Кладовщик · 📅 Пн 27.07 · 📍 адрес</text>
+<rect x="98" y="2810" width="354" height="64" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="112" y="2836" font-size="14" font-weight="700" fill="#111111">Принять решение по кандидату:</text>
+<text x="112" y="2858" font-size="12" font-weight="400" fill="#9CA3AF">Не подходит      Подходит</text>
+<text x="98" y="2918" font-size="13" fill="#9CA3AF">Сегодня</text>
+<rect x="98" y="2930" width="354" height="42" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="112" y="2956" font-size="14" font-weight="700" fill="#111111">Здравствуйте! Есть опыт?</text>
+<rect x="98" y="2984" width="102" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="149.0" y="3004" font-size="11.5" fill="#111111" text-anchor="middle">Опыт в Лавке?</text>
+<rect x="207" y="2984" width="130" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="272.0" y="3004" font-size="11.5" fill="#111111" text-anchor="middle">Подтвердите выход</text>
+<rect x="98" y="3024" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="110" y="3049" font-size="13" fill="#111111">＋   Сообщение              ➤</text>
+<text x="436" y="3049" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+</g>
+<g id="perm-vacancy-detail">
+<text x="660" y="2590" font-size="17" font-weight="700" fill="#111111">Вакансия</text>
+<text x="660" y="2608" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/perm-vacancy-detail.tsx</text>
+<rect x="660" y="2620" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#2563EB" stroke-width="2.5"/>
+<rect x="790" y="2632" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="686" y="2647" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="678" y="2738" font-size="24" font-weight="800" fill="#111111">Кладовщик</text>
+<text x="678" y="2772" font-size="13" fill="#9CA3AF">Лавка</text>
+<rect x="678" y="2784" width="95" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="725.5" y="2804" font-size="11.5" fill="#111111" text-anchor="middle">80 000 ₽/мес</text>
+<rect x="780" y="2784" width="116" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="838.0" y="2804" font-size="11.5" fill="#111111" text-anchor="middle">5/2 07:00–16:00</text>
+<text x="678" y="2838" font-size="13" fill="#9CA3AF">Расположение</text>
+<rect x="678" y="2850" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="690" y="2875" font-size="13" fill="#111111">Пионерская</text>
+<text x="1016" y="2875" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="678" y="2898" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="690" y="2923" font-size="13" fill="#111111">ул. Полосухина, 1/28</text>
+<text x="1016" y="2923" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<text x="678" y="2960" font-size="13" fill="#9CA3AF">Работодатель</text>
+<rect x="678" y="2972" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="690" y="2997" font-size="13" fill="#111111">Лавка              Профиль →</text>
+<text x="1016" y="2997" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="678" y="3038" width="88" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="722.0" y="3058" font-size="11.5" fill="#111111" text-anchor="middle">♥ Сохранить</text>
+<rect x="773" y="3038" width="95" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="820.5" y="3058" font-size="11.5" fill="#111111" text-anchor="middle">Откликнуться</text>
+</g>
+<g id="create-vacancy">
+<text x="1240" y="2590" font-size="17" font-weight="700" fill="#111111">Создание смены</text>
+<text x="1240" y="2608" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/create-vacancy.tsx</text>
+<rect x="1240" y="2620" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#2563EB" stroke-width="2.5"/>
+<rect x="1370" y="2632" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="1266" y="2647" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="1258" y="2738" font-size="24" font-weight="800" fill="#111111">Новая смена</text>
+<rect x="1258" y="2758" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1270" y="2783" font-size="13" fill="#111111">Тип работы</text>
+<text x="1596" y="2783" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1258" y="2806" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1270" y="2831" font-size="13" fill="#111111">Дата · время</text>
+<text x="1596" y="2831" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1258" y="2854" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1270" y="2879" font-size="13" fill="#111111">Метро</text>
+<text x="1596" y="2879" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1258" y="2902" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1270" y="2927" font-size="13" fill="#111111">Адрес (подсказки)</text>
+<text x="1596" y="2927" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1258" y="2950" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1270" y="2975" font-size="13" fill="#111111">Нормативы и оплата</text>
+<text x="1596" y="2975" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1258" y="2998" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1270" y="3023" font-size="13" fill="#111111">Сколько человек</text>
+<text x="1596" y="3023" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1258" y="3064" width="354" height="44" rx="14" fill="#FF6B1A"/>
+<text x="1435.0" y="3092" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Опубликовать</text>
+</g>
+<g id="create-perm-vacancy">
+<text x="1820" y="2590" font-size="17" font-weight="700" fill="#111111">Создание вакансии</text>
+<text x="1820" y="2608" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/create-perm-vacancy.tsx</text>
+<rect x="1820" y="2620" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#2563EB" stroke-width="2.5"/>
+<rect x="1950" y="2632" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="1846" y="2647" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="1838" y="2738" font-size="24" font-weight="800" fill="#111111">Новая вакансия</text>
+<rect x="1838" y="2758" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1850" y="2783" font-size="13" fill="#111111">Должность</text>
+<text x="2176" y="2783" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1838" y="2806" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1850" y="2831" font-size="13" fill="#111111">Зарплата</text>
+<text x="2176" y="2831" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1838" y="2854" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1850" y="2879" font-size="13" fill="#111111">График</text>
+<text x="2176" y="2879" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1838" y="2902" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1850" y="2927" font-size="13" fill="#111111">Метро</text>
+<text x="2176" y="2927" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1838" y="2950" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1850" y="2975" font-size="13" fill="#111111">Адрес (подсказки)</text>
+<text x="2176" y="2975" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1838" y="2998" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="1850" y="3023" font-size="13" fill="#111111">Описание</text>
+<text x="2176" y="3023" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="1838" y="3064" width="354" height="44" rx="14" fill="#FF6B1A"/>
+<text x="2015.0" y="3092" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Опубликовать</text>
+</g>
+<g id="perm-applications">
+<text x="2400" y="2590" font-size="17" font-weight="700" fill="#111111">Отклики на вакансии</text>
+<text x="2400" y="2608" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/perm-applications.tsx</text>
+<rect x="2400" y="2620" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#2563EB" stroke-width="2.5"/>
+<rect x="2530" y="2632" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="2426" y="2647" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="2418" y="2738" font-size="24" font-weight="800" fill="#111111">Отклики</text>
+<rect x="2418" y="2758" width="60" height="30" rx="15" fill="#FFF3ED" stroke="#FF6B1A"/>
+<text x="2448.0" y="2778" font-size="11.5" fill="#FF6B1A" text-anchor="middle">Новые</text>
+<rect x="2485" y="2758" width="86" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="2528.0" y="2778" font-size="11.5" fill="#9CA3AF" text-anchor="middle">Приглашены</text>
+<rect x="2578" y="2758" width="60" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="2608.0" y="2778" font-size="11.5" fill="#9CA3AF" text-anchor="middle">Отказы</text>
+<rect x="2418" y="2798" width="354" height="108" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="2432" y="2824" font-size="14" font-weight="700" fill="#111111">Максим Фёдоров</text>
+<text x="2432" y="2846" font-size="12" font-weight="400" fill="#9CA3AF">Кладовщик</text>
+<text x="2432" y="2868" font-size="12" font-weight="400" fill="#9CA3AF">Профиль ›</text>
+<text x="2432" y="2890" font-size="12" font-weight="400" fill="#9CA3AF">Чат   Пригласить   Отказать</text>
+</g>
+<g id="user-profile">
+<text x="2980" y="2590" font-size="17" font-weight="700" fill="#111111">Профиль пользователя</text>
+<text x="2980" y="2608" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/user-profile.tsx</text>
+<rect x="2980" y="2620" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#2563EB" stroke-width="2.5"/>
+<rect x="3110" y="2632" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="3006" y="2647" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="2998" y="2738" font-size="24" font-weight="800" fill="#111111">Профиль</text>
+<rect x="2998" y="2758" width="354" height="86" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="3012" y="2784" font-size="14" font-weight="700" fill="#111111">Сергей Манолий</text>
+<text x="3012" y="2806" font-size="12" font-weight="400" fill="#9CA3AF">Работодатель</text>
+<text x="3012" y="2828" font-size="12" font-weight="400" fill="#9CA3AF">★ 5.0 · 1 отзыв</text>
+<rect x="2998" y="2856" width="65" height="30" rx="15" fill="#FFF3ED" stroke="#FF6B1A"/>
+<text x="3030.5" y="2876" font-size="11.5" fill="#FF6B1A" text-anchor="middle">Профиль</text>
+<rect x="3070" y="2856" width="60" height="30" rx="15" fill="#fff" stroke="#E5E7EB"/>
+<text x="3100.0" y="2876" font-size="11.5" fill="#9CA3AF" text-anchor="middle">Отзывы</text>
+<text x="2998" y="2910" font-size="13" fill="#9CA3AF">Основная информация</text>
+<rect x="2998" y="2922" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="3010" y="2947" font-size="13" fill="#111111">Компания           Лавка</text>
+<text x="3336" y="2947" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+</g>
+<g id="match">
+<text x="80" y="3800" font-size="17" font-weight="700" fill="#111111">Мэтч</text>
+<text x="80" y="3818" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/match.tsx</text>
+<rect x="80" y="3830" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#2563EB" stroke-width="2.5"/>
+<rect x="210" y="3842" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="106" y="3857" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="98" y="3948" font-size="24" font-weight="800" fill="#111111">Мэтч!</text>
+<text x="98" y="3982" font-size="13" fill="#9CA3AF">Вы понравились друг другу</text>
+<rect x="98" y="3994" width="354" height="86" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="112" y="4020" font-size="14" font-weight="700" fill="#111111">ДЕТАЛИ СМЕНЫ</text>
+<text x="112" y="4042" font-size="12" font-weight="400" fill="#9CA3AF">Кладовщик · Лавка</text>
+<text x="112" y="4064" font-size="12" font-weight="400" fill="#9CA3AF">Пн 27.07 · 07:00–16:00</text>
+<rect x="98" y="4092" width="354" height="64" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="112" y="4118" font-size="14" font-weight="700" fill="#111111">КОНТАКТ</text>
+<text x="112" y="4140" font-size="12" font-weight="400" fill="#9CA3AF">+7 …</text>
+<rect x="98" y="4186" width="354" height="44" rx="14" fill="#FF6B1A"/>
+<text x="275.0" y="4214" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Написать в чат</text>
+<rect x="98" y="4240" width="354" height="44" rx="14" fill="none" stroke="#E5E7EB" stroke-width="1.5"/>
+<text x="275.0" y="4268" font-size="14" font-weight="600" fill="#111111" text-anchor="middle">Продолжить поиск</text>
+</g>
+<g id="rate">
+<text x="660" y="3800" font-size="17" font-weight="700" fill="#111111">Оценка смены</text>
+<text x="660" y="3818" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/rate.tsx</text>
+<rect x="660" y="3830" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#2563EB" stroke-width="2.5"/>
+<rect x="790" y="3842" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="686" y="3857" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="678" y="3948" font-size="24" font-weight="800" fill="#111111">Как прошла смена?</text>
+<text x="678" y="3982" font-size="13" fill="#9CA3AF">★ ★ ★ ★ ★</text>
+<rect x="678" y="3994" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="690" y="4019" font-size="13" fill="#111111">Комментарий</text>
+<text x="1016" y="4019" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+<rect x="678" y="4060" width="354" height="44" rx="14" fill="#FF6B1A"/>
+<text x="855.0" y="4088" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Отправить оценку</text>
+<rect x="678" y="4114" width="354" height="44" rx="14" fill="none" stroke="#E5E7EB" stroke-width="1.5"/>
+<text x="855.0" y="4142" font-size="14" font-weight="600" fill="#111111" text-anchor="middle">Пропустить</text>
+</g>
+<g id="legal">
+<text x="1240" y="3800" font-size="17" font-weight="700" fill="#111111">Документы</text>
+<text x="1240" y="3818" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/legal.tsx</text>
+<rect x="1240" y="3830" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#2563EB" stroke-width="2.5"/>
+<rect x="1370" y="3842" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="1266" y="3857" font-size="11" fill="#9CA3AF">9:41</text>
+<text x="1258" y="3948" font-size="24" font-weight="800" fill="#111111">Документ</text>
+<text x="1258" y="3982" font-size="13" fill="#9CA3AF">Пользовательское соглашение</text>
+<text x="1258" y="4008" font-size="13" fill="#9CA3AF">Политика конфиденциальности</text>
+<text x="1258" y="4034" font-size="13" fill="#9CA3AF">Согласие на обработку данных</text>
+</g>
+<g id="candidates">
+<text x="1820" y="3800" font-size="17" font-weight="700" fill="#111111">Кандидаты</text>
+<text x="1820" y="3818" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/candidates.tsx</text>
+<rect x="1820" y="3830" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#DC2626" stroke-width="2.5"/>
+<rect x="1950" y="3842" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="1846" y="3857" font-size="11" fill="#9CA3AF">9:41</text>
+<rect x="2092" y="3800" width="112" height="22" rx="11" fill="#FEF2F2" stroke="#DC2626"/>
+<text x="2148" y="3815" font-size="10.5" fill="#DC2626" text-anchor="middle">нет входа в код</text>
+<text x="1838" y="3948" font-size="24" font-weight="800" fill="#111111">Кандидаты</text>
+<rect x="1838" y="3968" width="354" height="108" rx="16" fill="#fff" stroke="#E5E7EB"/>
+<text x="1852" y="3994" font-size="14" font-weight="700" fill="#111111">Имя</text>
+<text x="1852" y="4016" font-size="12" font-weight="400" fill="#9CA3AF">Специальность</text>
+<text x="1852" y="4038" font-size="12" font-weight="400" fill="#9CA3AF">Телефон</text>
+<text x="1852" y="4060" font-size="12" font-weight="400" fill="#9CA3AF">Профиль ›</text>
+</g>
+<g id="admin">
+<text x="2400" y="3800" font-size="17" font-weight="700" fill="#111111">Админка</text>
+<text x="2400" y="3818" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/admin.tsx</text>
+<rect x="2400" y="3830" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#DC2626" stroke-width="2.5"/>
+<rect x="2530" y="3842" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="2426" y="3857" font-size="11" fill="#9CA3AF">9:41</text>
+<rect x="2672" y="3800" width="112" height="22" rx="11" fill="#FEF2F2" stroke="#DC2626"/>
+<text x="2728" y="3815" font-size="10.5" fill="#DC2626" text-anchor="middle">нет входа в код</text>
+<text x="2418" y="3948" font-size="24" font-weight="800" fill="#111111">Админка</text>
+<rect x="2418" y="3968" width="354" height="40" rx="12" fill="#fff" stroke="#E5E7EB"/>
+<text x="2430" y="3993" font-size="13" fill="#111111">Аналитика</text>
+<text x="2756" y="3993" font-size="13" fill="#9CA3AF" text-anchor="end">›</text>
+</g>
+<g id="analytics">
+<text x="2980" y="3800" font-size="17" font-weight="700" fill="#111111">Аналитика</text>
+<text x="2980" y="3818" font-size="11.5" fill="#9CA3AF" font-family="monospace">app/analytics.tsx</text>
+<rect x="2980" y="3830" width="390" height="844" rx="34" fill="#F5F7FA" stroke="#DC2626" stroke-width="2.5"/>
+<rect x="3110" y="3842" width="130" height="20" rx="10" fill="#E9EAED"/>
+<text x="3006" y="3857" font-size="11" fill="#9CA3AF">9:41</text>
+<rect x="3252" y="3800" width="112" height="22" rx="11" fill="#FEF2F2" stroke="#DC2626"/>
+<text x="3308" y="3815" font-size="10.5" fill="#DC2626" text-anchor="middle">нет входа в код</text>
+<text x="2998" y="3948" font-size="24" font-weight="800" fill="#111111">Аналитика</text>
+<text x="2998" y="3982" font-size="13" fill="#9CA3AF">Пользователи · Вакансии</text>
+<text x="2998" y="4008" font-size="13" fill="#9CA3AF">Оценки и заявки</text>
+<text x="2998" y="4034" font-size="13" fill="#9CA3AF">Рост за 30 дней</text>
+</g>
+<text x="80" y="4920" font-size="15" font-weight="700" fill="#111111">Отдельно</text>
+<text x="80" y="4946" font-size="13" fill="#9CA3AF">• Пуш и колокольчик → чат, Мэтчи, Лента или Биржа (services/notificationRoute.ts)</text>
+<text x="80" y="4968" font-size="13" fill="#9CA3AF">• Нижняя панель переключает 5 вкладок: Поиск · Мэтчи · Биржа · Чаты · Профиль</text>
+</svg>
