@@ -4,7 +4,9 @@ import {
   ScrollView, SafeAreaView, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useApp } from '@/hooks/useApp';
+import { routeForNotification, routeByTitle } from '@/services/notificationRoute';
 import { Colors } from '@/constants/theme';
 import {
   dbGetNotifications, dbMarkNotifRead, dbMarkAllNotifsRead,
@@ -17,10 +19,15 @@ interface Notif {
   body: string;
   isRead: boolean;
   createdAt: string;
+  /** Вид уведомления — по нему открываем нужный экран (может отсутствовать
+   *  у записей, созданных до появления колонки) */
+  type?: string | null;
+  payload?: { chatId?: string } | null;
 }
 
 export function NotifBell() {
   const app = useApp();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,6 +43,11 @@ export function NotifBell() {
       setNotifs(rows.map((n: any) => ({
         id: n.id, title: n.title, body: n.body,
         isRead: n.is_read, createdAt: n.created_at,
+        type: n.type ?? null,
+        // payload приходит объектом (jsonb) либо строкой — принимаем оба вида
+        payload: typeof n.payload === 'string'
+          ? (() => { try { return JSON.parse(n.payload); } catch { return null; } })()
+          : (n.payload ?? null),
       })));
       app?.refreshNotifications?.();
     } catch {
@@ -58,10 +70,38 @@ export function NotifBell() {
     app?.markAllNotifsRead?.();
   }
 
-  async function handleTap(id: string) {
-    setNotifs(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-    await dbMarkNotifRead(id).catch(() => {});
-    app?.markNotifRead?.(id);
+  /** Чат с этим человеком — для старых уведомлений «💬 Имя», у которых
+   *  не сохранён chatId. Имя берём из заголовка. */
+  function chatIdByPersonName(title: string): string | undefined {
+    const name = title.replace(/^💬\s*/, '').trim();
+    if (!name) return undefined;
+    const me = app?.currentUser;
+    const chats = app?.chats ?? [];
+    const users = app?.users ?? [];
+    const match = chats.find((c: any) => {
+      const otherId = me?.role === 'worker' ? c.employerId : c.workerId;
+      const u = users.find((x: any) => x.id === otherId);
+      return u && `${u.firstName} ${u.lastName}`.trim() === name;
+    });
+    return match?.id;
+  }
+
+  async function handleTap(n: Notif) {
+    setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, isRead: true } : x));
+    dbMarkNotifRead(n.id).catch(() => {});
+    app?.markNotifRead?.(n.id);
+
+    // Уведомление — это ссылка: открываем экран, о котором оно говорит
+    let target = routeForNotification(n.type, n.payload);
+    if (!target || (target.pathname === '/(tabs)/chats' && n.title.startsWith('💬'))) {
+      const chatId = n.payload?.chatId ?? chatIdByPersonName(n.title);
+      if (chatId) target = { pathname: '/chat-room', params: { chatId } };
+    }
+    if (!target) target = routeByTitle(n.title);
+    if (!target) return;
+
+    setOpen(false);
+    router.push(target as never);
   }
 
   async function handleDelete(id: string) {
@@ -140,7 +180,7 @@ export function NotifBell() {
               notifs.map(n => (
                 <View key={n.id} style={[s.item, !n.isRead && s.itemUnread]}>
                   <TouchableOpacity
-                    onPress={() => handleTap(n.id)}
+                    onPress={() => handleTap(n)}
                     activeOpacity={0.7}
                     style={s.itemContent}
                   >
@@ -157,6 +197,8 @@ export function NotifBell() {
                         })}
                       </Text>
                     </View>
+                    {/* Стрелка — знак того, что уведомление открывается */}
+                    <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} style={{ alignSelf: 'center' }} />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => handleDelete(n.id)} style={s.deleteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="trash-outline" size={18} color={Colors.textMuted} />

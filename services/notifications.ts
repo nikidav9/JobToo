@@ -234,8 +234,9 @@ async function pushTo(
   data: Record<string, unknown> = {},
   sendTelegram = true,
 ): Promise<void> {
-  // Save in-app notification so the bell always shows it
-  dbSaveNotification(recipientUserId, title, body).catch(() => {});
+  // Save in-app notification so the bell always shows it. type/data кладём
+  // рядом — по ним колокольчик понимает, какой экран открыть по нажатию.
+  dbSaveNotification(recipientUserId, title, body, type, data).catch(() => {});
   // Fire-and-forget web push alongside Expo push
   sendWebPushTo(recipientUserId, title, body, { type, ...data }).catch(() => {});
   // Mirror to Telegram (bell + push + web push + Telegram — все каналы)

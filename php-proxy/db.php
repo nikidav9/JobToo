@@ -289,9 +289,16 @@ function broadcast_workers(string $title, string $body, string $tgHtml, string $
     // In-app bell (jm_notifications) — for EVERY worker, so the announcement
     // is visible in the app even without a push token or linked Telegram
     $all = sb_select('jm_users', ['role' => 'eq.worker'], 'id');
-    $rows = array_map(fn($w) => ['user_id' => $w['id'], 'title' => $title, 'body' => $body], $all);
+    // type — чтобы по нажатию в колокольчике открылся нужный раздел
+    $rows = array_map(fn($w) => ['user_id' => $w['id'], 'title' => $title, 'body' => $body, 'type' => $dataType], $all);
     if (!empty($rows)) {
-        try { sb_insert('jm_notifications', $rows); } catch (Throwable $e) {}
+        try {
+            sb_insert('jm_notifications', $rows);
+        } catch (Throwable $e) {
+            // Колонки type ещё нет — пишем как раньше
+            $plain = array_map(fn($r) => ['user_id' => $r['user_id'], 'title' => $r['title'], 'body' => $r['body']], $rows);
+            try { sb_insert('jm_notifications', $plain); } catch (Throwable $e2) {}
+        }
     }
 
     // Web push (PWA users) — sent through the dashboard's VAPID endpoint
@@ -1087,7 +1094,7 @@ try {
             if (TG_GROUP_CHAT_ID !== 0) {
                 $groupOk = tg_send_message(TG_GROUP_CHAT_ID, $groupHtml, true);
             }
-            $data = broadcast_workers('📣 Новое объявление на бирже!', $body, $tgHtml, 'nearby_shift');
+            $data = broadcast_workers('📣 Новое объявление на бирже!', $body, $tgHtml, 'new_bulletin');
             $data['group'] = $groupOk;
             break;
         }
@@ -1137,8 +1144,27 @@ try {
             break;
         }
 
-        case 'dbSaveNotification':
-            sb_insert('jm_notifications', ['user_id' => $args[0], 'title' => $args[1], 'body' => $args[2]]); break;
+        case 'dbSaveNotification': {
+            // type/payload нужны, чтобы по нажатию на уведомление открылся
+            // нужный экран. Колонок может ещё не быть — тогда сохраняем как
+            // раньше, только заголовок и текст.
+            $row = ['user_id' => $args[0], 'title' => $args[1], 'body' => $args[2]];
+            $type = $args[3] ?? null;
+            $payload = $args[4] ?? null;
+            if ($type) $row['type'] = $type;
+            if ($payload) $row['payload'] = json_encode($payload, JSON_UNESCAPED_UNICODE);
+            try {
+                sb_insert('jm_notifications', $row);
+            } catch (\Throwable $e) {
+                if (stripos($e->getMessage(), 'type') !== false || stripos($e->getMessage(), 'payload') !== false) {
+                    unset($row['type'], $row['payload']);
+                    sb_insert('jm_notifications', $row);
+                } else {
+                    throw $e;
+                }
+            }
+            break;
+        }
 
         case 'dbGetNotifications':
             $data = sb_select('jm_notifications', ['user_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;

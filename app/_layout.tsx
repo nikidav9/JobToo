@@ -13,6 +13,7 @@ import { AlertProvider } from '@/template';
 import { AppProvider, AppContext } from '@/contexts/AppContext';
 import { ToastLayer } from '@/components/ui/ToastLayer';
 import { setupAndroidChannels } from '@/services/notifications';
+import { routeForNotification } from '@/services/notificationRoute';
 import { hideWebSplash } from '@/lib/webSplash';
 import { initTelegramMiniApp, isTelegramMiniApp, getTelegramStartParam } from '@/lib/telegram';
 
@@ -108,15 +109,8 @@ function NotificationHandler() {
       const type = data?.type as string | undefined;
       const chatId = data?.chatId as string | undefined;
 
-      if (type === 'message' && chatId) {
-        router.push({ pathname: '/chat-room', params: { chatId } });
-      } else if (type === 'match_worker' || type === 'match_employer') {
-        router.push('/(tabs)/matches');
-      } else if (type === 'new_applicant') {
-        router.push('/(tabs)/matches');
-      } else if (type === 'nearby_shift' || type === 'nearby_perm') {
-        router.push('/(tabs)');
-      }
+      const target = routeForNotification(type, { chatId });
+      if (target) router.push(target as never);
     });
 
     // Handle notification that launched the app from terminated state
@@ -126,11 +120,8 @@ function NotificationHandler() {
       const type = data?.type as string | undefined;
       const chatId = data?.chatId as string | undefined;
 
-      if (type === 'message' && chatId) {
-        setTimeout(() => router.push({ pathname: '/chat-room', params: { chatId } }), 500);
-      } else if (type === 'match_worker' || type === 'match_employer' || type === 'new_applicant') {
-        setTimeout(() => router.push('/(tabs)/matches'), 500);
-      }
+      const target = routeForNotification(type, { chatId });
+      if (target) setTimeout(() => router.push(target as never), 500);
     }).catch(() => {});
 
     return () => {

@@ -1020,16 +1020,19 @@ export async function dbGetWorkerTokensByMetro(metroStation: string): Promise<{ 
 
 // ─── In-app notifications ──────────────────────────────────────────────────────
 
-export async function dbSaveNotification(userId: string, title: string, body: string): Promise<void> {
-  if (IS_NATIVE) { await proxy('dbSaveNotification', [userId, title, body]); return; }
-  await withTimeout(supabase.from('jm_notifications').insert({ user_id: userId, title, body }));
+export async function dbSaveNotification(
+  userId: string, title: string, body: string,
+  type?: string, payload?: Record<string, unknown>,
+): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbSaveNotification', [userId, title, body, type ?? null, payload ?? null]); return; }
+  await withTimeout(supabase.from('jm_notifications').insert({ user_id: userId, title, body, type, payload }));
 }
 
-export async function dbGetNotifications(userId: string): Promise<{ id: string; title: string; body: string; is_read: boolean; created_at: string }[]> {
+export async function dbGetNotifications(userId: string): Promise<{ id: string; title: string; body: string; is_read: boolean; created_at: string; type?: string | null; payload?: any }[]> {
   if (IS_NATIVE) { return proxy('dbGetNotifications', [userId]); }
   const { data, error } = await withTimeout(
     supabase.from('jm_notifications')
-      .select('id, title, body, is_read, created_at')
+      .select('id, title, body, is_read, created_at, type, payload')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(50)
