@@ -45,14 +45,30 @@ function basePath() {
 }
 
 export async function adminLogin(login: string, password: string): Promise<void> {
-  const res = await fetch(`${ADMIN_PROXY_URL}?action=login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ login, password }),
-  })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok || !data?.token) {
-    throw new Error(data?.error || 'Неверный логин или пароль')
+  let res: Response
+  try {
+    res = await fetch(`${ADMIN_PROXY_URL}?action=login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login, password }),
+    })
+  } catch {
+    throw new Error(`Сервер входа не отвечает: ${ADMIN_PROXY_URL}`)
+  }
+
+  const text = await res.text()
+  let data: any = null
+  try { data = JSON.parse(text) } catch {}
+
+  // Если вместо ответа пришла страница, значит admin.php на хостинге нет:
+  // jobtoo.ru отдаёт приложение на любой неизвестный адрес. Пароль тут ни при
+  // чём, и говорить про него — только сбивать с толку.
+  if (data === null) {
+    throw new Error(`Сервер входа не настроен: по адресу ${ADMIN_PROXY_URL} нет admin.php`)
+  }
+
+  if (!res.ok || !data.token) {
+    throw new Error(data.error || 'Неверный логин или пароль')
   }
   setToken(data.token)
 }
