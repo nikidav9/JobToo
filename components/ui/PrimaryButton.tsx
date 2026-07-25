@@ -33,7 +33,14 @@ export function PrimaryButton({ label, onPress, disabled, loading, secondary, sm
       {loading ? (
         <ActivityIndicator color={color} size="small" />
       ) : (
-        <Text style={[styles.label, { color, fontSize: fs }]}>{label}</Text>
+        <Text
+          style={[styles.label, { color, fontSize: fs }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+        >
+          {label}
+        </Text>
       )}
     </TouchableOpacity>
   );
@@ -43,6 +50,9 @@ const styles = StyleSheet.create({
   btn: {
     width: '100%',
     borderRadius: 100,
+    // Боковые поля: высота у кнопки фиксированная, и длинная подпись
+    // без них упиралась в края овала и вылезала наружу
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
@@ -52,5 +62,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontWeight: '700',
+    textAlign: 'center',
   },
 });

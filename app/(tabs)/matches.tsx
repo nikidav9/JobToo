@@ -144,14 +144,14 @@ function ConfirmBanner({ onConfirm, onCancelShift, loading }: {
                 onPress={() => setShowDialog(false)}
                 activeOpacity={0.8}
               >
-                <Text style={s.dialogCancelTxt}>Отмена</Text>
+                <Text style={s.dialogCancelTxt} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Отмена</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.dialogConfirmBtn}
                 onPress={() => { setShowDialog(false); onConfirm(); }}
                 activeOpacity={0.8}
               >
-                <Text style={s.dialogConfirmTxt}>Подтвердить</Text>
+                <Text style={s.dialogConfirmTxt} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Подтвердить</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -172,14 +172,14 @@ function ConfirmBanner({ onConfirm, onCancelShift, loading }: {
                 onPress={() => setShowCancel(false)}
                 activeOpacity={0.8}
               >
-                <Text style={s.dialogCancelTxt}>Назад</Text>
+                <Text style={s.dialogCancelTxt} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Назад</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.dialogDangerBtn}
                 onPress={() => { setShowCancel(false); onCancelShift(); }}
                 activeOpacity={0.8}
               >
-                <Text style={s.dialogConfirmTxt}>Отменить смену</Text>
+                <Text style={s.dialogConfirmTxt} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Отменить</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1161,19 +1161,24 @@ const s = StyleSheet.create({
   dialogTitle: { fontSize: 17, fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
   dialogBody: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   dialogBtns: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  // Кнопкам нужны боковые поля и центрирование по обеим осям: без них
+  // длинная подпись («Отменить смену») вылезала за пределы овала.
   dialogCancelBtn: {
     flex: 1, borderWidth: 1.5, borderColor: Colors.inputBorder,
-    borderRadius: 100, paddingVertical: 12, alignItems: 'center',
+    borderRadius: 100, paddingVertical: 12, paddingHorizontal: 10,
+    minHeight: 44, alignItems: 'center', justifyContent: 'center',
   },
-  dialogCancelTxt: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
+  dialogCancelTxt: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary, textAlign: 'center' },
   dialogConfirmBtn: {
     flex: 1, backgroundColor: Colors.green,
-    borderRadius: 100, paddingVertical: 12, alignItems: 'center',
+    borderRadius: 100, paddingVertical: 12, paddingHorizontal: 10,
+    minHeight: 44, alignItems: 'center', justifyContent: 'center',
   },
-  dialogConfirmTxt: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  dialogConfirmTxt: { fontSize: 14, fontWeight: '700', color: '#fff', textAlign: 'center' },
   dialogDangerBtn: {
     flex: 1, backgroundColor: Colors.red,
-    borderRadius: 100, paddingVertical: 12, alignItems: 'center',
+    borderRadius: 100, paddingVertical: 12, paddingHorizontal: 10,
+    minHeight: 44, alignItems: 'center', justifyContent: 'center',
   },
   empty: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
