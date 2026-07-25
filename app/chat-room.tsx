@@ -6,6 +6,7 @@ import {
   TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
@@ -434,7 +435,8 @@ export default function ChatRoom() {
               disabled={decidingLike}
               activeOpacity={0.8}
             >
-              <Text style={styles.decisionBtnRejectTxt}>✕ Не подходит</Text>
+              <Ionicons name="close" size={17} color={Colors.textSecondary} />
+              <Text style={styles.decisionBtnRejectTxt}>Не подходит</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.decisionBtn, styles.decisionBtnAccept, decidingLike && { opacity: 0.5 }]}
@@ -442,17 +444,30 @@ export default function ChatRoom() {
               disabled={decidingLike}
               activeOpacity={0.8}
             >
-              {decidingLike ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.decisionBtnAcceptTxt}>✅ Подходит</Text>}
+              {decidingLike ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark" size={17} color="#fff" />
+                  <Text style={styles.decisionBtnAcceptTxt}>Подходит</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </View>
       ) : isEmployer && !isBulletinChat && likeStatus === 'approved' ? (
         <View style={[styles.decisionBar, { backgroundColor: '#D1FAE5' }]}>
-          <Text style={[styles.decisionBarLabel, { color: Colors.green, textAlign: 'center' }]}>🎉 Мэтч создан!</Text>
+          <View style={styles.decisionStatusRow}>
+            <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
+            <Text style={[styles.decisionBarLabel, { color: Colors.green }]}>Мэтч создан</Text>
+          </View>
         </View>
       ) : isEmployer && !isBulletinChat && likeStatus === 'rejected' ? (
         <View style={[styles.decisionBar, { backgroundColor: '#FEE2E2' }]}>
-          <Text style={[styles.decisionBarLabel, { color: Colors.red, textAlign: 'center' }]}>✕ Кандидат отклонён</Text>
+          <View style={styles.decisionStatusRow}>
+            <Ionicons name="close-circle" size={16} color={Colors.red} />
+            <Text style={[styles.decisionBarLabel, { color: Colors.red }]}>Кандидат отклонён</Text>
+          </View>
         </View>
       ) : null}
 
@@ -575,18 +590,28 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
   // Decision bar (employer top bar)
   decisionBar: {
-    paddingHorizontal: 14, paddingVertical: 10,
-    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: Colors.bg,
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
-    gap: 8,
+    gap: 10,
   },
-  decisionBarLabel: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
-  decisionBtnsRow: { flexDirection: 'row', gap: 8 },
-  decisionBtn: { flex: 1, borderRadius: 100, paddingVertical: 9, alignItems: 'center', justifyContent: 'center' },
-  decisionBtnReject: { backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FECACA' },
-  decisionBtnRejectTxt: { fontSize: 13, fontWeight: '700', color: Colors.red },
+  decisionBarLabel: { fontSize: 12.5, fontWeight: '600', color: Colors.textSecondary },
+  decisionStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  decisionBtnsRow: { flexDirection: 'row', gap: 10 },
+  decisionBtn: {
+    flex: 1, flexDirection: 'row', gap: 6,
+    borderRadius: 12, paddingVertical: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  // «Не подходит» — второстепенное действие: контур, без заливки и без красного
+  decisionBtnReject: {
+    backgroundColor: Colors.bg,
+    borderWidth: 1.5, borderColor: Colors.inputBorder,
+  },
+  decisionBtnRejectTxt: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
+  // «Подходит» — главное действие
   decisionBtnAccept: { backgroundColor: Colors.primary },
-  decisionBtnAcceptTxt: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  decisionBtnAcceptTxt: { fontSize: 14, fontWeight: '700', color: '#fff' },
   // Compact back icon button
   backIconBtn: {
     width: 34, height: 34, borderRadius: 17,
