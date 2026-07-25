@@ -936,10 +936,11 @@ function SectionCard({ iconName, iconBg, title, onEdit, rows, chips, placeholder
         r.label ? (
           <View key={i} style={sS.row}>
             <Text style={sS.label}>{r.label}</Text>
+            {/* Без стрелки: строка не кликабельна, редактирование —
+                через «Изменить» в шапке карточки */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {r.lineColor ? <View style={[sS.dot, { backgroundColor: r.lineColor }]} /> : null}
               <Text style={sS.value}>{r.value}</Text>
-              <Text style={sS.rowArrow}>›</Text>
             </View>
           </View>
         ) : (
@@ -965,7 +966,6 @@ const sS = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.divider },
   label: { fontSize: 13, color: Colors.textMuted },
   value: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
-  rowArrow: { fontSize: 16, color: Colors.textMuted, marginLeft: 2 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   chip: { backgroundColor: Colors.primaryLight, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 6 },

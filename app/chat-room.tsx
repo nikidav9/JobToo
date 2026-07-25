@@ -138,7 +138,7 @@ export default function ChatRoom() {
   // Низ строки ввода задаём сами: SafeAreaView отдаёт нижний край нам,
   // а минимум в 10 px держит поле на отступе от края даже там, где
   // системной панели нет
-  const barPadBottom = Math.max(insets.bottom, 10);
+  const barPadBottom = Math.max(insets.bottom, 16);
   // Track whether this chat screen is currently visible — used to suppress
   // push notifications when the user is already reading the conversation.
   const isFocused = useIsFocused();
