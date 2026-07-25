@@ -43,3 +43,6 @@ app-example
 .vercel
 .expo/
 supabase/.temp/
+
+# Локальная веб-сборка для снимков экранов (scripts/shoot-screens.mjs)
+.figma-export/
