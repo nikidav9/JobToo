@@ -250,6 +250,14 @@ function WorkerMatches() {
           <Chip label={`${vac.timeStart}–${vac.timeEnd}`} variant="time" icon="time-outline" />
         </View>
 
+        {/* Адрес — то, ради чего иначе приходится открывать карточку смены */}
+        {vac.address ? (
+          <View style={s.addressRow}>
+            <Ionicons name="location-outline" size={14} color="#92400E" style={{ marginTop: 1 }} />
+            <Text style={s.addressTxt}>{vac.address}</Text>
+          </View>
+        ) : null}
+
         {employer ? (
           <TouchableOpacity
             style={s.profileRow}
@@ -1046,6 +1054,11 @@ const s = StyleSheet.create({
   metroRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  addressRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6,
+    backgroundColor: '#FFFBEB', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8,
+  },
+  addressTxt: { flex: 1, fontSize: 12.5, color: '#92400E', lineHeight: 17 },
   profileRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: Colors.surface, borderRadius: 12, padding: 10,

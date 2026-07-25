@@ -32,9 +32,6 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
         {/* Затемнение над шторкой тоже закрывает: не единственный способ выйти */}
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
         <View style={[styles.sheet, { paddingBottom: insets.bottom }]}>
-          {/* Handle */}
-          <View style={styles.handle} />
-
           {/* Close */}
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Ionicons name="close" size={20} color={Colors.textPrimary} />
@@ -128,13 +125,11 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     maxHeight: '90%',
-    paddingTop: 12,
+    // Полоску-хват убрали, но её место оставляем: иначе строка компании
+    // подъезжает под крестик, и «Срочно» с ним сталкивается.
+    paddingTop: 25,
   },
-  // Ручка и крестик были почти в цвет шторки — закрыть окно было нечем.
-  handle: {
-    width: 44, height: 5, backgroundColor: '#C7CBD1',
-    borderRadius: 3, alignSelf: 'center', marginBottom: 8,
-  },
+  // Крестик был почти в цвет шторки — закрыть окно было нечем.
   closeBtn: {
     position: 'absolute', top: 16, right: 16, zIndex: 10,
     width: 34, height: 34, borderRadius: 17,
