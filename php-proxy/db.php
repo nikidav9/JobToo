@@ -169,6 +169,55 @@ function sb_rpc(string $fn, array $params = []): mixed {
     return json_decode($resp ?: 'null', true);
 }
 
+// ─── Мгновенные сообщения ─────────────────────────────────────────────────────
+// Раньше телефон слушал саму таблицу сообщений. Как только доступ к таблицам
+// закрыли, такая подписка замолкает — она подчиняется тем же правилам.
+//
+// Поэтому сигналим иначе: сервер шлёт короткое «в этом чате что-то новое»
+// через канал трансляций, а телефон в ответ забирает сообщения обычным путём,
+// через прокси. Канал таблиц не касается, правила ему не помеха.
+//
+// В сигнале намеренно нет текста: каналы трансляции публичные, и всё, что
+// туда попадёт, сможет прочитать любой, кто угадает имя канала. Пусть знает
+// только то, что где-то шевельнулось.
+
+function rt_broadcast(string $topic, string $event, array $payload = []): void {
+    $body = json_encode([
+        'messages' => [['topic' => $topic, 'event' => $event, 'payload' => $payload]],
+    ], JSON_UNESCAPED_UNICODE);
+
+    $ch = curl_init(SB_URL . '/realtime/v1/api/broadcast');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $body,
+        // Коротко: сообщение уже записано, и если сигнал не уйдёт, телефон
+        // всё равно подхватит его следующим опросом.
+        CURLOPT_TIMEOUT => 4,
+        CURLOPT_HTTPHEADER => [
+            'apikey: ' . SB_KEY,
+            'Authorization: Bearer ' . SB_KEY,
+            'Content-Type: application/json',
+        ],
+    ]);
+    curl_exec($ch);
+    curl_close($ch);
+}
+
+// Единственное место, где сообщения попадают в базу: и обычные, и системные.
+// Сигнал уходит отсюда, чтобы его нельзя было забыть добавить.
+function msg_insert(array $row): array {
+    sb_insert('jm_messages', $row);
+    try {
+        if (!empty($row['chat_id'])) {
+            rt_broadcast('chat:' . $row['chat_id'], 'refresh');
+        }
+    } catch (\Throwable $e) {
+        // Отправка сообщения не должна падать из-за сигнала.
+    }
+    return $row;
+}
+
 // ─── Адреса и координаты ──────────────────────────────────────────────────────
 // Ищем через OpenStreetMap/Nominatim: бесплатно, без ключа и работает с
 // сервера — в отличие от Яндекса, у которого наш ключ умеет только рисовать
@@ -996,7 +1045,7 @@ try {
 
         case 'dbInsertMessage': {
             $msg = ['id' => uid(), 'chat_id' => $args[0], 'sender_id' => $args[1], 'text' => $args[2], 'created_at' => now_iso()];
-            sb_insert('jm_messages', $msg);
+            msg_insert($msg);
             $data = $msg; break;
         }
 
@@ -1029,7 +1078,7 @@ try {
             sb_insert('jm_chats', ['id' => $cid, 'vacancy_id' => $vid, 'worker_id' => $wid,
                 'employer_id' => $eid, 'vac_title' => $vt, 'company_name' => $cn,
                 'unread_worker' => $uw, 'unread_employer' => $ue, 'created_at' => now_iso()]);
-            if ($sm) sb_insert('jm_messages', ['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system', 'text' => $sm, 'created_at' => now_iso()]);
+            if ($sm) msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system', 'text' => $sm, 'created_at' => now_iso()]);
             $data = $cid; break;
         }
 
@@ -1097,9 +1146,9 @@ try {
                     'created_at' => now_iso(),
                 ]);
             }
-            sb_insert('jm_messages', ['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
+            msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
                 'text' => '🎉 У вас мэтч! Вы подошли друг другу. Познакомьтесь и обсудите детали!', 'created_at' => now_iso()]);
-            sb_insert('jm_messages', ['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system_safety',
+            msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system_safety',
                 'text' => "🔒 Рекомендуем не переводить общение в сторонние мессенджеры или почту, а продолжить его в чате JobToo: так у мошенников будет меньше шансов вас обмануть.\n\nГде бы вы ни общались — не сообщайте свой CVV-код, код из SMS и не вводите данные карты по ссылке.",
                 'created_at' => now_iso()]);
             if ($vac) {
@@ -1184,6 +1233,8 @@ try {
                 'vacancy_id' => $vid, 'like_id' => $lid, 'rating' => $rat,
                 'role' => $rol, 'review_text' => $p['reviewText'] ?? null, 'created_at' => now_iso(),
             ]);
+            // Сигнал тому, кого оценили: у него открыт профиль — обновится сам.
+            try { rt_broadcast('ratings:' . $tuid, 'refresh'); } catch (\Throwable $e) {}
             $rf = $rol === 'worker' ? 'worker_rated' : 'employer_rated';
             sb_update('jm_likes', ['id' => 'eq.' . $lid], [$rf => true]);
             $all = sb_select('jm_ratings', ['to_user_id' => 'eq.' . $tuid], 'rating');
@@ -1444,7 +1495,7 @@ try {
                 'company_name' => $bul['company'], 'unread_worker' => 0, 'unread_employer' => 1,
                 'bulletin_id' => $bid, 'is_locked' => false, 'created_at' => now_iso(),
             ]);
-            sb_insert('jm_messages', [
+            msg_insert([
                 'id' => uid(), 'chat_id' => $cid, 'sender_id' => $wid,
                 'text' => $greeting, 'created_at' => now_iso(),
             ]);
@@ -1461,7 +1512,7 @@ try {
             $chats = sb_select('jm_chats', ['bulletin_id' => 'eq.' . $bid], 'id');
             foreach ($chats as $chat) {
                 sb_update('jm_chats', ['id' => 'eq.' . $chat['id']], ['is_locked' => true]);
-                sb_insert('jm_messages', [
+                msg_insert([
                     'id' => uid(), 'chat_id' => $chat['id'], 'sender_id' => 'system',
                     'text' => $closeMsg, 'created_at' => now_iso(),
                 ]);
@@ -1553,7 +1604,7 @@ try {
                 'is_locked' => false,
                 'created_at' => now_iso(),
             ]);
-            sb_insert('jm_messages', [
+            msg_insert([
                 'id' => uid(), 'chat_id' => $cid, 'sender_id' => $empId,
                 'text' => $greeting, 'created_at' => now_iso(),
             ]);

@@ -93,8 +93,10 @@ function RatingsModal({ userId, users, onClose }: { userId: string; users: any[]
     try {
       const sb = getSupabaseClient();
       channel = sb
-        .channel(`ratings_modal:${userId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jm_ratings', filter: `to_user_id=eq.${userId}` }, fetchRatings)
+        // Сигнал от сервера вместо подписки на таблицу: к таблицам доступ
+        // закрыт, а канал трансляции их не касается.
+        .channel(`ratings:${userId}`)
+        .on('broadcast', { event: 'refresh' }, fetchRatings)
         .subscribe();
     } catch (e) {
       console.warn('[RatingsModal] realtime subscription failed:', e);

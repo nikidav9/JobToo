@@ -198,6 +198,9 @@ export default function ChatRoom() {
   const [likeStatus, setLikeStatus] = useState<'pending' | 'approved' | 'rejected' | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
   const lastCountRef = useRef(cached.length);
+  // Перечитать чат по сигналу от сервера. Хранится ссылкой, чтобы подписка
+  // не пересоздавалась на каждый перерисованный кадр.
+  const pollRef = useRef<() => void>(() => {});
 
   // If chat is not in context (freshly created, or navigated from push notification),
   // fetch it directly from DB so the chat room is fully functional immediately.
@@ -336,56 +339,33 @@ export default function ChatRoom() {
       }
     };
 
+    // Опрос — подстраховка на случай, если сигнал не дошёл. Обычно новое
+    // сообщение приходит раньше, по сигналу от сервера (см. ниже).
+    pollRef.current = poll;
     poll();
     const interval = setInterval(poll, POLL_INTERVAL);
     return () => clearInterval(interval);
   }, [chat?.id]);
 
-  // Real-time subscription for new messages in this chat
+  // Сигнал о новом сообщении.
+  //
+  // Раньше здесь было две подписки — на таблицу сообщений и на таблицу
+  // откликов. Обе читали базу напрямую и после закрытия доступа замолчали бы.
+  // Теперь сервер, записав сообщение, шлёт в канал чата короткое «обнови»
+  // без текста, а мы в ответ разом перечитываем и сообщения, и статус
+  // отклика — тем же запросом, что и при обычном опросе.
+  //
+  // Решения «подходит / не подходит» тоже пишут в чат системное сообщение,
+  // поэтому статус отклика обновляется сразу же, отдельная подписка не нужна.
   useEffect(() => {
     if (!chatId || !currentUser) return;
-    const userId = currentUser.id;
-    const role = currentUser.role;
     const sb = getSupabaseClient();
     const channel = sb
-      .channel(`messages:${chatId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jm_messages', filter: `chat_id=eq.${chatId}` }, (payload: any) => {
-        const r = payload.new;
-        const msg: Message = { id: r.id, senderId: r.sender_id, text: r.text, timestamp: r.created_at };
-        setMessages(prev => {
-          if (prev.some(m => m.id === msg.id)) return prev;
-          const next = [...prev, msg];
-          msgCache.set(chatId, next);
-          lastCountRef.current = next.length;
-          return next;
-        });
-        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-        if (r.sender_id !== userId) {
-          dbMarkRead(chatId, role).catch(() => {});
-          refreshChats().catch(() => {});
-        }
-      })
+      .channel(`chat:${chatId}`)
+      .on('broadcast', { event: 'refresh' }, () => { pollRef.current(); })
       .subscribe();
     return () => { channel.unsubscribe(); };
   }, [chatId, currentUser?.id]);
-
-  // Real-time subscription for like status changes (match / reject) — not applicable for bulletin/slot chats
-  useEffect(() => {
-    if (!chat || chat.bulletinId || chat.workerSlotId) return;
-    const { vacancyId, workerId } = chat;
-    const sb = getSupabaseClient();
-    const channel = sb
-      .channel(`like:${vacancyId}:${workerId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'jm_likes', filter: `vacancy_id=eq.${vacancyId}` }, (payload: any) => {
-        const r = payload.new;
-        if (r.worker_id !== workerId) return;
-        if (r.is_match || r.employer_liked === true) setLikeStatus('approved');
-        else if (r.employer_liked === false) setLikeStatus('rejected');
-        else setLikeStatus('pending');
-      })
-      .subscribe();
-    return () => { channel.unsubscribe(); };
-  }, [chat?.id]);
 
   // Scroll to bottom when messages load
   useEffect(() => {

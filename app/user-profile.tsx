@@ -103,7 +103,9 @@ export default function UserProfileScreen() {
       const sb = getSupabaseClient();
       channel = sb
         .channel(`ratings:${userId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jm_ratings', filter: `to_user_id=eq.${userId}` }, () => {
+        // Сигнал от сервера вместо подписки на таблицу: к таблицам доступ
+        // закрыт, а канал трансляции их не касается.
+        .on('broadcast', { event: 'refresh' }, () => {
           fetchRatings(userId);
         })
         .subscribe();
