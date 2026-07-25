@@ -241,12 +241,6 @@ export default function PermVacancyDetailScreen() {
           </View>
         ) : null}
 
-        {/* Permanent badge */}
-        <View style={[styles.permBadge, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-          <Ionicons name="briefcase-outline" size={12} color="#7C3AED" />
-          <Text style={styles.permBadgeTxt}>Постоянная работа</Text>
-        </View>
-
         {/* Title + company */}
         <Text style={styles.jobTitle}>{vacancy.title}</Text>
         <Text style={styles.companyName}>{employerDisplayName}</Text>
@@ -465,13 +459,6 @@ const styles = StyleSheet.create({
 
   statusBadge: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, alignSelf: 'flex-start' },
   statusTxt: { fontSize: 13, fontWeight: '700' },
-
-  permBadge: {
-    backgroundColor: '#EDE9FE', borderRadius: 100,
-    paddingHorizontal: 12, paddingVertical: 5,
-    alignSelf: 'flex-start',
-  },
-  permBadgeTxt: { fontSize: 12, fontWeight: '700', color: '#7C3AED' },
 
   jobTitle: { fontSize: 26, fontWeight: '800', color: Colors.textPrimary, lineHeight: 32 },
   companyName: { fontSize: 14, color: Colors.textMuted, marginTop: -8 },

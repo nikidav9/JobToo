@@ -30,6 +30,8 @@ import {
   dbRecordPermVacancyView,
   dbGetVacancyViewers,
   dbGetPermVacancyViewers,
+  dbAddPermSaved,
+  dbRemovePermSaved,
 } from '@/services/db';
 import { notifyEmployerNewApplicant, notifyEmployerGotMatch, notifyWorkerGotMatch } from '@/services/notifications';
 import { Image } from 'expo-image';
@@ -1318,7 +1320,7 @@ function WorkerFeed() {
 // ─────────────────────────────────────────────────
 // Worker Permanent mode
 // ─────────────────────────────────────────────────
-type PermTab = 'open' | 'applied' | 'rejected';
+type PermTab = 'open' | 'applied' | 'saved';
 
 const SALARY_CHIPS = [
   { label: 'Любая', value: 0 },
@@ -1335,6 +1337,7 @@ function WorkerPermMode() {
     refreshPermVacancies, refreshPermApplications,
     chats, refreshChats,
     showToast, permVacancyViewsMap, refreshPermVacancyViews,
+    permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved,
   } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
 
@@ -1411,14 +1414,16 @@ function WorkerPermMode() {
     return true;
   };
 
-  const openVacancies     = permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id) && matchesSearch(v) && matchesFilters(v));
-  const appliedVacancies  = permVacancies.filter(v => myAppVacIds.has(v.id) && getAppStatus(v.id) !== 'rejected' && matchesSearch(v) && matchesFilters(v));
-  const rejectedVacancies = permVacancies.filter(v => myAppVacIds.has(v.id) && getAppStatus(v.id) === 'rejected' && matchesSearch(v) && matchesFilters(v));
+  const openVacancies    = permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id) && matchesSearch(v) && matchesFilters(v));
+  // Отказ больше не прячется в отдельную вкладку: отклик остаётся здесь,
+  // просто с красной плашкой «✕ Отказ» — иначе вакансия исчезала без объяснений
+  const appliedVacancies = permVacancies.filter(v => myAppVacIds.has(v.id) && matchesSearch(v) && matchesFilters(v));
+  const savedVacancies   = permVacancies.filter(v => permSavedIds.includes(v.id) && matchesSearch(v) && matchesFilters(v));
 
   const shownVacancies =
     tab === 'open'     ? openVacancies :
     tab === 'applied'  ? appliedVacancies :
-    rejectedVacancies;
+    savedVacancies;
 
   const applyTo = (v: PermVacancy) : void => {
     if (!currentUser) return;
@@ -1468,10 +1473,23 @@ function WorkerPermMode() {
     : null;
 
   const TAB_CONFIG: { key: PermTab; label: string; count: number }[] = [
-    { key: 'open',     label: 'Открытые',     count: openVacancies.length },
-    { key: 'applied',  label: 'Откликнулись', count: appliedVacancies.length },
-    { key: 'rejected', label: 'Отказы',       count: rejectedVacancies.length },
+    { key: 'open',    label: 'Открытые',     count: openVacancies.length },
+    { key: 'applied', label: 'Откликнулись', count: appliedVacancies.length },
+    { key: 'saved',   label: 'Избранное',    count: savedVacancies.length },
   ];
+
+  const toggleSaved = (v: PermVacancy) => {
+    if (!currentUser) return;
+    if (permSavedIds.includes(v.id)) {
+      optimisticRemovePermSaved(v.id);
+      dbRemovePermSaved(currentUser.id, v.id).catch(() => {});
+      showToast('Удалено из избранного', 'success');
+    } else {
+      optimisticAddPermSaved(v.id);
+      dbAddPermSaved(currentUser.id, v.id).catch(() => {});
+      showToast('Сохранено ❤️', 'success');
+    }
+  };
 
   const shareVacancy = async (v: PermVacancy) => {
     const url = `https://jobtoo.ru/perm-vacancy-detail?vacancyId=${v.id}`;
@@ -1487,6 +1505,7 @@ function WorkerPermMode() {
   const renderPerm = ({ item: v }: { item: PermVacancy }) => {
     const isApplied = myAppVacIds.has(v.id);
     const isApplying = applying === v.id;
+    const isSaved = permSavedIds.includes(v.id);
     const appStatus = getAppStatus(v.id);
     const statusInfo = appStatus ? STATUS_MAP[appStatus] : null;
     const metroLine = v.metroStation
@@ -1574,49 +1593,47 @@ function WorkerPermMode() {
         </View>
 
         {/* Actions */}
-        {tab !== 'rejected' ? (
-          <View style={pS.actionRow}>
-            <TouchableOpacity
-              style={[pS.applyBtn, isApplied && pS.applyBtnDone, isApplying && { opacity: 0.6 }]}
-              onPress={(e) => { e.stopPropagation?.(); applyTo(v); }}
-              disabled={isApplied || isApplying}
-              activeOpacity={0.8}
-            >
-              <Text style={[pS.applyBtnTxt, isApplied && { color: Colors.green }]}>
-                {isApplied ? '✓ Отклик отправлен' : 'Откликнуться'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[pS.actionIconBtn, chatLoading === v.id && { opacity: 0.5 }]}
-              onPress={(e) => { e.stopPropagation?.(); openPermChat(v, displayCompany); }}
-              disabled={chatLoading === v.id}
-              activeOpacity={0.8}
-            >
-              {chatLoading === v.id
-                ? <ActivityIndicator size={14} color={Colors.textSecondary} />
-                : <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
-              }
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={pS.actionIconBtn}
-              onPress={(e) => { e.stopPropagation?.(); shareVacancy(v); }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="share-outline" size={17} color={Colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={pS.actionIconBtn}
-              onPress={() => router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId: v.id } })}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="information-circle-outline" size={17} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={pS.rejectedInfo}>
-            <Text style={pS.rejectedInfoTxt}>Работодатель отказал по этой вакансии</Text>
-          </View>
-        )}
+        <View style={pS.actionRow}>
+          <TouchableOpacity
+            style={[pS.applyBtn, isApplied && pS.applyBtnDone, isApplying && { opacity: 0.6 }]}
+            onPress={(e) => { e.stopPropagation?.(); applyTo(v); }}
+            disabled={isApplied || isApplying}
+            activeOpacity={0.8}
+          >
+            <Text style={[pS.applyBtnTxt, isApplied && { color: Colors.green }]}>
+              {isApplied ? '✓ Отклик отправлен' : 'Откликнуться'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[pS.actionIconBtn, chatLoading === v.id && { opacity: 0.5 }]}
+            onPress={(e) => { e.stopPropagation?.(); openPermChat(v, displayCompany); }}
+            disabled={chatLoading === v.id}
+            activeOpacity={0.8}
+          >
+            {chatLoading === v.id
+              ? <ActivityIndicator size={14} color={Colors.textSecondary} />
+              : <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
+            }
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={pS.actionIconBtn}
+            onPress={(e) => { e.stopPropagation?.(); shareVacancy(v); }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="share-outline" size={17} color={Colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[pS.actionIconBtn, isSaved && pS.actionIconBtnSaved]}
+            onPress={(e) => { e.stopPropagation?.(); toggleSaved(v); }}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={isSaved ? 'heart' : 'heart-outline'}
+              size={17}
+              color={isSaved ? Colors.red : Colors.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -1624,7 +1641,7 @@ function WorkerPermMode() {
   const emptyMessages: Record<PermTab, { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; sub: string }> = {
     open:     { icon: 'search-outline', title: 'Нет открытых вакансий', sub: 'Попробуйте изменить фильтры' },
     applied:  { icon: 'paper-plane-outline', title: 'Нет откликов', sub: 'Откликайтесь на вакансии во вкладке «Открытые»' },
-    rejected: { icon: 'close-circle-outline', title: 'Отказов нет', sub: 'Это хорошо! Продолжайте откликаться' },
+    saved:    { icon: 'heart-outline', title: 'Пока пусто', sub: 'Нажмите ♥ на вакансии — она сохранится здесь' },
   };
 
   return (
@@ -1695,9 +1712,9 @@ function WorkerPermMode() {
               onPress={() => setTab(t.key)}
               activeOpacity={0.8}
             >
-              {t.key === 'rejected' ? (
+              {t.key === 'saved' ? (
                 <Ionicons
-                  name="close-circle-outline"
+                  name="heart"
                   size={13}
                   color={isActive ? Colors.primary : Colors.textMuted}
                 />
@@ -2271,17 +2288,12 @@ const pS = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.bg,
   },
+  actionIconBtnSaved: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
 
   // views row
   viewsRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
   viewsTxt: { fontSize: 12, color: Colors.textMuted },
 
-  // rejected info
-  rejectedInfo: {
-    backgroundColor: '#FEE2E2', borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 10,
-  },
-  rejectedInfoTxt: { fontSize: 13, color: Colors.red, fontWeight: '500', textAlign: 'center' },
 
   // Employer-side perm card styles (used in EmployerHome)
   permVacCard: { borderLeftWidth: 3, borderLeftColor: '#7C3AED' },
