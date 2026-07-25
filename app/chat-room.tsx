@@ -20,8 +20,9 @@ import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { Message, Chat } from '@/constants/types';
 import { nameColorFromString, getInitials, formatDate, uid, nowISO } from '@/services/storage';
-import { dbGetMessages, dbInsertMessage, dbMarkRead, dbIncrementUnread, dbGetLikeByVacancyWorker, dbUpsertLike, dbCheckAndCreateMatch, dbGetLikes, dbGetChatById, dbGetUserById } from '@/services/db';
-import { notifyWorkerGotMatch, notifyWorkerNewMessage, notifyEmployerNewMessage } from '@/services/notifications';
+import { dbGetMessages, dbInsertMessage, dbMarkRead, dbIncrementUnread, dbGetLikeByVacancyWorker, dbUpsertLike, dbCheckAndCreateMatch, dbGetLikes, dbGetChatById, dbGetUserById, dbSetPermApplicationStatus } from '@/services/db';
+import { notifyWorkerGotMatch, notifyWorkerNewMessage, notifyEmployerNewMessage,
+  notifyWorkerPermApplicationApproved, notifyWorkerPermApplicationRejected } from '@/services/notifications';
 import { useIsFocused } from '@react-navigation/native';
 import { getSupabaseClient } from '@/template';
 import { getChatSuggestions } from '@/constants/chatSuggestions';
@@ -142,7 +143,10 @@ const msgCache = new Map<string, Message[]>();
 export default function ChatRoom() {
   const router = useRouter();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
-  const { currentUser, users, chats, vacancies, refreshChats, refreshLikes, likes, optimisticUpdateLike, showToast } = useApp();
+  const {
+    currentUser, users, chats, vacancies, refreshChats, refreshLikes, likes,
+    optimisticUpdateLike, showToast, permVacancies, permApplications, refreshPermApplications,
+  } = useApp();
 
   // Track whether this chat screen is currently visible — used to suppress
   // push notifications when the user is already reading the conversation.
@@ -254,10 +258,25 @@ export default function ChatRoom() {
   const presence = useMemo(() => lastSeenLabel(other?.lastSeenAt), [other?.lastSeenAt, presenceTick]);
   const otherAvatarUrl = other?.avatarUrl;
 
+  // Чат по постоянной вакансии живёт на другой механике: там не лайки,
+  // а отклик в jm_perm_applications. Решение «подходит/не подходит» должно
+  // менять именно его — через лайки оно молча падало, и кнопка ничего не делала.
+  const permVacancy = (permVacancies ?? []).find((v: any) => v.id === chat?.vacancyId) ?? null;
+  const permApp = permVacancy
+    ? (permApplications ?? []).find((a: any) => a.vacancyId === chat?.vacancyId && a.workerId === chat?.workerId) ?? null
+    : null;
+
   // Fetch like status (for employer decision bar — not applicable for bulletin/slot chats)
   useEffect(() => {
     if (!chat || !currentUser) return;
     if (chat.bulletinId || chat.workerSlotId) { setLikeStatus(null); return; }
+    // Постоянная вакансия — статус берём из отклика, а не из лайков
+    if (permVacancy) {
+      setLikeStatus(permApp
+        ? (permApp.status === 'approved' ? 'approved' : permApp.status === 'rejected' ? 'rejected' : 'pending')
+        : null);
+      return;
+    }
     dbGetLikes().then(allLikes => {
       const like = allLikes.find(l => l.vacancyId === chat.vacancyId && l.workerId === chat.workerId);
       if (!like) { setLikeStatus('pending'); return; }
@@ -265,7 +284,7 @@ export default function ChatRoom() {
       else if (like.employerLiked === false) setLikeStatus('rejected');
       else setLikeStatus('pending');
     }).catch(() => {});
-  }, [chat?.id, currentUser?.id]);
+  }, [chat?.id, currentUser?.id, permVacancy?.id, permApp?.status]);
 
   // Mark as read on mount
   useEffect(() => {
@@ -385,6 +404,21 @@ export default function ChatRoom() {
     try {
       const workerId = chat.workerId;
       const vacId = chat.vacancyId;
+
+      if (permVacancy) {
+        if (!permApp) { showToast('Отклик не найден', 'error'); return; }
+        await dbSetPermApplicationStatus(permApp.id, 'approved');
+        setLikeStatus('approved');
+        const okMsg: Message = { id: uid(), senderId: 'system',
+          text: '✅ Кандидат одобрен на вакансию. Обсудите детали выхода.', timestamp: nowISO() };
+        appendMessages([okMsg]);
+        dbInsertMessage(chat.id, 'system', okMsg.text).catch(() => {});
+        notifyWorkerPermApplicationApproved(workerId, permVacancy.company, permVacancy.title).catch(() => {});
+        refreshPermApplications?.().catch(() => {});
+        refreshChats().catch(() => {});
+        return;
+      }
+
       await dbUpsertLike(vacId, workerId, currentUser.id, { employerLiked: true });
       const result = await dbCheckAndCreateMatch(vacId, workerId);
       setLikeStatus('approved');
@@ -400,6 +434,7 @@ export default function ChatRoom() {
       refreshChats().catch(() => {});
     } catch (e) {
       console.error('[ChatRoom] handleApprove error', e);
+      showToast('Не удалось сохранить решение. Попробуйте ещё раз', 'error');
     } finally {
       setDecidingLike(false);
     }
@@ -417,12 +452,27 @@ export default function ChatRoom() {
       const optimisticMsg: Message = { id: uid(), senderId: 'system', text: rejectMsg, timestamp: nowISO() };
       setLikeStatus('rejected');
       appendMessages([optimisticMsg]);
+
+      if (permVacancy) {
+        if (permApp) {
+          await dbSetPermApplicationStatus(permApp.id, 'rejected');
+          notifyWorkerPermApplicationRejected(workerId, permVacancy.company, permVacancy.title).catch(() => {});
+          refreshPermApplications?.().catch(() => {});
+        }
+        dbInsertMessage(chat.id, 'system', rejectMsg).catch(() => {});
+        dbIncrementUnread(chat.id, 'worker').catch(() => {});
+        refreshChats().catch(() => {});
+        return;
+      }
+
       await dbUpsertLike(vacId, workerId, currentUser.id, { employerLiked: false });
       dbInsertMessage(chat.id, 'system', rejectMsg).catch(() => {});
       dbIncrementUnread(chat.id, 'worker').catch(() => {});
       refreshChats().catch(() => {});
     } catch (e) {
       console.error('[ChatRoom] handleRejectConfirmed error', e);
+      showToast('Не удалось сохранить решение. Попробуйте ещё раз', 'error');
+      setLikeStatus('pending');
     } finally {
       setDecidingLike(false);
     }
