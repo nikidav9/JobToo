@@ -169,6 +169,122 @@ function sb_rpc(string $fn, array $params = []): mixed {
     return json_decode($resp ?: 'null', true);
 }
 
+// ─── Адреса и координаты ──────────────────────────────────────────────────────
+// Ищем через OpenStreetMap/Nominatim: бесплатно, без ключа и работает с
+// сервера — в отличие от Яндекса, у которого наш ключ умеет только рисовать
+// карту.
+
+function nominatim_search(string $q, int $timeout = 8): array {
+    $url = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
+        'q' => $q,
+        'format' => 'jsonv2',
+        'addressdetails' => 1,
+        'limit' => 7,
+        'accept-language' => 'ru',
+        'countrycodes' => 'ru',
+        // приоритет Москве и области, но не жёстко (bounded=0)
+        'viewbox' => '36.80,56.02,37.97,55.14',
+        'bounded' => 0,
+    ]);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_SSL_VERIFYPEER => true,
+        // Nominatim требует идентифицирующий User-Agent
+        CURLOPT_HTTPHEADER => ['User-Agent: JobToo/1.0 (+https://jobtoo.ru)', 'Accept: application/json'],
+    ]);
+    $resp = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $dec = json_decode($resp ?: 'null', true);
+    if ($code !== 200 || !is_array($dec)) return [];
+
+    $out = [];
+    foreach ($dec as $r) {
+        $name = $r['display_name'] ?? '';
+        if ($name === '') continue;
+        // Убираем хвост «, Россия» и почтовый индекс — короче и чище
+        $name = preg_replace('/,\s*Россия$/u', '', $name);
+        $name = preg_replace('/,\s*\d{6}(?=,|$)/u', '', $name);
+        $out[] = [
+            'name' => $name,
+            'lat' => isset($r['lat']) ? (float)$r['lat'] : null,
+            'lng' => isset($r['lon']) ? (float)$r['lon'] : null,
+        ];
+    }
+    return $out;
+}
+
+// Работодатели пишут адрес как придётся. Готовим несколько написаний одного
+// и того же адреса — от самого точного к самому общему.
+function address_variants(string $address): array {
+    $v = [];
+    $s = trim($address);
+    if ($s === '') return $v;
+    $v[] = $s;
+
+    // «Ул.», «Ул,», «улица» в начале Nominatim только сбивают
+    $t = preg_replace('/^\s*(ул[.,]?|улица)\s+/ui', '', $s);
+
+    // Улицы называют в родительном падеже: не «Скульптура Мухиной», а
+    // «Скульптора». Работодатели регулярно пишут именительный.
+    $t = preg_replace('/\bСкульптура\b/ui', 'Скульптора', $t);
+    $t = preg_replace('/\bАрхитектура\b/ui', 'Архитектора', $t);
+
+    // «2й проезд» → «2-й проезд»
+    $t = preg_replace('/\b(\d+)(й|я|е|го)\b/u', '$1-$2', $t);
+    if ($t !== $s) $v[] = $t;
+
+    // Без корпуса и строения: «Мневники 7к2» → «Мневники 7»
+    $u = preg_replace('/\s*(\d+)\s*[кс]\s*\d+[а-я]?\s*$/ui', ' $1', $t);
+    if ($u !== $t) $v[] = trim($u);
+
+    // Совсем без номера дома — хотя бы попасть на нужную улицу
+    $w = preg_replace('/[\s,]+\d.*$/u', '', $u);
+    if (mb_strlen(trim($w)) > 4 && trim($w) !== trim($u)) $v[] = trim($w);
+
+    return array_values(array_unique($v));
+}
+
+// Координаты по адресу. Возвращает [lat, lng] или null.
+// Города за пределами Москвы (Красногорск, Химки и прочие) не трогаем: если
+// дописать им «, Москва», геокодер уводит метку в другой конец области.
+function geocode_address(string $address, int $timeout = 6): ?array {
+    $outsideMoscow = (bool)preg_match(
+        '/\b(красногорск|химки|люберцы|балашиха|мытищи|реутов|котельники|видное|одинцово|подольск|домодедово|щербинка|долгопрудный|лобня|дзержинский)\b/ui',
+        $address
+    );
+
+    foreach (address_variants($address) as $q) {
+        $full = $outsideMoscow ? $q . ', Московская область' : $q . ', Москва';
+        foreach (nominatim_search($full, $timeout) as $hit) {
+            if ($hit['lat'] !== null && $hit['lng'] !== null) {
+                return [$hit['lat'], $hit['lng']];
+            }
+        }
+    }
+    return null;
+}
+
+// Дописываем координаты в строку вакансии перед сохранением. Без этого метка
+// на карте не появляется вовсе: раньше телефон геокодировал адреса сам при
+// каждом открытии карты, и пока все тридцать запросов не пройдут, на карте
+// висела одна-единственная вакансия.
+function fill_coords(array $row): array {
+    $hasCoords = isset($row['lat']) && $row['lat'] !== null
+              && isset($row['lng']) && $row['lng'] !== null;
+    $address = trim((string)($row['address'] ?? ''));
+    if ($hasCoords || $address === '') return $row;
+
+    // Сохранение вакансии не должно падать из-за геокодера: не нашлось —
+    // значит не нашлось, метка встанет у метро.
+    try {
+        $c = geocode_address($address);
+        if ($c) { $row['lat'] = $c[0]; $row['lng'] = $c[1]; }
+    } catch (\Throwable $e) {}
+
+    return $row;
+}
+
 // ─── Telegram Mini App ────────────────────────────────────────────────────────
 
 define('TG_BOT_TOKEN', getenv('TG_BOT_TOKEN') ?: '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug');
@@ -740,14 +856,27 @@ try {
             $data = sb_select('jm_vacancies', [], '*', 'created_at.desc'); break;
 
         case 'dbUpsertVacancy':
-            sb_upsert('jm_vacancies', $args[0], 'id'); break;
+            sb_upsert('jm_vacancies', fill_coords($args[0]), 'id'); break;
 
-        case 'dbUpsertVacancyBatch':
-            // $args[0] — массив строк вакансий, пишется одним запросом
-            sb_upsert('jm_vacancies', $args[0], 'id'); break;
+        case 'dbUpsertVacancyBatch': {
+            // $args[0] — массив строк вакансий, пишется одним запросом.
+            // Один адрес на всю пачку смен, поэтому геокодируем его однажды.
+            $rows = $args[0];
+            $cache = [];
+            foreach ($rows as $k => $r) {
+                $a = trim((string)($r['address'] ?? ''));
+                if ($a === '' || (isset($r['lat']) && $r['lat'] !== null)) continue;
+                if (!array_key_exists($a, $cache)) $cache[$a] = fill_coords($r);
+                $rows[$k]['lat'] = $cache[$a]['lat'] ?? null;
+                $rows[$k]['lng'] = $cache[$a]['lng'] ?? null;
+            }
+            sb_upsert('jm_vacancies', $rows, 'id'); break;
+        }
 
         case 'dbUpdateVacancy':
-            sb_update('jm_vacancies', ['id' => 'eq.' . $args[0]], $args[1]); break;
+            // Если правят адрес, координаты пересчитываем: иначе метка
+            // осталась бы висеть на старом месте.
+            sb_update('jm_vacancies', ['id' => 'eq.' . $args[0]], fill_coords($args[1])); break;
 
         // ── Likes ──────────────────────────────────────────────────────────────
         case 'dbGetLikes':
@@ -989,7 +1118,7 @@ try {
             $data = sb_select('jm_perm_vacancies', ['employer_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;
 
         case 'dbUpsertPermVacancy':
-            sb_upsert('jm_perm_vacancies', $args[0], 'id'); break;
+            sb_upsert('jm_perm_vacancies', fill_coords($args[0]), 'id'); break;
 
         case 'dbClosePermVacancy':
             sb_update('jm_perm_vacancies', ['id' => 'eq.' . $args[0]], ['status' => 'closed']); break;
@@ -1172,47 +1301,8 @@ try {
         }
 
         case 'addressSuggest': {
-            // Подсказки адресов через OpenStreetMap/Nominatim (бесплатно, без ключа,
-            // работает и с сервера — в отличие от Яндекс Suggest/Geocoder).
             $text = trim((string)($args[0] ?? ''));
-            $data = [];
-            if (mb_strlen($text) >= 3) {
-                $q = http_build_query([
-                    'q' => $text . ', Москва',
-                    'format' => 'jsonv2',
-                    'addressdetails' => 1,
-                    'limit' => 7,
-                    'accept-language' => 'ru',
-                    'countrycodes' => 'ru',
-                    // приоритет Москве и области, но не жёстко (bounded=0)
-                    'viewbox' => '36.80,56.02,37.97,55.14',
-                    'bounded' => 0,
-                ]);
-                $ch = curl_init('https://nominatim.openstreetmap.org/search?' . $q);
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 8,
-                    CURLOPT_SSL_VERIFYPEER => true,
-                    // Nominatim требует идентифицирующий User-Agent
-                    CURLOPT_HTTPHEADER => ['User-Agent: JobToo/1.0 (+https://jobtoo.ru)', 'Accept: application/json'],
-                ]);
-                $resp = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-                $dec = json_decode($resp ?: 'null', true);
-                if ($code === 200 && is_array($dec)) {
-                    foreach ($dec as $r) {
-                        $name = $r['display_name'] ?? '';
-                        if ($name === '') continue;
-                        // Убираем хвост «, Россия» и почтовый индекс — короче и чище
-                        $name = preg_replace('/,\s*Россия$/u', '', $name);
-                        $name = preg_replace('/,\s*\d{6}(?=,|$)/u', '', $name);
-                        $data[] = [
-                            'name' => $name,
-                            'lat' => isset($r['lat']) ? (float)$r['lat'] : null,
-                            'lng' => isset($r['lon']) ? (float)$r['lon'] : null,
-                        ];
-                    }
-                }
-            }
+            $data = mb_strlen($text) >= 3 ? nominatim_search($text . ', Москва') : [];
             break;
         }
 

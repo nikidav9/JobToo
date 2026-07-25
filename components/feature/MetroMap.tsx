@@ -37,6 +37,8 @@ type Place = {
   count: number;
   lat: number | null;
   lng: number | null;
+  /** Координаты взяты от станции метро: адрес ещё не найден на карте */
+  approx: boolean;
 };
 
 const { height: SH } = Dimensions.get('window');
@@ -68,13 +70,6 @@ html,body,#map{margin:0;padding:0;width:100%;height:100%;}
   box-shadow:0 2px 8px rgba(0,0,0,0.2);
   font:600 14px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   color:#111;transform:translate(-50%,-100%);
-}
-/* Хвостик вниз — чтобы «таблетка» читалась как метка, а не как ярлык */
-.pin::after{
-  content:'';position:absolute;left:50%;bottom:-7px;z-index:-1;
-  width:14px;height:14px;background:#fff;
-  border-right:1px solid #E5E7EB;border-bottom:1px solid #E5E7EB;
-  transform:translateX(-50%) rotate(45deg);
 }
 .pin img{width:45px;height:45px;border-radius:23px;display:block;}
 .pin .n{
@@ -167,15 +162,19 @@ export function MetroMap({
       const found = m.get(key);
       if (found) {
         found.count += 1;
-        if (found.lat == null && i.lat != null) { found.lat = i.lat; found.lng = i.lng ?? null; }
+        if (found.approx && i.lat != null) {
+          found.lat = i.lat; found.lng = i.lng ?? null; found.approx = false;
+        }
         continue;
       }
-      // Метро — запасной вариант ТОЛЬКО когда адреса нет вовсе. Раньше
-      // вакансия с адресом, но без координат, сразу садилась на станцию,
-      // и геокодер до неё уже не доходил — метка навсегда оставалась у метро.
-      const hasAddress = !!i.address?.trim();
-      const fallback = extra[key]
-        ?? (!hasAddress && i.station ? METRO_COORDS[i.station] : undefined);
+      // Порядок такой: координаты из базы → то, что нашёл геокодер → станция
+      // метро. Станция здесь именно временная подстановка, а не ответ: метка
+      // сразу видна на карте, а как только адрес найдётся, она переедет на
+      // своё место. Раньше без координат метки просто не было — из тридцати
+      // одной вакансии на карте висела одна.
+      const geo = extra[key];
+      const metro = i.station ? METRO_COORDS[i.station] : undefined;
+      const exact = i.lat != null ? [i.lat, i.lng ?? null] : geo ?? null;
       m.set(key, {
         key,
         address: i.address?.trim() || (i.station ? `м. ${i.station}` : ''),
@@ -184,8 +183,9 @@ export function MetroMap({
         // на карте всегда показываем название сети
         company: normalizeCompany(i.company),
         count: 1,
-        lat: i.lat ?? (fallback ? fallback[0] : null),
-        lng: i.lng ?? (fallback ? fallback[1] : null),
+        lat: exact ? (exact[0] as number) : metro ? metro[0] : null,
+        lng: exact ? (exact[1] as number) : metro ? metro[1] : null,
+        approx: !exact && !!metro,
       });
     }
     return Array.from(m.values());
@@ -193,23 +193,37 @@ export function MetroMap({
 
   // Догеокодируем адреса, у которых координат так и не нашлось: у вакансий,
   // созданных до появления подсказок адреса, их просто нет.
+  // Каждая находка меняет places и заново запускает этот эффект. Чтобы список
+  // не пошёл по кругу, помним, какие адреса уже спрашивали, и не начинаем
+  // второй проход, пока не закончился первый.
+  const tried = useRef<Set<string>>(new Set());
+  const running = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+
   useEffect(() => {
-    if (!visible) return;
-    const unknown = places.filter(p => p.lat == null && !extra[p.key]);
+    if (!visible || running.current) return;
+    // Ищем адреса, которые пока стоят у метро. Тех, у кого адреса нет вовсе,
+    // не трогаем: станция для них и есть окончательный ответ.
+    const unknown = places.filter(
+      p => p.approx && !tried.current.has(p.key) && !p.address.startsWith('м. '),
+    );
     if (unknown.length === 0) return;
-    let cancelled = false;
+
+    running.current = true;
     (async () => {
-      const found: Record<string, [number, number]> = {};
       for (const p of unknown) {
-        const query = p.address.startsWith('м. ') ? `метро ${p.station}, Москва` : p.address;
-        if (!query) continue;
-        const res = await dbAddressSuggest(query);
+        tried.current.add(p.key);
+        const res = await dbAddressSuggest(p.address).catch(() => []);
         const hit = res.find(r => r.lat != null && r.lng != null);
-        if (hit) found[p.key] = [hit.lat as number, hit.lng as number];
+        // Записываем каждую находку сразу: метки переезжают на свои места по
+        // одной, а не ждут, пока отработает весь список.
+        if (hit && alive.current) {
+          setExtra(prev => ({ ...prev, [p.key]: [hit.lat as number, hit.lng as number] }));
+        }
       }
-      if (!cancelled && Object.keys(found).length) setExtra(prev => ({ ...prev, ...found }));
+      running.current = false;
     })();
-    return () => { cancelled = true; };
   }, [visible, places]);
 
   // Закрыли карту — забываем выбранный адрес, чтобы в следующий раз
