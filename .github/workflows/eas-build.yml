@@ -4,6 +4,10 @@ name: EAS Build
 # что нельзя доставить OTA-обновлением: разрешения, конфиг-плагины, нативные
 # модули, иконка и сплэш.
 on:
+  # Запуск тегом: push тега build-* стартует сборку обеих платформ.
+  # Нужен потому, что запустить workflow_dispatch может не всякая интеграция.
+  push:
+    tags: ['build-*']
   workflow_dispatch:
     inputs:
       platform:
@@ -15,7 +19,7 @@ on:
 
 jobs:
   build:
-    name: Build ${{ inputs.platform }}
+    name: Build ${{ inputs.platform || 'all' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +43,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           eas build \
-            --platform ${{ inputs.platform }} \
+            --platform ${{ inputs.platform || 'all' }} \
             --profile production \
             --non-interactive \
             --no-wait
