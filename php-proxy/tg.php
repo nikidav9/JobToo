@@ -4,7 +4,25 @@
 // - callback-кнопки «Одобрить/Отклонить» под заявками на вакансии
 define('TG_BOT_TOKEN', getenv('TG_BOT_TOKEN') ?: '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug');
 define('SB_URL', 'https://bbiqmkeysalwdonlnylb.supabase.co');
-define('SB_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiaXFta2V5c2Fsd2RvbmxueWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTI5NTIsImV4cCI6MjA5MzM4ODk1Mn0.HHYjTdjdP6lN-GosNfGypts6Kg-2CYyoMPMTnLfdfJQ');
+
+// Ключ доступа к базе — та же схема, что и в db.php: сервисный ключ с
+// хостинга, анонимный лишь как запасной вариант. Подробности там же.
+define('SB_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiaXFta2V5c2Fsd2RvbmxueWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTI5NTIsImV4cCI6MjA5MzM4ODk1Mn0.HHYjTdjdP6lN-GosNfGypts6Kg-2CYyoMPMTnLfdfJQ');
+
+function sb_resolve_key(): string {
+    $env = getenv('SB_SERVICE_KEY');
+    if (is_string($env) && trim($env) !== '') return trim($env);
+
+    $file = __DIR__ . '/sb_service_key.php';
+    if (is_readable($file)) {
+        $v = @include $file;
+        if (is_string($v) && trim($v) !== '') return trim($v);
+    }
+
+    return SB_ANON_KEY;
+}
+
+define('SB_KEY', sb_resolve_key());
 
 header('Content-Type: application/json; charset=utf-8');
 

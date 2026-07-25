@@ -1,6 +1,40 @@
 <?php
 define('SB_URL', 'https://bbiqmkeysalwdonlnylb.supabase.co');
-define('SB_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiaXFta2V5c2Fsd2RvbmxueWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTI5NTIsImV4cCI6MjA5MzM4ODk1Mn0.HHYjTdjdP6lN-GosNfGypts6Kg-2CYyoMPMTnLfdfJQ');
+
+// Ключ доступа к базе.
+//
+// Анонимный ключ публичен по своей природе: он лежит в бандле сайта
+// jobtoo.ru, и достать его может любой, кто откроет исходники страницы.
+// Пока RLS выключены, с ним читаются телефоны, имена и переписки. Поэтому
+// прокси переводим на сервисный ключ — он остаётся на сервере.
+//
+// Откуда берём (в порядке приоритета):
+//   1) переменная окружения SB_SERVICE_KEY;
+//   2) файл sb_service_key.php рядом с этим скриптом — на хостинге, где
+//      переменные окружения не задать, это единственный рабочий путь.
+//      Расширение .php тут не случайно: если файл запросят по прямой
+//      ссылке, сервер его выполнит и отдаст пустоту, а не сам ключ;
+//   3) старый анонимный ключ — запасной вариант, чтобы ничего не легло,
+//      пока сервисный не прописан.
+//
+// Как только сервисный ключ окажется на хостинге — можно применять
+// миграцию 013_lock_down_rls.sql и закрывать базу от анонимного доступа.
+define('SB_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiaXFta2V5c2Fsd2RvbmxueWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTI5NTIsImV4cCI6MjA5MzM4ODk1Mn0.HHYjTdjdP6lN-GosNfGypts6Kg-2CYyoMPMTnLfdfJQ');
+
+function sb_resolve_key(): string {
+    $env = getenv('SB_SERVICE_KEY');
+    if (is_string($env) && trim($env) !== '') return trim($env);
+
+    $file = __DIR__ . '/sb_service_key.php';
+    if (is_readable($file)) {
+        $v = @include $file;
+        if (is_string($v) && trim($v) !== '') return trim($v);
+    }
+
+    return SB_ANON_KEY;
+}
+
+define('SB_KEY', sb_resolve_key());
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
