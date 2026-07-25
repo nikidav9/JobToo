@@ -27,7 +27,7 @@ const WHITE = '#FFFFFF';
 const ORANGE = '#FF6B1A';
 
 // Длительность полной прорисовки
-const DRAW_MS = 1700;
+const DRAW_MS = 1280;
 
 // Штрихи арта. from/to — окно прорисовки внутри общего прогресса 0→1,
 // len — приблизительная длина пути (для strokeDasharray).
@@ -100,7 +100,7 @@ export function DrawnArt({
  *      (видно, что приложение не зависло, но и до 100 % не врём);
  *   3) данные готовы → быстро добегаем до 100 %.
  */
-const TAIL_STEP_MS = 320;
+const TAIL_STEP_MS = 250;
 
 // Момент начала загрузки, общий на всё приложение. Загрузочный экран
 // показывается дважды подряд (сначала в index.tsx, затем оверлеем
@@ -123,7 +123,7 @@ export function bootElapsed(): number {
  * быстром старте (например, у гостя, которому нечего грузить) экран улетал
  * недорисованным.
  */
-export const SPLASH_MIN_MS = DRAW_MS + 200;  // ≈1.9 c — вся анимация успевает
+export const SPLASH_MIN_MS = DRAW_MS + 280;  // ≈1.56 c: хватает и на добег 95→100
 
 export function useLoadingPercent(ready: boolean, minMs = DRAW_MS): number {
   const [percent, setPercent] = useState(1);
@@ -135,7 +135,12 @@ export function useLoadingPercent(ready: boolean, minMs = DRAW_MS): number {
     const id = setInterval(() => {
       setPercent(prev => {
         if (prev >= 100) return prev;
-        if (readyRef.current) return Math.min(100, prev + 7);
+        if (readyRef.current) {
+          // Добегаем до 100 плавно: у финиша — по проценту за тик, чтобы
+          // 96, 97, 98, 99 успели показаться, а не перескочили одним кадром
+          const left = 100 - prev;
+          return Math.min(100, prev + (left > 12 ? Math.ceil(left / 8) : 1));
+        }
         const elapsed = Date.now() - start.current;
         if (elapsed < minMs) {
           // равномерный подъём 1 → 95: пользователь видит счёт с самого начала

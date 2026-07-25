@@ -70,9 +70,9 @@ export const ART_VB_W = 200;
 export const ART_VB_H = 250;
 
 // Тайминги (мс от начала загрузки)
-export const BASKET_DRAW_MS = 820;
-export const PROD_FIRST_MS = 660;
-export const PROD_STAGGER_MS = 200;
-export const PROD_FALL_MS = 320;
-export const SPARKS_AT_MS = 1400;
-export const SPARKS_MS = 260;
+export const BASKET_DRAW_MS = 640;
+export const PROD_FIRST_MS = 500;
+export const PROD_STAGGER_MS = 150;
+export const PROD_FALL_MS = 260;
+export const SPARKS_AT_MS = 1060;
+export const SPARKS_MS = 200;
