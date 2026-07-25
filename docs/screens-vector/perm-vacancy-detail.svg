@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844"><rect width="390" height="844" fill="rgba(0, 0, 0, 0)"/><rect data-name="css-g5y9jx" x="0.0" y="0.0" width="390.0" height="844.0" fill="rgb(242, 242, 242)"/>
+<rect data-name="css-g5y9jx" x="0.0" y="0.0" width="390.0" height="844.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="css-g5y9jx" x="0.0" y="0.0" width="390.0" height="844.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="css-g5y9jx" x="0.0" y="63.0" width="390.0" height="41.0" fill="rgb(255, 107, 26)"/>
+<rect data-name="css-g5y9jx" x="20.0" y="196.0" width="169.0" height="92.0" rx="12.0" fill="rgb(249, 250, 251)"/>
+<rect data-name="border" x="20.5" y="196.5" width="168.0" height="91.0" rx="11.5" fill="none" stroke="rgb(243, 244, 246)" stroke-width="1"/>
+<rect data-name="css-g5y9jx" x="201.0" y="196.0" width="169.0" height="92.0" rx="12.0" fill="rgb(249, 250, 251)"/>
+<rect data-name="border" x="201.5" y="196.5" width="168.0" height="91.0" rx="11.5" fill="none" stroke="rgb(243, 244, 246)" stroke-width="1"/>
+<rect data-name="css-g5y9jx" x="20.0" y="331.0" width="350.0" height="58.0" rx="12.0" fill="rgb(249, 250, 251)"/>
+<rect data-name="css-g5y9jx" x="32.0" y="346.0" width="14.0" height="14.0" rx="7.0" fill="rgb(0, 158, 224)"/>
+<rect data-name="css-g5y9jx" x="20.0" y="399.0" width="350.0" height="64.0" rx="12.0" fill="rgb(249, 250, 251)"/>
+<rect data-name="css-g5y9jx" x="20.0" y="593.0" width="350.0" height="76.0" rx="14.0" fill="rgb(249, 250, 251)"/>
+<image data-name="image" x="34.0" y="607.0" width="48.0" height="48.0" href="http://127.0.0.1:8099/assets/assets/images/lavka-logo.04582e733b9826077f6e6252e5fed518.png" preserveAspectRatio="xMidYMid slice"/>
+<rect data-name="css-g5y9jx" x="20.0" y="679.0" width="350.0" height="82.0" rx="14.0" fill="rgb(249, 250, 251)" opacity="0.85"/>
+<rect data-name="border" x="20.5" y="679.5" width="349.0" height="81.0" rx="13.5" fill="none" stroke="rgb(243, 244, 246)" stroke-width="1" opacity="0.85"/>
+<rect data-name="css-g5y9jx" x="0.0" y="756.0" width="390.0" height="88.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="border" x="0.5" y="756.5" width="389.0" height="87.0" fill="none" stroke="rgb(243, 244, 246)" stroke-width="1"/>
+<rect data-name="border" x="16.5" y="773.5" width="115.7" height="46.0" rx="23.0" fill="none" stroke="rgb(229, 231, 235)" stroke-width="1"/>
+<rect data-name="css-g5y9jx" x="144.7" y="773.0" width="229.3" height="47.0" rx="23.5" fill="rgb(124, 58, 237)"/>
+<text data-name="← Назад" x="16.0" y="35.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="500" fill="rgb(107, 114, 128)">← Назад</text>
+<g data-icon="ionicons" data-cp="ec78" data-x="346.0" data-y="37.5" data-size="24" data-fill="rgb(156, 163, 175)"></g>
+<text data-name="Открыть в приложении" x="107.7" y="87.6" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="rgb(255, 255, 255)">Открыть в приложении</text>
+<text data-name="Кладовщик" x="20.0" y="147.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="26" font-weight="800" fill="rgb(17, 17, 17)">Кладовщик</text>
+<text data-name="Лавка" x="20.0" y="175.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="rgb(156, 163, 175)">Лавка</text>
+<g data-icon="ionicons" data-cp="eb07" data-x="93.5" data-y="228.9" data-size="22" data-fill="rgb(255, 107, 26)"></g>
+<text data-name="Зарплата" x="74.9" y="248.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="rgb(156, 163, 175)">Зарплата</text>
+<text data-name="80 000" x="81.8" y="268.5" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="800" fill="rgb(17, 17, 17)" text-anchor="middle">80 000</text>
+<text data-name="₽/мес" x="127.4" y="268.5" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="800" fill="rgb(17, 17, 17)" text-anchor="middle">₽/мес</text>
+<g data-icon="ionicons" data-cp="ead7" data-x="274.5" data-y="228.9" data-size="22" data-fill="rgb(255, 107, 26)"></g>
+<text data-name="График" x="263.3" y="248.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="rgb(156, 163, 175)">График</text>
+<text data-name="5/2 07:00-16:00" x="285.5" y="267.5" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="800" fill="rgb(17, 17, 17)" text-anchor="middle">5/2 07:00-16:00</text>
+<g data-icon="ionicons" data-cp="ecc6" data-x="20.0" data-y="316.3" data-size="16" data-fill="rgb(17, 17, 17)"></g>
+<text data-name="Расположение" x="42.0" y="316.3" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="rgb(17, 17, 17)">Расположение</text>
+<text data-name="Филёвская" x="56.0" y="352.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgb(156, 163, 175)">Филёвская</text>
+<text data-name="Пионерская" x="56.0" y="370.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="500" fill="rgb(17, 17, 17)">Пионерская</text>
+<g data-icon="ionicons" data-cp="ecc6" data-x="32.0" data-y="424.3" data-size="16" data-fill="rgb(156, 163, 175)"></g>
+<text data-name="1/28, улица Полосухина, райо" x="58.0" y="424.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="500" fill="rgb(17, 17, 17)">1/28, улица Полосухина, район Фили-</text>
+<text data-name="Давыдково, Москва" x="58.0" y="444.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="500" fill="rgb(17, 17, 17)">Давыдково, Москва</text>
+<g data-icon="ionicons" data-cp="ebb5" data-x="20.0" data-y="491.3" data-size="16" data-fill="rgb(17, 17, 17)"></g>
+<text data-name="Описание вакансии" x="42.0" y="491.3" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="rgb(17, 17, 17)">Описание вакансии</text>
+<text data-name="Приёмка, размещение и учёт т" x="20.0" y="520.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="rgb(107, 114, 128)">Приёмка, размещение и учёт товара в дарксторе.</text>
+<text data-name="Оформление по ТК." x="20.0" y="542.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="rgb(107, 114, 128)">Оформление по ТК.</text>
+<g data-icon="ionicons" data-cp="eac8" data-x="20.0" data-y="578.3" data-size="16" data-fill="rgb(17, 17, 17)"></g>
+<text data-name="Работодатель" x="42.0" y="578.3" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="rgb(17, 17, 17)">Работодатель</text>
+<text data-name="Лавка" x="94.0" y="635.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="rgb(17, 17, 17)">Лавка</text>
+<g data-icon="ionicons" data-cp="ecc9" data-x="35.0" data-y="725.9" data-size="22" data-fill="rgb(156, 163, 175)"></g>
+<text data-name="Телефон скрыт" x="69.0" y="705.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="rgb(17, 17, 17)">Телефон скрыт</text>
+<text data-name="Откликнитесь на вакансию, чт" x="69.0" y="723.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgb(156, 163, 175)">Откликнитесь на вакансию, чтобы получить</text>
+<text data-name="контакт" x="69.0" y="740.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgb(156, 163, 175)">контакт</text>
+<g data-icon="ionicons" data-cp="ec78" data-x="25.8" data-y="800.3" data-size="16" data-fill="rgb(107, 114, 128)"></g>
+<text data-name="Сохранить" x="47.9" y="800.3" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="rgb(107, 114, 128)">Сохранить</text>
+<text data-name="Откликнуться" x="207.2" y="799.5" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="rgb(255, 255, 255)">Откликнуться</text></svg>

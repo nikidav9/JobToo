@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844"><rect width="390" height="844" fill="rgba(0, 0, 0, 0)"/><rect data-name="css-g5y9jx" x="0.0" y="0.0" width="390.0" height="844.0" fill="rgb(242, 242, 242)"/>
+<rect data-name="css-g5y9jx" x="0.0" y="0.0" width="390.0" height="844.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="css-g5y9jx" x="0.0" y="0.0" width="390.0" height="844.0" fill="rgb(242, 242, 242)"/>
+<rect data-name="css-g5y9jx" x="0.0" y="0.0" width="390.0" height="844.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="css-g5y9jx" x="0.0" y="0.0" width="390.0" height="59.0" fill="rgb(255, 255, 255)"/>
+<svg width="22.0" height="22.0" viewBox="0 0 24 24" x="312.0" y="19.0"><defs><linearGradient x1="0" y1="0" x2="0" y2="1" id="tgGrad"><stop offset="0" stop-color="#2AABEE"></stop><stop offset="1" stop-color="#229ED9"></stop></linearGradient></defs><circle cx="12" cy="12" r="12" fill="url(#tgGrad)"></circle><path d="M5.45 11.9l11.2-4.32c.52-.19.98.12.81.9l-1.91 9c-.14.64-.52.8-1.05.5l-2.91-2.15-1.4 1.35c-.16.16-.29.29-.59.29l.21-2.98 5.42-4.9c.24-.21-.05-.33-.37-.12l-6.7 4.22-2.89-.9c-.63-.2-.64-.63.18-.89z" fill="#fff"></path><path d="M9.81 16.47l.21-2.98 1.3 1.63-1.51 1.35z" fill="#C8DAEA"></path></svg>
+<rect data-name="css-g5y9jx" x="326.0" y="17.0" width="10.0" height="10.0" rx="5.0" fill="rgb(255, 107, 26)"/>
+<rect data-name="border" x="326.5" y="17.5" width="9.0" height="9.0" rx="4.5" fill="none" stroke="rgb(255, 255, 255)" stroke-width="1"/>
+<rect data-name="css-g5y9jx" x="358.0" y="14.0" width="16.0" height="16.0" rx="8.0" fill="rgb(255, 107, 26)"/>
+<rect data-name="css-g5y9jx" x="16.0" y="75.0" width="358.0" height="279.0" rx="18.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="border" x="16.5" y="75.5" width="357.0" height="278.0" rx="17.5" fill="none" stroke="rgb(243, 244, 246)" stroke-width="1"/>
+<rect data-name="css-g5y9jx" x="33.0" y="92.0" width="70.9" height="18.0" rx="9.0" fill="rgb(254, 243, 199)"/>
+<rect data-name="css-g5y9jx" x="33.0" y="295.0" width="324.0" height="42.0" rx="21.0" fill="rgb(255, 107, 26)"/>
+<rect data-name="border" x="16.5" y="768.5" width="357.0" height="63.0" rx="27.5" fill="none" stroke="rgba(255, 255, 255, 0.75)" stroke-width="1"/>
+<rect data-name="css-g5y9jx" x="17.0" y="769.0" width="356.0" height="62.0" fill="rgba(249, 249, 249, 0.56)"/>
+<rect data-name="css-g5y9jx" x="17.0" y="769.0" width="356.0" height="62.0" fill="rgba(255, 255, 255, 0.82)"/>
+<rect data-name="css-g5y9jx" x="165.4" y="779.0" width="61.2" height="44.0" rx="20.0" fill="rgb(255, 243, 237)"/>
+<rect data-name="css-g5y9jx" x="129.2" y="777.0" width="16.0" height="16.0" rx="8.0" fill="rgb(255, 107, 26)"/>
+<text data-name="Биржа" x="16.0" y="35.4" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="22" font-weight="800" fill="rgb(17, 17, 17)">Биржа</text>
+<g data-icon="ionicons" data-cp="ed80" data-x="348.0" data-y="35.9" data-size="22" data-fill="rgb(17, 17, 17)"></g>
+<text data-name="2" x="363.5" y="24.4" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="9" font-weight="700" fill="rgb(255, 255, 255)">2</text>
+<g data-icon="ionicons" data-cp="ec17" data-x="41.0" data-y="103.5" data-size="11" data-fill="rgb(146, 64, 14)"></g>
+<text data-name="Срочно" x="55.0" y="104.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="rgb(146, 64, 14)">Срочно</text>
+<text data-name="Лавка" x="111.9" y="104.5" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="rgb(107, 114, 128)">Лавка</text>
+<text data-name="Сборка заказов" x="33.0" y="136.4" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="rgb(17, 17, 17)">Сборка заказов</text>
+<g data-icon="ionicons" data-cp="ead7" data-x="33.0" data-y="163.5" data-size="13" data-fill="rgb(156, 163, 175)"></g>
+<text data-name="26 июл (вс)" x="51.0" y="164.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(107, 114, 128)">26 июл (вс)</text>
+<g data-icon="ionicons" data-cp="eedf" data-x="130.9" data-y="163.5" data-size="13" data-fill="rgb(156, 163, 175)"></g>
+<text data-name="18:00" x="149.0" y="164.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(107, 114, 128)">18:00</text>
+<text data-name="–" x="181.5" y="164.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(107, 114, 128)">–</text>
+<text data-name="23:00" x="188.7" y="164.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(107, 114, 128)">23:00</text>
+<g data-icon="ionicons" data-cp="eeac" data-x="33.0" data-y="190.5" data-size="13" data-fill="rgb(156, 163, 175)"></g>
+<text data-name="м." x="51.0" y="191.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(107, 114, 128)">м.</text>
+<text data-name="Пятницкое шоссе" x="67.2" y="191.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(107, 114, 128)">Пятницкое шоссе</text>
+<g data-icon="ionicons" data-cp="ecc6" data-x="33.0" data-y="223.0" data-size="13" data-fill="rgb(107, 114, 128)"></g>
+<text data-name="11, Пятницкая улица, Отрадно" x="51.0" y="216.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(107, 114, 128)">11, Пятницкая улица, Отрадное, городской округ</text>
+<text data-name="Красногорск" x="51.0" y="231.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(107, 114, 128)">Красногорск</text>
+<text data-name="Нужен один человек на вечер," x="33.0" y="257.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="rgb(156, 163, 175)">Нужен один человек на вечер, оплата в конце</text>
+<text data-name="смены." x="33.0" y="275.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="rgb(156, 163, 175)">смены.</text>
+<text data-name="✉️ Откликнуться" x="135.7" y="319.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="rgb(255, 255, 255)">✉️ Откликнуться</text>
+<g data-icon="ionicons" data-cp="ee64" data-x="46.4" data-y="798.9" data-size="22" data-fill="rgb(255, 107, 26)"></g>
+<text data-name="Поиск" x="42.4" y="816.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10" font-weight="600" fill="rgb(255, 107, 26)">Поиск</text>
+<g data-icon="ionicons" data-cp="eda4" data-x="115.2" data-y="798.9" data-size="22" data-fill="rgb(255, 107, 26)"></g>
+<text data-name="1" x="134.7" y="787.4" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="9" font-weight="700" fill="rgb(255, 255, 255)">1</text>
+<text data-name="Мэтчи" x="110.9" y="816.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10" font-weight="600" fill="rgb(255, 107, 26)">Мэтчи</text>
+<g data-icon="ionicons" data-cp="ed4f" data-x="184.0" data-y="798.9" data-size="22" data-fill="rgb(255, 107, 26)"></g>
+<text data-name="Биржа" x="178.9" y="816.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10" font-weight="600" fill="rgb(255, 107, 26)">Биржа</text>
+<g data-icon="ionicons" data-cp="eb16" data-x="252.8" data-y="798.9" data-size="22" data-fill="rgb(255, 107, 26)"></g>
+<text data-name="Чаты" x="250.8" y="816.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10" font-weight="600" fill="rgb(255, 107, 26)">Чаты</text>
+<g data-icon="ionicons" data-cp="edad" data-x="321.6" data-y="798.9" data-size="22" data-fill="rgb(255, 107, 26)"></g>
+<text data-name="Профиль" x="309.2" y="816.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10" font-weight="600" fill="rgb(255, 107, 26)">Профиль</text></svg>

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844"><rect width="390" height="844" fill="rgba(0, 0, 0, 0)"/><rect data-name="css-g5y9jx" x="0.0" y="0.0" width="390.0" height="844.0" fill="rgb(242, 242, 242)"/>
+<rect data-name="css-g5y9jx" x="0.0" y="0.0" width="390.0" height="844.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="css-g5y9jx" x="0.0" y="0.0" width="390.0" height="844.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="css-g5y9jx" x="20.0" y="67.0" width="350.0" height="108.0" rx="16.0" fill="rgb(239, 248, 255)"/>
+<rect data-name="border" x="20.5" y="67.5" width="349.0" height="107.0" rx="15.5" fill="none" stroke="rgb(190, 227, 255)" stroke-width="1"/>
+<svg width="34.0" height="34.0" viewBox="0 0 24 24" x="33.0" y="104.0"><defs><linearGradient x1="0" y1="0" x2="0" y2="1" id="tgBanGrad"><stop offset="0" stop-color="#2AABEE"></stop><stop offset="1" stop-color="#229ED9"></stop></linearGradient></defs><circle cx="12" cy="12" r="12" fill="url(#tgBanGrad)"></circle><path d="M5.45 11.9l11.2-4.32c.52-.19.98.12.81.9l-1.91 9c-.14.64-.52.8-1.05.5l-2.91-2.15-1.4 1.35c-.16.16-.29.29-.59.29l.21-2.98 5.42-4.9c.24-.21-.05-.33-.37-.12l-6.7 4.22-2.89-.9c-.63-.2-.64-.63.18-.89z" fill="#fff"></path><path d="M9.81 16.47l.21-2.98 1.3 1.63-1.51 1.35z" fill="#C8DAEA"></path></svg>
+<rect data-name="css-g5y9jx" x="264.4" y="106.5" width="92.6" height="29.0" rx="14.5" fill="rgb(42, 171, 238)"/>
+<rect data-name="css-g5y9jx" x="20.0" y="207.0" width="350.0" height="94.0" rx="16.0" fill="rgb(255, 247, 237)"/>
+<rect data-name="border" x="20.5" y="207.5" width="349.0" height="93.0" rx="15.5" fill="none" stroke="rgb(254, 215, 170)" stroke-width="1"/>
+<rect data-name="css-g5y9jx" x="20.0" y="333.0" width="172.3" height="29.0" rx="14.5" fill="rgb(237, 233, 254)"/>
+<rect data-name="css-g5y9jx" x="20.0" y="403.0" width="350.0" height="90.0" rx="16.0" fill="rgb(255, 243, 237)"/>
+<rect data-name="border" x="21.0" y="404.0" width="348.0" height="88.0" rx="15.0" fill="none" stroke="rgb(255, 107, 26)" stroke-width="2"/>
+<rect data-name="css-g5y9jx" x="326.0" y="436.0" width="24.0" height="24.0" rx="12.0" fill="rgb(255, 107, 26)"/>
+<rect data-name="border" x="326.5" y="436.5" width="23.0" height="23.0" rx="11.5" fill="none" stroke="rgb(255, 107, 26)" stroke-width="1"/>
+<rect data-name="css-g5y9jx" x="20.0" y="505.0" width="350.0" height="75.0" rx="16.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="border" x="21.0" y="506.0" width="348.0" height="73.0" rx="15.0" fill="none" stroke="rgb(229, 231, 235)" stroke-width="2"/>
+<rect data-name="css-g5y9jx" x="326.0" y="530.5" width="24.0" height="24.0" rx="12.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="border" x="326.5" y="531.0" width="23.0" height="23.0" rx="11.5" fill="none" stroke="rgb(229, 231, 235)" stroke-width="1"/>
+<rect data-name="css-g5y9jx" x="20.0" y="592.0" width="350.0" height="90.0" rx="16.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="border" x="21.0" y="593.0" width="348.0" height="88.0" rx="15.0" fill="none" stroke="rgb(229, 231, 235)" stroke-width="2"/>
+<rect data-name="css-g5y9jx" x="326.0" y="625.0" width="24.0" height="24.0" rx="12.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="border" x="326.5" y="625.5" width="23.0" height="23.0" rx="11.5" fill="none" stroke="rgb(229, 231, 235)" stroke-width="1"/>
+<rect data-name="css-g5y9jx" x="20.0" y="694.0" width="350.0" height="75.0" rx="16.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="border" x="21.0" y="695.0" width="348.0" height="73.0" rx="15.0" fill="none" stroke="rgb(229, 231, 235)" stroke-width="2"/>
+<rect data-name="css-g5y9jx" x="326.0" y="719.5" width="24.0" height="24.0" rx="12.0" fill="rgb(255, 255, 255)"/>
+<rect data-name="border" x="326.5" y="720.0" width="23.0" height="23.0" rx="11.5" fill="none" stroke="rgb(229, 231, 235)" stroke-width="1"/>
+<rect data-name="border" x="20.5" y="810.5" width="349.0" height="56.0" rx="11.5" fill="none" stroke="rgb(229, 231, 235)" stroke-width="1"/>
+<text data-name="← Назад" x="16.0" y="27.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="500" fill="rgb(107, 114, 128)">← Назад</text>
+<text data-name="Постоянная вакансия" x="105.3" y="26.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="rgb(17, 17, 17)">Постоянная вакансия</text>
+<text data-name="Привяжите Telegram" x="77.0" y="91.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="rgb(17, 17, 17)">Привяжите Telegram</text>
+<text data-name="Отклики на эту вакансию" x="77.0" y="109.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgb(107, 114, 128)">Отклики на эту вакансию</text>
+<text data-name="придут вам в Телеграм с" x="77.0" y="125.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgb(107, 114, 128)">придут вам в Телеграм с</text>
+<text data-name="кнопками «Одобрить /" x="77.0" y="141.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgb(107, 114, 128)">кнопками «Одобрить /</text>
+<text data-name="Отклонить»" x="77.0" y="157.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgb(107, 114, 128)">Отклонить»</text>
+<text data-name="Привязать" x="276.4" y="124.5" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="rgb(255, 255, 255)">Привязать</text>
+<g data-icon="ionicons" data-cp="eedf" data-x="33.0" data-y="234.9" data-size="18" data-fill="rgb(146, 64, 14)"></g>
+<text data-name="Отвечайте на отклики вовремя" x="59.0" y="231.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgb(146, 64, 14)">Отвечайте на отклики вовремя: заявки без ответа</text>
+<text data-name="7" x="340.4" y="231.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="800" fill="rgb(146, 64, 14)">7</text>
+<text data-name="дней" x="59.0" y="248.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="800" fill="rgb(146, 64, 14)">дней</text>
+<text data-name="закрываются автоматически, и" x="87.9" y="248.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgb(146, 64, 14)">закрываются автоматически, и кандидат</text>
+<text data-name="уходит. Одобрить или отклони" x="59.0" y="265.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgb(146, 64, 14)">уходит. Одобрить или отклонить — один тап в</text>
+<text data-name="разделе «Мэтчи» или в Telegr" x="59.0" y="282.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgb(146, 64, 14)">разделе «Мэтчи» или в Telegram.</text>
+<text data-name="💼 Постоянная работа" x="34.0" y="351.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="rgb(124, 58, 237)">💼 Постоянная работа</text>
+<text data-name="Специальность *" x="20.0" y="391.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="rgb(156, 163, 175)">Специальность *</text>
+<text data-name="Кладовщик" x="40.0" y="435.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="rgb(17, 17, 17)">Кладовщик</text>
+<text data-name="Хранение, приёмка и учёт тов" x="40.0" y="454.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="rgb(156, 163, 175)">Хранение, приёмка и учёт товаров на</text>
+<text data-name="складе" x="40.0" y="469.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="rgb(156, 163, 175)">складе</text>
+<text data-name="✓" x="332.5" y="451.5" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="rgb(255, 255, 255)">✓</text>
+<text data-name="Повар" x="40.0" y="537.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="rgb(17, 17, 17)">Повар</text>
+<text data-name="Приготовление блюд на кухне" x="40.0" y="556.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="rgb(156, 163, 175)">Приготовление блюд на кухне</text>
+<text data-name="Старший смены" x="40.0" y="624.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="rgb(17, 17, 17)">Старший смены</text>
+<text data-name="Управление процессами и перс" x="40.0" y="643.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="rgb(156, 163, 175)">Управление процессами и персоналом</text>
+<text data-name="смены" x="40.0" y="658.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="rgb(156, 163, 175)">смены</text>
+<text data-name="Сборщик" x="40.0" y="726.8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="rgb(17, 17, 17)">Сборщик</text>
+<text data-name="Комплектация и сборка заказо" x="40.0" y="745.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="rgb(156, 163, 175)">Комплектация и сборка заказов</text>
+<text data-name="Метро *" x="20.0" y="798.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="rgb(156, 163, 175)">Метро *</text>
+<text data-name="🚇 Выбрать станцию" x="37.0" y="843.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="rgb(17, 17, 17)">🚇 Выбрать станцию</text>
+<text data-name="›" x="346.3" y="843.4" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="rgb(156, 163, 175)">›</text></svg>

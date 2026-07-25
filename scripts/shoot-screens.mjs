@@ -18,6 +18,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve('.figma-export');
 const OUT = path.resolve('docs/screens');
+const VEC = path.resolve('docs/screens-vector');
 const PORT = 8099;
 const VW = 390, VH = 844;
 
@@ -128,6 +129,7 @@ const RATINGS = [{
 function respond(fn, args) {
   switch (fn) {
     case 'dbGetUsers': return USERS;
+    case 'dbCheckPhoneExists': return false;
     case 'dbGetUserById': return USERS.find(u => u.id === args?.[0]) ?? null;
     case 'dbGetVacancies': return VACANCIES;
     case 'dbGetPermVacancies': return PERM;
@@ -163,13 +165,116 @@ function respond(fn, args) {
   }
 }
 
+// ─── Проходы по многошаговым экранам ────────────────────────────────────
+// Регистрация — это один маршрут с внутренним состоянием шага, по ссылке
+// на конкретный шаг не попасть. Поэтому проходим форму как человек:
+// заполняем и жмём «Продолжить».
+const type = async (page, label, value) => {
+  const box = page.locator(`text=${label}`).first();
+  await box.waitFor({ timeout: 5000 }).catch(() => {});
+  const input = page.locator('input, textarea').nth(await inputIndexNear(page, label));
+  await input.fill(value);
+};
+
+async function inputIndexNear(page, label) {
+  return page.evaluate((lbl) => {
+    const nodes = Array.from(document.querySelectorAll('input, textarea'));
+    const all = Array.from(document.querySelectorAll('*'));
+    const anchor = all.find(e => e.children.length === 0 && (e.textContent || '').trim() === lbl);
+    if (!anchor) return 0;
+    const ay = anchor.getBoundingClientRect().top;
+    let best = 0, bestD = Infinity;
+    nodes.forEach((n, i) => {
+      const d = Math.abs(n.getBoundingClientRect().top - ay);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  }, label);
+}
+
+const clickText = async (page, text) => {
+  const el = page.locator(`text=${text}`).first();
+  await el.click({ timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(700);
+};
+
+/** Регистрация работника: 6 шагов */
+async function walkRegisterWorker(page, snap) {
+  await snap('register-worker-1');
+  await page.locator('input').first().fill('9990001122');
+  await page.waitForTimeout(300);
+  await clickText(page, 'Продолжить');
+
+  await snap('register-worker-2');
+  const pass = page.locator('input');
+  await pass.nth(0).fill('123456');
+  await pass.nth(1).fill('123456');
+  await clickText(page, 'Продолжить');
+
+  await snap('register-worker-3');
+  await page.locator('input').nth(0).fill('Фёдоров');
+  await page.locator('input').nth(1).fill('Максим');
+  await clickText(page, 'Продолжить');
+
+  await snap('register-worker-4');          // согласие с документами
+  // Галочка — не <input>, а нарисованный квадрат внутри строки. Жмём по
+  // нему по координатам, мимо ссылок на документы в тексте рядом.
+  await page.evaluate(() => {
+    const box = Array.from(document.querySelectorAll('div'))
+      .find(d => {
+        const r = d.getBoundingClientRect();
+        const cs = getComputedStyle(d);
+        return r.width >= 18 && r.width <= 30 && Math.abs(r.width - r.height) < 3
+          && parseFloat(cs.borderTopWidth) > 0 && d.children.length === 0;
+      });
+    if (box) box.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+  await page.waitForTimeout(400);
+  await clickText(page, 'Продолжить');
+
+  await snap('register-worker-5');          // метро
+  await clickText(page, 'Выбрать станцию');
+  await snap('register-worker-5-picker');  // выбор станции — отдельное окно
+  await clickText(page, 'Арбатско-Покровская');
+  await page.waitForTimeout(500);
+  await clickText(page, 'Митино');
+  await page.waitForTimeout(600);
+  await snap('register-worker-5-chosen');
+  await clickText(page, 'Продолжить');
+
+  await snap('register-worker-6');          // специализация
+  await clickText(page, 'Кладовщик');
+  await snap('register-worker-6-selected');
+}
+
+/** Регистрация работодателя: 4 шага */
+async function walkRegisterEmployer(page, snap) {
+  await snap('register-employer-1');
+  await page.locator('input').first().fill('9990003344');
+  await page.waitForTimeout(300);
+  await clickText(page, 'Продолжить');
+
+  await snap('register-employer-2');
+  await page.locator('input').nth(0).fill('123456');
+  await page.locator('input').nth(1).fill('123456');
+  await clickText(page, 'Продолжить');
+
+  await snap('register-employer-3');
+  await page.locator('input').nth(0).fill('Манолий');
+  await page.locator('input').nth(1).fill('Сергей');
+  await clickText(page, 'Лавка');
+  await clickText(page, 'Продолжить');
+
+  await snap('register-employer-4');
+}
+
 // ─── Экраны для съёмки ──────────────────────────────────────────────────
 // who: под каким пользователем открывать (null — гость)
 const SHOTS = [
   { id: 'index', url: '/', who: null, title: 'Стартовый экран', wait: 3500 },
   { id: 'login', url: '/login', who: null, title: 'Вход' },
-  { id: 'register-worker', url: '/register-worker', who: null, title: 'Регистрация работника' },
-  { id: 'register-employer', url: '/register-employer', who: null, title: 'Регистрация работодателя' },
+  { id: 'register-worker', url: '/register-worker', who: null, title: 'Регистрация работника', walk: walkRegisterWorker },
+  { id: 'register-employer', url: '/register-employer', who: null, title: 'Регистрация работодателя', walk: walkRegisterEmployer },
 
   { id: 'feed-shift', url: '/(tabs)/feed', who: WORKER, title: 'Поиск · Смены', wait: 3000 },
   { id: 'matches', url: '/(tabs)/matches', who: WORKER, title: 'Мои отклики' },
@@ -234,9 +339,11 @@ function toAppUser(r) {
 
 const srv = serve();
 fs.mkdirSync(OUT, { recursive: true });
+fs.mkdirSync(VEC, { recursive: true });
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const results = [];
+const shotIds = [];
 
 for (const shot of SHOTS) {
   const ctx = await browser.newContext({
@@ -292,7 +399,19 @@ for (const shot of SHOTS) {
     // будет оранжевый экран загрузки вместо приложения.
     await page.evaluate(() => { try { window.__hideSplash && window.__hideSplash(); } catch {} });
     await page.waitForTimeout(1400);
-    await page.screenshot({ path: path.join(OUT, `${shot.id}.png`) });
+    // Снимок + векторная версия. Вектор нужен, чтобы в Figma приехали
+    // слои, а не картинка.
+    const snap = async (id) => {
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: path.join(OUT, `${id}.png`) });
+      await page.addScriptTag({ path: path.resolve('scripts/dom-to-svg.js') });
+      const svg = await page.evaluate(([w, h]) => window.__domToSvg({ width: w, height: h }), [VW, VH]);
+      fs.writeFileSync(path.join(VEC, `${id}.svg`), svg);
+      shotIds.push(id);
+    };
+
+    if (shot.walk) await shot.walk(page, snap);
+    else await snap(shot.id);
     results.push({ id: shot.id, ok: true, errs: errs.slice(0, 2) });
   } catch (e) {
     results.push({ id: shot.id, ok: false, err: e.message.split('\n')[0] });
@@ -303,6 +422,8 @@ for (const shot of SHOTS) {
 await browser.close();
 srv.close();
 
+fs.writeFileSync(path.join(VEC, 'index.json'), JSON.stringify(shotIds, null, 1));
+console.log('снято экранов:', shotIds.length);
 for (const r of results) {
   console.log(r.ok ? `✓ ${r.id}${r.errs?.length ? '  [' + r.errs.join(' | ') + ']' : ''}` : `✗ ${r.id}  ${r.err}`);
 }
