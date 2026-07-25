@@ -21,6 +21,9 @@ jobs:
   build:
     name: Build ${{ inputs.platform || 'all' }}
     runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EAS_BUILD_NO_EXPO_GO_WARNING: 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -38,12 +41,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: |
-          eas build \
-            --platform ${{ inputs.platform || 'all' }} \
-            --profile production \
-            --non-interactive \
-            --no-wait
+      # Платформы собираем отдельными шагами: iOS требует сертификата
+      # распространения, и раньше его отсутствие обрывало весь запуск —
+      # вместе с уже готовой сборкой Android.
+      - name: Build Android
+        if: ${{ (inputs.platform || 'all') != 'ios' }}
+        run: eas build --platform android --profile production --non-interactive --no-wait
+
+      - name: Build iOS
+        # Не валим весь запуск: сертификат iOS настраивается интерактивно,
+        # один раз (eas build -p ios локально либо через expo.dev → Credentials)
+        continue-on-error: true
+        if: ${{ (inputs.platform || 'all') != 'android' }}
+        run: eas build --platform ios --profile production --non-interactive --no-wait
