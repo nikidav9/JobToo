@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SplashLoader, { useLoadingPercent, DrawnArt, bootElapsed, SPLASH_MIN_MS } from '@/components/SplashLoader';
 import { ICON_WORKER, ICON_EMPLOYER } from '@/constants/roleIcons';
+import { Ionicons } from '@expo/vector-icons';
 import { hideWebSplash } from '@/lib/webSplash';
 
 const USER_COUNT_KEY = 'cached_user_count';
@@ -151,7 +152,7 @@ export default function RootScreen() {
             <Text style={styles.cardSub}>{'Смены на складах —\nвыходите когда удобно'}</Text>
           </View>
           <View style={styles.arrowBtn}>
-            <Text style={styles.arrowTxt}>›</Text>
+            <Ionicons name="chevron-forward" size={r(18)} color={Colors.primary} />
           </View>
         </TouchableOpacity>
 
@@ -177,7 +178,7 @@ export default function RootScreen() {
             <Text style={styles.cardSub}>{'Размещайте вакансии\nи находите сотрудников'}</Text>
           </View>
           <View style={styles.arrowBtn}>
-            <Text style={styles.arrowTxt}>›</Text>
+            <Ionicons name="chevron-forward" size={r(18)} color={Colors.primary} />
           </View>
         </TouchableOpacity>
 
@@ -268,11 +269,10 @@ const styles = StyleSheet.create({
     fontSize: r(13), color: Colors.textSecondary, lineHeight: r(18),
   },
   arrowBtn: {
-    width: r(34), height: r(34), borderRadius: r(17),
-    backgroundColor: Colors.primary,
+    width: r(32), height: r(32), borderRadius: r(16),
+    backgroundColor: Colors.primaryLight,
     alignItems: 'center', justifyContent: 'center',
   },
-  arrowTxt: { fontSize: r(20), color: '#FFFFFF', lineHeight: r(24), marginLeft: 2, fontWeight: '700' },
 
   featuresRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
