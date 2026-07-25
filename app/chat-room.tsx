@@ -10,6 +10,11 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as Application from 'expo-application';
+import {
+  useAudioRecorder, useAudioRecorderState, useAudioPlayer,
+  RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync,
+} from 'expo-audio';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
@@ -22,6 +27,52 @@ import { getSupabaseClient } from '@/template';
 
 const POLL_INTERVAL = 8000;
 
+/** Пузырь голосового: кнопка воспроизведения, дорожка и длительность. */
+function VoiceBubble({ url, sec, isMe }: { url: string; sec: number; isMe: boolean }) {
+  const player = useAudioPlayer({ uri: url });
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    const sub = player.addListener('playbackStatusUpdate', (st: any) => {
+      setPlaying(!!st?.playing);
+      // Дослушали — сматываем в начало, чтобы можно было включить снова
+      if (st?.didJustFinish) { player.seekTo(0); setPlaying(false); }
+    });
+    return () => sub.remove();
+  }, [player]);
+
+  const toggle = () => {
+    if (player.playing) { player.pause(); setPlaying(false); }
+    else { player.play(); setPlaying(true); }
+  };
+
+  const tint = isMe ? '#fff' : Colors.primary;
+  return (
+    <View style={vb.row}>
+      <TouchableOpacity onPress={toggle} activeOpacity={0.7}
+        style={[vb.playBtn, { backgroundColor: isMe ? 'rgba(255,255,255,0.22)' : Colors.primaryLight }]}>
+        <Ionicons name={playing ? 'pause' : 'play'} size={16} color={tint} />
+      </TouchableOpacity>
+      <View style={vb.waveWrap}>
+        {[10, 16, 8, 20, 13, 18, 9, 15, 11, 19, 7, 14].map((h, i) => (
+          <View key={i} style={[vb.bar, { height: h, backgroundColor: isMe ? 'rgba(255,255,255,0.55)' : Colors.inputBorder }]} />
+        ))}
+      </View>
+      <Text style={[vb.dur, { color: isMe ? 'rgba(255,255,255,0.85)' : Colors.textMuted }]}>
+        {fmtDuration(sec)}
+      </Text>
+    </View>
+  );
+}
+
+const vb = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 168 },
+  playBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  waveWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3, height: 22 },
+  bar: { width: 2.5, borderRadius: 2 },
+  dur: { fontSize: 11, fontWeight: '600' },
+});
+
 // Поле ввода растёт вместе с текстом, но не выше этого — дальше текст
 // прокручивается внутри, как в Telegram.
 const INPUT_MIN_H = 22;
@@ -32,6 +83,28 @@ const INPUT_MAX_H = 108;
 const IMG_PREFIX = '[img]';
 const isImageMessage = (t: string) => t.startsWith(IMG_PREFIX);
 const imageUrlOf = (t: string) => t.slice(IMG_PREFIX.length);
+
+// Голосовое: [voice]<url>|<секунды>
+const VOICE_PREFIX = '[voice]';
+const isVoiceMessage = (t: string) => t.startsWith(VOICE_PREFIX);
+const voiceOf = (t: string) => {
+  const [url, sec] = t.slice(VOICE_PREFIX.length).split('|');
+  return { url, sec: Number(sec) || 0 };
+};
+const fmtDuration = (sec: number) =>
+  `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+
+// Запись микрофона требует разрешения, которое нельзя добавить через OTA:
+// на Android оно уже есть (его объявляет сам модуль expo-audio), а на iOS
+// ключ NSMicrophoneUsageDescription появится только в следующей сборке.
+// Поэтому на iOS кнопку показываем начиная с этой сборки.
+const VOICE_IOS_MIN_BUILD = 6;
+const voiceSupported = (() => {
+  if (Platform.OS === 'android') return true;
+  if (Platform.OS !== 'ios') return false;
+  const b = Number(Application.nativeBuildVersion ?? 0);
+  return b >= VOICE_IOS_MIN_BUILD;
+})();
 
 // Module-level message cache — survives navigation but cleared on app restart
 const msgCache = new Map<string, Message[]>();
@@ -59,6 +132,10 @@ export default function ChatRoom() {
   const [sending, setSending] = useState(false);
   const [inputH, setInputH] = useState(INPUT_MIN_H);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingVoice, setUploadingVoice] = useState(false);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  // Обновляем состояние записи раз в 200 мс — этого хватает для счётчика
+  const recorderState = useAudioRecorderState(recorder, 200);
   const [decidingLike, setDecidingLike] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [likeStatus, setLikeStatus] = useState<'pending' | 'approved' | 'rejected' | null>(null);
@@ -356,6 +433,80 @@ export default function ChatRoom() {
     }
   };
 
+  // ── Голосовые сообщения ──────────────────────────────────────────────────
+  const startRecording = async () => {
+    if (isChatBlocked || uploadingVoice) return;
+    try {
+      const { granted } = await requestRecordingPermissionsAsync();
+      if (!granted) { showToast('Нет доступа к микрофону', 'error'); return; }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+    } catch (e) {
+      console.error('[ChatRoom] startRecording error', e);
+      showToast('Не удалось начать запись', 'error');
+    }
+  };
+
+  const cancelRecording = async () => {
+    try { await recorder.stop(); } catch {}
+    await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
+  };
+
+  const stopAndSendVoice = async () => {
+    if (!chat || !currentUser) return;
+    const seconds = Math.max(1, Math.round(recorderState.durationMillis / 1000));
+    try {
+      await recorder.stop();
+      await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
+    } catch (e) {
+      console.error('[ChatRoom] stop recording error', e);
+      return;
+    }
+    const uri = recorder.uri;
+    if (!uri) return;
+
+    setUploadingVoice(true);
+    try {
+      const base64Data = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const sb = getSupabaseClient();
+      const fileName = `chat/voice_${chat.id}_${Date.now()}.m4a`;
+      const { error: upErr } = await sb.storage.from('avatars').upload(
+        fileName, base64ToUint8Array(base64Data),
+        { contentType: 'audio/m4a', upsert: true, cacheControl: '3600' },
+      );
+      if (upErr) console.warn('[ChatRoom] voice upload warning', upErr.message);
+      const { data: urlData } = sb.storage.from('avatars').getPublicUrl(fileName);
+
+      const msg = await dbInsertMessage(
+        chat.id, currentUser.id, `${VOICE_PREFIX}${urlData.publicUrl}|${seconds}`,
+      );
+      setMessages(prev => {
+        const next = [...prev, msg];
+        msgCache.set(chat.id, next);
+        return next;
+      });
+      lastCountRef.current += 1;
+      const forRole = currentUser.role === 'worker' ? 'employer' : 'worker';
+      dbIncrementUnread(chat.id, forRole).catch(() => {});
+      const senderName = `${currentUser.firstName} ${currentUser.lastName}`;
+      if (currentUser.role === 'worker') {
+        notifyEmployerNewMessage(chat.employerId, senderName, '🎤 Голосовое сообщение', chat.id).catch(() => {});
+      } else {
+        notifyWorkerNewMessage(chat.workerId, senderName, '🎤 Голосовое сообщение', chat.id).catch(() => {});
+      }
+      refreshChats().catch(() => {});
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+    } catch (e) {
+      console.error('[ChatRoom] sendVoice error', e);
+      showToast('Не удалось отправить голосовое', 'error');
+    } finally {
+      setUploadingVoice(false);
+    }
+  };
+
   const pickImage = async () => {
     if (isChatBlocked || uploadingImage) return;
     try {
@@ -478,7 +629,9 @@ export default function ChatRoom() {
           isMe ? styles.bubbleMe : styles.bubbleThem,
           isImageMessage(item.text) && styles.bubbleImage,
         ]}>
-          {isImageMessage(item.text) ? (
+          {isVoiceMessage(item.text) ? (
+            <VoiceBubble {...voiceOf(item.text)} isMe={isMe} />
+          ) : isImageMessage(item.text) ? (
             <Image
               source={{ uri: imageUrlOf(item.text) }}
               style={styles.msgImage}
@@ -659,7 +812,32 @@ export default function ChatRoom() {
           />
         )}
 
-        {/* Input bar */}
+        {/* Идёт запись — строка ввода заменяется счётчиком */}
+        {recorderState.isRecording ? (
+          <View style={styles.inputBar}>
+            <TouchableOpacity
+              style={styles.attachBtn}
+              onPress={cancelRecording}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="trash-outline" size={21} color={Colors.red} />
+            </TouchableOpacity>
+
+            <View style={[styles.inputWrap, styles.recordWrap]}>
+              <View style={styles.recDot} />
+              <Text style={styles.recTime}>
+                {fmtDuration(recorderState.durationMillis / 1000)}
+              </Text>
+              <Text style={styles.recHint}>Идёт запись…</Text>
+            </View>
+
+            <TouchableOpacity style={styles.sendBtn} onPress={stopAndSendVoice} activeOpacity={0.8}>
+              <Ionicons name="arrow-up" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+        /* Input bar */
         <View style={styles.inputBar}>
           {/* Вложение — слева, как в мессенджерах */}
           <TouchableOpacity
@@ -694,17 +872,32 @@ export default function ChatRoom() {
             />
           </View>
 
-          <TouchableOpacity
-            style={[styles.sendBtn, (!input.trim() || sending || isChatBlocked) && styles.sendBtnDisabled]}
-            onPress={sendMessage}
-            disabled={!input.trim() || sending || isChatBlocked}
-            activeOpacity={0.8}
-          >
-            {sending
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Ionicons name="arrow-up" size={20} color="#fff" />}
-          </TouchableOpacity>
+          {/* Пустое поле — предлагаем записать голосовое, как в мессенджерах */}
+          {!input.trim() && voiceSupported && !isChatBlocked ? (
+            <TouchableOpacity
+              style={styles.sendBtn}
+              onPress={startRecording}
+              disabled={uploadingVoice}
+              activeOpacity={0.8}
+            >
+              {uploadingVoice
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="mic" size={20} color="#fff" />}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.sendBtn, (!input.trim() || sending || isChatBlocked) && styles.sendBtnDisabled]}
+              onPress={sendMessage}
+              disabled={!input.trim() || sending || isChatBlocked}
+              activeOpacity={0.8}
+            >
+              {sending
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="arrow-up" size={20} color="#fff" />}
+            </TouchableOpacity>
+          )}
         </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -861,4 +1054,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
   sendBtnDisabled: { opacity: 0.35 },
+  recordWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  recDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: Colors.red },
+  recTime: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, fontVariant: ['tabular-nums'] },
+  recHint: { fontSize: 13, color: Colors.textMuted },
 });

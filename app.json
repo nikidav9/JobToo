@@ -12,7 +12,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nikidav23.onspaceapp",
-      "buildNumber": "5",
+      "buildNumber": "6",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -25,7 +25,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.nikidav23.onspaceapp",
-      "versionCode": 5,
+      "versionCode": 6,
       "blockedPermissions": [
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.READ_MEDIA_AUDIO",
@@ -66,7 +66,13 @@
       "expo-web-browser",
       "@react-native-community/datetimepicker",
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Разрешите доступ к микрофону, чтобы записывать голосовые сообщения в чате"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
