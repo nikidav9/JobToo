@@ -155,7 +155,10 @@ export interface PermVacancy {
   createdAt: string;
 }
 
-export type PermApplicationStatus = 'pending' | 'approved' | 'rejected';
+// hired — работодатель нажал «Завершить»: кандидат закрыт, карточка ушла из
+// «Мэтчей» в «Завершённые». Сама вакансия при этом остаётся в поиске, закрыть
+// её можно во вкладке «Активные».
+export type PermApplicationStatus = 'pending' | 'approved' | 'rejected' | 'hired';
 
 export interface PermApplication {
   id: string;

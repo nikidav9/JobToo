@@ -228,8 +228,15 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   title: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
-  searchWrap: { paddingHorizontal: 16, paddingBottom: 12 },
-  searchInner: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  // Поиск стоял вплотную к заголовку и читался его частью. Отодвинули и
+  // скруглили до овала — теперь это отдельный элемент, а не продолжение шапки.
+  searchWrap: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 14 },
+  searchInner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.surface, borderRadius: 100,
+    borderWidth: 1, borderColor: Colors.divider,
+    paddingHorizontal: 14, paddingVertical: 10,
+  },
   searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginTop: 12 },

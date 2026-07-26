@@ -255,9 +255,12 @@ export default function ChatRoom() {
   }, [otherId, contextOther]);
 
   const vacancy = vacancies.find(v => v.id === chat?.vacancyId);
+  // Пока собеседник не загрузился, здесь подставлялось название компании. Для
+  // работника это ещё сходило за правду, а работодателю казалось, что он
+  // переписывается с «Лавкой» вместо человека. Лучше пустая строка, чем чужое имя.
   const otherName = other
     ? `${other.firstName} ${other.lastName}`.trim()
-    : (chat?.companyName ?? '');
+    : (isEmployer ? '' : (chat?.companyName ?? ''));
   const otherColor = nameColorFromString(otherId || otherName);
   // Пересчитываем раз в минуту, иначе «5 мин назад» застывает на экране
   const [presenceTick, setPresenceTick] = useState(0);
@@ -961,8 +964,7 @@ export default function ChatRoom() {
             как только человек начал печатать или уже что-то написал в чат. */}
         {showSuggestions ? (
           <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             style={styles.suggestScroll}
             contentContainerStyle={styles.suggestRow}
@@ -1160,12 +1162,19 @@ const styles = StyleSheet.create({
   },
   timestamp: { fontSize: 10, color: Colors.textMuted, marginTop: 4 },
   timestampMe: { color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
+  // Раньше подсказки лежали в ленте, прокручиваемой вбок: видно было две-три,
+  // остальные приходилось искать пальцем. Теперь переносятся на строки и видны
+  // сразу. Высоту ограничиваем, иначе восемь фраз съедят пол-экрана над
+  // клавиатурой — дальше обычная прокрутка вниз.
   suggestScroll: {
-    flexGrow: 0,
+    flexGrow: 0, maxHeight: 168,
     borderTopWidth: 1, borderTopColor: Colors.divider,
     backgroundColor: Colors.bg,
   },
-  suggestRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  suggestRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+    paddingHorizontal: 10, paddingVertical: 8,
+  },
   suggestChip: {
     borderWidth: 1, borderColor: Colors.primaryBorder,
     backgroundColor: Colors.primaryLight,

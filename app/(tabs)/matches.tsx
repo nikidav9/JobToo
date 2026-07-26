@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, RefreshControl,
@@ -17,6 +17,7 @@ import {
   dbSetPermApplicationStatus, dbCreateChat,
 } from '@/services/db';
 import { TabHeader } from '@/components/ui/TabHeader';
+import { useMissingUsers } from '@/hooks/useMissingUsers';
 import {
   notifyWorkerShiftConfirmedByEmployer,
   notifyWorkerShiftCancelled,
@@ -211,6 +212,13 @@ function WorkerMatches() {
   const myLikes = likes.filter(l => l.workerId === currentUser.id && l.workerLiked);
 
   const getVacancy = (id: string) => vacancies.find(v => v.id === id);
+  // Та же история, что и у работодателя: общий список пользователей приходит
+  // не сразу, и без этого в карточке вместо работодателя пусто.
+  const neededEmployerIds = useMemo<string[]>(
+    () => Array.from(new Set(likes.map((l: Like) => l.employerId).filter(Boolean))) as string[],
+    [likes],
+  );
+  const getEmployer = useMissingUsers(users, neededEmployerIds);
 
   const activeItems = myLikes.filter(l => !l.shiftCompleted && !l.cancelled && l.employerLiked !== false);
   const rejectedItems = myLikes.filter(l => l.employerLiked === false);
@@ -224,7 +232,7 @@ function WorkerMatches() {
   const renderItem = ({ item: like }: { item: Like }) => {
     const vac = getVacancy(like.vacancyId);
     if (!vac) return null;
-    const employer = users.find(u => u.id === like.employerId);
+    const employer = getEmployer(like.employerId);
     const isMatch = like.isMatch;
     const isCompleted = like.shiftCompleted;
     const isCancelled = like.cancelled;
@@ -469,6 +477,9 @@ function EmployerMatches() {
   const myPermApps: PermApplication[] = permApplications.filter((a: PermApplication) => a.employerId === currentUser.id);
   const permPending = myPermApps.filter(a => a.status === 'pending');
   const permApproved = myPermApps.filter(a => a.status === 'approved');
+  // hired — работодатель нажал «Завершить»: кандидат закрыт, карточка ушла
+  // из «Мэтчей» в «Завершённые». Сама вакансия при этом остаётся в поиске.
+  const permHired = myPermApps.filter(a => a.status === 'hired');
 
   const needsConfirm = matched.filter(l => !l.employerConfirmed).length;
   const shown: EmployerMatchItem[] =
@@ -482,10 +493,25 @@ function EmployerMatches() {
           ...permApproved.map(app => ({ kind: 'permApp' as const, app })),
           ...matched.map((like: Like) => ({ kind: 'like' as const, like })),
         ]
-      : completed.map((like: Like) => ({ kind: 'like' as const, like }));
+      : [
+          ...permHired.map(app => ({ kind: 'permApp' as const, app })),
+          ...completed.map((like: Like) => ({ kind: 'like' as const, like })),
+        ];
 
   const getVacancy = (id: string) => vacancies.find(v => v.id === id);
-  const getWorker = (id: string) => users.find(u => u.id === id);
+  // Имена работников: общий список приходит не сразу, недостающих догружаем
+  // поимённо — иначе в карточках висит «Работник · Загрузка…».
+  const neededWorkerIds = useMemo(() => {
+    const ids = new Set<string>();
+    permApplications.forEach((a: PermApplication) => {
+      if (a.employerId === currentUser.id) ids.add(a.workerId);
+    });
+    likes.forEach((l: Like) => {
+      if (l.employerId === currentUser.id) ids.add(l.workerId);
+    });
+    return Array.from(ids);
+  }, [permApplications, likes, currentUser.id]);
+  const getWorker = useMissingUsers(users, neededWorkerIds);
 
   const approve = async (like: Like) => {
     setLoading(like.id);
@@ -637,6 +663,25 @@ function EmployerMatches() {
     }
   };
 
+  // Одобренный отклик оставался в «Мэтчах» навсегда: убрать его оттуда было
+  // нечем. Статус hired уводит карточку в «Завершённые».
+  //
+  // Саму вакансию не закрываем — она остаётся в поиске. Закрыть её можно во
+  // вкладке «Активные», и об этом говорим прямо: иначе легко решить, что
+  // вакансия снялась, и потом удивляться новым откликам.
+  const finishPermApp = async (app: PermApplication) => {
+    setLoading(app.id + '_f');
+    try {
+      await dbSetPermApplicationStatus(app.id, 'hired');
+      await refreshPermApplications();
+      showToast('Кандидат закрыт. Вакансия осталась в поиске — закрыть её можно во вкладке «Активные»', 'success');
+    } catch {
+      showToast('Ошибка', 'error');
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const renderPermApp = (app: PermApplication) => {
     const vacancy = permVacancies.find((v: PermVacancy) => v.id === app.vacancyId);
     const worker = getWorker(app.workerId);
@@ -719,6 +764,21 @@ function EmployerMatches() {
             >
               <Ionicons name="chatbubble-outline" size={15} color="#fff" />
               <Text style={s.chatBtnTxt}>Чат</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.finishBtn, actionLoading === app.id + '_f' && { opacity: 0.5 }]}
+              onPress={() => finishPermApp(app)}
+              disabled={!!actionLoading}
+              activeOpacity={0.8}
+            >
+              {actionLoading === app.id + '_f' ? (
+                <ActivityIndicator size="small" color={Colors.green} />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-done" size={15} color={Colors.green} />
+                  <Text style={s.finishBtnTxt}>Завершить</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         ) : (
@@ -966,7 +1026,7 @@ function EmployerMatches() {
         {([
           { key: 'pending',   label: 'Отклики',    count: permPending.length + pending.length },
           { key: 'matched',   label: 'Мэтчи',      count: permApproved.length + matched.length },
-          { key: 'completed', label: 'Завершённые', count: completed.length },
+          { key: 'completed', label: 'Завершённые', count: completed.length + permHired.length },
         ] as const).map(t => (
           <TouchableOpacity
             key={t.key}
@@ -1120,6 +1180,12 @@ const s = StyleSheet.create({
     borderRadius: 100, paddingVertical: 11,
   },
   chatBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  finishBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    borderWidth: 1.5, borderColor: Colors.green,
+    borderRadius: 100, paddingVertical: 11,
+  },
+  finishBtnTxt: { color: Colors.green, fontSize: 14, fontWeight: '700' },
   rateBtn: {
     flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
     backgroundColor: '#FBBF24',

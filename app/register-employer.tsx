@@ -12,6 +12,8 @@ import { PhoneInput } from '@/components/feature/PhoneInput';
 import { useApp } from '@/hooks/useApp';
 import { uid, nowISO, isPhoneComplete, extractPhoneDigits } from '@/services/storage';
 import { dbCheckPhoneExists, dbWarmup } from '@/services/db';
+import { PasswordRules } from '@/components/ui/PasswordRules';
+import { firstUnmetRule } from '@/constants/passwordRules';
 
 // Steps: 1-Phone, 2-Password, 3-Name+Company, 4-Legal
 const TOTAL = 4;
@@ -63,8 +65,9 @@ export default function RegisterEmployer() {
   // Step 2 → 3: validate password
   const continueFromPassword = () => {
     setPassError('');
-    if (password.length < 6) {
-      setPassError('Пароль должен быть не менее 6 символов');
+    const unmet = firstUnmetRule(password);
+    if (unmet) {
+      setPassError(`Пароль не подходит: ${unmet.label.toLowerCase()}`);
       return;
     }
     if (password !== passwordConfirm) {
@@ -145,15 +148,16 @@ export default function RegisterEmployer() {
           {step === 2 && (
             <View style={styles.stepContent}>
               <Text style={styles.title}>Создай пароль</Text>
-              <Text style={styles.subtitle}>Минимум 6 символов. Запомни его — восстановления нет.</Text>
+              <Text style={styles.subtitle}>Запомни его — восстановления нет.</Text>
               <AppInput
                 label="Пароль"
                 value={password}
                 onChangeText={v => { setPassword(v); setPassError(''); }}
                 secureTextEntry
-                placeholder="Минимум 6 символов"
+                placeholder="Придумайте пароль"
                 autoFocus
               />
+              <PasswordRules password={password} />
               <AppInput
                 label="Повторите пароль"
                 value={passwordConfirm}
@@ -163,7 +167,14 @@ export default function RegisterEmployer() {
               />
               {passError ? <Text style={styles.fieldError}>{passError}</Text> : null}
 
-              {/* Forgot password hint */}
+              <PrimaryButton
+                label="Продолжить →"
+                onPress={continueFromPassword}
+                disabled={!password.trim() || !passwordConfirm.trim()}
+              />
+
+              {/* Подсказка про почту стоит после кнопки: она нужна тем, кто
+                  сюда вернётся, и не должна перебивать главное действие */}
               <TouchableOpacity
                 onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Восстановление пароля JobToo`)}
                 activeOpacity={0.8}
@@ -175,12 +186,6 @@ export default function RegisterEmployer() {
                   </Text>
                 </View>
               </TouchableOpacity>
-
-              <PrimaryButton
-                label="Продолжить →"
-                onPress={continueFromPassword}
-                disabled={!password.trim() || !passwordConfirm.trim()}
-              />
             </View>
           )}
 
@@ -259,7 +264,9 @@ const styles = StyleSheet.create({
   stepLabel: { fontSize: 13, color: Colors.textMuted },
   progress: { height: 3, backgroundColor: Colors.divider },
   progressFill: { height: 3, backgroundColor: Colors.primary },
-  body: { padding: 24, paddingBottom: 40 },
+  // flexGrow + center: короткий шаг встаёт по центру экрана, длинный
+  // ведёт себя как обычная прокрутка сверху.
+  body: { padding: 24, paddingBottom: 40, flexGrow: 1, justifyContent: 'center' },
   stepContent: { gap: 16 },
   title: { fontSize: 24, fontWeight: '700', color: Colors.textPrimary },
   subtitle: { fontSize: 14, color: Colors.textMuted, marginTop: -8, lineHeight: 20 },

@@ -65,7 +65,7 @@ export default function Login() {
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
-        style={{ flex: 1, justifyContent: 'flex-end' }}
+        style={{ flex: 1, justifyContent: 'center' }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
@@ -90,16 +90,6 @@ export default function Login() {
         />
         {passError ? <Text style={styles.errText}>{passError}</Text> : null}
 
-        {/* Forgot password */}
-        <TouchableOpacity style={styles.forgotRow} onPress={openSupport} activeOpacity={0.8}>
-          <View style={styles.forgotBanner}>
-            <Text style={styles.forgotText}>
-              Забыли пароль?{' '}
-              <Text style={styles.forgotLink}>Обращайтесь на {SUPPORT_EMAIL}</Text>
-            </Text>
-          </View>
-        </TouchableOpacity>
-
         <View style={{ marginTop: 8 }}>
           {loading ? (
             <ActivityIndicator color={Colors.primary} />
@@ -112,6 +102,17 @@ export default function Login() {
           )}
         </View>
 
+        {/* Порядок внизу: сначала подсказка про почту, «Отмена» — последней.
+            Раньше подсказка стояла над кнопкой «Войти» и перебивала её. */}
+        <TouchableOpacity style={styles.forgotRow} onPress={openSupport} activeOpacity={0.8}>
+          <View style={styles.forgotBanner}>
+            <Text style={styles.forgotText}>
+              Забыли пароль?{' '}
+              <Text style={styles.forgotLink}>Обращайтесь на {SUPPORT_EMAIL}</Text>
+            </Text>
+          </View>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.cancel} onPress={() => router.back()}>
           <Text style={styles.cancelText}>Отмена</Text>
         </TouchableOpacity>
@@ -122,13 +123,14 @@ export default function Login() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
+  safe: { flex: 1, backgroundColor: 'transparent', justifyContent: 'center' },
+  // Раньше это была шторка, прижатая к низу: скруглялись только верхние углы.
+  // Теперь окно стоит по центру, поэтому скругление круговое и есть поля по бокам.
   sheet: {
     backgroundColor: Colors.bg,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 24,
+    marginHorizontal: 16,
     padding: 24,
-    paddingBottom: 40,
     gap: 14,
     // Sheet adapts to keyboard via parent KeyboardAvoidingView
   },

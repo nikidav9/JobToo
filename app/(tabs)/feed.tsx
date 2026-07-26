@@ -254,7 +254,7 @@ function ModeSwitcher({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode
         onPress={() => onChange('shift')}
         activeOpacity={0.8}
       >
-        <Ionicons name="flash" size={14} color={mode === 'shift' ? '#fff' : Colors.textMuted} style={{ marginRight: 4 }} />
+        <Ionicons name="flash" size={14} color={mode === 'shift' ? '#fff' : Colors.textMuted} style={ms.btnIcon} />
         <Text style={[ms.btnTxt, mode === 'shift' && ms.btnTxtActive]}>Смены</Text>
       </TouchableOpacity>
       <TouchableOpacity
@@ -262,7 +262,7 @@ function ModeSwitcher({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode
         onPress={() => onChange('perm')}
         activeOpacity={0.8}
       >
-        <Ionicons name="briefcase" size={14} color={mode === 'perm' ? '#fff' : Colors.textMuted} style={{ marginRight: 4 }} />
+        <Ionicons name="briefcase" size={14} color={mode === 'perm' ? '#fff' : Colors.textMuted} style={ms.btnIcon} />
         <Text style={[ms.btnTxt, mode === 'perm' && ms.btnTxtActive]}>Работа</Text>
       </TouchableOpacity>
     </View>
@@ -276,7 +276,11 @@ const ms = StyleSheet.create({
     borderRadius: 100, padding: 3,
     borderWidth: 1, borderColor: Colors.divider,
   },
-  btn: { flex: 1, borderRadius: 100, paddingVertical: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  // Значок вынесен из потока: пока он стоял слева от текста, центрировалась
+  // вся пара целиком, и надпись уезжала вправо на половину его ширины с
+  // отступом — на 9 пикселей. Теперь по центру стоит именно текст.
+  btn: { flex: 1, borderRadius: 100, paddingVertical: 8, alignItems: 'center', justifyContent: 'center' },
+  btnIcon: { position: 'absolute', left: 12 },
   btnActive: { backgroundColor: Colors.primary },
   btnTxt: { fontSize: 12, fontWeight: '600', color: Colors.textMuted },
   btnTxtActive: { color: '#FFFFFF', fontWeight: '700' },
@@ -1755,6 +1759,10 @@ function EmployerHome() {
   const fabRef = useRef<View>(null);
   const [mode, setMode] = useState<AppMode>('shift');
   const [tab, setTab] = useState<'active' | 'closed'>('active');
+  // Смена раздела — это переход в другое место, а не продолжение прежнего.
+  // Раньше «Закрытые» тянулись из смен в постоянные вакансии, и человек
+  // попадал сразу в архив вместо списка активных.
+  const changeMode = (m: AppMode) => { setMode(m); setTab('active'); };
   const [confirmClose, setConfirmClose] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [workerListModal, setWorkerListModal] = useState<{ vacId: string; type: 'applicants' | 'hired' | 'rejected' } | null>(null);
@@ -1863,7 +1871,7 @@ function EmployerHome() {
       <TabHeader tgAnchor />
 
       <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
-        <ModeSwitcher mode={mode} onChange={setMode} />
+        <ModeSwitcher mode={mode} onChange={changeMode} />
       </View>
 
       <View style={styles.tabs}>
@@ -2279,7 +2287,7 @@ const pS = StyleSheet.create({
   permVacCard: { borderLeftWidth: 3, borderLeftColor: '#7C3AED' },
   permCompany: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   permMetaRow: { gap: 2 },
-  permTagsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  permTagsRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   permSalaryTag: { backgroundColor: '#D1FAE5', borderRadius: 100, paddingHorizontal: 12, paddingVertical: 5 },
   permSalaryTxt: { fontSize: 13, fontWeight: '800', color: Colors.green },
   permScheduleTag: { backgroundColor: Colors.surface, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 5 },
@@ -2438,7 +2446,9 @@ const styles = StyleSheet.create({
   tabLabel2: { fontSize: 15, fontWeight: '500', color: Colors.textMuted },
   tabLabelActive: { fontWeight: '700', color: Colors.textPrimary },
   tabUnderline: { position: 'absolute', bottom: 0, left: '20%', right: '20%', height: 2, backgroundColor: Colors.primary, borderRadius: 1 },
-  vacCard: { backgroundColor: Colors.bg, borderRadius: Radius.lg, padding: 16, ...Shadow.card },
+  // gap, а не отступы у каждого блока: внутри карточки строки шли вплотную —
+  // метро, адрес и плашки с зарплатой слипались в одну кашу.
+  vacCard: { backgroundColor: Colors.bg, borderRadius: Radius.lg, padding: 16, gap: 8, ...Shadow.card },
   vacTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   vacTopRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   vacTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, flex: 1 },
@@ -2448,11 +2458,17 @@ const styles = StyleSheet.create({
   editBtnText: { fontSize: 14 },
   vacMeta: { fontSize: 12, color: Colors.textMuted, marginTop: 4 },
   vacAddress: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  statsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  statBox: { flex: 1, backgroundColor: Colors.surface, borderRadius: 10, padding: 8, alignItems: 'center' },
+  statsRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  // Плитка должна читаться как кнопка: рамка и стрелка в углу. Раньше стрелка
+  // была девятого размера и пряталась под подписью — нажать догадывался не всякий.
+  statBox: {
+    flex: 1, backgroundColor: Colors.surface, borderRadius: 10,
+    paddingVertical: 8, paddingHorizontal: 8, alignItems: 'center',
+    borderWidth: 1, borderColor: Colors.divider,
+  },
   statNum: { fontSize: 18, fontWeight: '800' },
   statLabel: { fontSize: 10, color: Colors.textMuted, textTransform: 'uppercase', marginTop: 2 },
-  statTap: { fontSize: 9, color: Colors.primary, marginTop: 2 },
+  statTap: { position: 'absolute', top: 5, right: 7, fontSize: 12, fontWeight: '700', color: Colors.primary },
   vacProgress: { height: 3, backgroundColor: Colors.divider, borderRadius: 2, marginTop: 10, overflow: 'hidden' },
   vacActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
   candBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.blue, borderRadius: 100, paddingVertical: 8, alignItems: 'center' },

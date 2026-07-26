@@ -5,7 +5,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Modal, Platform,
+  TouchableOpacity, ActivityIndicator, Modal, Platform, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -287,6 +287,23 @@ export default function PermVacancyDetailScreen() {
                 <Text style={[styles.locationValue, { flex: 1 }]}>{vacancy.address}</Text>
               </View>
             ) : null}
+
+            {/* Маршрут до точки. Откуда ехать, Яндекс подставит сам по
+                геопозиции — своего разрешения на неё нам просить не нужно.
+                Есть приложение Карт — откроется оно, нет — браузер. */}
+            {vacancy.lat != null && vacancy.lng != null ? (
+              <TouchableOpacity
+                style={styles.mapBtn}
+                activeOpacity={0.85}
+                onPress={() => {
+                  const url = `https://yandex.ru/maps/?rtext=~${vacancy.lat},${vacancy.lng}&rtt=mt`;
+                  Linking.openURL(url).catch(() => {});
+                }}
+              >
+                <Ionicons name="navigate-outline" size={16} color={Colors.primary} />
+                <Text style={styles.mapBtnTxt}>Смотреть на карте</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         ) : null}
 
@@ -479,6 +496,11 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
 
   locationRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: Colors.surface, borderRadius: 12, padding: 12 },
+  mapBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 12, paddingVertical: 12,
+  },
+  mapBtnTxt: { fontSize: 14, fontWeight: '700', color: Colors.primary },
   locationIcon: { fontSize: 16, marginTop: 1 },
   locationValue: { fontSize: 14, color: Colors.textPrimary, fontWeight: '500', lineHeight: 20 },
   metroDot: { width: 14, height: 14, borderRadius: 7, marginTop: 3 },

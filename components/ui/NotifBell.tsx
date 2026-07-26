@@ -1,8 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, Modal, StyleSheet,
-  ScrollView, SafeAreaView, ActivityIndicator,
+  ScrollView, ActivityIndicator,
 } from 'react-native';
+// Именно отсюда, а не из react-native: тот SafeAreaView работает только на
+// iOS, а на Android остаётся обычным контейнером. Из-за этого содержимое
+// окна залезало под часы и значок сети — на айфоне всё выглядело нормально,
+// а на андроидах нет.
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useApp } from '@/hooks/useApp';
@@ -134,7 +139,7 @@ export function NotifBell() {
       </TouchableOpacity>
 
       <Modal statusBarTranslucent navigationBarTranslucent visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
-        <SafeAreaView style={s.sheet}>
+        <SafeAreaView style={s.sheet} edges={['top', 'bottom', 'left', 'right']}>
           <View style={s.header}>
             <Text style={s.title}>Уведомления</Text>
             <View style={s.headerRight}>
