@@ -423,7 +423,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Immediate poll on mount so new data appears right after login
     poll();
     const interval = setInterval(poll, WEB_POLL_INTERVAL);
-    return () => clearInterval(interval);
+
+    // Отметка «был в сети». Раньше она стояла только в эффекте для нативных,
+    // и у тех, кто заходит с сайта, last_seen_at не появлялся вообще никогда:
+    // в шапке чата у них не было статуса, а в дашборде — последнего входа.
+    const touch = () => { if (user.id) dbTouchLastSeen(user.id); };
+    touch();
+    const seenInterval = setInterval(touch, LAST_SEEN_INTERVAL);
+
+    // Возврат к вкладке — то же, что выход приложения из фона на телефоне.
+    // Вкладку могут держать открытой сутками, поэтому без этого отметка
+    // отставала бы на целый интервал.
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        poll(); touch();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisible);
+    }
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(seenInterval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisible);
+      }
+    };
   }, [currentUser?.id]);
 
   // ─── Polling fallback for native (fires when app comes to foreground) ──────
