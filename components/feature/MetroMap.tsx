@@ -110,7 +110,7 @@ ymaps.ready(function(){
   var clusterer=new ymaps.Clusterer({
     preset:'islands#invertedOrangeClusterIcons',
     groupByCoordinates:false,
-    clusterDisableClickZoom:false,
+    clusterDisableClickZoom:true,
     clusterOpenBalloonOnClick:false,
     gridSize:72,
     minClusterSize:2
@@ -119,7 +119,7 @@ ymaps.ready(function(){
   var marks=[],coords=[];
   PTS.forEach(function(p){
     var pm=new ymaps.Placemark([p.lat,p.lng],
-      {company:p.company,count:p.count,hintContent:p.address},
+      {company:p.company,count:p.count,hintContent:p.address,key:p.key},
       {iconLayout:PinLayout,
        // Область метки нужна, иначе Яндекс не знает её размеров и клик
        // не попадает по «таблетке»
@@ -128,6 +128,22 @@ ymaps.ready(function(){
     marks.push(pm);
     coords.push([p.lat,p.lng]);
   });
+  // Нажатие на кружок с числом. Раньше оно только приближало карту, а когда
+  // приближать было некуда — точки стоят почти в одной координате или зум уже
+  // на пределе — не происходило вообще ничего. Теперь в этом случае открываем
+  // список всем содержимым кружка.
+  clusterer.events.add('click',function(e){
+    var t=e.get('target');
+    if(!t.getGeoObjects) return;               // одиночная метка — у неё свой обработчик
+    var keys=t.getGeoObjects().map(function(g){return g.properties.get('key');});
+    var b=t.getBounds&&t.getBounds();
+    var spread=b?Math.max(Math.abs(b[0][0]-b[1][0]),Math.abs(b[0][1]-b[1][1])):0;
+    if(map.getZoom()<17&&spread>2e-5){
+      try{map.setBounds(b,{checkZoomRange:true,zoomMargin:60});return;}catch(err){}
+    }
+    send(keys.join('|'));
+  });
+
   clusterer.add(marks);
   map.geoObjects.add(clusterer);
 
@@ -244,10 +260,18 @@ export function MetroMap({
     [placed],
   );
 
-  const sheetPlace = sheetKey ? places.find(p => p.key === sheetKey) ?? null : null;
+  // В ключе может быть несколько адресов через «|» — так приходит нажатие на
+  // кружок с числом, когда разводить его приближением уже некуда.
+  const sheetKeys = useMemo(() => (sheetKey ? sheetKey.split('|').filter(Boolean) : []), [sheetKey]);
+  const sheetPlaces = useMemo(
+    () => places.filter(p => sheetKeys.includes(p.key)),
+    [places, sheetKeys],
+  );
+  const sheetPlace = sheetPlaces[0] ?? null;
+  const isCluster = sheetPlaces.length > 1;
   const placeItems = useMemo(
-    () => (sheetKey ? items.filter(i => placeKey(i) === sheetKey) : []),
-    [items, sheetKey],
+    () => (sheetKeys.length ? items.filter(i => sheetKeys.includes(placeKey(i))) : []),
+    [items, sheetKeys],
   );
   const sheetLine = sheetPlace?.station
     ? METRO_LINES.find(l => l.stations.includes(sheetPlace.station)) ?? null
@@ -384,11 +408,15 @@ export function MetroMap({
               <View {...pan.panHandlers}>
                 <View style={s.grabWrap}><View style={s.grab} /></View>
                 <View style={s.sheetHead}>
-                  {sheetLine ? <View style={[s.lineDot, { backgroundColor: sheetLine.color }]} /> : null}
+                  {!isCluster && sheetLine ? <View style={[s.lineDot, { backgroundColor: sheetLine.color }]} /> : null}
                   <View style={{ flex: 1 }}>
-                    <Text style={s.sheetTitle} numberOfLines={2}>{sheetPlace.address}</Text>
+                    <Text style={s.sheetTitle} numberOfLines={2}>
+                      {isCluster
+                        ? `${sheetPlaces.length} ${plural(sheetPlaces.length, 'адрес', 'адреса', 'адресов')} рядом`
+                        : sheetPlace.address}
+                    </Text>
                     <Text style={s.sheetSub}>
-                      {sheetPlace.station ? `м. ${sheetPlace.station} · ` : ''}
+                      {!isCluster && sheetPlace.station ? `м. ${sheetPlace.station} · ` : ''}
                       {placeItems.length} {plural(placeItems.length, 'вариант', 'варианта', 'вариантов')}
                     </Text>
                   </View>
@@ -400,7 +428,7 @@ export function MetroMap({
 
               {/* Кнопка «все» закреплена сразу под шапкой: в половинном
                   положении низ шторки уходит за край экрана */}
-              {sheetPlace.station ? (
+              {!isCluster && sheetPlace.station ? (
                 <TouchableOpacity style={s.allBtn} activeOpacity={0.85} onPress={() => onSelect(sheetPlace.station)}>
                   <Text style={s.allBtnTxt}>Смотреть все на станции</Text>
                   <Ionicons name="arrow-forward" size={15} color="#fff" />
@@ -421,6 +449,10 @@ export function MetroMap({
                     <View style={{ flex: 1 }}>
                       <Text style={s.rowTitle} numberOfLines={1}>{it.title}</Text>
                       <Text style={s.rowCompany} numberOfLines={1}>{normalizeCompany(it.company)}</Text>
+                      {/* Внутри кружка адреса разные — подписываем каждую строку */}
+                      {isCluster && it.address ? (
+                        <Text style={s.rowMeta} numberOfLines={1}>{it.address}</Text>
+                      ) : null}
                       {it.meta ? <Text style={s.rowMeta} numberOfLines={1}>{it.meta}</Text> : null}
                     </View>
                     {it.pay ? <Text style={s.rowPay}>{it.pay}</Text> : null}
