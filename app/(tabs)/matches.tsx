@@ -701,18 +701,22 @@ function EmployerMatches() {
     const isLoading = actionLoading === app.id;
     const isDLoading = actionLoading === app.id + '_d';
     const isApproved = app.status === 'approved';
+    // Завершённый отклик — состояние конечное: решать по нему уже нечего,
+    // и кнопки «Подходит / Не подходит» здесь были бы предложением заново
+    // выбрать то, что выбрано.
+    const isHired = app.status === 'hired';
+
+    const badge = isHired
+      ? { bg: '#EEF2FF', color: '#4F46E5', icon: 'checkmark-done' as const, text: 'Кандидат закрыт' }
+      : isApproved
+      ? { bg: '#D1FAE5', color: Colors.green, icon: 'checkmark-circle' as const, text: 'Одобрен на вакансию' }
+      : { bg: '#EEF2FF', color: '#4F46E5', icon: 'briefcase-outline' as const, text: 'Отклик на вакансию' };
 
     return (
       <View style={[s.card, isApproved && s.matchedCard]}>
-        <View style={[s.statusBadge, { backgroundColor: isApproved ? '#D1FAE5' : '#EEF2FF' }]}>
-          <Ionicons
-            name={isApproved ? 'checkmark-circle' : 'briefcase-outline'}
-            size={14}
-            color={isApproved ? Colors.green : '#4F46E5'}
-          />
-          <Text style={[s.statusTxt, { color: isApproved ? Colors.green : '#4F46E5' }]}>
-            {isApproved ? 'Одобрен на вакансию' : 'Отклик на вакансию'}
-          </Text>
+        <View style={[s.statusBadge, { backgroundColor: badge.bg }]}>
+          <Ionicons name={badge.icon} size={14} color={badge.color} />
+          <Text style={[s.statusTxt, { color: badge.color }]}>{badge.text}</Text>
         </View>
 
         <TouchableOpacity
@@ -760,7 +764,23 @@ function EmployerMatches() {
 
         <Text style={s.vacLabel}>{vacancy?.title ?? 'Вакансия'} · Постоянная работа</Text>
 
-        {isApproved ? (
+        {isHired ? (
+          // Только переписка: решение принято, завершать больше нечего
+          <View style={s.actionRow}>
+            <TouchableOpacity
+              style={s.chatBtn}
+              onPress={() => {
+                const c = chats.find((c: Chat) => c.employerId === app.employerId && c.workerId === app.workerId);
+                if (c) router.push({ pathname: '/chat-room', params: { chatId: c.id } });
+                else router.push({ pathname: '/(tabs)/chats' });
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble-outline" size={15} color="#fff" />
+              <Text style={s.chatBtnTxt}>Чат</Text>
+            </TouchableOpacity>
+          </View>
+        ) : isApproved ? (
           <View style={s.actionRow}>
             <TouchableOpacity
               style={s.chatBtn}

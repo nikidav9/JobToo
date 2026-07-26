@@ -307,8 +307,11 @@ export default function ChatRoom() {
     if (chat.bulletinId || chat.workerSlotId) { setLikeStatus(null); return; }
     // Постоянная вакансия — статус берём из отклика, а не из лайков
     if (permVacancy) {
+      // hired — тоже решённый: иначе после «Завершить» чат снова предложил бы
+      // выбрать «Подходит / Не подходит» по уже закрытому кандидату.
       setLikeStatus(permApp
-        ? (permApp.status === 'approved' ? 'approved' : permApp.status === 'rejected' ? 'rejected' : 'pending')
+        ? (permApp.status === 'approved' || permApp.status === 'hired' ? 'approved'
+          : permApp.status === 'rejected' ? 'rejected' : 'pending')
         : null);
       return;
     }

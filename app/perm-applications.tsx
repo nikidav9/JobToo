@@ -29,6 +29,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
   pending:  { label: '⏳ На рассмотрении', color: '#92400E', bg: '#FFF7ED' },
   approved: { label: '✅ Одобрено',        color: Colors.green, bg: '#D1FAE5' },
   rejected: { label: '✕ Отказ',           color: Colors.red,   bg: '#FEE2E2' },
+  hired:    { label: '✅ Кандидат закрыт', color: '#4F46E5',    bg: '#EEF2FF' },
 };
 
 export default function PermApplicationsScreen() {
@@ -108,7 +109,9 @@ export default function PermApplicationsScreen() {
     if (!worker) return null;
     const name = `${worker.firstName} ${worker.lastName}`;
     const color = nameColorFromString(worker.id);
-    const status = STATUS_LABELS[app.status];
+    // Подстраховка: неизвестный статус не должен ронять экран. Раньше здесь
+    // читалось status.bg у undefined, и один новый статус клал весь список.
+    const status = STATUS_LABELS[app.status] ?? STATUS_LABELS.pending;
     const isLoading = actionLoading === app.id;
     const isRLoading = actionLoading === app.id + '_r';
 

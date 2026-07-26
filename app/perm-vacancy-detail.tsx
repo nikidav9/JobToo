@@ -80,7 +80,9 @@ export default function PermVacancyDetailScreen() {
   }, [permApplications, currentUser, vacancy]);
 
   const isApplied = !!myApp;
-  const isApproved = myApp?.status === 'approved';
+  // hired значит «кандидата закрыли» — для работника это тот же одобренный
+  // отклик, просто работодатель уже завершил подбор.
+  const isApproved = myApp?.status === 'approved' || myApp?.status === 'hired';
   const isSaved = vacancy ? permSavedIds.includes(vacancy.id) : false;
 
   const metroLine = vacancy?.metroStation
