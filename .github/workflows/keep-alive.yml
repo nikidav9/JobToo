@@ -10,10 +10,18 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
+      # Стучимся через свой прокси, а не напрямую публичным ключом: после
+      # закрытия базы тот получал бы отказ и грел бы воздух. Прокси ходит под
+      # сервисным ключом, и dbWarmup делает настоящее чтение.
       - name: Ping Supabase
+        env:
+          APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
         run: |
-          curl -sf \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/jm_users?limit=1" \
-            -o /dev/null && echo "✅ Supabase is warm" || echo "⚠️ Ping failed (non-critical)"
+          SECRET="${APP_SECRET:-ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6}"
+          RESP=$(curl -s -m 20 -X POST "https://jobtoo.ru/api/db.php" \
+            -H "Content-Type: application/json" \
+            -H "X-App-Secret: $SECRET" \
+            -d '{"fn":"dbWarmup","args":[]}')
+          echo "$RESP" | grep -q '"data"' \
+            && echo "База отвечает" \
+            || { echo "Прогрев не прошёл: $RESP"; exit 1; }

@@ -634,6 +634,10 @@ try {
             sb_upsert('jm_users', $args[0], 'id'); break;
 
         case 'dbWarmup':
+            // Раньше просто возвращалось true — прогревался только PHP, а сама
+            // база оставалась холодной. Теперь делаем самое дешёвое чтение:
+            // этим же вызовом её будит и расписание раз в пять минут.
+            try { sb_select('jm_users', ['limit' => '1'], 'id'); } catch (\Throwable $e) {}
             $data = true; break;
 
         case 'dbDeleteUser':
