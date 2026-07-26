@@ -373,7 +373,12 @@ function WorkerMatches() {
       <View style={s.tabStrip}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={s.tabItem} onPress={() => setTab(t.key)} activeOpacity={0.8}>
-            <Text style={[s.tabLabel, tab === t.key && s.tabLabelActive]}>
+            <Text
+              style={[s.tabLabel, tab === t.key && s.tabLabelActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {t.label}{t.count > 0 ? ` (${t.count})` : ''}
             </Text>
             {tab === t.key ? <View style={s.tabUnderline} /> : null}
@@ -1063,7 +1068,12 @@ function EmployerMatches() {
             onPress={() => { tabTouched.current = true; setTab(t.key); }}
             activeOpacity={0.8}
           >
-            <Text style={[s.tabLabel, tab === t.key && s.tabLabelActive]}>
+            <Text
+              style={[s.tabLabel, tab === t.key && s.tabLabelActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {t.label}{t.count > 0 ? ` (${t.count})` : ''}
             </Text>
             {tab === t.key ? <View style={s.tabUnderline} /> : null}
@@ -1130,8 +1140,13 @@ const s = StyleSheet.create({
   },
   urgentBadgeTxt: { color: '#92400E', fontSize: 12, fontWeight: '700' },
   tabStrip: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.divider },
-  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 12 },
-  tabLabel: { fontSize: 14, fontWeight: '500', color: Colors.textMuted },
+  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 2 },
+  // Подпись всегда в одну строку. Активная вкладка становится жирной и шире —
+  // «Завершённые (4)» переставало влезать и переносилось на вторую строку,
+  // отчего вся полоса подпрыгивала при переключении. Теперь вместо переноса
+  // текст чуть ужимается, и строка стоит на месте при любой ширине экрана и
+  // любом системном размере шрифта.
+  tabLabel: { fontSize: 14, fontWeight: '500', color: Colors.textMuted, textAlign: 'center' },
   tabLabelActive: { fontWeight: '700', color: Colors.textPrimary },
   tabUnderline: {
     position: 'absolute', bottom: 0, left: '20%', right: '20%',
