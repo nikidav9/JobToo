@@ -18,6 +18,9 @@ import {
 } from '@/services/db';
 import { TabHeader } from '@/components/ui/TabHeader';
 import { useMissingUsers } from '@/hooks/useMissingUsers';
+import { workerLikes, workerActive, workerRejected, workerCompleted,
+  employerLikes, employerPending, employerMatched, employerCompleted,
+  employerPermApps } from '@/services/matchCounts';
 import {
   notifyWorkerShiftConfirmedByEmployer,
   notifyWorkerShiftCancelled,
@@ -211,7 +214,7 @@ function WorkerMatches() {
 
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
-  const myLikes = likes.filter(l => l.workerId === currentUser.id && l.workerLiked);
+  const myLikes = workerLikes(likes, currentUser.id);
 
   const getVacancy = (id: string) => vacancies.find(v => v.id === id);
   // Та же история, что и у работодателя: общий список пользователей приходит
@@ -222,9 +225,9 @@ function WorkerMatches() {
   );
   const getEmployer = useMissingUsers(users, neededEmployerIds);
 
-  const activeItems = myLikes.filter(l => !l.shiftCompleted && !l.cancelled && l.employerLiked !== false);
-  const rejectedItems = myLikes.filter(l => l.employerLiked === false);
-  const completedItems = myLikes.filter(l => l.shiftCompleted || l.cancelled);
+  const activeItems = workerActive(myLikes);
+  const rejectedItems = workerRejected(myLikes);
+  const completedItems = workerCompleted(myLikes);
 
   const shownItems =
     tab === 'active' ? activeItems :
@@ -451,14 +454,12 @@ function EmployerMatches() {
   // иначе директор видит пустые «Отклики» и думает, что кандидатов нет вовсе
   useEffect(() => {
     if (!currentUser || tabTouched.current || autoSwitched.current) return;
-    const myIds = vacancies.filter((v: Vacancy) => v.employerId === currentUser.id).map((v: Vacancy) => v.id);
-    const myLikes = likes.filter((l: Like) => myIds.includes(l.vacancyId) && l.workerLiked);
+    const myLikes = employerLikes(likes, vacancies, currentUser.id);
+    const perm = employerPermApps(permApplications, currentUser.id);
     const pendingCount =
-      myLikes.filter((l: Like) => !l.isMatch && l.employerLiked !== false).length +
-      permApplications.filter((a: PermApplication) => a.employerId === currentUser.id && a.status === 'pending').length;
+      employerPending(myLikes).length + perm.filter(a => a.status === 'pending').length;
     const matchedCount =
-      myLikes.filter((l: Like) => l.isMatch && !l.shiftCompleted).length +
-      permApplications.filter((a: PermApplication) => a.employerId === currentUser.id && a.status === 'approved').length;
+      employerMatched(myLikes).length + perm.filter(a => a.status === 'approved').length;
     if (pendingCount === 0 && matchedCount > 0) {
       autoSwitched.current = true;
       setTab('matched');
@@ -474,14 +475,14 @@ function EmployerMatches() {
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
   const myVacIds = vacancies.filter(v => v.employerId === currentUser.id).map(v => v.id);
-  const allLikes = likes.filter(l => myVacIds.includes(l.vacancyId) && l.workerLiked);
+  const allLikes = employerLikes(likes, vacancies, currentUser.id);
 
-  const pending = allLikes.filter(l => !l.isMatch && l.employerLiked !== false);
-  const matched = allLikes.filter(l => l.isMatch && !l.shiftCompleted && !l.cancelled);
-  const completed = allLikes.filter(l => l.isMatch && (l.shiftCompleted || l.cancelled));
+  const pending = employerPending(allLikes);
+  const matched = employerMatched(allLikes);
+  const completed = employerCompleted(allLikes);
 
   // Отклики на постоянные вакансии — тоже сюда, а не только на карточку вакансии
-  const myPermApps: PermApplication[] = permApplications.filter((a: PermApplication) => a.employerId === currentUser.id);
+  const myPermApps: PermApplication[] = employerPermApps(permApplications, currentUser.id);
   const permPending = myPermApps.filter(a => a.status === 'pending');
   const permApproved = myPermApps.filter(a => a.status === 'approved');
   // hired — работодатель нажал «Завершить»: кандидат закрыт, карточка ушла

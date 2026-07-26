@@ -16,6 +16,7 @@ import NotificationPermissionSheet from '@/components/NotificationPermissionShee
 import EntryTransition from '@/components/EntryTransition';
 import { OnboardingOverlay } from '@/components/OnboardingOverlay';
 import { setOnboardingTarget } from '@/lib/onboardingTargets';
+import { matchBadgeCount } from '@/services/matchCounts';
 
 import { rs, rf } from '@/constants/scale';
 
@@ -192,6 +193,7 @@ export default function TabLayout() {
   const unreadCount = app?.unreadCount ?? 0;
   const likes = app?.likes ?? [];
   const vacancies = app?.vacancies ?? [];
+  const permApplications = app?.permApplications ?? [];
   const isWorker = currentUser?.role === 'worker';
   const navigation = useNavigation();
 
@@ -206,35 +208,14 @@ export default function TabLayout() {
   }, []);
 
   // ─── Match badge ─────────────────────────────────────────────────────────
-  const matchBadge = (() => {
-    if (!currentUser) return 0;
-    if (isWorker) {
-      const awaiting = likes.filter(l =>
-        l.workerId === currentUser.id && l.workerLiked && l.employerLiked === null && !l.isMatch
-      ).length;
-      const rejected = likes.filter(l =>
-        l.workerId === currentUser.id && l.workerLiked && l.employerLiked === false
-      ).length;
-      const matched = likes.filter(l =>
-        l.workerId === currentUser.id && l.isMatch && !l.shiftCompleted
-      ).length;
-      const needsRating = likes.filter(l =>
-        l.workerId === currentUser.id && l.isMatch && l.shiftCompleted && !l.workerRated
-      ).length;
-      return awaiting + rejected + matched + needsRating;
-    }
-    const myVacIds = vacancies.filter(v => v.employerId === currentUser.id).map(v => v.id);
-    const pending = likes.filter(l =>
-      myVacIds.includes(l.vacancyId) && l.workerLiked && l.employerLiked === null && !l.isMatch
-    ).length;
-    const matched = likes.filter(l =>
-      myVacIds.includes(l.vacancyId) && l.isMatch && !l.shiftCompleted
-    ).length;
-    const needsRating = likes.filter(l =>
-      myVacIds.includes(l.vacancyId) && l.isMatch && l.shiftCompleted && !l.employerRated
-    ).length;
-    return pending + matched + needsRating;
-  })();
+  // Считаем тем же кодом, что и вкладки внутри экрана, — см. services/matchCounts.ts.
+  const matchBadge = currentUser
+    ? matchBadgeCount({
+        role: isWorker ? 'worker' : 'employer',
+        userId: currentUser.id,
+        likes, vacancies, permApplications,
+      })
+    : 0;
 
   const tabs: TabDef[] = [
     {
