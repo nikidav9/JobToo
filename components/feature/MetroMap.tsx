@@ -30,6 +30,9 @@ export type MapListItem = {
 
 /** Точка на карте — один адрес со всеми вакансиями, которые на нём висят */
 type Place = {
+  /** Ключи адресов, попавших в эту метку. Обычно один, но один и тот же дом
+   *  встречается в базе с разным написанием — такие метки сливаются. */
+  keys: string[];
   key: string;
   address: string;
   station: string;
@@ -119,12 +122,12 @@ ymaps.ready(function(){
   var marks=[],coords=[];
   PTS.forEach(function(p){
     var pm=new ymaps.Placemark([p.lat,p.lng],
-      {company:p.company,count:p.count,hintContent:p.address,key:p.key},
+      {company:p.company,count:p.count,hintContent:p.address,key:p.keys.join('|')},
       {iconLayout:PinLayout,
        // Область метки нужна, иначе Яндекс не знает её размеров и клик
        // не попадает по «таблетке»
        iconShape:{type:'Rectangle',coordinates:[[-95,-62],[95,0]]}});
-    pm.events.add('click',function(){send(p.key);});
+    pm.events.add('click',function(){send(p.keys.join('|'));});
     marks.push(pm);
     coords.push([p.lat,p.lng]);
   });
@@ -135,7 +138,8 @@ ymaps.ready(function(){
   clusterer.events.add('click',function(e){
     var t=e.get('target');
     if(!t.getGeoObjects) return;               // одиночная метка — у неё свой обработчик
-    var keys=t.getGeoObjects().map(function(g){return g.properties.get('key');});
+    var keys=[];
+    t.getGeoObjects().forEach(function(g){keys=keys.concat(String(g.properties.get('key')).split('|'));});
     var b=t.getBounds&&t.getBounds();
     var spread=b?Math.max(Math.abs(b[0][0]-b[1][0]),Math.abs(b[0][1]-b[1][1])):0;
     if(map.getZoom()<17&&spread>2e-5){
@@ -197,6 +201,7 @@ export function MetroMap({
       const metro = i.station ? METRO_COORDS[i.station] : undefined;
       const exact = i.lat != null ? [i.lat, i.lng ?? null] : geo ?? null;
       m.set(key, {
+        keys: [key],
         key,
         address: i.address?.trim() || (i.station ? `м. ${i.station}` : ''),
         station: i.station,
@@ -209,7 +214,28 @@ export function MetroMap({
         approx: !exact && !!metro,
       });
     }
-    return Array.from(m.values());
+
+    // Один и тот же дом попадает в базу с разным написанием: «Домостроиельная»
+    // и «Домостроительная», «проезд, 7» и «проезд,7». Адреса разные, а точка
+    // одна — и на карте выходили две метки в одной координате. Кружок с числом
+    // над ними не разлетался ни при каком приближении: разводить нечего.
+    // Поэтому метки с совпадающими координатами склеиваем в одну.
+    const byCoord = new Map<string, Place>();
+    const out: Place[] = [];
+    for (const pl of m.values()) {
+      if (pl.lat == null || pl.lng == null) { out.push(pl); continue; }
+      // Пять знаков после запятой — около метра: ближе домов не бывает
+      const ck = `${pl.lat.toFixed(5)},${pl.lng.toFixed(5)}`;
+      const same = byCoord.get(ck);
+      if (same) {
+        same.count += pl.count;
+        same.keys.push(...pl.keys);
+        continue;
+      }
+      byCoord.set(ck, pl);
+      out.push(pl);
+    }
+    return out;
   }, [items, extra]);
 
   // Догеокодируем адреса, у которых координат так и не нашлось: у вакансий,
@@ -264,7 +290,7 @@ export function MetroMap({
   // кружок с числом, когда разводить его приближением уже некуда.
   const sheetKeys = useMemo(() => (sheetKey ? sheetKey.split('|').filter(Boolean) : []), [sheetKey]);
   const sheetPlaces = useMemo(
-    () => places.filter(p => sheetKeys.includes(p.key)),
+    () => places.filter(p => p.keys.some(k => sheetKeys.includes(k))),
     [places, sheetKeys],
   );
   const sheetPlace = sheetPlaces[0] ?? null;
