@@ -16,6 +16,7 @@ import { dbDeleteChat } from '@/services/db';
 import { TabHeader } from '@/components/ui/TabHeader';
 
 import { rs, rf } from '@/constants/scale';
+import { messagePreview } from '@/services/messagePreview';
 
 const { width: SW } = Dimensions.get('window');
 const DELETE_THRESHOLD = -80;
@@ -121,7 +122,7 @@ function ChatRow({ item, currentUser, users, onPress, onDelete }: {
             </View>
             <Text style={styles.chatVac} numberOfLines={1}>{item.vacTitle}</Text>
             <Text style={styles.chatLast} numberOfLines={1}>
-              {last ? last.text : ''}
+              {messagePreview(last?.text)}
             </Text>
           </View>
           {unread > 0 ? (

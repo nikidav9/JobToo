@@ -28,6 +28,8 @@ import { useIsFocused } from '@react-navigation/native';
 import { getSupabaseClient } from '@/template';
 import { getChatSuggestions } from '@/constants/chatSuggestions';
 import { isOnline, lastSeenLabel } from '@/services/presence';
+import { IMG_PREFIX, VOICE_PREFIX, isImageMessage, imageUrlOf,
+  isVoiceMessage, voiceOf } from '@/services/messagePreview';
 import { WebVoiceRecording, webVoiceSupported, type VoiceClip } from '@/services/webVoice';
 
 import { rs, rf } from '@/constants/scale';
@@ -97,19 +99,8 @@ const vb = StyleSheet.create({
 const INPUT_MIN_H = 22;
 const INPUT_MAX_H = 108;
 
-// Фото передаём тем же текстовым полем сообщения: URL с меткой.
-// Так не нужна миграция таблицы сообщений.
-const IMG_PREFIX = '[img]';
-const isImageMessage = (t: string) => t.startsWith(IMG_PREFIX);
-const imageUrlOf = (t: string) => t.slice(IMG_PREFIX.length);
-
-// Голосовое: [voice]<url>|<секунды>
-const VOICE_PREFIX = '[voice]';
-const isVoiceMessage = (t: string) => t.startsWith(VOICE_PREFIX);
-const voiceOf = (t: string) => {
-  const [url, sec] = t.slice(VOICE_PREFIX.length).split('|');
-  return { url, sec: Number(sec) || 0 };
-};
+// Метки фото и голосовых живут в services/messagePreview.ts: их разбирает
+// не только этот экран, но и список чатов, и дашборд.
 const MONTHS_RU = ['января','февраля','марта','апреля','мая','июня','июля',
   'августа','сентября','октября','ноября','декабря'];
 

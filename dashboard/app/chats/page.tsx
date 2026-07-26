@@ -2,6 +2,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react'
 import { fetchChats } from '@/lib/queries'
 import { useRealtime } from '@/lib/useRealtime'
+import { messagePreview } from '@/lib/messagePreview'
 
 function timeLabel(iso: string) {
   const d = new Date(iso)
@@ -160,9 +161,10 @@ export default function ChatsPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
                     <div style={{ fontSize: 11.5, color: 'var(--ink-4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
                       {chat.lastMessage
-                        ? (chat.lastMessage.text.length > 40
-                            ? chat.lastMessage.text.slice(0, 40) + '…'
-                            : chat.lastMessage.text)
+                        ? (() => {
+                            const p = messagePreview(chat.lastMessage.text)
+                            return p.length > 40 ? p.slice(0, 40) + '…' : p
+                          })()
                         : 'Нет сообщений'}
                     </div>
                     {unread > 0 && (
@@ -293,7 +295,7 @@ export default function ChatsPage() {
                         display: 'inline-block', fontSize: 11.5, color: 'var(--ink-4)',
                         background: 'var(--bg-sunken)', border: '1px solid var(--line)',
                         borderRadius: 12, padding: '4px 12px',
-                      }}>{msg.text}</span>
+                      }}>{messagePreview(msg.text)}</span>
                     </div>
                   )
                 }
@@ -342,7 +344,7 @@ export default function ChatsPage() {
                         boxShadow: 'var(--shadow-sm)',
                         wordBreak: 'break-word',
                       }}>
-                        {msg.text}
+                        {messagePreview(msg.text)}
                       </div>
                       <div style={{
                         fontSize: 10.5, color: 'var(--ink-4)', marginTop: 3,
