@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Modal, KeyboardAvoidingView, Platform,
-  ActivityIndicator, FlatList, LayoutAnimation, UIManager,
+  ActivityIndicator, FlatList, LayoutAnimation, UIManager, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -30,6 +30,7 @@ const COMPANY_OPTIONS = ['Лавка'] as const;
 type CompanyOption = typeof COMPANY_OPTIONS[number];
 import { METRO_LINES } from '@/constants/metro';
 import { NotifBell } from '@/components/ui/NotifBell';
+import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 
 type EditSection = 'personal' | 'metro' | 'worktypes' | 'company' | 'bio' | null;
@@ -76,6 +77,7 @@ const rS = StyleSheet.create({
 function RatingsModal({ userId, users, onClose }: { userId: string; users: any[]; onClose: () => void }) {
   const [ratings, setRatings] = useState<UserRating[]>([]);
   const [loading, setLoading] = useState(true);
+  const reviewsSwipe = useSwipeToDismiss(onClose);
 
   const fetchRatings = () => {
     dbGetRatingsForUser(userId)
@@ -156,13 +158,13 @@ function RatingsModal({ userId, users, onClose }: { userId: string; users: any[]
   return (
     <Modal statusBarTranslucent navigationBarTranslucent visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={rmS.overlay}>
-        <View style={rmS.sheet}>
-          <View style={rmS.handle} />
-          <View style={rmS.header}>
-            <Text style={rmS.title}>Мои отзывы</Text>
-            <TouchableOpacity onPress={onClose} style={rmS.closeBtn}>
-              <Text style={rmS.closeTxt}>✕</Text>
-            </TouchableOpacity>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+        <Animated.View style={[rmS.sheet, reviewsSwipe.animStyle]}>
+          <View {...reviewsSwipe.panHandlers}>
+            <SheetHandle />
+            <View style={rmS.header}>
+              <Text style={rmS.title}>Мои отзывы</Text>
+            </View>
           </View>
 
           {/* Summary */}
@@ -199,7 +201,7 @@ function RatingsModal({ userId, users, onClose }: { userId: string; users: any[]
               showsVerticalScrollIndicator={false}
             />
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -208,11 +210,8 @@ function RatingsModal({ userId, users, onClose }: { userId: string; users: any[]
 const rmS = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: Colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '85%' },
-  handle: { width: 36, height: 4, backgroundColor: Colors.inputBorder, borderRadius: 2, alignSelf: 'center', marginTop: 12 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
   title: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
-  closeBtn: { padding: 4 },
-  closeTxt: { fontSize: 18, color: Colors.textMuted },
   summary: {
     flexDirection: 'row', alignItems: 'center', gap: 16,
     marginHorizontal: 16, marginBottom: 8,

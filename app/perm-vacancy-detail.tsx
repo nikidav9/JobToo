@@ -5,7 +5,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Modal, Platform, Linking,
+  TouchableOpacity, ActivityIndicator, Modal, Platform, Linking, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,7 @@ import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { normalizeCompany } from '@/services/storage';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
+import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import {
   dbApplyPermVacancy,
   dbAddPermSaved,
@@ -86,6 +87,8 @@ export default function PermVacancyDetailScreen() {
     ? METRO_LINES.find(l => l.stations.includes(vacancy.metroStation!)) ?? null
     : null;
 
+  const authSwipe = useSwipeToDismiss(() => setAuthModalDismissed(true), showAuthModal);
+
   const authModalJSX = (
     <Modal statusBarTranslucent navigationBarTranslucent
       visible={showAuthModal}
@@ -94,14 +97,10 @@ export default function PermVacancyDetailScreen() {
       onRequestClose={() => setAuthModalDismissed(true)}
     >
       <View style={styles.authOverlay}>
-        <View style={styles.authSheet}>
-          <TouchableOpacity
-            style={styles.authClose}
-            onPress={() => setAuthModalDismissed(true)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="close" size={18} color={Colors.textMuted} />
-          </TouchableOpacity>
+        {/* Затемнение тоже закрывает: без крестика нужен запасной путь наружу */}
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setAuthModalDismissed(true)} />
+        <Animated.View style={[styles.authSheet, authSwipe.animStyle]}>
+          <View {...authSwipe.panHandlers} style={{ alignSelf: 'stretch' }}><SheetHandle /></View>
           <Ionicons name="hand-left-outline" size={36} color={Colors.primary} style={{ marginBottom: 10, marginTop: 4 }} />
           <Text style={styles.authTitle}>Войдите, чтобы откликнуться</Text>
           <Text style={styles.authSub}>Зарегистрируйтесь или войдите — это бесплатно</Text>
@@ -119,7 +118,7 @@ export default function PermVacancyDetailScreen() {
           <TouchableOpacity style={[styles.authBtnSecondary, { marginTop: 8 }]} onPress={() => router.push('/register-employer')} activeOpacity={0.85}>
             <Text style={styles.authBtnSecondaryTxt}>Ищу сотрудников — Зарегистрироваться</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -591,14 +590,8 @@ const styles = StyleSheet.create({
   authSheet: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, paddingBottom: 40,
+    paddingHorizontal: 24, paddingTop: 4, paddingBottom: 40,
     alignItems: 'center', gap: 0,
-  },
-  authClose: {
-    position: 'absolute', top: 16, right: 20,
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: Colors.surface,
-    alignItems: 'center', justifyContent: 'center',
   },
   authCloseTxt: { fontSize: 14, color: Colors.textMuted },
   authEmoji: { fontSize: 36, marginBottom: 10, marginTop: 4 },

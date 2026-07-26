@@ -41,6 +41,7 @@ import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { nameColorFromString, getInitials, normalizeCompany } from '@/services/storage';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
 import { TabHeader } from '@/components/ui/TabHeader';
+import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import { MetroMap, MapListItem } from '@/components/feature/MetroMap';
 import { setOnboardingTarget, setOnboardingFlag } from '@/lib/onboardingTargets';
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
@@ -295,6 +296,7 @@ function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId
   const [loading, setLoading] = useState(true);
   const [viewers, setViewers] = useState<User[]>([]);
   const [chatLoading, setChatLoading] = useState<string | null>(null);
+  const viewersSwipe = useSwipeToDismiss(onClose);
 
   const vacancy = kind === 'perm'
     ? permVacancies.find(v => v.id === vacancyId)
@@ -342,14 +344,16 @@ function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId
   };
 
   return (
-    <Modal statusBarTranslucent navigationBarTranslucent visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={wS.modalContainer}>
-        <View style={wS.modalHeader}>
-          <Text style={wS.modalTitle}>Просмотрели вакансию</Text>
-          <TouchableOpacity onPress={onClose} style={wS.closeBtn}>
-            <Ionicons name="close" size={22} color={Colors.textPrimary} />
-          </TouchableOpacity>
-        </View>
+    <Modal statusBarTranslucent navigationBarTranslucent visible animationType="slide" transparent onRequestClose={onClose}>
+      <View style={wS.overlay}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+        <Animated.View style={[wS.sheet, viewersSwipe.animStyle]}>
+          <View {...viewersSwipe.panHandlers}>
+            <SheetHandle />
+            <View style={wS.sheetHeader}>
+              <Text style={wS.sheetTitle}>Просмотрели вакансию</Text>
+            </View>
+          </View>
         {loading ? (
           <ActivityIndicator style={{ marginTop: 40 }} color={Colors.primary} />
         ) : viewers.length === 0 ? (
@@ -390,6 +394,7 @@ function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId
             }}
           />
         )}
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -411,6 +416,7 @@ function WorkerListModal({
   const { currentUser, users, vacancies, chats, showToast, refreshLikes, refreshChats, optimisticUpdateLike } = useApp();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
+  const listSwipe = useSwipeToDismiss(onClose);
   const [localLikes, setLocalLikes] = useState<Like[]>([]);
   const [localWorkers, setLocalWorkers] = useState<User[]>([]);
 
@@ -612,13 +618,13 @@ function WorkerListModal({
   return (
     <Modal statusBarTranslucent navigationBarTranslucent visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={wS.overlay}>
-        <View style={wS.sheet}>
-          <View style={wS.handle} />
-          <View style={wS.sheetHeader}>
-            <Text style={wS.sheetTitle}>{titleMap[type]}</Text>
-            <TouchableOpacity onPress={onClose} style={wS.closeBtn}>
-              <Text style={wS.closeTxt}>✕</Text>
-            </TouchableOpacity>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+        <Animated.View style={[wS.sheet, listSwipe.animStyle]}>
+          <View {...listSwipe.panHandlers}>
+            <SheetHandle />
+            <View style={wS.sheetHeader}>
+              <Text style={wS.sheetTitle}>{titleMap[type]}</Text>
+            </View>
           </View>
           {vacancy ? (
             <Text style={wS.vacSubtitle} numberOfLines={1}>📋 {vacancy.title} · 📅 {formatDate(vacancy.date)}</Text>
@@ -727,7 +733,7 @@ function WorkerListModal({
               }}
             />
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -736,11 +742,8 @@ function WorkerListModal({
 const wS = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: Colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '85%' },
-  handle: { width: 36, height: 4, backgroundColor: Colors.inputBorder, borderRadius: 2, alignSelf: 'center', marginTop: 12 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
   sheetTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
-  closeBtn: { padding: 4 },
-  closeTxt: { fontSize: 18, color: Colors.textMuted },
   vacSubtitle: { fontSize: 12, color: Colors.textMuted, paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.divider },
   empty: { alignItems: 'center', padding: 48, gap: 10 },
   emptyTxt: { fontSize: 14, color: Colors.textMuted, textAlign: 'center' },
@@ -757,9 +760,6 @@ const wS = StyleSheet.create({
   acceptBtnTxt: { fontSize: 13, color: '#fff', fontWeight: '700' },
   chatBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
   chatBtnTxt: { fontSize: 13, color: '#fff', fontWeight: '600' },
-  modalContainer: { flex: 1, backgroundColor: Colors.bg },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.divider },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
   cardInfo: { flex: 1 },
   cardName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
   cardMeta: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },

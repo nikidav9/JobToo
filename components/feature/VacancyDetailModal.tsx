@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, Modal, ScrollView,
-  TouchableOpacity,
+  TouchableOpacity, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { User, Vacancy } from '@/constants/types';
 import { Chip } from '@/components/ui/Chip';
 import { formatDate, normalizeCompany } from '@/services/storage';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
+import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 
 interface Props {
   vacancy: Vacancy | null;
@@ -22,6 +23,7 @@ interface Props {
 
 export function VacancyDetailModal({ vacancy, visible, onClose, employer, actions }: Props) {
   const insets = useSafeAreaInsets();
+  const { panHandlers, animStyle } = useSwipeToDismiss(onClose, visible);
   if (!vacancy) return null;
 
   const companyName = normalizeCompany(employer?.company || vacancy.company);
@@ -31,11 +33,8 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
       <View style={styles.overlay}>
         {/* Затемнение над шторкой тоже закрывает: не единственный способ выйти */}
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom }]}>
-          {/* Close */}
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="close" size={20} color={Colors.textPrimary} />
-          </TouchableOpacity>
+        <Animated.View style={[styles.sheet, { paddingBottom: insets.bottom }, animStyle]}>
+          <View {...panHandlers}><SheetHandle /></View>
 
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -108,7 +107,7 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
 
             {actions ? <View style={styles.actionsWrap}>{actions}</View> : null}
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -128,14 +127,6 @@ const styles = StyleSheet.create({
     // Полоску-хват убрали, но её место оставляем: иначе строка компании
     // подъезжает под крестик, и «Срочно» с ним сталкивается.
     paddingTop: 25,
-  },
-  // Крестик был почти в цвет шторки — закрыть окно было нечем.
-  closeBtn: {
-    position: 'absolute', top: 16, right: 16, zIndex: 10,
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: '#EDEFF2',
-    borderWidth: 1, borderColor: '#DDE1E6',
-    alignItems: 'center', justifyContent: 'center',
   },
   body: { padding: 20, paddingTop: 8, gap: 10, paddingBottom: 24 },
   companyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 },
