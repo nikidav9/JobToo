@@ -46,6 +46,16 @@ function VoiceBubble({ url, sec, isMe }: { url: string; sec: number; isMe: boole
   const player = useAudioPlayer({ uri: url });
   const [playing, setPlaying] = useState(false);
 
+  const toggle = () => {
+    // На айфоне с выключенным звонком звук по умолчанию не идёт вообще:
+    // плеер честно «играет» в тишину. Разрешение выдаётся на весь сеанс
+    // работы со звуком, но ставим его прямо перед пуском — запись его
+    // сбрасывает, а порядок «записал, потом слушаю» самый обычный.
+    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+    if (player.playing) { player.pause(); setPlaying(false); }
+    else { player.play(); setPlaying(true); }
+  };
+
   useEffect(() => {
     const sub = player.addListener('playbackStatusUpdate', (st: any) => {
       setPlaying(!!st?.playing);
@@ -54,11 +64,6 @@ function VoiceBubble({ url, sec, isMe }: { url: string; sec: number; isMe: boole
     });
     return () => sub.remove();
   }, [player]);
-
-  const toggle = () => {
-    if (player.playing) { player.pause(); setPlaying(false); }
-    else { player.play(); setPlaying(true); }
-  };
 
   const tint = isMe ? '#fff' : Colors.primary;
   return (
@@ -583,7 +588,9 @@ export default function ChatRoom() {
         fileName, base64ToUint8Array(base64Data),
         { contentType: 'image/jpeg', upsert: true, cacheControl: '3600' },
       );
-      if (upErr) console.warn('[ChatRoom] image upload warning', upErr.message);
+      // Не залилось — не отправляем: иначе собеседник получит сообщение со
+      // ссылкой в никуда, и оба будут думать, что фото ушло.
+      if (upErr) throw upErr;
       const { data: urlData } = sb.storage.from('avatars').getPublicUrl(fileName);
 
       const msg = await dbInsertMessage(chat.id, currentUser.id, IMG_PREFIX + urlData.publicUrl);
@@ -644,7 +651,9 @@ export default function ChatRoom() {
       return;
     }
     try { await recorder.stop(); } catch {}
-    await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
+    // playsInSilentMode оставляем включённым: без него следующее же
+    // прослушивание на айфоне с выключенным звонком уйдёт в тишину.
+    await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
   };
 
   const stopAndSendVoice = async () => {
@@ -671,7 +680,9 @@ export default function ChatRoom() {
     } else {
       try {
         await recorder.stop();
-        await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
+        // playsInSilentMode оставляем включённым: без него следующее же
+        // прослушивание на айфоне с выключенным звонком уйдёт в тишину.
+        await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
       } catch (e) {
         console.error('[ChatRoom] stop recording error', e);
         return;
@@ -701,7 +712,10 @@ export default function ChatRoom() {
         fileName, clip.bytes,
         { contentType: clip.contentType, upsert: true, cacheControl: '3600' },
       );
-      if (upErr) console.warn('[ChatRoom] voice upload warning', upErr.message);
+      // Раньше здесь стоял console.warn и отправка шла дальше. Ссылку на
+      // несуществующий файл собеседник увидит обычным голосовым — нажмёт, а
+      // там тишина, и ни он, ни отправитель не поймут, что запись не дошла.
+      if (upErr) throw upErr;
       const { data: urlData } = sb.storage.from('avatars').getPublicUrl(fileName);
 
       const msg = await dbInsertMessage(
