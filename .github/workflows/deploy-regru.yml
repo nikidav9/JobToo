@@ -50,7 +50,26 @@ jobs:
           SB_SERVICE_KEY: ${{ secrets.SB_SERVICE_KEY }}
           DASHBOARD_LOGIN: ${{ secrets.DASHBOARD_LOGIN }}
           DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+          APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+          APP_SECRET_PREV: ${{ secrets.APP_SECRET_PREV }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          YANDEX_SUGGEST_KEY: ${{ secrets.YANDEX_SUGGEST_KEY }}
         run: |
+          # app_secrets.php: пропуск к db.php, токен бота, ключ подсказок.
+          # Собираем, если задан хотя бы один — незаданные попадут пустыми, и
+          # db.php/tg.php возьмут для них запасное значение из кода.
+          if [ -n "$APP_SECRET$APP_SECRET_PREV$TG_BOT_TOKEN$YANDEX_SUGGEST_KEY" ]; then
+            A=$(printf '%s' "$APP_SECRET"         | base64 -w0)
+            R=$(printf '%s' "$APP_SECRET_PREV"    | base64 -w0)
+            T=$(printf '%s' "$TG_BOT_TOKEN"       | base64 -w0)
+            Y=$(printf '%s' "$YANDEX_SUGGEST_KEY" | base64 -w0)
+            printf "<?php return ['APP_SECRET' => base64_decode('%s'), 'APP_SECRET_PREV' => base64_decode('%s'), 'TG_BOT_TOKEN' => base64_decode('%s'), 'YANDEX_SUGGEST_KEY' => base64_decode('%s')];\n" \
+              "$A" "$R" "$T" "$Y" > dist/api/app_secrets.php
+            echo "app_secrets.php: собран"
+          else
+            echo "app_secrets.php: секреты не заданы, пропускаю"
+          fi
+
           if [ -n "$SB_SERVICE_KEY" ]; then
             B=$(printf '%s' "$SB_SERVICE_KEY" | base64 -w0)
             printf "<?php return base64_decode('%s');\n" "$B" > dist/api/sb_service_key.php

@@ -17,7 +17,8 @@ jobs:
         env:
           APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
         run: |
-          SECRET="${APP_SECRET:-ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6}"
+          SECRET="$APP_SECRET"
+          [ -n "$SECRET" ] || { echo "Не задан секрет EXPO_PUBLIC_APP_SECRET"; exit 1; }
           RESP=$(curl -s -m 20 -X POST "https://jobtoo.ru/api/db.php" \
             -H "Content-Type: application/json" \
             -H "X-App-Secret: $SECRET" \

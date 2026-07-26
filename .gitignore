@@ -47,6 +47,7 @@ supabase/.temp/
 # Локальная веб-сборка для снимков экранов (scripts/shoot-screens.mjs)
 .figma-export/
 
-# Сервисный ключ Supabase — живёт только на хостинге
+# Секреты — живут только на хостинге, в репозиторий не попадают
 php-proxy/sb_service_key.php
 php-proxy/admin_credentials.php
+php-proxy/app_secrets.php

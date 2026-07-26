@@ -46,9 +46,19 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405); echo json_encode(['error' => 'Method not allowed']); exit;
 }
 
-$secret = getenv('APP_SECRET') ?: 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6';
+// Смена секрета не может быть мгновенной: у части людей приложение уже
+// установлено и старый секрет зашит в него до следующего обновления по воздуху.
+// Поэтому на время перехода принимаем и предыдущий — APP_SECRET_PREV.
+// Когда все обновятся, секрет из GitHub Secrets убирается, и старый ключ
+// перестаёт работать сам собой.
 $provided = $_SERVER['HTTP_X_APP_SECRET'] ?? '';
-if (!hash_equals($secret, $provided)) {
+$accepted = array_filter([
+    jt_secret('APP_SECRET', 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6'),
+    jt_secret('APP_SECRET_PREV'),
+]);
+$ok = false;
+foreach ($accepted as $s) { if (hash_equals($s, $provided)) $ok = true; }
+if (!$ok) {
     http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
 }
 
@@ -167,6 +177,30 @@ function sb_rpc(string $fn, array $params = []): mixed {
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($params));
     $resp = curl_exec($ch); curl_close($ch);
     return json_decode($resp ?: 'null', true);
+}
+
+
+// ─── Секреты приложения ──────────────────────────────────────────────────────
+// Раньше они лежали прямо в коде «на всякий случай». Пока репозиторий был
+// закрытым, это сходило с рук; как только он стал публичным, токен бота и
+// секрет приложения оказались доступны любому поиском по коду.
+//
+// Теперь берём их с хостинга: из переменных окружения либо из файла
+// app_secrets.php рядом (см. app_secrets.example.php). Расширение .php не
+// случайно: по прямой ссылке сервер выполнит файл и отдаст пустоту.
+function jt_secret(string $name, string $fallback = ''): string {
+    static $file = null;
+    $env = getenv($name);
+    if (is_string($env) && trim($env) !== '') return trim($env);
+
+    if ($file === null) {
+        $p = __DIR__ . '/app_secrets.php';
+        $v = is_readable($p) ? @include $p : null;
+        $file = is_array($v) ? $v : [];
+    }
+    if (!empty($file[$name])) return (string)$file[$name];
+
+    return $fallback;
 }
 
 // ─── Мгновенные сообщения ─────────────────────────────────────────────────────
@@ -383,10 +417,10 @@ function fill_coords(array $row): array {
 
 // ─── Telegram Mini App ────────────────────────────────────────────────────────
 
-define('TG_BOT_TOKEN', getenv('TG_BOT_TOKEN') ?: '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug');
+define('TG_BOT_TOKEN', jt_secret('TG_BOT_TOKEN', '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug'));
 define('DASHBOARD_URL', getenv('DASHBOARD_URL') ?: 'https://dashboard-nujus-projects.vercel.app');
 define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025)); // группа «ПОДРАБОТКИ»
-define('YANDEX_SUGGEST_KEY', getenv('YANDEX_SUGGEST_KEY') ?: '44152824-d925-46ab-b464-3ce4d9fd50c7'); // Suggest API (адреса)
+define('YANDEX_SUGGEST_KEY', jt_secret('YANDEX_SUGGEST_KEY', '44152824-d925-46ab-b464-3ce4d9fd50c7')); // Suggest API (адреса)
 
 /**
  * Validates Telegram WebApp initData signature (HMAC per official spec).
@@ -574,7 +608,7 @@ function broadcast_workers(string $title, string $body, string $tgHtml, string $
     try {
         $workerIds = array_flip(array_column($all, 'id'));
         $subs = sb_select('jm_web_push_subscriptions', [], 'user_id,endpoint,p256dh,auth');
-        $appSecret = getenv('APP_SECRET') ?: 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6';
+        $appSecret = jt_secret('APP_SECRET', 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6');
         foreach ($subs as $s) {
             if (!isset($workerIds[$s['user_id']]) || empty($s['endpoint'])) continue;
             $ch = curl_init(DASHBOARD_URL . '/api/webpush/send');

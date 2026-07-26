@@ -2,8 +2,27 @@
 // Telegram bot webhook:
 // - /start и любые сообщения в личке → приветствие с кнопкой приложения
 // - callback-кнопки «Одобрить/Отклонить» под заявками на вакансии
-define('TG_BOT_TOKEN', getenv('TG_BOT_TOKEN') ?: '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug');
 define('SB_URL', 'https://bbiqmkeysalwdonlnylb.supabase.co');
+
+// Секреты приложения — из окружения либо из файла app_secrets.php рядом
+// (см. app_secrets.example.php). Та же функция есть в db.php: файлы на хостинг
+// кладутся по отдельности, общий include лишний раз всё усложнил бы.
+function jt_secret(string $name, string $fallback = ''): string {
+    static $file = null;
+    $env = getenv($name);
+    if (is_string($env) && trim($env) !== '') return trim($env);
+
+    if ($file === null) {
+        $p = __DIR__ . '/app_secrets.php';
+        $v = is_readable($p) ? @include $p : null;
+        $file = is_array($v) ? $v : [];
+    }
+    if (!empty($file[$name])) return (string)$file[$name];
+
+    return $fallback;
+}
+
+define('TG_BOT_TOKEN', jt_secret('TG_BOT_TOKEN', '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug'));
 
 // Ключ доступа к базе — та же схема, что и в db.php: сервисный ключ с
 // хостинга, анонимный лишь как запасной вариант. Подробности там же.
