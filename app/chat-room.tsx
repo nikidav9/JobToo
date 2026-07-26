@@ -60,9 +60,23 @@ function VoiceBubble({ url, sec, isMe }: { url: string; sec: number; isMe: boole
 
   useEffect(() => {
     const sub = player.addListener('playbackStatusUpdate', (st: any) => {
+      // Конец записи. Раньше здесь только перематывали в начало, но плеер не
+      // останавливали — он оставался в состоянии «играет», и следующий же
+      // отчёт возвращал значок на паузу. Со стороны выглядело так, будто
+      // голосовое доиграло, а кнопка об этом не знает.
+      //
+      // На didJustFinish одного не полагаемся: он приходит не на всех
+      // прошивках, поэтому конец распознаём ещё и по времени. Дополнительное
+      // условие «плеер считает, что играет» нужно, чтобы не перематывать
+      // запись, которую человек сам поставил на паузу у самого конца.
+      const atEnd = st?.duration > 0 && st.currentTime >= st.duration - 0.05;
+      if (st?.didJustFinish || (atEnd && st?.playing)) {
+        try { player.pause(); } catch {}
+        try { player.seekTo(0); } catch {}
+        setPlaying(false);
+        return;
+      }
       setPlaying(!!st?.playing);
-      // Дослушали — сматываем в начало, чтобы можно было включить снова
-      if (st?.didJustFinish) { player.seekTo(0); setPlaying(false); }
     });
     return () => sub.remove();
   }, [player]);
