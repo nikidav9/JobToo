@@ -11,7 +11,7 @@ export interface AppNotification {
 import { Platform, AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { getSupabaseClient } from '@/template';
-import { User, Vacancy, Like, Chat, PermVacancy, PermApplication, Bulletin, WorkerSlot } from '@/constants/types';
+import { User, Vacancy, Like, Chat, PermVacancy, PermApplication } from '@/constants/types';
 import {
   getSessionUser,
   saveSessionUser,
@@ -40,10 +40,6 @@ import {
   dbGetNotifications,
   dbMarkNotifRead,
   dbMarkAllNotifsRead,
-  dbGetActiveBulletins,
-  dbGetMyBulletins,
-  dbGetActiveWorkerSlots,
-  dbGetMyWorkerSlots,
   dbTelegramAuth,
   dbBindTelegram,
   dbAutoClosePastVacancies,
@@ -125,11 +121,7 @@ export interface AppContextValue {
   refreshVacancyStats: () => Promise<void>;
   permVacancyViewsMap: Record<string, number>;
   refreshPermVacancyViews: () => Promise<void>;
-  bulletins: Bulletin[];
-  refreshBulletins: (u?: User) => Promise<void>;
-  workerSlots: WorkerSlot[];
-  refreshWorkerSlots: (u?: User) => Promise<void>;
-  /** true once the initial fresh-data fetch (vacancies, bulletins, …) has completed */
+  /** true once the initial fresh-data fetch (vacancies, …) has completed */
   dataReady: boolean;
 }
 
@@ -161,8 +153,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [vacancyStatsMap, setVacancyStatsMap] = useState<Record<string, VacancyStats>>({});
   const [permVacancyViewsMap, setPermVacancyViewsMap] = useState<Record<string, number>>({});
-  const [bulletins, setBulletins] = useState<Bulletin[]>([]);
-  const [workerSlots, setWorkerSlots] = useState<WorkerSlot[]>([]);
 
   const unreadNotifCount = notifications.filter(n => !n.isRead).length;
 
@@ -335,8 +325,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               refreshNotifications(),
               refreshVacancyStats(),
               refreshPermVacancyViews(),
-              refreshBulletins(sessionUser),
-              refreshWorkerSlots(sessionUser),
             ]).catch(() => {});
           }, 100);
 
@@ -430,7 +418,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshNotifications(),
         refreshVacancyStats(),
         refreshPermVacancyViews(),
-        refreshBulletins(user),
       ]).catch(() => {});
     };
     // Immediate poll on mount so new data appears right after login
@@ -456,7 +443,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshNotifications(),
         refreshVacancyStats(),
         refreshPermVacancyViews(),
-        refreshBulletins(user),
       ]).catch(() => {});
     };
 
@@ -696,28 +682,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch {}
   };
 
-  const refreshBulletins = async (u?: User) => {
-    const user = u ?? currentUser;
-    if (!user) return;
-    try {
-      const data = user.role === 'employer'
-        ? await dbGetMyBulletins(user.id)
-        : await dbGetActiveBulletins();
-      setBulletins(data);
-    } catch {}
-  };
-
-  const refreshWorkerSlots = async (u?: User) => {
-    const user = u ?? currentUser;
-    if (!user) return;
-    try {
-      const data = user.role === 'employer'
-        ? await dbGetActiveWorkerSlots()
-        : await dbGetMyWorkerSlots(user.id);
-      setWorkerSlots(data);
-    } catch {}
-  };
-
   const unreadCount = chats.reduce((sum, c) => {
     if (currentUser?.role === 'worker') return sum + (c.unreadWorker ?? 0);
     if (currentUser?.role === 'employer') return sum + (c.unreadEmployer ?? 0);
@@ -773,10 +737,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshVacancyStats,
         permVacancyViewsMap,
         refreshPermVacancyViews,
-        bulletins,
-        refreshBulletins,
-        workerSlots,
-        refreshWorkerSlots,
         notifications,
         unreadNotifCount,
         refreshNotifications,

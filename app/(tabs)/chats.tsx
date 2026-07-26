@@ -148,9 +148,21 @@ export default function ChatsScreen() {
 
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
-  const myChats = chats.filter(c =>
-    currentUser.role === 'worker' ? c.workerId === currentUser.id : c.employerId === currentUser.id
-  );
+  // Сервер отдаёт чаты в порядке их создания — то есть по тому, когда с
+  // человеком связались впервые. Со временем это расходится с тем, кто писал
+  // последним, и список выглядит случайным. Сортируем как в мессенджерах: по
+  // последнему сообщению. У чата без сообщений берём дату создания, иначе он
+  // навсегда провалился бы в конец.
+  const chatTime = (c: Chat) => {
+    const last = c.messages[c.messages.length - 1];
+    return new Date(last?.timestamp ?? c.createdAt).getTime() || 0;
+  };
+
+  const myChats = chats
+    .filter(c =>
+      currentUser.role === 'worker' ? c.workerId === currentUser.id : c.employerId === currentUser.id
+    )
+    .sort((a: Chat, b: Chat) => chatTime(b) - chatTime(a));
 
   const filtered = myChats.filter(c => {
     if (!search.trim()) return true;

@@ -240,7 +240,10 @@ export default function ChatRoom() {
   }, [chatId]);
 
   const isEmployer = currentUser?.role === 'employer';
-  const isBulletinChat = !!chat?.bulletinId || !!chat?.workerSlotId;
+  // Чат без вакансии. Такие остались от удалённого раздела «Биржа» — их два.
+  // Решать по кандидату в них нечего, поэтому панель решений не показываем и
+  // за статусом отклика не ходим: вакансии, к которой он относится, просто нет.
+  const isChatWithoutVacancy = !!chat?.bulletinId || !!chat?.workerSlotId;
 
   const otherId = chat
     ? (currentUser?.role === 'worker' ? chat.employerId : chat.workerId)
@@ -280,7 +283,7 @@ export default function ChatRoom() {
     ? (permApplications ?? []).find((a: any) => a.vacancyId === chat?.vacancyId && a.workerId === chat?.workerId) ?? null
     : null;
 
-  // Fetch like status (for employer decision bar — not applicable for bulletin/slot chats)
+  // Статус отклика для панели решений. У чатов без вакансии его нет.
   useEffect(() => {
     if (!chat || !currentUser) return;
     if (chat.bulletinId || chat.workerSlotId) { setLikeStatus(null); return; }
@@ -469,7 +472,7 @@ export default function ChatRoom() {
     }
   };
 
-  // Chat is locked for bulletin closure or rejected for vacancy
+  // Переписка закрыта: отклик отклонён либо чат достался от удалённого раздела
   const isChatBlocked = likeStatus === 'rejected' || (chat?.isLocked ?? false);
 
   // Готовые фразы показываем, пока человек ещё ничего не написал в этот чат
@@ -808,7 +811,7 @@ export default function ChatRoom() {
       ) : null}
 
       {/* Employer decision bar — shown at the top */}
-      {isEmployer && !isBulletinChat && likeStatus === 'pending' ? (
+      {isEmployer && !isChatWithoutVacancy && likeStatus === 'pending' ? (
         <View style={styles.decisionBar}>
           <Text style={styles.decisionBarLabel}>Принять решение по кандидату:</Text>
           <View style={styles.decisionBtnsRow}>
@@ -838,14 +841,14 @@ export default function ChatRoom() {
             </TouchableOpacity>
           </View>
         </View>
-      ) : isEmployer && !isBulletinChat && likeStatus === 'approved' ? (
+      ) : isEmployer && !isChatWithoutVacancy && likeStatus === 'approved' ? (
         <View style={[styles.decisionBar, { backgroundColor: '#D1FAE5' }]}>
           <View style={styles.decisionStatusRow}>
             <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
             <Text style={[styles.decisionBarLabel, { color: Colors.green }]}>Мэтч создан</Text>
           </View>
         </View>
-      ) : isEmployer && !isBulletinChat && likeStatus === 'rejected' ? (
+      ) : isEmployer && !isChatWithoutVacancy && likeStatus === 'rejected' ? (
         <View style={[styles.decisionBar, { backgroundColor: '#FEE2E2' }]}>
           <View style={styles.decisionStatusRow}>
             <Ionicons name="close-circle" size={16} color={Colors.red} />

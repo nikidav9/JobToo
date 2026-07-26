@@ -24,7 +24,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 // The static HTML splash (web) stays up through the '/' boot flow and the tabs
 // entry — those hide it once data is ready. Any other route (deep links like
 // /perm-vacancy-detail, /login, …) should reveal the page immediately.
-const ENTRY_PATHS = new Set(['/', '/feed', '/matches', '/exchange', '/chats', '/profile', '/saved']);
+const ENTRY_PATHS = new Set(['/', '/feed', '/matches', '/chats', '/profile', '/saved']);
 
 function WebSplashController() {
   const pathname = usePathname();

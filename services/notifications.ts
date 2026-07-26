@@ -490,26 +490,3 @@ export async function notifyWorkerPermApplicationRejected(
   );
 }
 
-// ─── Bulletin broadcast ───────────────────────────────────────────────────────
-
-export async function notifyAllWorkersNewBulletin(params: {
-  company: string;
-  workType: string;
-  date: string;
-  metro: string;
-}): Promise<void> {
-  try {
-    const { company, workType, date, metro } = params;
-    // Route through server proxy so push is sent server-side (reliable on all platforms)
-    await fetch(PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
-      body: JSON.stringify({
-        fn: 'dbNotifyAllWorkersNewBulletin',
-        args: [company, workType, date, metro],
-      }),
-    });
-  } catch {
-    // Never crash due to notification failure
-  }
-}

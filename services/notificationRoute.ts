@@ -24,7 +24,6 @@ export function routeForNotification(
   }
   if (TO_MATCHES.has(type)) return { pathname: '/(tabs)/matches' };
   if (TO_FEED.has(type)) return { pathname: '/(tabs)/feed' };
-  if (type === 'new_bulletin') return { pathname: '/(tabs)/exchange' };
   return null;
 }
 
@@ -38,6 +37,5 @@ export function routeByTitle(title: string): NotifTarget | null {
     return { pathname: '/(tabs)/matches' };
   }
   if (t.startsWith('⚡') || t.startsWith('💼')) return { pathname: '/(tabs)/feed' };
-  if (t.startsWith('📣')) return { pathname: '/(tabs)/exchange' };
   return null;
 }

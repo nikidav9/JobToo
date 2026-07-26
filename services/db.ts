@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus, Bulletin } from '@/constants/types';
+import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus } from '@/constants/types';
 import { uid, nowISO } from '@/services/storage';
 
 const DB_TIMEOUT = 12_000;
@@ -1083,45 +1083,8 @@ export async function dbDeleteAllNotifs(userId: string): Promise<void> {
   await withTimeout(supabase.from('jm_notifications').delete().eq('user_id', userId));
 }
 
-// ─── Bulletins (Биржа) ────────────────────────────────────────────────────────
+// ─── Подсказки адресов ───────────────────────────────────────────────────────
 
-function rowToBulletin(r: any): Bulletin {
-  return {
-    id: r.id,
-    employerId: r.employer_id,
-    company: r.company,
-    workType: r.work_type,
-    date: r.date,
-    timeStart: r.time_start,
-    timeEnd: r.time_end,
-    metro: r.metro,
-    address: r.address,
-    lat: r.lat ?? undefined,
-    lng: r.lng ?? undefined,
-    comment: r.comment ?? undefined,
-    status: r.status,
-    views: r.views ?? 0,
-    createdAt: r.created_at,
-  };
-}
-
-export async function dbCreateBulletin(params: {
-  employerId: string;
-  company: string;
-  workType: string;
-  date: string;
-  timeStart: string;
-  timeEnd: string;
-  metro: string;
-  address: string;
-  lat?: number | null;
-  lng?: number | null;
-  comment?: string;
-}): Promise<string> {
-  return proxy<string>('dbCreateBulletin', [params]);
-}
-
-// ─── Address suggestions (OpenStreetMap/Nominatim via proxy) ──────────────────
 export type AddressSuggestion = { name: string; lat: number | null; lng: number | null };
 
 export async function dbAddressSuggest(query: string): Promise<AddressSuggestion[]> {
@@ -1131,36 +1094,6 @@ export async function dbAddressSuggest(query: string): Promise<AddressSuggestion
   } catch {
     return [];
   }
-}
-
-export async function dbGetActiveBulletins(): Promise<Bulletin[]> {
-  const d = await proxy<any[]>('dbGetActiveBulletins');
-  return d.map(rowToBulletin);
-}
-
-export async function dbRespondToBulletin(bulletinId: string, workerId: string): Promise<string> {
-  return proxy<string>('dbRespondToBulletin', [bulletinId, workerId]);
-}
-
-export async function dbGetMyBulletins(employerId: string): Promise<Bulletin[]> {
-  const d = await proxy<any[]>('dbGetMyBulletins', [employerId]);
-  return d.map(rowToBulletin);
-}
-
-export async function dbCloseBulletin(bulletinId: string): Promise<void> {
-  await proxy('dbCloseBulletin', [bulletinId]);
-}
-
-export async function dbIncrementBulletinViews(bulletinId: string): Promise<void> {
-  await proxy('dbIncrementBulletinViews', [bulletinId]);
-}
-
-export async function dbAutoClosePastBulletins(): Promise<void> {
-  await proxy('dbAutoClosePastBulletins');
-}
-
-export async function dbAutoClosePastWorkerSlots(): Promise<void> {
-  await proxy('dbAutoClosePastWorkerSlots');
 }
 
 export async function dbGetAllWorkerTokens(): Promise<{ id: string; push_token: string }[]> {

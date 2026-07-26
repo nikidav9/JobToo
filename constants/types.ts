@@ -85,41 +85,11 @@ export interface Chat {
   unreadWorker: number;
   unreadEmployer: number;
   createdAt: string;
+  // Остались от удалённого раздела «Биржа»: два старых чата заведены оттуда.
+  // Вакансии у них нет, и по этим полям чат это про себя и понимает.
   bulletinId?: string;
   workerSlotId?: string;
   isLocked?: boolean;
-}
-
-export interface Bulletin {
-  id: string;
-  employerId: string;
-  company: string;
-  workType: string;
-  date: string;
-  timeStart: string;
-  timeEnd: string;
-  metro: string;
-  address: string;
-  lat?: number;
-  lng?: number;
-  comment?: string;
-  status: 'open' | 'closed';
-  views: number;
-  createdAt: string;
-}
-
-export interface WorkerSlot {
-  id: string;
-  workerId: string;
-  workerName: string;
-  workType: string;
-  date: string;
-  timeStart: string;
-  timeEnd: string;
-  metro: string;
-  comment?: string;
-  status: 'open' | 'closed';
-  createdAt: string;
 }
 
 export interface Complaint {
