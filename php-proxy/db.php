@@ -1459,8 +1459,25 @@ try {
         }
 
         // ── Push tokens ────────────────────────────────────────────────────────
+        // Токен принадлежит устройству, а не человеку. Если на телефоне сменили
+        // аккаунт, тот же токен остался бы записан и за прежним — и уведомления
+        // для обоих приходили бы на один телефон. Поэтому сначала снимаем его
+        // со всех остальных.
         case 'dbSavePushToken':
+            sb_update('jm_users', ['push_token' => 'eq.' . $args[1], 'id' => 'neq.' . $args[0]], ['push_token' => null]);
             sb_update('jm_users', ['id' => 'eq.' . $args[0]], ['push_token' => $args[1]]); break;
+
+        // Выход из аккаунта. Без этого сервер продолжал слать уведомления на
+        // телефон, с которого человек вышел: приложение он не удалял, а токен
+        // так и лежал в его строке.
+        case 'dbClearPushToken':
+            sb_update('jm_users', ['id' => 'eq.' . $args[0]], ['push_token' => null]); break;
+
+        // Разбор завалов: те, кто вышел до появления dbClearPushToken, так и
+        // остались с токеном в базе, а войти и почиститься не могут — они же
+        // вышли. Здесь ищем по самому токену, аккаунт знать не нужно.
+        case 'dbReleasePushToken':
+            sb_update('jm_users', ['push_token' => 'eq.' . $args[0]], ['push_token' => null]); break;
 
         case 'dbGetPushToken': {
             $r = sb_single('jm_users', ['id' => 'eq.' . $args[0]], 'push_token');
@@ -1488,6 +1505,10 @@ try {
                 'auth'       => $args[3],
                 'updated_at' => gmdate('Y-m-d\TH:i:s\Z'),
             ], 'user_id'); break;
+
+        // Выход из аккаунта в браузере — то же, что снятие токена на телефоне.
+        case 'dbDeleteWebPushSubscription':
+            sb_delete('jm_web_push_subscriptions', ['user_id' => 'eq.' . $args[0]]); break;
 
         // ── Push notifications ─────────────────────────────────────────────────
         case 'sendPushNotification': {

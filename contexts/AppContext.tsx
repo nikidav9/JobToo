@@ -37,6 +37,8 @@ import {
   dbGetPermApplications,
   dbGetPermSaved,
   dbTouchLastSeen,
+  dbClearPushToken,
+  dbDeleteWebPushSubscription,
   dbGetNotifications,
   dbMarkNotifRead,
   dbMarkAllNotifsRead,
@@ -44,7 +46,7 @@ import {
   dbBindTelegram,
   dbAutoClosePastVacancies,
 } from '@/services/db';
-import { registerForPushNotifications } from '@/services/notifications';
+import { registerForPushNotifications, releasePushTokenIfSignedOut } from '@/services/notifications';
 import { isTelegramMiniApp, getTelegramInitData } from '@/lib/telegram';
 
 // Polling interval for native (Realtime is primary, polling is fallback)
@@ -263,6 +265,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
 
         if (cancelled) return;
+
+        // Открыли приложение, а входить некому — значит это устройство ни за
+        // кем не числится. Снимаем с него токен: иначе уведомления так и
+        // будут приходить за аккаунт, из которого человек давно вышел.
+        if (!sessionUser) releasePushTokenIfSignedOut().catch(() => {});
 
         if (sessionUser) {
           _setCurrentUser(sessionUser);
@@ -582,6 +589,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const logout = async () => {
+    // Отвязываем устройство от аккаунта. Пока токен лежал в строке
+    // пользователя, сервер продолжал слать на телефон уведомления, хотя
+    // человек уже вышел: приложение он не удалял. По нажатию такое
+    // уведомление вело внутрь приложения, где входить уже некому.
+    const leaving = currentUser;
+    if (leaving) {
+      if (Platform.OS === 'web') dbDeleteWebPushSubscription(leaving.id).catch(() => {});
+      else dbClearPushToken(leaving.id).catch(() => {});
+    }
+
     _setCurrentUser(null);
     await clearSessionUser();
     setUsers([]);

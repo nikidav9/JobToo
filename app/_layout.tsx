@@ -15,6 +15,7 @@ import { ToastLayer } from '@/components/ui/ToastLayer';
 import { setupAndroidChannels } from '@/services/notifications';
 import { routeForNotification } from '@/services/notificationRoute';
 import { hideWebSplash } from '@/lib/webSplash';
+import { getSessionUser } from '@/services/storage';
 import { initTelegramMiniApp, isTelegramMiniApp, getTelegramStartParam } from '@/lib/telegram';
 
 // Keep the web/native splash visible until hideAsync() is called from the tabs layout or index screen.
@@ -103,25 +104,31 @@ function NotificationHandler() {
       // UI updates handled by Realtime/polling in AppContext
     });
 
-    // Background/terminated: user tapped the notification
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+    // Куда вести по нажатию. Если в аккаунт никто не вошёл, внутрь приложения
+    // идти нельзя: экран чата рассчитывает на вошедшего пользователя и падает.
+    // Такое случается, когда человек вышел из аккаунта, но приложение оставил,
+    // — раньше на это уведомление он получал ошибку.
+    const openFromNotification = async (response: Notifications.NotificationResponse) => {
       const data = response.notification.request.content.data as Record<string, unknown>;
       const type = data?.type as string | undefined;
       const chatId = data?.chatId as string | undefined;
 
       const target = routeForNotification(type, { chatId });
-      if (target) router.push(target as never);
+      if (!target) return;
+
+      const user = await getSessionUser().catch(() => null);
+      router.push((user ? target : '/') as never);
+    };
+
+    // Background/terminated: user tapped the notification
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      openFromNotification(response).catch(() => {});
     });
 
     // Handle notification that launched the app from terminated state
     Notifications.getLastNotificationResponseAsync().then(response => {
       if (!response) return;
-      const data = response.notification.request.content.data as Record<string, unknown>;
-      const type = data?.type as string | undefined;
-      const chatId = data?.chatId as string | undefined;
-
-      const target = routeForNotification(type, { chatId });
-      if (target) setTimeout(() => router.push(target as never), 500);
+      setTimeout(() => { openFromNotification(response).catch(() => {}); }, 500);
     }).catch(() => {});
 
     return () => {

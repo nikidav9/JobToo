@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { dbSavePushToken, dbGetPushToken, dbGetWebPushSubscription, dbSaveNotification } from '@/services/db';
+import { dbSavePushToken, dbGetPushToken, dbReleasePushToken, dbGetWebPushSubscription, dbSaveNotification } from '@/services/db';
 
 const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6';
 const DASHBOARD_URL = process.env.EXPO_PUBLIC_DASHBOARD_URL || '';
@@ -121,6 +121,30 @@ export async function registerForPushNotifications(userId: string): Promise<void
   }
 }
 
+
+/**
+ * Отвязать это устройство от чужого аккаунта при запуске без входа.
+ *
+ * Нужно для тех, кто вышел из аккаунта раньше, чем появилось снятие токена
+ * при выходе: токен так и остался записан за ними, уведомления продолжали
+ * приходить, а почиститься при входе они не могут — они же вышли.
+ *
+ * Разрешение не запрашиваем: если его нет, токена всё равно не будет.
+ */
+export async function releasePushTokenIfSignedOut(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  if (!Device.isDevice) return;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return;
+    const projectId = getExpoProjectId();
+    if (!projectId) return;
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    await dbReleasePushToken(token);
+  } catch {
+    // Молча: это уборка, а не то, ради чего человек открыл приложение.
+  }
+}
 
 type ExpoPushMessage = {
   to: string;

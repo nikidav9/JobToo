@@ -983,6 +983,30 @@ export async function dbSavePushToken(userId: string, token: string): Promise<vo
   await withTimeout(supabase.from('jm_users').update({ push_token: token }).eq('id', userId));
 }
 
+/**
+ * Отвязать устройство от аккаунта при выходе.
+ *
+ * Токен лежит в строке пользователя, и пока он там, сервер шлёт на этот
+ * телефон уведомления — даже если человек из аккаунта вышел, а приложение
+ * оставил. Именно так уведомления и приходили «в никуда».
+ */
+export async function dbClearPushToken(userId: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbClearPushToken', [userId]); return; }
+  await withTimeout(supabase.from('jm_users').update({ push_token: null }).eq('id', userId));
+}
+
+/** Снять токен с любого аккаунта, за которым он записан. Аккаунт знать не нужно. */
+export async function dbReleasePushToken(token: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbReleasePushToken', [token]); return; }
+  await withTimeout(supabase.from('jm_users').update({ push_token: null }).eq('push_token', token));
+}
+
+/** То же для браузера: снимаем подписку на веб-пуши. */
+export async function dbDeleteWebPushSubscription(userId: string): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbDeleteWebPushSubscription', [userId]); return; }
+  await withTimeout(supabase.from('jm_web_push_subscriptions').delete().eq('user_id', userId));
+}
+
 export async function dbGetPushToken(userId: string): Promise<string | null> {
   if (IS_NATIVE) { return proxy<string | null>('dbGetPushToken', [userId]); }
   const { data } = await withTimeout(
