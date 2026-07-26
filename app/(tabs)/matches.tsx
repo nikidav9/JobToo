@@ -675,8 +675,17 @@ function EmployerMatches() {
       await dbSetPermApplicationStatus(app.id, 'hired');
       await refreshPermApplications();
       showToast('Кандидат закрыт. Вакансия осталась в поиске — закрыть её можно во вкладке «Активные»', 'success');
-    } catch {
-      showToast('Ошибка', 'error');
+    } catch (e: any) {
+      // Голое «Ошибка» ничего не объясняет. Отдельно ловим случай, когда база
+      // ещё не знает про статус hired: пока миграция 014 не применена, запись
+      // падает на проверке и починить это из приложения нельзя.
+      const msg = String(e?.message ?? '');
+      showToast(
+        msg.includes('status_check')
+          ? 'База ещё не знает про статус «завершён». Нужна миграция 014.'
+          : 'Не удалось завершить. Попробуйте ещё раз.',
+        'error',
+      );
     } finally {
       setLoading(null);
     }
