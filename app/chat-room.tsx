@@ -283,6 +283,24 @@ export default function ChatRoom() {
     ? (permApplications ?? []).find((a: any) => a.vacancyId === chat?.vacancyId && a.workerId === chat?.workerId) ?? null
     : null;
 
+  // В общем чате с одним человеком решений может ждать сразу несколько: он мог
+  // откликнуться на две смены подряд. Панель умеет только одно — последнее, по
+  // нему чат и настроен. Если ждут ещё, кнопки прятать нельзя (иначе решение
+  // не принять вовсе), но и молчать об остальных тоже: легко одобрить не ту
+  // смену. Поэтому под кнопками появляется строка со счётчиком.
+  const otherPending = useMemo(() => {
+    if (!isEmployer || !chat) return 0;
+    const fromLikes = (likes ?? []).filter((l: any) =>
+      l.employerId === chat.employerId && l.workerId === chat.workerId &&
+      l.workerLiked && l.employerLiked == null && l.vacancyId !== chat.vacancyId,
+    ).length;
+    const fromPerm = (permApplications ?? []).filter((a: any) =>
+      a.employerId === chat.employerId && a.workerId === chat.workerId &&
+      a.status === 'pending' && a.vacancyId !== chat.vacancyId,
+    ).length;
+    return fromLikes + fromPerm;
+  }, [isEmployer, chat?.employerId, chat?.workerId, chat?.vacancyId, likes, permApplications]);
+
   // Статус отклика для панели решений. У чатов без вакансии его нет.
   useEffect(() => {
     if (!chat || !currentUser) return;
@@ -813,7 +831,9 @@ export default function ChatRoom() {
       {/* Employer decision bar — shown at the top */}
       {isEmployer && !isChatWithoutVacancy && likeStatus === 'pending' ? (
         <View style={styles.decisionBar}>
-          <Text style={styles.decisionBarLabel}>Принять решение по кандидату:</Text>
+          <Text style={styles.decisionBarLabel} numberOfLines={2}>
+            {chat.vacTitle ? `Решение по кандидату — «${chat.vacTitle}»:` : 'Принять решение по кандидату:'}
+          </Text>
           <View style={styles.decisionBtnsRow}>
             <TouchableOpacity
               style={[styles.decisionBtn, styles.decisionBtnReject, decidingLike && { opacity: 0.5 }]}
@@ -840,6 +860,13 @@ export default function ChatRoom() {
               )}
             </TouchableOpacity>
           </View>
+          {otherPending > 0 ? (
+            <TouchableOpacity onPress={() => router.push('/(tabs)/matches')} activeOpacity={0.7}>
+              <Text style={styles.decisionMoreTxt}>
+                Ещё {otherPending} {otherPending === 1 ? 'отклик ждёт' : 'откликов ждут'} решения — во вкладке «Мэтчи» →
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       ) : isEmployer && !isChatWithoutVacancy && likeStatus === 'approved' ? (
         <View style={[styles.decisionBar, { backgroundColor: '#D1FAE5' }]}>
@@ -892,8 +919,8 @@ export default function ChatRoom() {
           )}
           <View>
             <Text style={styles.headerName}>{otherName}</Text>
-            {/* Под именем — присутствие, как в мессенджерах. Название
-                вакансии переехало в полосу ниже, чтобы не потеряться. */}
+            {/* Под именем — присутствие, как в мессенджерах. Пока человек не
+                в сети, на этом месте стоит компания. */}
             {presence ? (
               <View style={styles.presenceRow}>
                 {online ? <View style={styles.onlineDot} /> : null}
@@ -902,7 +929,10 @@ export default function ChatRoom() {
                 </Text>
               </View>
             ) : (
-              <Text style={styles.headerSub} numberOfLines={1}>{chat.vacTitle}</Text>
+              // Компания, а не должность: в общем чате смен может быть
+              // несколько, и должность у человека меняется от смены к смене,
+              // а компания — нет.
+              <Text style={styles.headerSub} numberOfLines={1}>{chat.companyName}</Text>
             )}
           </View>
           <Text style={{ fontSize: 16, color: Colors.textMuted, marginLeft: 4 }}>›</Text>
@@ -910,35 +940,10 @@ export default function ChatRoom() {
         <View style={{ width: 70 }} />
       </View>
 
-      {/* Vacancy info block */}
-      {vacancy || chat.vacTitle ? (
-        <View style={styles.vacancyBar}>
-          {chat.vacTitle ? (
-            <View style={styles.vacancyItem}>
-              <Ionicons name="briefcase-outline" size={13} color={Colors.textMuted} />
-              <Text style={styles.vacancyText} numberOfLines={1}>{chat.vacTitle}</Text>
-            </View>
-          ) : null}
-          {vacancy?.date ? (
-            <View style={styles.vacancyItem}>
-              <Ionicons name="calendar-outline" size={13} color={Colors.textMuted} />
-              <Text style={styles.vacancyText}>{formatDate(vacancy.date)}</Text>
-            </View>
-          ) : null}
-          {vacancy?.timeStart && vacancy?.timeEnd ? (
-            <View style={styles.vacancyItem}>
-              <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
-              <Text style={styles.vacancyText}>{vacancy.timeStart}–{vacancy.timeEnd}</Text>
-            </View>
-          ) : null}
-          {vacancy?.address ? (
-            <View style={styles.vacancyItem}>
-              <Ionicons name="location-outline" size={13} color={Colors.textMuted} />
-              <Text style={styles.vacancyText} numberOfLines={1}>{vacancy.address}</Text>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
+      {/* Полосы с вакансией здесь больше нет. Чат теперь один на пару людей, и
+          смен в нём может быть несколько — одна строка в шапке говорила бы
+          только про последнюю. Вместо неё каждый отклик открывается карточкой
+          прямо в переписке, на своём месте по времени. */}
 
       {/* Messages + Input */}
       <KeyboardAvoidingView
@@ -1087,6 +1092,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   decisionBarLabel: { fontSize: 12.5, fontWeight: '600', color: Colors.textSecondary },
+  decisionMoreTxt: { fontSize: 12, fontWeight: '600', color: Colors.primary, marginTop: 8 },
   decisionStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   decisionBtnsRow: { flexDirection: 'row', gap: 10 },
   decisionBtn: {
@@ -1237,20 +1243,6 @@ const styles = StyleSheet.create({
   confirmCancelTxt: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
   confirmRejectBtn: { flex: 1, backgroundColor: Colors.red, borderRadius: 100, paddingVertical: 13, alignItems: 'center' },
   confirmRejectTxt: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  vacancyBar: { // Corrected: Added 'vacancyBar' to align with the missing style error
-    flexDirection: 'row', flexWrap: 'wrap', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 10,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1, borderBottomColor: Colors.divider,
-  },
-  vacancyItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Colors.bg, borderRadius: 100,
-    paddingHorizontal: 10, paddingVertical: 4,
-    borderWidth: 1, borderColor: Colors.divider,
-  },
-
-  vacancyText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500', maxWidth: 160 },
   // Фон и скругление — у обёртки; само поле прозрачное, чтобы высота
   // считалась только по тексту и рост был плавным
   textInput: {

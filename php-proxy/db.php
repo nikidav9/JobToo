@@ -218,6 +218,53 @@ function msg_insert(array $row): array {
     return $row;
 }
 
+// ─── Карточка вакансии в чате ─────────────────────────────────────────────────
+// Чат теперь один на пару людей, и в нём может идти речь о нескольких сменах.
+// Чтобы не путаться, каждый новый отклик открывается карточкой: что за работа,
+// когда и где. Раньше это висело полосой в шапке чата и относилось непонятно
+// к чему — при второй смене шапка показывала бы только одну из них.
+//
+// Текстом, а не значками: карточка попадает и в список чатов, и в пуш, а там
+// разметки нет. Эмодзи не ставим — от них в чате договорились уходить.
+
+function fmt_date_ru(string $iso): string {
+    if ($iso === '') return '';
+    $ts = strtotime($iso);
+    if (!$ts) return $iso;
+    $days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    return $days[(int)date('w', $ts)] . ' ' . date('d.m', $ts);
+}
+
+function vacancy_card_text(string $vid): ?string {
+    if (trim($vid) === '') return null;
+
+    $v = sb_single('jm_vacancies', ['id' => 'eq.' . $vid]);
+    if ($v) {
+        $lines = ['Смена: ' . trim((string)($v['title'] ?? ''))];
+        $date = fmt_date_ru((string)($v['date'] ?? ''));
+        $time = ($v['time_start'] ?? '') && ($v['time_end'] ?? '')
+            ? $v['time_start'] . '–' . $v['time_end'] : '';
+        $when = trim($date . ($date && $time ? ', ' : '') . $time);
+        if ($when !== '') $lines[] = 'Когда: ' . $when;
+        $where = trim((string)($v['address'] ?? ''));
+        if ($where === '' && !empty($v['metro_station'])) $where = 'м. ' . $v['metro_station'];
+        if ($where !== '') $lines[] = 'Где: ' . $where;
+        return implode("\n", $lines);
+    }
+
+    $p = sb_single('jm_perm_vacancies', ['id' => 'eq.' . $vid]);
+    if ($p) {
+        $lines = ['Постоянная работа: ' . trim((string)($p['title'] ?? ''))];
+        if (!empty($p['schedule'])) $lines[] = 'График: ' . $p['schedule'];
+        $where = trim((string)($p['address'] ?? ''));
+        if ($where === '' && !empty($p['metro_station'])) $where = 'м. ' . $p['metro_station'];
+        if ($where !== '') $lines[] = 'Где: ' . $where;
+        return implode("\n", $lines);
+    }
+
+    return null;
+}
+
 // ─── Адреса и координаты ──────────────────────────────────────────────────────
 // Ищем через OpenStreetMap/Nominatim: бесплатно, без ключа и работает с
 // сервера — в отличие от Яндекса, у которого наш ключ умеет только рисовать
@@ -1072,12 +1119,48 @@ try {
         case 'dbCreateChat': {
             [$wid, $eid, $vid, $vt, $cn, $sm, $uw, $ue] =
                 [$args[0], $args[1], $args[2], $args[3], $args[4], $args[5] ?? null, $args[6] ?? 0, $args[7] ?? 0];
-            $ex = sb_single('jm_chats', ['vacancy_id' => 'eq.' . $vid, 'worker_id' => 'eq.' . $wid], 'id');
-            if ($ex) { $data = $ex['id']; break; }
+            // Чат один на пару людей, а не на каждую вакансию. Раньше директор
+            // с тремя сменами получал три отдельные переписки с одним и тем же
+            // человеком, и разговор рассыпался.
+            $ex = sb_single('jm_chats',
+                ['worker_id' => 'eq.' . $wid, 'employer_id' => 'eq.' . $eid],
+                'id,vacancy_id,unread_worker,unread_employer');
+
+            if ($ex) {
+                $cid = $ex['id'];
+                // Та же вакансия — ничего не добавляем, чат уже про неё.
+                if ($vid !== '' && ($ex['vacancy_id'] ?? '') !== $vid) {
+                    // Переводим чат на новую вакансию: панель решений и статус
+                    // отклика смотрят на последнюю.
+                    sb_update('jm_chats', ['id' => 'eq.' . $cid], [
+                        'vacancy_id' => $vid,
+                        'vac_title' => $vt,
+                        'company_name' => $cn,
+                        'unread_worker' => (int)($ex['unread_worker'] ?? 0) + (int)$uw,
+                        'unread_employer' => (int)($ex['unread_employer'] ?? 0) + (int)$ue,
+                    ]);
+                    $card = vacancy_card_text($vid);
+                    if ($card) {
+                        msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
+                            'text' => $card, 'created_at' => now_iso()]);
+                    }
+                    if ($sm) {
+                        msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
+                            'text' => $sm, 'created_at' => now_iso()]);
+                    }
+                }
+                $data = $cid; break;
+            }
+
             $cid = uid();
             sb_insert('jm_chats', ['id' => $cid, 'vacancy_id' => $vid, 'worker_id' => $wid,
                 'employer_id' => $eid, 'vac_title' => $vt, 'company_name' => $cn,
                 'unread_worker' => $uw, 'unread_employer' => $ue, 'created_at' => now_iso()]);
+            $card = vacancy_card_text($vid);
+            if ($card) {
+                msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
+                    'text' => $card, 'created_at' => now_iso()]);
+            }
             if ($sm) msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system', 'text' => $sm, 'created_at' => now_iso()]);
             $data = $cid; break;
         }
@@ -1093,6 +1176,74 @@ try {
             $f = $args[1] === 'worker' ? 'unread_worker' : 'unread_employer';
             $cur = $args[1] === 'worker' ? ($row['unread_worker'] ?? 0) : ($row['unread_employer'] ?? 0);
             sb_update('jm_chats', ['id' => 'eq.' . $args[0]], [$f => $cur + 1]); break;
+        }
+
+        // Разовая уборка после перехода на «один чат — одна пара людей».
+        // Пары, у которых чатов больше одного, сливаем в старший: перед каждым
+        // блоком ставим карточку его вакансии, сообщения переносим с их
+        // временем, лишний чат удаляем (сообщения к этому моменту уже не его).
+        //
+        // args: [apply] — без true только считает и показывает план.
+        // Повторный запуск безопасен: сливать станет нечего.
+        case 'dbMergeDuplicateChats': {
+            @set_time_limit(300);
+            $apply = ($args[0] ?? false) === true;
+
+            $all = sb_select('jm_chats', [], 'id,worker_id,employer_id,vacancy_id,unread_worker,unread_employer,created_at', 'created_at.asc');
+            $groups = [];
+            foreach ($all as $c) {
+                $groups[$c['worker_id'] . '|' . $c['employer_id']][] = $c;
+            }
+
+            $report = ['pairs' => 0, 'chatsMerged' => 0, 'messagesMoved' => 0, 'cards' => 0, 'details' => []];
+            foreach ($groups as $key => $group) {
+                if (count($group) < 2) continue;
+                $report['pairs']++;
+                $keeper = $group[0];   // created_at.asc — первый и есть старший
+
+                foreach ($group as $ch) {
+                    $msgs = sb_select('jm_messages', ['chat_id' => 'eq.' . $ch['id']], 'id,created_at', 'created_at.asc');
+                    // Карточка встаёт на секунду раньше первого сообщения блока
+                    $first = $msgs[0]['created_at'] ?? $ch['created_at'];
+                    $stamp = gmdate('Y-m-d\TH:i:s.v\Z', max(0, strtotime($first) - 1));
+                    $card = vacancy_card_text((string)($ch['vacancy_id'] ?? ''));
+
+                    if ($card) {
+                        $report['cards']++;
+                        if ($apply) {
+                            sb_insert('jm_messages', ['id' => uid(), 'chat_id' => $keeper['id'],
+                                'sender_id' => 'system', 'text' => $card, 'created_at' => $stamp]);
+                        }
+                    }
+
+                    if ($ch['id'] === $keeper['id']) continue;
+
+                    $report['chatsMerged']++;
+                    $report['messagesMoved'] += count($msgs);
+                    if ($apply && $msgs) {
+                        sb_update('jm_messages', ['chat_id' => 'eq.' . $ch['id']], ['chat_id' => $keeper['id']]);
+                    }
+                }
+
+                if ($apply) {
+                    $uw = 0; $ue = 0;
+                    foreach ($group as $ch) {
+                        $uw += (int)($ch['unread_worker'] ?? 0);
+                        $ue += (int)($ch['unread_employer'] ?? 0);
+                    }
+                    sb_update('jm_chats', ['id' => 'eq.' . $keeper['id']],
+                        ['unread_worker' => $uw, 'unread_employer' => $ue]);
+                    foreach ($group as $ch) {
+                        // Только строку чата: сообщения уже переехали к старшему
+                        if ($ch['id'] !== $keeper['id']) sb_delete('jm_chats', ['id' => 'eq.' . $ch['id']]);
+                    }
+                }
+
+                $report['details'][] = ['pair' => $key, 'keep' => $keeper['id'], 'chats' => count($group)];
+            }
+
+            $report['applied'] = $apply;
+            $data = $report; break;
         }
 
         case 'dbDeleteChat':
@@ -1128,29 +1279,52 @@ try {
             [$vid, $wid] = [$args[0], $args[1]];
             $like = sb_single('jm_likes', ['vacancy_id' => 'eq.' . $vid, 'worker_id' => 'eq.' . $wid]);
             if (!$like) { $data = ['matched' => false]; break; }
+            $eid = $like['employer_id'];
             if ($like['is_match']) {
-                $ec = sb_single('jm_chats', ['vacancy_id' => 'eq.' . $vid, 'worker_id' => 'eq.' . $wid], 'id');
+                $ec = sb_single('jm_chats', ['worker_id' => 'eq.' . $wid, 'employer_id' => 'eq.' . $eid], 'id');
                 $data = ['matched' => false, 'chatId' => $ec['id'] ?? null]; break;
             }
             if (!$like['worker_liked'] || $like['employer_liked'] !== true) { $data = ['matched' => false]; break; }
             sb_update('jm_likes', ['vacancy_id' => 'eq.' . $vid, 'worker_id' => 'eq.' . $wid],
                 ['is_match' => true, 'matched_at' => now_iso()]);
             $vac = sb_single('jm_vacancies', ['id' => 'eq.' . $vid]);
-            $ec2 = sb_single('jm_chats', ['vacancy_id' => 'eq.' . $vid, 'worker_id' => 'eq.' . $wid], 'id');
+
+            // Чат ищем по паре людей: со вторым мэтчем разговор продолжается
+            // там же, где начался, а не заводится заново.
+            $ec2 = sb_single('jm_chats', ['worker_id' => 'eq.' . $wid, 'employer_id' => 'eq.' . $eid], 'id');
+            $isNewChat = !$ec2;
             $cid = $ec2['id'] ?? uid();
-            if (!$ec2) {
+            if ($isNewChat) {
                 sb_insert('jm_chats', [
                     'id' => $cid, 'vacancy_id' => $vid, 'worker_id' => $wid,
-                    'employer_id' => $like['employer_id'], 'vac_title' => $vac['title'] ?? '',
+                    'employer_id' => $eid, 'vac_title' => $vac['title'] ?? '',
                     'company_name' => $vac['company'] ?? '', 'unread_worker' => 1, 'unread_employer' => 1,
                     'created_at' => now_iso(),
                 ]);
+            } else {
+                sb_update('jm_chats', ['id' => 'eq.' . $cid], [
+                    'vacancy_id' => $vid,
+                    'vac_title' => $vac['title'] ?? '',
+                    'company_name' => $vac['company'] ?? '',
+                ]);
+            }
+
+            // Карточка смены открывает блок: дальше в чате может идти речь о
+            // другой смене, и без неё непонятно, к чему относится разговор.
+            $card = vacancy_card_text($vid);
+            if ($card) {
+                msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
+                    'text' => $card, 'created_at' => now_iso()]);
             }
             msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
                 'text' => '🎉 У вас мэтч! Вы подошли друг другу. Познакомьтесь и обсудите детали!', 'created_at' => now_iso()]);
-            msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system_safety',
-                'text' => "🔒 Рекомендуем не переводить общение в сторонние мессенджеры или почту, а продолжить его в чате JobToo: так у мошенников будет меньше шансов вас обмануть.\n\nГде бы вы ни общались — не сообщайте свой CVV-код, код из SMS и не вводите данные карты по ссылке.",
-                'created_at' => now_iso()]);
+            // Предупреждение о безопасности — один раз, при заведении чата.
+            // Повторять его на каждую смену незачем: читать перестанут.
+            if ($isNewChat) {
+                msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system_safety',
+                    'text' => "🔒 Рекомендуем не переводить общение в сторонние мессенджеры или почту, а продолжить его в чате JobToo: так у мошенников будет меньше шансов вас обмануть.\n\nГде бы вы ни общались — не сообщайте свой CVV-код, код из SMS и не вводите данные карты по ссылке.",
+                    'created_at' => now_iso()]);
+            }
             if ($vac) {
                 $nf = ($vac['workers_found'] ?? 0) + 1;
                 sb_update('jm_vacancies', ['id' => 'eq.' . $vid],

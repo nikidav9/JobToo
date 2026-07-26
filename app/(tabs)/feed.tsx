@@ -320,7 +320,8 @@ function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId
     if (!currentUser) return;
     setChatLoading(worker.id);
     try {
-      const existing = chats.find(c => c.vacancyId === vacancyId && c.workerId === worker.id);
+      // Чат теперь один на пару людей — ищем по собеседнику, а не по вакансии
+      const existing = chats.find(c => c.employerId === currentUser.id && c.workerId === worker.id);
       if (existing) {
         onClose();
         router.push({ pathname: '/chat-room', params: { chatId: existing.id } });
@@ -460,8 +461,9 @@ function WorkerListModal({
   const getWorker = (id: string) =>
     localWorkers.find(u => u.id === id) ?? users.find(u => u.id === id);
 
+  // Чат один на пару людей, поэтому ищем по собеседнику, а не по вакансии
   const getChatId = (workerId: string) =>
-    chats.find(c => c.vacancyId === vacancyId && c.workerId === workerId)?.id ?? null;
+    chats.find(c => c.employerId === currentUser?.id && c.workerId === workerId)?.id ?? null;
 
   // Open or create a chat with a worker (no match decision required)
   const openOrCreateChat = async (like: Like) => {
@@ -966,7 +968,7 @@ function WorkerFeed() {
   const doMessage = useCallback(async () => {
     if (!currentCard || !currentUser || messagingRef.current) return;
     const existingChat = chats.find(
-      c => c.vacancyId === currentCard.id && c.workerId === currentUser.id
+      c => c.employerId === currentCard.employerId && c.workerId === currentUser.id
     );
     if (existingChat) {
       router.push({ pathname: '/chat-room', params: { chatId: existingChat.id } });
@@ -1424,7 +1426,7 @@ function WorkerPermMode() {
   const openPermChat = async (v: PermVacancy, displayCompany: string) => {
     if (!currentUser || chatLoading) return;
     // Check if chat already exists
-    const existing = chats.find(c => c.vacancyId === v.id && c.workerId === currentUser.id);
+    const existing = chats.find(c => c.employerId === v.employerId && c.workerId === currentUser.id);
     if (existing) {
       router.push({ pathname: '/chat-room', params: { chatId: existing.id } });
       return;

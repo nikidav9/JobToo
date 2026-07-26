@@ -305,7 +305,7 @@ function WorkerMatches() {
             <TouchableOpacity
               style={s.chatBtn}
               onPress={() => {
-                const c = chats.find(c => c.vacancyId === like.vacancyId && c.workerId === currentUser.id);
+                const c = chats.find(c => c.employerId === like.employerId && c.workerId === currentUser.id);
                 if (c) router.push({ pathname: '/chat-room', params: { chatId: c.id } });
                 else router.push({ pathname: '/(tabs)/chats' });
               }}
@@ -756,7 +756,7 @@ function EmployerMatches() {
             <TouchableOpacity
               style={s.chatBtn}
               onPress={() => {
-                const c = chats.find((c: Chat) => c.vacancyId === app.vacancyId && c.workerId === app.workerId);
+                const c = chats.find((c: Chat) => c.employerId === app.employerId && c.workerId === app.workerId);
                 if (c) router.push({ pathname: '/chat-room', params: { chatId: c.id } });
                 else router.push({ pathname: '/(tabs)/chats' });
               }}
@@ -887,7 +887,7 @@ function EmployerMatches() {
             <TouchableOpacity
               style={s.chatBtn}
               onPress={() => {
-                const c = chats.find(c => c.vacancyId === like.vacancyId && c.workerId === like.workerId);
+                const c = chats.find(c => c.employerId === like.employerId && c.workerId === like.workerId);
                 if (c) router.push({ pathname: '/chat-room', params: { chatId: c.id } });
                 else router.push({ pathname: '/(tabs)/chats' });
               }}
