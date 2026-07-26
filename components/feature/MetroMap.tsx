@@ -113,7 +113,7 @@ ymaps.ready(function(){
   var clusterer=new ymaps.Clusterer({
     preset:'islands#invertedOrangeClusterIcons',
     groupByCoordinates:false,
-    clusterDisableClickZoom:true,
+    clusterDisableClickZoom:false,
     clusterOpenBalloonOnClick:false,
     gridSize:72,
     minClusterSize:2
@@ -131,25 +131,31 @@ ymaps.ready(function(){
     marks.push(pm);
     coords.push([p.lat,p.lng]);
   });
-  // Нажатие на кружок с числом. Раньше оно только приближало карту, а когда
-  // приближать было некуда — точки стоят почти в одной координате или зум уже
-  // на пределе — не происходило вообще ничего. Теперь в этом случае открываем
-  // список всем содержимым кружка.
-  clusterer.events.add('click',function(e){
-    var t=e.get('target');
-    if(!t.getGeoObjects) return;               // одиночная метка — у неё свой обработчик
-    var keys=[];
-    t.getGeoObjects().forEach(function(g){keys=keys.concat(String(g.properties.get('key')).split('|'));});
-    var b=t.getBounds&&t.getBounds();
-    var spread=b?Math.max(Math.abs(b[0][0]-b[1][0]),Math.abs(b[0][1]-b[1][1])):0;
-    if(map.getZoom()<17&&spread>2e-5){
-      try{map.setBounds(b,{checkZoomRange:true,zoomMargin:60});return;}catch(err){}
-    }
-    send(keys.join('|'));
-  });
-
   clusterer.add(marks);
   map.geoObjects.add(clusterer);
+
+  // Приближение по нажатию делает сам Яндекс — это работает всегда, и отбирать
+  // у него эту обязанность оказалось ошибкой: свой обработчик мог не
+  // сработать, и тогда кружок переставал отзываться вовсе.
+  //
+  // Здесь только добавка: когда приближать некуда — точки стоят почти в одной
+  // координате или мы уже у предела — открываем список всем содержимым кружка.
+  // Если эта добавка почему-то не сработает, останется штатное приближение.
+  clusterer.events.add('click',function(e){
+    try{
+      var t=e.get('target');
+      if(!t||typeof t.getGeoObjects!=='function') return;   // одиночная метка
+      var b=t.getBounds&&t.getBounds();
+      var spread=b?Math.max(Math.abs(b[0][0]-b[1][0]),Math.abs(b[0][1]-b[1][1])):0;
+      if(map.getZoom()<17&&spread>2e-5) return;             // Яндекс сам приблизит
+      var keys=[];
+      t.getGeoObjects().forEach(function(g){
+        keys=keys.concat(String(g.properties.get('key')||'').split('|'));
+      });
+      keys=keys.filter(function(k){return k;});
+      if(keys.length) send(keys.join('|'));
+    }catch(err){}
+  });
 
   if(coords.length===1){map.setCenter(coords[0],14);}
   else if(coords.length>1){
