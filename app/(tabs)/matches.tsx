@@ -713,7 +713,7 @@ function EmployerMatches() {
       : { bg: '#EEF2FF', color: '#4F46E5', icon: 'briefcase-outline' as const, text: 'Отклик на вакансию' };
 
     return (
-      <View style={[s.card, isApproved && s.matchedCard]}>
+      <View style={[s.card, isApproved && s.matchedCard, isHired && s.completedCard]}>
         <View style={[s.statusBadge, { backgroundColor: badge.bg }]}>
           <Ionicons name={badge.icon} size={14} color={badge.color} />
           <Text style={[s.statusTxt, { color: badge.color }]}>{badge.text}</Text>
@@ -1138,6 +1138,13 @@ const s = StyleSheet.create({
     height: 2, backgroundColor: Colors.primary, borderRadius: 1,
   },
   list: { padding: 16, gap: 12 },
+  // Рамка карточки говорит о её состоянии, и правило одно на все три вида
+  // карточек — смены у работника, смены у работодателя, отклики на постоянные:
+  //   ждёт решения        — без рамки
+  //   в работе            — зелёная
+  //   в архиве            — синяя и приглушённая
+  // Отклик на постоянную вакансию про архив не знал, и завершённая карточка
+  // стояла в «Завершённых» без рамки рядом с обрамлёнными сменами.
   card: { backgroundColor: Colors.bg, borderRadius: Radius.lg, padding: 16, ...Shadow.card, gap: 10 },
   matchedCard: { borderWidth: 1.5, borderColor: Colors.green },
   completedCard: { borderWidth: 1.5, borderColor: Colors.blue, opacity: 0.8 },
