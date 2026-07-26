@@ -70,7 +70,6 @@ export default function Login() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <View style={styles.sheet}>
-        <View style={styles.handle} />
 
         <Text style={styles.title}>Войти</Text>
         <Text style={styles.subtitle}>Номер телефона и пароль</Text>
@@ -133,10 +132,6 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 14,
     // Sheet adapts to keyboard via parent KeyboardAvoidingView
-  },
-  handle: {
-    width: 36, height: 4, backgroundColor: Colors.inputBorder,
-    borderRadius: 2, alignSelf: 'center', marginBottom: 8,
   },
   title: { fontSize: 22, fontWeight: '700', color: Colors.textPrimary },
   subtitle: { fontSize: 14, color: Colors.textMuted, marginTop: -6, lineHeight: 20 },

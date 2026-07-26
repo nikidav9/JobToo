@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius } from '@/constants/theme';
+import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import { METRO_LINES } from '@/constants/metro';
 
 interface Props {
@@ -26,6 +27,8 @@ function norm(s: string): string {
 export function MetroPicker({ visible, onClose, onSelect, selectedLineId, selectedStation }: Props) {
   const [selectedLine, setSelectedLine] = useState<typeof METRO_LINES[0] | null>(null);
   const [query, setQuery] = useState('');
+  // Полоска сверху была, а смахивание — нет: обещание без исполнения
+  const swipe = useSwipeToDismiss(onClose, visible);
 
   useEffect(() => {
     if (visible) {
@@ -67,8 +70,9 @@ export function MetroPicker({ visible, onClose, onSelect, selectedLineId, select
   return (
     <Modal visible={visible} animationType="none" transparent statusBarTranslucent navigationBarTranslucent>
       <View style={styles.overlay} onStartShouldSetResponder={() => true}>
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+        <Animated.View style={[styles.sheet, swipe.animStyle]}>
+          <View {...swipe.panHandlers}><SheetHandle /></View>
 
           {/* Поиск по станции — работает всегда, сверху */}
           <View style={styles.searchBox}>
@@ -171,7 +175,7 @@ export function MetroPicker({ visible, onClose, onSelect, selectedLineId, select
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
             <Text style={styles.closeBtnText}>Закрыть</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

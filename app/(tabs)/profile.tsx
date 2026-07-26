@@ -251,6 +251,10 @@ export default function ProfileScreen() {
   const [metroPicker, setMetroPicker] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  // Полоска сверху обещает смахивание — значит оно должно работать
+  const editSwipe = useSwipeToDismiss(() => setEditSection(null));
+  const notifSwipe = useSwipeToDismiss(() => setShowNotifications(false));
+  const pwdSwipe = useSwipeToDismiss(() => setShowSettings(false));
   const [showPhotoSource, setShowPhotoSource] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -741,8 +745,9 @@ export default function ProfileScreen() {
       {/* Edit modal */}
       <Modal statusBarTranslucent navigationBarTranslucent visible={!!editSection} animationType="slide" transparent>
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <View style={styles.modalSheet}>
-            <View style={styles.handle} />
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setEditSection(null)} />
+          <Animated.View style={[styles.modalSheet, editSwipe.animStyle]}>
+            <View {...editSwipe.panHandlers}><SheetHandle /></View>
             <Text style={styles.modalTitle}>Изменить</Text>
 
             {editSection === 'personal' && (
@@ -814,7 +819,7 @@ export default function ProfileScreen() {
               <PrimaryButton label="Сохранить" onPress={saveEdit} disabled={savingEdit} />
               <PrimaryButton label="Отмена" onPress={() => setEditSection(null)} secondary />
             </View>
-          </View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -859,13 +864,10 @@ export default function ProfileScreen() {
       {/* Notifications modal */}
       <Modal statusBarTranslucent navigationBarTranslucent visible={showNotifications} transparent animationType="slide" onRequestClose={() => setShowNotifications(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowNotifications(false)}>
-          <View style={styles.modalSheet} onStartShouldSetResponder={() => true}>
-            <View style={styles.handle} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Animated.View style={[styles.modalSheet, notifSwipe.animStyle]} onStartShouldSetResponder={() => true}>
+            <View {...notifSwipe.panHandlers}>
+              <SheetHandle />
               <Text style={styles.modalTitle}>Уведомления</Text>
-              <TouchableOpacity onPress={() => setShowNotifications(false)} style={{ padding: 4 }}>
-                <Ionicons name="close" size={22} color={Colors.textMuted} />
-              </TouchableOpacity>
             </View>
             <View style={{ alignItems: 'center', paddingVertical: 48, gap: 12 }}>
               <Ionicons name="notifications-outline" size={56} color={Colors.textMuted} />
@@ -874,7 +876,7 @@ export default function ProfileScreen() {
                 Здесь будут появляться уведомления и новости от приложения
               </Text>
             </View>
-          </View>
+          </Animated.View>
         </TouchableOpacity>
       </Modal>
 
@@ -882,13 +884,10 @@ export default function ProfileScreen() {
       <Modal statusBarTranslucent navigationBarTranslucent visible={showSettings} transparent animationType="slide" onRequestClose={() => setShowSettings(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowSettings(false)} />
-          <View style={styles.modalSheet}>
-            <View style={styles.handle} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <Animated.View style={[styles.modalSheet, pwdSwipe.animStyle]}>
+            <View {...pwdSwipe.panHandlers}>
+              <SheetHandle />
               <Text style={styles.modalTitle}>Изменить пароль</Text>
-              <TouchableOpacity onPress={() => setShowSettings(false)} style={{ padding: 4 }}>
-                <Ionicons name="close" size={22} color={Colors.textMuted} />
-              </TouchableOpacity>
             </View>
             <View style={{ gap: 12 }}>
               <AppInput
@@ -945,7 +944,7 @@ export default function ProfileScreen() {
               />
               <PrimaryButton label="Отмена" onPress={() => setShowSettings(false)} secondary />
             </View>
-          </View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
