@@ -695,7 +695,10 @@ export default function ChatRoom() {
         });
         clip = {
           bytes: base64ToUint8Array(base64Data),
-          contentType: 'audio/m4a', ext: 'm4a', seconds,
+          // audio/mp4, а не audio/m4a: файл — это AAC внутри контейнера mp4,
+          // а «audio/m4a» вообще не зарегистрированный тип, и часть плееров
+          // на него спотыкается.
+          contentType: 'audio/mp4', ext: 'm4a', seconds,
         };
       } catch (e) {
         console.error('[ChatRoom] read recording error', e);
