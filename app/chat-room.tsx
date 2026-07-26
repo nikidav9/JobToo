@@ -285,12 +285,30 @@ export default function ChatRoom() {
     : '';
   const contextOther = users.find(u => u.id === otherId);
   const [fetchedOther, setFetchedOther] = useState<import('@/constants/types').User | null>(null);
-  const other = contextOther ?? fetchedOther;
+  // Своя загрузка идёт первой: та, что из общего списка, почти всегда устарела.
+  const other = fetchedOther ?? contextOther;
 
+  // Собеседника перечитываем сами, раз в минуту.
+  //
+  // Из общего списка users брать нельзя: он загружается один раз при запуске,
+  // а дальше обновляется только подпиской rt_users — а она работает через
+  // postgres_changes и молчит с тех пор, как базу закрыли (по той же причине
+  // сообщения переводили на broadcast). Из-за этого в шапке висела отметка
+  // «был(а)» на момент открытия приложения: человек пишет прямо сейчас, а над
+  // перепиской значилось утро.
+  //
+  // Класть refreshUsers в общий опрос нельзя — он тянет таблицу пользователей
+  // целиком. Здесь же нужен ровно один человек, и только пока чат открыт.
   useEffect(() => {
-    if (!otherId || contextOther) return;
-    dbGetUserById(otherId).then(u => setFetchedOther(u)).catch(() => {});
-  }, [otherId, contextOther]);
+    if (!otherId) return;
+    let alive = true;
+    const load = () => {
+      dbGetUserById(otherId).then(u => { if (alive && u) setFetchedOther(u); }).catch(() => {});
+    };
+    load();
+    const t = setInterval(load, 60_000);
+    return () => { alive = false; clearInterval(t); };
+  }, [otherId]);
 
   const vacancy = vacancies.find(v => v.id === chat?.vacancyId);
   // Пока собеседник не загрузился, здесь подставлялось название компании. Для
