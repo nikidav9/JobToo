@@ -1,9 +1,9 @@
 /** @type {import('next').NextConfig} */
-const isGhPages = process.env.DEPLOY_TARGET === 'ghpages'
+// Дашборд живёт на Vercel и больше нигде. Раньше здесь была вторая сборка —
+// статическая, под GitHub Pages. Толку от неё не было: статика не выполняет
+// серверный код, поэтому маршруты /api/* в неё не попадали — ни пересылка
+// вебхука бота, ни веб-пуши, ни сброс пароля. Публикация к тому же ни разу не
+// прошла: Pages для репозитория не включён.
+const nextConfig = {}
 
-const nextConfig = {
-  ...(isGhPages ? { output: 'export', trailingSlash: true } : {}),
-  basePath: isGhPages ? '/JobToo' : '',
-  assetPrefix: isGhPages ? '/JobToo/' : '',
-}
 module.exports = nextConfig
