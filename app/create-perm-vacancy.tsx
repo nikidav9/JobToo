@@ -147,7 +147,7 @@ export default function CreatePermVacancy() {
             ) : (
               <TouchableOpacity style={[styles.pickerField, errors.metro ? styles.inputError : null]} onPress={() => setMetroPicker(true)}>
                 <Text style={styles.pickerFieldTxt}>🚇 Выбрать станцию</Text>
-                <Text style={{ color: Colors.textMuted, fontSize: 20 }}>›</Text>
+                <Text style={{ color: Colors.textMuted, fontSize: rf(20) }}>›</Text>
               </TouchableOpacity>
             )}
             {errors.metro ? <Text style={styles.errMsg}>{errors.metro}</Text> : null}

@@ -115,8 +115,8 @@ export default function AdminScreen() {
           <View style={{ width: 60 }} />
         </View>
         <View style={styles.center}>
-          <Text style={{ fontSize: 48 }}>🔒</Text>
-          <Text style={[styles.emptyTxt, { marginTop: 12, fontSize: 16, fontWeight: '700', color: Colors.textPrimary }]}>
+          <Text style={{ fontSize: rf(48) }}>🔒</Text>
+          <Text style={[styles.emptyTxt, { marginTop: 12, fontSize: rf(16), fontWeight: '700', color: Colors.textPrimary }]}>
             Доступ запрещён
           </Text>
           <Text style={[styles.emptyTxt, { marginTop: 6 }]}>
@@ -285,7 +285,7 @@ export default function AdminScreen() {
         <Text style={styles.cardLabel}>⚡</Text>
         <Text style={[styles.cardVal, { flex: 1, fontWeight: '700' }]}>{item.title}</Text>
         <View style={[styles.statusDot, { backgroundColor: item.status === 'open' ? Colors.green : Colors.textMuted }]} />
-        <Text style={[styles.cardVal, { color: item.status === 'open' ? Colors.green : Colors.textMuted, fontSize: 12 }]}>
+        <Text style={[styles.cardVal, { color: item.status === 'open' ? Colors.green : Colors.textMuted, fontSize: rf(12) }]}>
           {item.status === 'open' ? 'Открыта' : 'Закрыта'}
         </Text>
       </View>
@@ -314,7 +314,7 @@ export default function AdminScreen() {
         <Text style={styles.cardLabel}>💼</Text>
         <Text style={[styles.cardVal, { flex: 1, fontWeight: '700' }]}>{item.title}</Text>
         <View style={[styles.statusDot, { backgroundColor: item.status === 'open' ? Colors.green : Colors.textMuted }]} />
-        <Text style={[styles.cardVal, { color: item.status === 'open' ? Colors.green : Colors.textMuted, fontSize: 12 }]}>
+        <Text style={[styles.cardVal, { color: item.status === 'open' ? Colors.green : Colors.textMuted, fontSize: rf(12) }]}>
           {item.status === 'open' ? 'Открыта' : 'Закрыта'}
         </Text>
       </View>
@@ -372,7 +372,7 @@ export default function AdminScreen() {
             onPress={() => router.push('/analytics' as any)}
             style={{ backgroundColor: Colors.primaryLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}
           >
-            <Text style={{ fontSize: 13, color: Colors.primary, fontWeight: '600' }}>📊 Аналитика</Text>
+            <Text style={{ fontSize: rf(13), color: Colors.primary, fontWeight: '600' }}>📊 Аналитика</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={loadAll} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text style={styles.refreshBtn}>↻</Text>

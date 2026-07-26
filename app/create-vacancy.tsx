@@ -419,7 +419,7 @@ export default function CreateVacancy() {
             ) : (
               <TouchableOpacity style={styles.metroField} onPress={() => setMetroPicker(true)}>
                 <Text style={styles.metroFieldTxt}>🚇 Выбрать станцию</Text>
-                <Text style={{ color: Colors.textMuted, fontSize: 20 }}>›</Text>
+                <Text style={{ color: Colors.textMuted, fontSize: rf(20) }}>›</Text>
               </TouchableOpacity>
             )}
             {errors.metro ? <Text style={styles.errMsg}>{errors.metro}</Text> : null}
@@ -455,7 +455,7 @@ export default function CreateVacancy() {
                 {/* @ts-ignore */}
                 <input type="date" value={formatISODate(selectedDate)} min={formatISODate(new Date())}
                   onChange={(e: any) => e.target.value && applyDate('date', parseISOToDate(e.target.value))}
-                  style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+                  style={{ flex: 1, border: 'none', background: 'transparent', fontSize: rf(16), color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
               </View>
             ) : (
               <TouchableOpacity style={styles.pickerField} onPress={() => openPicker('date')} activeOpacity={0.8}>
@@ -476,7 +476,7 @@ export default function CreateVacancy() {
                     {/* @ts-ignore */}
                     <input type="date" value={formatISODate(selectedEndDate)} min={formatISODate(selectedDate)}
                       onChange={(e: any) => e.target.value && applyDate('endDate', parseISOToDate(e.target.value))}
-                      style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+                      style={{ flex: 1, border: 'none', background: 'transparent', fontSize: rf(16), color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
                   </View>
                 ) : (
                   <TouchableOpacity style={styles.pickerField} onPress={() => openPicker('endDate')} activeOpacity={0.8}>
@@ -518,7 +518,7 @@ export default function CreateVacancy() {
                   {/* @ts-ignore */}
                   <input type="time" value={formatTime(selectedTimeStart)}
                     onChange={(e: any) => e.target.value && applyDate('timeStart', parseTimeToDate(e.target.value))}
-                    style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+                    style={{ flex: 1, border: 'none', background: 'transparent', fontSize: rf(16), color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
                 </View>
                 <Text style={styles.timeSep}>–</Text>
                 <View style={[styles.pickerField, { flex: 1 }]}>
@@ -526,7 +526,7 @@ export default function CreateVacancy() {
                   {/* @ts-ignore */}
                   <input type="time" value={formatTime(selectedTimeEnd)}
                     onChange={(e: any) => e.target.value && applyDate('timeEnd', parseTimeToDate(e.target.value))}
-                    style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
+                    style={{ flex: 1, border: 'none', background: 'transparent', fontSize: rf(16), color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
                 </View>
               </View>
             ) : (

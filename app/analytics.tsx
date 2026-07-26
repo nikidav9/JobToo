@@ -420,7 +420,7 @@ export default function AnalyticsScreen() {
           <View style={{ width: 60 }} />
         </View>
         <View style={s.center}>
-          <Text style={{ fontSize: 48 }}>🔒</Text>
+          <Text style={{ fontSize: rf(48) }}>🔒</Text>
           <Text style={s.accessDenied}>Доступ запрещён</Text>
         </View>
       </SafeAreaView>

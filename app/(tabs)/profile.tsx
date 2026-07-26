@@ -190,7 +190,7 @@ function RatingsModal({ userId, users, onClose }: { userId: string; users: any[]
             </View>
           ) : ratings.length === 0 ? (
             <View style={rmS.empty}>
-              <Text style={{ fontSize: 44 }}>⭐</Text>
+              <Text style={{ fontSize: rf(44) }}>⭐</Text>
               <Text style={rmS.emptyTitle}>Отзывов пока нет</Text>
               <Text style={rmS.emptySub}>Оценки появятся после завершённых смен</Text>
             </View>
@@ -705,7 +705,7 @@ export default function ProfileScreen() {
         <View style={styles.confirmOverlay}>
           <View style={[styles.confirmCard, { gap: 0, padding: 0, overflow: 'hidden' }]}>
             <View style={{ padding: 20, paddingBottom: 16 }}>
-              <Text style={[styles.confirmTitle, { fontSize: 16 }]}>Обновить фото</Text>
+              <Text style={[styles.confirmTitle, { fontSize: rf(16) }]}>Обновить фото</Text>
               <Text style={[styles.confirmBody, { marginTop: 4 }]}>Выберите источник фото</Text>
             </View>
             <TouchableOpacity
@@ -789,7 +789,7 @@ export default function ProfileScreen() {
             )}
             {editSection === 'company' && (
               <View style={{ gap: 12 }}>
-                <Text style={{ fontSize: 13, fontWeight: '500', color: Colors.textSecondary }}>Название компании</Text>
+                <Text style={{ fontSize: rf(13), fontWeight: '500', color: Colors.textSecondary }}>Название компании</Text>
                 {COMPANY_OPTIONS.map(opt => (
                   <TouchableOpacity
                     key={opt}
@@ -873,8 +873,8 @@ export default function ProfileScreen() {
             </View>
             <View style={{ alignItems: 'center', paddingVertical: 48, gap: 12 }}>
               <Ionicons name="notifications-outline" size={56} color={Colors.textMuted} />
-              <Text style={{ fontSize: 17, fontWeight: '700', color: Colors.textPrimary }}>Уведомлений пока нет</Text>
-              <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: 'center' }}>
+              <Text style={{ fontSize: rf(17), fontWeight: '700', color: Colors.textPrimary }}>Уведомлений пока нет</Text>
+              <Text style={{ fontSize: rf(13), color: Colors.textMuted, textAlign: 'center' }}>
                 Здесь будут появляться уведомления и новости от приложения
               </Text>
             </View>
@@ -1115,18 +1115,18 @@ export function ErrorBoundary({ error, retry }: { error: Error; retry: () => voi
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top', 'left', 'right']}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <Text style={{ fontSize: 40, marginBottom: 12 }}>😕</Text>
-        <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', marginBottom: 8 }}>
+        <Text style={{ fontSize: rf(40), marginBottom: 12 }}>😕</Text>
+        <Text style={{ fontSize: rf(16), fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', marginBottom: 8 }}>
           Не удалось загрузить профиль
         </Text>
-        <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: 'center', marginBottom: 24 }}>
+        <Text style={{ fontSize: rf(13), color: Colors.textMuted, textAlign: 'center', marginBottom: 24 }}>
           {error.message}
         </Text>
         <TouchableOpacity
           onPress={retry}
           style={{ backgroundColor: Colors.primary, borderRadius: 100, paddingHorizontal: 24, paddingVertical: 12 }}
         >
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Попробовать снова</Text>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: rf(15) }}>Попробовать снова</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

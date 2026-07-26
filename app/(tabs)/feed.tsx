@@ -360,7 +360,7 @@ function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId
           <ActivityIndicator style={{ marginTop: 40 }} color={Colors.primary} />
         ) : viewers.length === 0 ? (
           <View style={wS.empty}>
-            <Text style={{ fontSize: 36 }}>👀</Text>
+            <Text style={{ fontSize: rf(36) }}>👀</Text>
             <Text style={wS.emptyTxt}>Ещё никто не просмотрел</Text>
           </View>
         ) : (
@@ -639,7 +639,7 @@ function WorkerListModal({
             </View>
           ) : filteredLikes.length === 0 ? (
             <View style={wS.empty}>
-              <Text style={{ fontSize: 36 }}>{type === 'applicants' ? '👀' : type === 'hired' ? '🤝' : '🙅'}</Text>
+              <Text style={{ fontSize: rf(36) }}>{type === 'applicants' ? '👀' : type === 'hired' ? '🤝' : '🙅'}</Text>
               <Text style={wS.emptyTxt}>
                 {type === 'applicants' ? 'Нет новых откликов' : type === 'hired' ? 'Никого не набрано' : 'Нет отклонённых'}
               </Text>

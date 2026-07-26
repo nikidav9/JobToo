@@ -32,7 +32,7 @@ function StarsMini({ rating }: { rating: number }) {
   return (
     <View style={{ flexDirection: 'row', gap: 2 }}>
       {[1, 2, 3, 4, 5].map(s => (
-        <Text key={s} style={{ fontSize: 13, color: rating >= s ? '#FBBF24' : '#E5E7EB' }}>★</Text>
+        <Text key={s} style={{ fontSize: rf(13), color: rating >= s ? '#FBBF24' : '#E5E7EB' }}>★</Text>
       ))}
     </View>
   );
@@ -242,7 +242,7 @@ export default function UserProfileScreen() {
             </View>
           ) : ratings.length === 0 ? (
             <View style={styles.emptyReviews}>
-              <Text style={{ fontSize: 40 }}>📭</Text>
+              <Text style={{ fontSize: rf(40) }}>📭</Text>
               <Text style={styles.emptyReviewsTitle}>Пока нет отзывов</Text>
               <Text style={styles.emptyReviewsSub}>Отзывы появятся после завершения смен</Text>
             </View>
@@ -339,18 +339,18 @@ export function ErrorBoundary({ error, retry }: { error: Error; retry: () => voi
         <Text style={styles.backText} />
       </View>
       <View style={[styles.center, { padding: 24 }]}>
-        <Text style={{ fontSize: 40, marginBottom: 12 }}>😕</Text>
-        <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', marginBottom: 8 }}>
+        <Text style={{ fontSize: rf(40), marginBottom: 12 }}>😕</Text>
+        <Text style={{ fontSize: rf(16), fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', marginBottom: 8 }}>
           Не удалось загрузить профиль
         </Text>
-        <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: 'center', marginBottom: 24 }}>
+        <Text style={{ fontSize: rf(13), color: Colors.textMuted, textAlign: 'center', marginBottom: 24 }}>
           {error.message}
         </Text>
         <TouchableOpacity
           onPress={retry}
           style={{ backgroundColor: Colors.primary, borderRadius: 100, paddingHorizontal: 24, paddingVertical: 12 }}
         >
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Попробовать снова</Text>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: rf(15) }}>Попробовать снова</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

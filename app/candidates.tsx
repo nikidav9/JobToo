@@ -83,7 +83,7 @@ export default function CandidatesScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={{ fontSize: 40 }}>{tab === 'want' ? '👀' : '🤝'}</Text>
+            <Text style={{ fontSize: rf(40) }}>{tab === 'want' ? '👀' : '🤝'}</Text>
             <Text style={styles.emptyTitle}>{tab === 'want' ? 'Нет откликов' : 'Нет мэтчей'}</Text>
             <Text style={styles.emptySub}>{tab === 'want' ? 'Работники ещё не откликались' : 'Подтвердите кандидатов во вкладке Хотят'}</Text>
           </View>

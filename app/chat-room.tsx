@@ -1018,7 +1018,7 @@ export default function ChatRoom() {
               <Text style={styles.headerSub} numberOfLines={1}>{chat.companyName}</Text>
             )}
           </View>
-          <Text style={{ fontSize: 16, color: Colors.textMuted, marginLeft: 4 }}>›</Text>
+          <Text style={{ fontSize: rf(16), color: Colors.textMuted, marginLeft: 4 }}>›</Text>
         </TouchableOpacity>
         <View style={{ width: 70 }} />
       </View>

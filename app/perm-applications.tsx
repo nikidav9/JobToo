@@ -182,7 +182,7 @@ export default function PermApplicationsScreen() {
 
       {apps.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={{ fontSize: 48 }}>📥</Text>
+          <Text style={{ fontSize: rf(48) }}>📥</Text>
           <Text style={styles.emptyTitle}>Нет откликов</Text>
           <Text style={styles.emptySub}>Когда кандидаты откликнутся — они появятся здесь</Text>
         </View>

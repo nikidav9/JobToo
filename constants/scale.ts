@@ -29,6 +29,28 @@ const factor = Math.min(MAX_FACTOR, Math.max(MIN_FACTOR, shortest / BASE_WIDTH))
 // в основном сжатие отступов.
 const fontFactor = 1 + (factor - 1) * 0.5;
 
+/**
+ * Потолок системного увеличения текста.
+ *
+ * И Android, и iPhone позволяют увеличить шрифт в настройках телефона, и этот
+ * множитель ложится сверху на всё, чем бы мы его ни задали. При двукратном
+ * увеличении вёрстка расходится: подписи не влезают в кнопки, счётчики
+ * выезжают за кружки.
+ *
+ * Полностью запрещать увеличение нельзя — людям со слабым зрением приложение
+ * станет нечитаемым. Поэтому оставляем 30%: текст заметно крупнее, а экраны
+ * ещё держатся.
+ *
+ * Как это работает. Обычный способ — Text.defaultProps — в React 19 больше
+ * не действует, его убрали для функциональных компонентов. Но все размеры
+ * шрифта в приложении проходят через rf(), поэтому проще уменьшить их здесь
+ * ровно во столько же раз, во сколько система потом увеличит: система свои
+ * два раза применит, а на экране выйдет полтора.
+ */
+const MAX_FONT_SCALE = 1.3;
+const systemFontScale = PixelRatio.getFontScale();
+const fontClamp = systemFontScale > MAX_FONT_SCALE ? MAX_FONT_SCALE / systemFontScale : 1;
+
 /** Отступ, размер блока, скругление. */
 export function rs(n: number): number {
   if (!n) return n;
@@ -38,7 +60,7 @@ export function rs(n: number): number {
 /** Размер шрифта и высота строки. */
 export function rf(n: number): number {
   if (!n) return n;
-  return PixelRatio.roundToNearestPixel(n * fontFactor);
+  return PixelRatio.roundToNearestPixel(n * fontFactor * fontClamp);
 }
 
 /** Множитель — если размер нужно посчитать вручную, а не через rs(). */
