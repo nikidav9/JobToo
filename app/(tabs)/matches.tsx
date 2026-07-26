@@ -1060,7 +1060,7 @@ function EmployerMatches() {
         {([
           { key: 'pending',   label: 'Отклики',    count: permPending.length + pending.length },
           { key: 'matched',   label: 'Мэтчи',      count: permApproved.length + matched.length },
-          { key: 'completed', label: 'Завершённые', count: completed.length + permHired.length },
+          { key: 'completed', label: 'Завершено',  count: completed.length + permHired.length },
         ] as const).map(t => (
           <TouchableOpacity
             key={t.key}
@@ -1140,13 +1140,18 @@ const s = StyleSheet.create({
   },
   urgentBadgeTxt: { color: '#92400E', fontSize: 12, fontWeight: '700' },
   tabStrip: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.divider },
-  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 2 },
+  tabItem: { flex: 1, paddingVertical: 12, paddingHorizontal: 4 },
   // Подпись всегда в одну строку. Активная вкладка становится жирной и шире —
   // «Завершённые (4)» переставало влезать и переносилось на вторую строку,
   // отчего вся полоса подпрыгивала при переключении. Теперь вместо переноса
   // текст чуть ужимается, и строка стоит на месте при любой ширине экрана и
   // любом системном размере шрифта.
-  tabLabel: { fontSize: 14, fontWeight: '500', color: Colors.textMuted, textAlign: 'center' },
+  tabLabel: {
+    fontSize: 13, fontWeight: '500', color: Colors.textMuted,
+    // Ширина во всю вкладку, иначе ужимать текст не во что: раньше он просто
+    // обрезался многоточием и счётчик пропадал.
+    alignSelf: 'stretch', textAlign: 'center',
+  },
   tabLabelActive: { fontWeight: '700', color: Colors.textPrimary },
   tabUnderline: {
     position: 'absolute', bottom: 0, left: '20%', right: '20%',
