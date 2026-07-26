@@ -28,6 +28,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { getSupabaseClient } from '@/template';
 import { getChatSuggestions } from '@/constants/chatSuggestions';
 import { isOnline, lastSeenLabel } from '@/services/presence';
+import { WebVoiceRecording, webVoiceSupported, type VoiceClip } from '@/services/webVoice';
 
 import { rs, rf } from '@/constants/scale';
 
@@ -143,10 +144,13 @@ const fmtDuration = (sec: number) =>
 const VOICE_IOS_MIN_BUILD = 6;
 const voiceSupported = (() => {
   if (Platform.OS === 'android') return true;
+  if (Platform.OS === 'web') return webVoiceSupported;
   if (Platform.OS !== 'ios') return false;
   const b = Number(Application.nativeBuildVersion ?? 0);
   return b >= VOICE_IOS_MIN_BUILD;
 })();
+
+const IS_WEB = Platform.OS === 'web';
 
 // Module-level message cache — survives navigation but cleared on app restart
 const msgCache = new Map<string, Message[]>();
@@ -204,6 +208,26 @@ export default function ChatRoom() {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   // Обновляем состояние записи раз в 200 мс — этого хватает для счётчика
   const recorderState = useAudioRecorderState(recorder, 200);
+
+  // В браузере пишем своим модулем, а не expo-audio, — почему, написано
+  // в services/webVoice.ts. Счётчик тикает здесь, тоже раз в 200 мс.
+  const webRec = useRef<WebVoiceRecording | null>(null);
+  const [webRecMs, setWebRecMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (webRecMs === null) return;
+    const id = setInterval(() => {
+      if (webRec.current) setWebRecMs(webRec.current.elapsed());
+    }, 200);
+    return () => clearInterval(id);
+  }, [webRecMs === null]);
+
+  // Ушли с экрана посреди записи — отпускаем микрофон. Иначе в браузере
+  // остаётся гореть значок записи, и человек думает, что его ещё слушают.
+  useEffect(() => () => { webRec.current?.cancel(); webRec.current = null; }, []);
+
+  // Дальше по экрану всё равно, кто именно пишет
+  const isRecording = IS_WEB ? webRecMs !== null : recorderState.isRecording;
+  const recordingMs = IS_WEB ? (webRecMs ?? 0) : recorderState.durationMillis;
   const [decidingLike, setDecidingLike] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [likeStatus, setLikeStatus] = useState<'pending' | 'approved' | 'rejected' | null>(null);
@@ -513,7 +537,7 @@ export default function ChatRoom() {
   const iAlreadyWrote = messages.some(m => m.senderId === currentUser?.id);
   const showSuggestions =
     suggestions.length > 0 && !iAlreadyWrote && !input.trim() &&
-    !isChatBlocked && !recorderState.isRecording;
+    !isChatBlocked && !isRecording;
 
   // ── Отправка фото ────────────────────────────────────────────────────────
   const base64ToUint8Array = (base64: string): Uint8Array => {
@@ -574,6 +598,13 @@ export default function ChatRoom() {
   const startRecording = async () => {
     if (isChatBlocked || uploadingVoice) return;
     try {
+      if (IS_WEB) {
+        // Разрешение здесь спрашивать нечем: браузер показывает свой запрос
+        // сам, когда мы просим микрофон, и отказ приходит ошибкой.
+        webRec.current = await WebVoiceRecording.start();
+        setWebRecMs(0);
+        return;
+      }
       const { granted } = await requestRecordingPermissionsAsync();
       if (!granted) { showToast('Нет доступа к микрофону', 'error'); return; }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
@@ -581,38 +612,76 @@ export default function ChatRoom() {
       recorder.record();
     } catch (e) {
       console.error('[ChatRoom] startRecording error', e);
-      showToast('Не удалось начать запись', 'error');
+      showToast(IS_WEB ? 'Нет доступа к микрофону' : 'Не удалось начать запись', 'error');
+      webRec.current = null;
+      setWebRecMs(null);
     }
   };
 
   const cancelRecording = async () => {
+    if (IS_WEB) {
+      webRec.current?.cancel();
+      webRec.current = null;
+      setWebRecMs(null);
+      return;
+    }
     try { await recorder.stop(); } catch {}
     await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
   };
 
   const stopAndSendVoice = async () => {
     if (!chat || !currentUser) return;
-    const seconds = Math.max(1, Math.round(recorderState.durationMillis / 1000));
-    try {
-      await recorder.stop();
-      await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
-    } catch (e) {
-      console.error('[ChatRoom] stop recording error', e);
-      return;
+
+    // Запись останавливаем одинаково по смыслу, но забираем разное: в браузере
+    // сразу байты, на телефоне — путь к файлу, который потом читаем.
+    let clip: VoiceClip | null = null;
+    let seconds = Math.max(1, Math.round(recordingMs / 1000));
+
+    if (IS_WEB) {
+      const rec = webRec.current;
+      webRec.current = null;
+      setWebRecMs(null);
+      if (!rec) return;
+      try {
+        clip = await rec.stop();
+        seconds = clip.seconds;
+      } catch (e) {
+        console.error('[ChatRoom] web stop recording error', e);
+        showToast('Не удалось отправить голосовое', 'error');
+        return;
+      }
+    } else {
+      try {
+        await recorder.stop();
+        await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
+      } catch (e) {
+        console.error('[ChatRoom] stop recording error', e);
+        return;
+      }
+      const uri = recorder.uri;
+      if (!uri) return;
+      try {
+        const base64Data = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        clip = {
+          bytes: base64ToUint8Array(base64Data),
+          contentType: 'audio/m4a', ext: 'm4a', seconds,
+        };
+      } catch (e) {
+        console.error('[ChatRoom] read recording error', e);
+        showToast('Не удалось отправить голосовое', 'error');
+        return;
+      }
     }
-    const uri = recorder.uri;
-    if (!uri) return;
 
     setUploadingVoice(true);
     try {
-      const base64Data = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
       const sb = getSupabaseClient();
-      const fileName = `chat/voice_${chat.id}_${Date.now()}.m4a`;
+      const fileName = `chat/voice_${chat.id}_${Date.now()}.${clip.ext}`;
       const { error: upErr } = await sb.storage.from('avatars').upload(
-        fileName, base64ToUint8Array(base64Data),
-        { contentType: 'audio/m4a', upsert: true, cacheControl: '3600' },
+        fileName, clip.bytes,
+        { contentType: clip.contentType, upsert: true, cacheControl: '3600' },
       );
       if (upErr) console.warn('[ChatRoom] voice upload warning', upErr.message);
       const { data: urlData } = sb.storage.from('avatars').getPublicUrl(fileName);
@@ -1005,7 +1074,7 @@ export default function ChatRoom() {
         ) : null}
 
         {/* Идёт запись — строка ввода заменяется счётчиком */}
-        {recorderState.isRecording ? (
+        {isRecording ? (
           <View style={[styles.inputBar, { paddingBottom: barPad }]}>
             <TouchableOpacity
               style={styles.attachBtn}
@@ -1019,7 +1088,7 @@ export default function ChatRoom() {
             <View style={[styles.inputWrap, styles.recordWrap]}>
               <View style={styles.recDot} />
               <Text style={styles.recTime}>
-                {fmtDuration(recorderState.durationMillis / 1000)}
+                {fmtDuration(recordingMs / 1000)}
               </Text>
               <Text style={styles.recHint}>Идёт запись…</Text>
             </View>
