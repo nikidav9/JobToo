@@ -11,6 +11,8 @@ import { useApp } from '@/hooks/useApp';
 import { getOnboardingTarget, getOnboardingFlag, subscribeOnboardingTargets } from '@/lib/onboardingTargets';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
 
+import { rs, rf } from '@/constants/scale';
+
 const KEY = (uid: string) => `jm_onboarding_done_${uid}`;
 
 // Подписка, чтобы «Показать обучение снова» из профиля мгновенно перезапускало оверлей
@@ -318,49 +320,49 @@ export function OnboardingOverlay() {
 
 const dc = StyleSheet.create({
   card: {
-    position: 'absolute', backgroundColor: '#fff', borderRadius: 18,
-    padding: 14, justifyContent: 'flex-start', gap: 10,
+    position: 'absolute', backgroundColor: '#fff', borderRadius: rs(18),
+    padding: rs(14), justifyContent: 'flex-start', gap: rs(10),
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.14, shadowRadius: 16, elevation: 10,
   },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  company: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
-  metroRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  metro: { fontSize: 12, color: Colors.textMuted },
-  urgent: { backgroundColor: '#FEF3C7', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  urgentTxt: { fontSize: 11, fontWeight: '700', color: '#92400E' },
-  title: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
-  chips: { flexDirection: 'row', gap: 8 },
-  chip: { backgroundColor: '#F4F4F5', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
-  chipTxt: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
-  actions: { flexDirection: 'row', justifyContent: 'center', gap: 24, marginTop: 4 },
-  actionBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  top: { flexDirection: 'row', alignItems: 'center', gap: rs(10) },
+  company: { fontSize: rf(14), fontWeight: '700', color: Colors.textPrimary },
+  metroRow: { flexDirection: 'row', alignItems: 'center', gap: rs(4), marginTop: rs(2) },
+  metro: { fontSize: rf(12), color: Colors.textMuted },
+  urgent: { backgroundColor: '#FEF3C7', borderRadius: rs(8), paddingHorizontal: rs(8), paddingVertical: rs(4) },
+  urgentTxt: { fontSize: rf(11), fontWeight: '700', color: '#92400E' },
+  title: { fontSize: rf(20), fontWeight: '800', color: Colors.textPrimary },
+  chips: { flexDirection: 'row', gap: rs(8) },
+  chip: { backgroundColor: '#F4F4F5', borderRadius: rs(10), paddingHorizontal: rs(10), paddingVertical: rs(6) },
+  chipTxt: { fontSize: rf(13), fontWeight: '600', color: Colors.textSecondary },
+  actions: { flexDirection: 'row', justifyContent: 'center', gap: rs(24), marginTop: rs(4) },
+  actionBtn: { width: rs(44), height: rs(44), borderRadius: rs(22), alignItems: 'center', justifyContent: 'center' },
 });
 
 const st = StyleSheet.create({
   skipWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   skip: {
-    paddingHorizontal: 16, paddingVertical: 6,
-    backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 100,
+    paddingHorizontal: rs(16), paddingVertical: rs(6),
+    backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: rs(100),
   },
-  skipTxt: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  skipTxt: { color: '#fff', fontSize: rf(13), fontWeight: '600' },
   card: {
-    position: 'absolute', backgroundColor: '#fff', borderRadius: 20,
-    padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    position: 'absolute', backgroundColor: '#fff', borderRadius: rs(20),
+    padding: rs(20), shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2, shadowRadius: 24, elevation: 16,
   },
   iconWrap: {
-    width: 44, height: 44, borderRadius: 14, backgroundColor: Colors.primary,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+    width: rs(44), height: rs(44), borderRadius: rs(14), backgroundColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center', marginBottom: rs(12),
   },
-  title: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary, marginBottom: 6 },
-  body: { fontSize: 14, color: Colors.textSecondary, lineHeight: 20 },
-  dots: { flexDirection: 'row', gap: 6, marginTop: 16, marginBottom: 14 },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#E4E4E7' },
-  dotActive: { backgroundColor: Colors.primary, width: 20 },
+  title: { fontSize: rf(18), fontWeight: '800', color: Colors.textPrimary, marginBottom: rs(6) },
+  body: { fontSize: rf(14), color: Colors.textSecondary, lineHeight: rf(20) },
+  dots: { flexDirection: 'row', gap: rs(6), marginTop: rs(16), marginBottom: rs(14) },
+  dot: { width: rs(7), height: rs(7), borderRadius: rs(4), backgroundColor: '#E4E4E7' },
+  dotActive: { backgroundColor: Colors.primary, width: rs(20) },
   btn: {
-    backgroundColor: Colors.primary, borderRadius: 100,
-    paddingVertical: 13, alignItems: 'center',
+    backgroundColor: Colors.primary, borderRadius: rs(100),
+    paddingVertical: rs(13), alignItems: 'center',
   },
-  btnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  btnTxt: { color: '#fff', fontSize: rf(15), fontWeight: '700' },
 });

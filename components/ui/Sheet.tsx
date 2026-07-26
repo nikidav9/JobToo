@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, PanResponder } from 'react-native';
 import { Colors } from '@/constants/theme';
 
+import { rs, rf } from '@/constants/scale';
+
 /**
  * Полоска-ручка сверху окна.
  *
@@ -61,6 +63,6 @@ export function useSwipeToDismiss(onClose: () => void, visible = true) {
 }
 
 const s = StyleSheet.create({
-  handleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 6 },
-  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.inputBorder },
+  handleWrap: { alignItems: 'center', paddingTop: rs(10), paddingBottom: rs(6) },
+  handle: { width: rs(40), height: rs(4), borderRadius: rs(2), backgroundColor: Colors.inputBorder },
 });

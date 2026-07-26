@@ -9,6 +9,8 @@ import { router } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { rs, rf } from '@/constants/scale';
+
 export default function NotFoundScreen() {
   return (
     <SafeAreaView style={styles.container}>
@@ -44,31 +46,31 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: rs(20),
   },
   title: {
-    fontSize: 28,
+    fontSize: rf(28),
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginTop: 20,
-    marginBottom: 10,
+    marginTop: rs(20),
+    marginBottom: rs(10),
   },
   message: {
-    fontSize: 16,
+    fontSize: rf(16),
     color: '#CCCCCC',
     textAlign: 'center',
-    marginBottom: 40,
-    lineHeight: 22,
+    marginBottom: rs(40),
+    lineHeight: rf(22),
   },
   homeButton: {
     backgroundColor: '#FFD700',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
+    paddingHorizontal: rs(30),
+    paddingVertical: rs(15),
+    borderRadius: rs(25),
   },
   homeButtonText: {
     color: '#0a0a0a',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: rf(16),
   },
 });

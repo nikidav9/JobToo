@@ -3,6 +3,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 
+import { rs, rf } from '@/constants/scale';
+
 type ChipVariant = 'work' | 'time' | 'metro' | 'exp' | 'salary' | 'urgent' | 'date';
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -38,13 +40,13 @@ export function Chip({ label, variant = 'work', icon }: ChipProps) {
 
 const styles = StyleSheet.create({
   chip: {
-    borderRadius: 100,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    borderRadius: rs(100),
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(5),
     flexDirection: 'row',
     alignItems: 'center',
   },
   chipText: {
-    fontSize: 13,
+    fontSize: rf(13),
   },
 });

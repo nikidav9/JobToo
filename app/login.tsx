@@ -12,6 +12,8 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useApp } from '@/hooks/useApp';
 import { isPhoneComplete, extractPhoneDigits } from '@/services/storage';
 
+import { rs, rf } from '@/constants/scale';
+
 const SUPPORT_EMAIL = 'zpouches@yandex.ru';
 
 export default function Login() {
@@ -127,22 +129,22 @@ const styles = StyleSheet.create({
   // Теперь окно стоит по центру, поэтому скругление круговое и есть поля по бокам.
   sheet: {
     backgroundColor: Colors.bg,
-    borderRadius: 24,
-    marginHorizontal: 16,
-    padding: 24,
-    gap: 14,
+    borderRadius: rs(24),
+    marginHorizontal: rs(16),
+    padding: rs(24),
+    gap: rs(14),
     // Sheet adapts to keyboard via parent KeyboardAvoidingView
   },
-  title: { fontSize: 22, fontWeight: '700', color: Colors.textPrimary },
-  subtitle: { fontSize: 14, color: Colors.textMuted, marginTop: -6, lineHeight: 20 },
-  errText: { fontSize: 13, color: Colors.red, marginTop: -6 },
-  forgotRow: { marginTop: -4 },
+  title: { fontSize: rf(22), fontWeight: '700', color: Colors.textPrimary },
+  subtitle: { fontSize: rf(14), color: Colors.textMuted, marginTop: rs(-6), lineHeight: rf(20) },
+  errText: { fontSize: rf(13), color: Colors.red, marginTop: rs(-6) },
+  forgotRow: { marginTop: rs(-4) },
   forgotBanner: {
-    backgroundColor: '#F0F4FF', borderRadius: 10, padding: 12,
+    backgroundColor: '#F0F4FF', borderRadius: rs(10), padding: rs(12),
     borderWidth: 1, borderColor: '#BFCBF5',
   },
-  forgotText: { fontSize: 13, color: Colors.textSecondary, lineHeight: 18 },
+  forgotText: { fontSize: rf(13), color: Colors.textSecondary, lineHeight: rf(18) },
   forgotLink: { color: Colors.primary, fontWeight: '600' },
-  cancel: { alignItems: 'center', marginTop: 4 },
-  cancelText: { fontSize: 15, color: Colors.textMuted, fontWeight: '500' },
+  cancel: { alignItems: 'center', marginTop: rs(4) },
+  cancelText: { fontSize: rf(15), color: Colors.textMuted, fontWeight: '500' },
 });

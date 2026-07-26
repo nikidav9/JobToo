@@ -15,6 +15,8 @@ import { ICON_WORKER, ICON_EMPLOYER } from '@/constants/roleIcons';
 import { Ionicons } from '@expo/vector-icons';
 import { hideWebSplash } from '@/lib/webSplash';
 
+import { rs, rf } from '@/constants/scale';
+
 const USER_COUNT_KEY = 'cached_user_count';
 
 const { width: SW, height: SH } = Dimensions.get('window');
@@ -227,7 +229,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: r(20),
     paddingTop: r(10),
     paddingBottom: r(12),
-    maxWidth: 430,
+    maxWidth: rs(430),
     width: '100%',
     alignSelf: 'center',
   },

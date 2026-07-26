@@ -19,6 +19,8 @@ import { WorkTypeSelector, WORK_TYPE_META } from '@/components/feature/WorkTypeS
 import { TelegramLinkBanner } from '@/components/TelegramLinkBanner';
 import { AutoRejectNotice } from '@/components/AutoRejectNotice';
 
+import { rs, rf } from '@/constants/scale';
+
 export default function CreatePermVacancy() {
   const router = useRouter();
   const { editId } = useLocalSearchParams<{ editId?: string }>();
@@ -236,41 +238,41 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
+    paddingHorizontal: rs(16), paddingVertical: rs(14),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  backText: { fontSize: 15, color: Colors.textSecondary, fontWeight: '500' },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
-  body: { padding: 20, gap: 18, paddingBottom: 20 },
-  modeBadge: { backgroundColor: '#EDE9FE', borderRadius: 100, paddingHorizontal: 14, paddingVertical: 7, alignSelf: 'flex-start' },
-  modeBadgeText: { fontSize: 13, fontWeight: '700', color: '#7C3AED' },
-  fieldGroup: { gap: 8 },
-  sectionLabel: { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
-  errMsg: { color: Colors.red, fontSize: 12 },
+  backText: { fontSize: rf(15), color: Colors.textSecondary, fontWeight: '500' },
+  headerTitle: { fontSize: rf(16), fontWeight: '700', color: Colors.textPrimary },
+  body: { padding: rs(20), gap: rs(18), paddingBottom: rs(20) },
+  modeBadge: { backgroundColor: '#EDE9FE', borderRadius: rs(100), paddingHorizontal: rs(14), paddingVertical: rs(7), alignSelf: 'flex-start' },
+  modeBadgeText: { fontSize: rf(13), fontWeight: '700', color: '#7C3AED' },
+  fieldGroup: { gap: rs(8) },
+  sectionLabel: { fontSize: rf(13), color: Colors.textMuted, fontWeight: '600' },
+  errMsg: { color: Colors.red, fontSize: rf(12) },
   input: {
-    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 13,
-    fontSize: 15, color: Colors.textPrimary, backgroundColor: Colors.bg,
+    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: rs(12),
+    paddingHorizontal: rs(14), paddingVertical: rs(13),
+    fontSize: rf(15), color: Colors.textPrimary, backgroundColor: Colors.bg,
   },
-  textarea: { minHeight: 100, paddingTop: 13 },
+  textarea: { minHeight: rs(100), paddingTop: rs(13) },
   inputError: { borderColor: Colors.red },
   pickerField: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: 12, padding: 16,
+    borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: rs(12), padding: rs(16),
   },
-  pickerFieldTxt: { fontSize: 15, color: Colors.textPrimary },
+  pickerFieldTxt: { fontSize: rf(15), color: Colors.textPrimary },
   metroSelected: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 12, padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: rs(10),
+    borderWidth: 1.5, borderColor: Colors.primary, borderRadius: rs(12), padding: rs(14),
     backgroundColor: Colors.primaryLight,
   },
-  dot: { width: 12, height: 12, borderRadius: 6 },
-  metroLineTxt: { fontSize: 11, color: Colors.textMuted },
-  metroStTxt: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary, marginTop: 2 },
-  changeLink: { color: Colors.primary, fontSize: 13, fontWeight: '600' },
+  dot: { width: rs(12), height: rs(12), borderRadius: rs(6) },
+  metroLineTxt: { fontSize: rf(11), color: Colors.textMuted },
+  metroStTxt: { fontSize: rf(15), fontWeight: '600', color: Colors.textPrimary, marginTop: rs(2) },
+  changeLink: { color: Colors.primary, fontSize: rf(13), fontWeight: '600' },
   submitBtn: {
-    backgroundColor: '#7C3AED', borderRadius: 100,
-    paddingVertical: 16, alignItems: 'center',
+    backgroundColor: '#7C3AED', borderRadius: rs(100),
+    paddingVertical: rs(16), alignItems: 'center',
   },
-  submitBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  submitBtnTxt: { color: '#fff', fontSize: rf(16), fontWeight: '700' },
 });

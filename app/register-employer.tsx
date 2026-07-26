@@ -15,6 +15,8 @@ import { dbCheckPhoneExists, dbWarmup } from '@/services/db';
 import { PasswordRules } from '@/components/ui/PasswordRules';
 import { firstUnmetRule } from '@/constants/passwordRules';
 
+import { rs, rf } from '@/constants/scale';
+
 // Steps: 1-Phone, 2-Password, 3-Name+Company, 4-Legal
 const TOTAL = 4;
 const SUPPORT_EMAIL = 'zpouches@yandex.ru';
@@ -258,45 +260,45 @@ export default function RegisterEmployer() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
-  backIcon: { fontSize: 18, color: Colors.textSecondary },
-  stepLabel: { fontSize: 13, color: Colors.textMuted },
-  progress: { height: 3, backgroundColor: Colors.divider },
-  progressFill: { height: 3, backgroundColor: Colors.primary },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: rs(16), paddingVertical: rs(12) },
+  backBtn: { width: rs(40), height: rs(40), borderRadius: rs(20), backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+  backIcon: { fontSize: rf(18), color: Colors.textSecondary },
+  stepLabel: { fontSize: rf(13), color: Colors.textMuted },
+  progress: { height: rs(3), backgroundColor: Colors.divider },
+  progressFill: { height: rs(3), backgroundColor: Colors.primary },
   // flexGrow + center: короткий шаг встаёт по центру экрана, длинный
   // ведёт себя как обычная прокрутка сверху.
-  body: { padding: 24, paddingBottom: 40, flexGrow: 1, justifyContent: 'center' },
-  stepContent: { gap: 16 },
-  title: { fontSize: 24, fontWeight: '700', color: Colors.textPrimary },
-  subtitle: { fontSize: 14, color: Colors.textMuted, marginTop: -8, lineHeight: 20 },
-  fieldError: { fontSize: 13, color: Colors.red, lineHeight: 18 },
-  loginHint: { marginTop: 8, alignItems: 'center' },
-  loginHintTxt: { fontSize: 14, color: Colors.textMuted },
+  body: { padding: rs(24), paddingBottom: rs(40), flexGrow: 1, justifyContent: 'center' },
+  stepContent: { gap: rs(16) },
+  title: { fontSize: rf(24), fontWeight: '700', color: Colors.textPrimary },
+  subtitle: { fontSize: rf(14), color: Colors.textMuted, marginTop: rs(-8), lineHeight: rf(20) },
+  fieldError: { fontSize: rf(13), color: Colors.red, lineHeight: rf(18) },
+  loginHint: { marginTop: rs(8), alignItems: 'center' },
+  loginHintTxt: { fontSize: rf(14), color: Colors.textMuted },
   forgotBanner: {
-    backgroundColor: '#F0F4FF', borderRadius: 10, padding: 12,
+    backgroundColor: '#F0F4FF', borderRadius: rs(10), padding: rs(12),
     borderWidth: 1, borderColor: '#BFCBF5',
   },
-  forgotText: { fontSize: 12, color: Colors.textSecondary, lineHeight: 17 },
+  forgotText: { fontSize: rf(12), color: Colors.textSecondary, lineHeight: rf(17) },
   forgotLink: { color: Colors.primary, fontWeight: '600' },
-  checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, paddingVertical: 8 },
-  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: Colors.inputBorder, backgroundColor: Colors.bg, alignItems: 'center', justifyContent: 'center', marginTop: 2, flexShrink: 0 },
+  checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: rs(14), paddingVertical: rs(8) },
+  checkbox: { width: rs(24), height: rs(24), borderRadius: rs(6), borderWidth: 1.5, borderColor: Colors.inputBorder, backgroundColor: Colors.bg, alignItems: 'center', justifyContent: 'center', marginTop: rs(2), flexShrink: 0 },
   checkboxActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  checkmark: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  checkLabel: { fontSize: 14, color: Colors.textPrimary, lineHeight: 22, flex: 1 },
+  checkmark: { color: '#fff', fontWeight: '700', fontSize: rf(14) },
+  checkLabel: { fontSize: rf(14), color: Colors.textPrimary, lineHeight: rf(22), flex: 1 },
   link: { color: Colors.primary, fontWeight: '600', textDecorationLine: 'underline' },
   companyOption: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    padding: 16, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.inputBorder,
+    flexDirection: 'row', alignItems: 'center', gap: rs(14),
+    padding: rs(16), borderRadius: rs(12), borderWidth: 1.5, borderColor: Colors.inputBorder,
     backgroundColor: Colors.surface,
   },
   companyOptionActive: { borderColor: Colors.primary, backgroundColor: '#F0EEFF' },
   companyRadio: {
-    width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: Colors.inputBorder,
+    width: rs(22), height: rs(22), borderRadius: rs(11), borderWidth: 2, borderColor: Colors.inputBorder,
     alignItems: 'center', justifyContent: 'center',
   },
   companyRadioActive: { borderColor: Colors.primary },
-  companyRadioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary },
-  companyLabel: { fontSize: 16, color: Colors.textPrimary, fontWeight: '500' },
+  companyRadioDot: { width: rs(10), height: rs(10), borderRadius: rs(5), backgroundColor: Colors.primary },
+  companyLabel: { fontSize: rf(16), color: Colors.textPrimary, fontWeight: '500' },
   companyLabelActive: { color: Colors.primary, fontWeight: '700' },
 });

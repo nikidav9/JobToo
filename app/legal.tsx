@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/theme';
 
+import { rs, rf } from '@/constants/scale';
+
 const OPERATOR_NAME = 'Давыдов Никита Сергеевич';
 const OPERATOR_INN = '773423983287';
 const OPERATOR_EMAIL = 'zpouches@yandex.ru';
@@ -154,15 +156,15 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
+    paddingHorizontal: rs(16), paddingVertical: rs(14),
     borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
   },
-  backBtn: { width: 70 },
-  backTxt: { fontSize: 15, color: '#6B7280', fontWeight: '500' },
-  headerTitle: { fontSize: 15, fontWeight: '700', color: '#111827', flex: 1, textAlign: 'center' },
-  body: { padding: 20, paddingBottom: 40, gap: 16 },
-  docTitle: { fontSize: 20, fontWeight: '800', color: '#111827', lineHeight: 26 },
-  section: { gap: 6 },
-  heading: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  docBody: { fontSize: 15, color: '#374151', lineHeight: 24 },
+  backBtn: { width: rs(70) },
+  backTxt: { fontSize: rf(15), color: '#6B7280', fontWeight: '500' },
+  headerTitle: { fontSize: rf(15), fontWeight: '700', color: '#111827', flex: 1, textAlign: 'center' },
+  body: { padding: rs(20), paddingBottom: rs(40), gap: rs(16) },
+  docTitle: { fontSize: rf(20), fontWeight: '800', color: '#111827', lineHeight: rf(26) },
+  section: { gap: rs(6) },
+  heading: { fontSize: rf(15), fontWeight: '700', color: '#111827' },
+  docBody: { fontSize: rf(15), color: '#374151', lineHeight: rf(24) },
 });

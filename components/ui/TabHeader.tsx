@@ -4,6 +4,8 @@ import { Colors } from '@/constants/theme';
 import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 import { NotifBell } from '@/components/ui/NotifBell';
 
+import { rs, rf } from '@/constants/scale';
+
 // Единая шапка для всех вкладок: одинаковая высота, шрифт и размеры иконок.
 // title отсутствует → показываем логотип JobToo. badge — доп. плашка слева
 // (например «N ждут»). right — кастомный правый блок (профиль с шестерёнкой).
@@ -44,14 +46,14 @@ export const HEADER_ICON = 22;
 const h = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12,
+    paddingHorizontal: rs(16), paddingTop: rs(14), paddingBottom: rs(12),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
     backgroundColor: Colors.bg,
   },
-  left: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
-  right: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  title: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
-  logo: { fontSize: 22 },
+  left: { flexDirection: 'row', alignItems: 'center', gap: rs(8), flexShrink: 1 },
+  right: { flexDirection: 'row', alignItems: 'center', gap: rs(6) },
+  title: { fontSize: rf(22), fontWeight: '800', color: Colors.textPrimary },
+  logo: { fontSize: rf(22) },
   logoB: { fontWeight: '800', color: Colors.textPrimary },
   logoO: { fontWeight: '800', color: Colors.primary },
 });

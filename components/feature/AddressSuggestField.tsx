@@ -9,6 +9,8 @@ import { Colors } from '@/constants/theme';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { dbAddressSuggest, AddressSuggestion } from '@/services/db';
 
+import { rs, rf } from '@/constants/scale';
+
 // Поле адреса с подсказками. Подсказки приходят с нашего сервера
 // (jobtoo.ru/api → OpenStreetMap/Nominatim), поэтому не нужен ни ключ, ни WebView.
 // Пользователь печатает/выбирает подсказку сверху, внизу — кнопка «Подтвердить».
@@ -187,45 +189,45 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: Colors.surface,
     borderWidth: 1, borderColor: Colors.divider,
-    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14,
+    borderRadius: rs(12), paddingHorizontal: rs(14), paddingVertical: rs(14),
   },
   fieldError: { borderColor: '#E03A3A' },
-  fieldTxt: { flex: 1, fontSize: 15, color: Colors.textPrimary },
+  fieldTxt: { flex: 1, fontSize: rf(15), color: Colors.textPrimary },
   placeholder: { color: Colors.textMuted },
   safe: { flex: 1, backgroundColor: Colors.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12,
+    paddingHorizontal: rs(16), paddingTop: rs(12), paddingBottom: rs(12),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  title: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary, flex: 1 },
+  title: { fontSize: rf(18), fontWeight: '800', color: Colors.textPrimary, flex: 1 },
   closeBtn: {
-    width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+    width: rs(36), height: rs(36), borderRadius: rs(18), alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.divider,
   },
   searchBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
+    flexDirection: 'row', alignItems: 'center', gap: rs(8),
     backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.inputBorder,
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
-    marginHorizontal: 16, marginTop: 12, marginBottom: 6,
+    borderRadius: rs(12), paddingHorizontal: rs(12), paddingVertical: rs(10),
+    marginHorizontal: rs(16), marginTop: rs(12), marginBottom: rs(6),
   },
-  searchInput: { flex: 1, fontSize: 16, color: Colors.textPrimary, padding: 0 },
+  searchInput: { flex: 1, fontSize: rf(16), color: Colors.textPrimary, padding: 0 },
   pickedRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 18, paddingBottom: 6,
+    flexDirection: 'row', alignItems: 'center', gap: rs(6),
+    paddingHorizontal: rs(18), paddingBottom: rs(6),
   },
-  pickedTxt: { fontSize: 12.5, color: Colors.primary, fontWeight: '600' },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 },
-  statusTxt: { fontSize: 14, color: Colors.textMuted },
+  pickedTxt: { fontSize: rf(12.5), color: Colors.primary, fontWeight: '600' },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: rs(8), paddingVertical: rs(14) },
+  statusTxt: { fontSize: rf(14), color: Colors.textMuted },
   row: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.divider,
+    flexDirection: 'row', alignItems: 'flex-start', gap: rs(12),
+    paddingVertical: rs(12), borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  rowHead: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
-  rowSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  hint: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', paddingVertical: 24, paddingHorizontal: 8 },
+  rowHead: { fontSize: rf(15), fontWeight: '600', color: Colors.textPrimary },
+  rowSub: { fontSize: rf(12), color: Colors.textMuted, marginTop: rs(2) },
+  hint: { fontSize: rf(14), color: Colors.textMuted, textAlign: 'center', paddingVertical: rs(24), paddingHorizontal: rs(8) },
   footer: {
-    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10,
+    paddingHorizontal: rs(16), paddingTop: rs(8), paddingBottom: rs(10),
     borderTopWidth: 1, borderTopColor: Colors.divider,
     backgroundColor: Colors.bg,
   },

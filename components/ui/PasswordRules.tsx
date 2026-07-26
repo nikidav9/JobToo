@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import { PASSWORD_RULES } from '@/constants/passwordRules';
 
+import { rs, rf } from '@/constants/scale';
+
 /**
  * Список требований к паролю под полем ввода.
  *
@@ -31,8 +33,8 @@ export function PasswordRules({ password }: { password: string }) {
 }
 
 const s = StyleSheet.create({
-  wrap: { gap: 6, marginTop: -4 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  label: { fontSize: 13, color: Colors.textMuted },
+  wrap: { gap: rs(6), marginTop: rs(-4) },
+  row: { flexDirection: 'row', alignItems: 'center', gap: rs(7) },
+  label: { fontSize: rf(13), color: Colors.textMuted },
   labelDone: { color: Colors.green, fontWeight: '600' },
 });

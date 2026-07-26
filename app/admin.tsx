@@ -9,6 +9,8 @@ import { Colors, Radius, Shadow } from '@/constants/theme';
 import { getSupabaseClient } from '@/template';
 import { useApp } from '@/hooks/useApp';
 
+import { rs, rf } from '@/constants/scale';
+
 const sb = () => getSupabaseClient();
 
 const ADMIN_PHONE = '89933431523';
@@ -476,60 +478,60 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
+    paddingHorizontal: rs(16), paddingVertical: rs(14),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  backTxt: { fontSize: 15, color: Colors.textSecondary, fontWeight: '500', width: 60 },
-  headerTitle: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary },
-  refreshBtn: { fontSize: 22, color: Colors.primary, fontWeight: '700', width: 40, textAlign: 'right' },
+  backTxt: { fontSize: rf(15), color: Colors.textSecondary, fontWeight: '500', width: rs(60) },
+  headerTitle: { fontSize: rf(16), fontWeight: '800', color: Colors.textPrimary },
+  refreshBtn: { fontSize: rf(22), color: Colors.primary, fontWeight: '700', width: rs(40), textAlign: 'right' },
 
   statsBar: {
-    flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12,
+    flexDirection: 'row', paddingHorizontal: rs(16), paddingVertical: rs(12),
     backgroundColor: Colors.surface, gap: 0,
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  statItem: { flex: 1, alignItems: 'center', gap: 2 },
-  statNum: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
-  statLbl: { fontSize: 10, color: Colors.textMuted, textTransform: 'uppercase', fontWeight: '600' },
+  statItem: { flex: 1, alignItems: 'center', gap: rs(2) },
+  statNum: { fontSize: rf(20), fontWeight: '800', color: Colors.textPrimary },
+  statLbl: { fontSize: rf(10), color: Colors.textMuted, textTransform: 'uppercase', fontWeight: '600' },
 
   tabBar: { borderBottomWidth: 1, borderBottomColor: Colors.divider, flexGrow: 0 },
-  tabBarContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  tabBarContent: { paddingHorizontal: rs(12), paddingVertical: rs(8), gap: rs(8) },
   tabBtn: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100,
+    paddingHorizontal: rs(14), paddingVertical: rs(8), borderRadius: rs(100),
     backgroundColor: Colors.surface,
   },
   tabBtnActive: { backgroundColor: Colors.primary },
-  tabBtnTxt: { fontSize: 13, color: Colors.textMuted, fontWeight: '500' },
+  tabBtnTxt: { fontSize: rf(13), color: Colors.textMuted, fontWeight: '500' },
   tabBtnTxtActive: { color: '#fff', fontWeight: '700' },
 
-  list: { padding: 16, gap: 10, paddingBottom: 100 },
-  card: { backgroundColor: Colors.bg, borderRadius: Radius.lg, padding: 14, ...Shadow.card, gap: 8 },
+  list: { padding: rs(16), gap: rs(10), paddingBottom: rs(100) },
+  card: { backgroundColor: Colors.bg, borderRadius: Radius.lg, padding: rs(14), ...Shadow.card, gap: rs(8) },
   blockedCard: { borderWidth: 1.5, borderColor: Colors.red, opacity: 0.8 },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  cardLabel: { fontSize: 12, color: Colors.textMuted, fontWeight: '500', minWidth: 60 },
-  cardVal: { fontSize: 13, color: Colors.textPrimary, fontWeight: '500' },
-  cardDate: { fontSize: 11, color: Colors.textMuted },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: rs(8), flexWrap: 'wrap' },
+  cardLabel: { fontSize: rf(12), color: Colors.textMuted, fontWeight: '500', minWidth: rs(60) },
+  cardVal: { fontSize: rf(13), color: Colors.textPrimary, fontWeight: '500' },
+  cardDate: { fontSize: rf(11), color: Colors.textMuted },
+  statusDot: { width: rs(8), height: rs(8), borderRadius: rs(4) },
 
-  blockedBadge: { backgroundColor: '#FEE2E2', borderRadius: 100, paddingHorizontal: 8, paddingVertical: 2 },
-  blockedBadgeTxt: { fontSize: 11, color: Colors.red, fontWeight: '600' },
-  roleBadge: { borderRadius: 100, paddingHorizontal: 8, paddingVertical: 2 },
-  roleBadgeTxt: { fontSize: 11, fontWeight: '600' },
+  blockedBadge: { backgroundColor: '#FEE2E2', borderRadius: rs(100), paddingHorizontal: rs(8), paddingVertical: rs(2) },
+  blockedBadgeTxt: { fontSize: rf(11), color: Colors.red, fontWeight: '600' },
+  roleBadge: { borderRadius: rs(100), paddingHorizontal: rs(8), paddingVertical: rs(2) },
+  roleBadgeTxt: { fontSize: rf(11), fontWeight: '600' },
 
-  btnRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  btnRow: { flexDirection: 'row', gap: rs(8), marginTop: rs(4) },
   actionBtn: {
-    borderWidth: 1.5, borderRadius: 100,
-    paddingVertical: 8, alignItems: 'center',
+    borderWidth: 1.5, borderRadius: rs(100),
+    paddingVertical: rs(8), alignItems: 'center',
   },
   blockBtn: { borderColor: Colors.red },
   unblockBtn: { borderColor: Colors.green },
   deleteBtn: { borderColor: Colors.red },
-  actionBtnTxt: { fontSize: 13, fontWeight: '600' },
+  actionBtnTxt: { fontSize: rf(13), fontWeight: '600' },
 
-  bulkActions: { padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.divider },
-  bulkBtn: { backgroundColor: Colors.red, paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.md, alignItems: 'center' },
-  bulkBtnTxt: { color: 'white', fontSize: 14, fontWeight: '600' },
+  bulkActions: { padding: rs(16), borderBottomWidth: 1, borderBottomColor: Colors.divider },
+  bulkBtn: { backgroundColor: Colors.red, paddingHorizontal: rs(16), paddingVertical: rs(10), borderRadius: Radius.md, alignItems: 'center' },
+  bulkBtnTxt: { color: 'white', fontSize: rf(14), fontWeight: '600' },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyTxt: { fontSize: 15, color: Colors.textMuted, textAlign: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: rs(32) },
+  emptyTxt: { fontSize: rf(15), color: Colors.textMuted, textAlign: 'center' },
 });

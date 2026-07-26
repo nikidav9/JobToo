@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { TextInput, View, Text, StyleSheet, TextInputProps } from 'react-native';
 import { Colors, Radius } from '@/constants/theme';
 
+import { rs, rf } from '@/constants/scale';
+
 interface Props extends TextInputProps {
   label?: string;
   error?: string;
@@ -32,23 +34,23 @@ export function AppInput({ label, error, style, ...rest }: Props) {
 const styles = StyleSheet.create({
   wrapper: { width: '100%' },
   label: {
-    fontSize: 13,
+    fontSize: rf(13),
     color: Colors.textMuted,
     fontWeight: '500',
-    marginBottom: 8,
+    marginBottom: rs(8),
   },
   input: {
     backgroundColor: Colors.bg,
     borderWidth: 1.5,
     borderColor: Colors.inputBorder,
     borderRadius: Radius.md,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(14),
+    fontSize: rf(16),
     color: Colors.textPrimary,
     width: '100%',
   },
   focused: { borderColor: Colors.primary },
   errBorder: { borderColor: Colors.red },
-  err: { color: Colors.red, fontSize: 12, marginTop: 4 },
+  err: { color: Colors.red, fontSize: rf(12), marginTop: rs(4) },
 });

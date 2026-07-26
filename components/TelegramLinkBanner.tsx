@@ -6,6 +6,8 @@ import { useApp } from '@/hooks/useApp';
 import { dbGetUserById } from '@/services/db';
 import { isTelegramMiniApp } from '@/lib/telegram';
 
+import { rs, rf } from '@/constants/scale';
+
 const BOT_URL = 'https://t.me/JobToo_bot';
 
 function TgLogo({ size }: { size: number }) {
@@ -69,15 +71,15 @@ export function TelegramLinkBanner() {
 
 const st = StyleSheet.create({
   banner: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+    flexDirection: 'row', alignItems: 'center', gap: rs(10),
     backgroundColor: '#EFF8FF', borderWidth: 1, borderColor: '#BEE3FF',
-    borderRadius: Radius.lg, padding: 12, marginBottom: 14,
+    borderRadius: Radius.lg, padding: rs(12), marginBottom: rs(14),
   },
-  title: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
-  sub: { fontSize: 12, color: Colors.textSecondary, marginTop: 2, lineHeight: 16 },
+  title: { fontSize: rf(14), fontWeight: '700', color: Colors.textPrimary },
+  sub: { fontSize: rf(12), color: Colors.textSecondary, marginTop: rs(2), lineHeight: rf(16) },
   cta: {
-    backgroundColor: '#2AABEE', borderRadius: 100,
-    paddingHorizontal: 12, paddingVertical: 7,
+    backgroundColor: '#2AABEE', borderRadius: rs(100),
+    paddingHorizontal: rs(12), paddingVertical: rs(7),
   },
-  ctaTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  ctaTxt: { color: '#fff', fontSize: rf(13), fontWeight: '700' },
 });

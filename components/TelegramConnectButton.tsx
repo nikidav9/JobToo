@@ -13,6 +13,8 @@ import { dbGetUserById, dbUnbindTelegram, dbTgPrepareLink } from '@/services/db'
 import { isTelegramMiniApp } from '@/lib/telegram';
 import { setOnboardingTarget } from '@/lib/onboardingTargets';
 
+import { rs, rf } from '@/constants/scale';
+
 const TG_BLUE = '#2AABEE';
 const BOT_URL = 'https://t.me/JobToo_bot';
 
@@ -200,52 +202,52 @@ function Benefit({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['
 
 const st = StyleSheet.create({
   attentionDot: {
-    position: 'absolute', top: 2, right: 2,
-    width: 10, height: 10, borderRadius: 5,
+    position: 'absolute', top: rs(2), right: rs(2),
+    width: rs(10), height: rs(10), borderRadius: rs(5),
     backgroundColor: Colors.primary,
     borderWidth: 1.5, borderColor: '#fff',
   },
   backdrop: { flex: 1, backgroundColor: 'rgba(17,17,17,0.45)', justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingTop: 10,
+    borderTopLeftRadius: rs(24), borderTopRightRadius: rs(24),
+    paddingHorizontal: rs(20), paddingTop: rs(10),
   },
   grabber: {
-    alignSelf: 'center', width: 40, height: 4, borderRadius: 2,
-    backgroundColor: '#E5E7EB', marginBottom: 16,
+    alignSelf: 'center', width: rs(40), height: rs(4), borderRadius: rs(2),
+    backgroundColor: '#E5E7EB', marginBottom: rs(16),
   },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
-  title: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
-  subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
-  benefits: { gap: 12, marginBottom: 20 },
-  benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: rs(12), marginBottom: rs(18) },
+  title: { fontSize: rf(18), fontWeight: '800', color: Colors.textPrimary },
+  subtitle: { fontSize: rf(13), color: Colors.textSecondary, marginTop: rs(2) },
+  benefits: { gap: rs(12), marginBottom: rs(20) },
+  benefitRow: { flexDirection: 'row', alignItems: 'center', gap: rs(12) },
   benefitIcon: {
-    width: 32, height: 32, borderRadius: 16,
+    width: rs(32), height: rs(32), borderRadius: rs(16),
     backgroundColor: '#E7F3FB',
     alignItems: 'center', justifyContent: 'center',
   },
-  benefitText: { flex: 1, fontSize: 14, lineHeight: 19, color: Colors.textPrimary, fontWeight: '500' },
+  benefitText: { flex: 1, fontSize: rf(14), lineHeight: rf(19), color: Colors.textPrimary, fontWeight: '500' },
   connectBtn: {
-    height: 52, borderRadius: Radius.lg,
+    height: rs(52), borderRadius: Radius.lg,
     backgroundColor: TG_BLUE,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
   },
-  connectText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  hint: { fontSize: 12.5, lineHeight: 17, color: Colors.textMuted, textAlign: 'center', marginTop: 10 },
+  connectText: { color: '#fff', fontSize: rf(16), fontWeight: '700' },
+  hint: { fontSize: rf(12.5), lineHeight: rf(17), color: Colors.textMuted, textAlign: 'center', marginTop: rs(10) },
   connectedBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+    flexDirection: 'row', alignItems: 'center', gap: rs(10),
     backgroundColor: Colors.greenLight, borderRadius: Radius.md,
-    padding: 12, marginBottom: 16,
+    padding: rs(12), marginBottom: rs(16),
   },
-  connectedText: { flex: 1, fontSize: 13.5, lineHeight: 18, color: Colors.textPrimary },
+  connectedText: { flex: 1, fontSize: rf(13.5), lineHeight: rf(18), color: Colors.textPrimary },
   secondaryBtn: {
-    height: 48, borderRadius: Radius.lg,
+    height: rs(48), borderRadius: Radius.lg,
     backgroundColor: '#E7F3FB',
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: rs(8),
   },
-  secondaryText: { color: TG_BLUE, fontSize: 15, fontWeight: '700' },
-  dangerBtn: { alignItems: 'center', paddingVertical: 12 },
-  dangerText: { color: Colors.red, fontSize: 14, fontWeight: '600' },
+  secondaryText: { color: TG_BLUE, fontSize: rf(15), fontWeight: '700' },
+  dangerBtn: { alignItems: 'center', paddingVertical: rs(12) },
+  dangerText: { color: Colors.red, fontSize: rf(14), fontWeight: '600' },
 });

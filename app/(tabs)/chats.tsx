@@ -15,6 +15,8 @@ import { nameColorFromString, getInitials } from '@/services/storage';
 import { dbDeleteChat } from '@/services/db';
 import { TabHeader } from '@/components/ui/TabHeader';
 
+import { rs, rf } from '@/constants/scale';
+
 const { width: SW } = Dimensions.get('window');
 const DELETE_THRESHOLD = -80;
 
@@ -238,41 +240,41 @@ export default function ChatsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-  title: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: rs(16), paddingTop: rs(16), paddingBottom: rs(8) },
+  title: { fontSize: rf(22), fontWeight: '800', color: Colors.textPrimary },
   // Поиск стоял вплотную к заголовку и читался его частью. Отодвинули и
   // скруглили до овала — теперь это отдельный элемент, а не продолжение шапки.
-  searchWrap: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 14 },
+  searchWrap: { paddingHorizontal: rs(16), paddingTop: rs(6), paddingBottom: rs(14) },
   searchInner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.surface, borderRadius: 100,
+    flexDirection: 'row', alignItems: 'center', gap: rs(8),
+    backgroundColor: Colors.surface, borderRadius: rs(100),
     borderWidth: 1, borderColor: Colors.divider,
-    paddingHorizontal: 14, paddingVertical: 10,
+    paddingHorizontal: rs(14), paddingVertical: rs(10),
   },
-  searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginTop: 12 },
-  emptySubtitle: { fontSize: 14, color: Colors.textMuted, marginTop: 6 },
+  searchInput: { flex: 1, fontSize: rf(14), color: Colors.textPrimary, padding: 0 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: rs(80) },
+  emptyTitle: { fontSize: rf(18), fontWeight: '700', color: Colors.textPrimary, marginTop: rs(12) },
+  emptySubtitle: { fontSize: rf(14), color: Colors.textMuted, marginTop: rs(6) },
 
   swipeRow: { position: 'relative', overflow: 'hidden' },
   deleteAction: {
     position: 'absolute', right: 0, top: 0, bottom: 0,
-    width: 120, alignItems: 'center', justifyContent: 'center',
+    width: rs(120), alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.red,
   },
-  deleteBtn: { alignItems: 'center', gap: 4 },
-  deleteBtnLabel: { fontSize: 11, color: '#fff', fontWeight: '600' },
+  deleteBtn: { alignItems: 'center', gap: rs(4) },
+  deleteBtnLabel: { fontSize: rf(11), color: '#fff', fontWeight: '600' },
 
   chatRowAnimated: { backgroundColor: Colors.bg },
-  chatRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.divider },
-  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  chatRow: { flexDirection: 'row', alignItems: 'center', gap: rs(12), paddingHorizontal: rs(16), paddingVertical: rs(14), borderBottomWidth: 1, borderBottomColor: Colors.divider },
+  avatar: { width: rs(44), height: rs(44), borderRadius: rs(22), alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontSize: rf(16), fontWeight: '700' },
   chatInfo: { flex: 1 },
   chatTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  chatName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, flex: 1 },
-  chatTime: { fontSize: 12, color: Colors.textMuted },
-  chatVac: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  chatLast: { fontSize: 13, color: '#374151', marginTop: 2 },
-  badge: { backgroundColor: Colors.primary, borderRadius: 100, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  chatName: { fontSize: rf(14), fontWeight: '700', color: Colors.textPrimary, flex: 1 },
+  chatTime: { fontSize: rf(12), color: Colors.textMuted },
+  chatVac: { fontSize: rf(12), color: Colors.textMuted, marginTop: rs(2) },
+  chatLast: { fontSize: rf(13), color: '#374151', marginTop: rs(2) },
+  badge: { backgroundColor: Colors.primary, borderRadius: rs(100), minWidth: rs(20), height: rs(20), alignItems: 'center', justifyContent: 'center', paddingHorizontal: rs(4) },
+  badgeText: { color: '#fff', fontSize: rf(10), fontWeight: '700' },
 });

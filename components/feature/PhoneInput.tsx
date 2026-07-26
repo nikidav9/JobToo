@@ -3,6 +3,8 @@ import { TextInput, StyleSheet, View, Text } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { isPhoneComplete } from '@/services/storage';
 
+import { rs, rf } from '@/constants/scale';
+
 interface Props {
   value: string; // formatted string like "+7 (999) 123-45-67"
   onChange: (formatted: string) => void;
@@ -79,10 +81,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bg,
     borderWidth: 1.5,
     borderColor: Colors.inputBorder,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 18,
+    borderRadius: rs(12),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(14),
+    fontSize: rf(18),
     color: Colors.textPrimary,
     letterSpacing: 1,
   },
@@ -91,7 +93,7 @@ const styles = StyleSheet.create({
   },
   error: {
     color: Colors.red,
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: rf(12),
+    marginTop: rs(4),
   },
 });

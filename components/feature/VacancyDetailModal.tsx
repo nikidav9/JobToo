@@ -12,6 +12,8 @@ import { formatDate, normalizeCompany } from '@/services/storage';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
 import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 
+import { rs, rf } from '@/constants/scale';
+
 interface Props {
   vacancy: Vacancy | null;
   visible: boolean;
@@ -121,35 +123,35 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.bg,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: rs(28),
+    borderTopRightRadius: rs(28),
     maxHeight: '90%',
     // Полоску-хват убрали, но её место оставляем: иначе строка компании
     // подъезжает под крестик, и «Срочно» с ним сталкивается.
-    paddingTop: 25,
+    paddingTop: rs(25),
   },
-  body: { padding: 20, paddingTop: 8, gap: 10, paddingBottom: 24 },
-  companyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 },
+  body: { padding: rs(20), paddingTop: rs(8), gap: rs(10), paddingBottom: rs(24) },
+  companyRow: { flexDirection: 'row', alignItems: 'center', gap: rs(12), marginBottom: rs(6) },
   avatar: {
-    width: 44, height: 44, borderRadius: 22,
+    width: rs(44), height: rs(44), borderRadius: rs(22),
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarImg: { width: 44, height: 44, borderRadius: 22 },
-  avatarTxt: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  company: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
-  metroRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  metro: { fontSize: 12, color: Colors.textMuted },
-  urgentBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FEF2F2', borderRadius: 100, paddingHorizontal: 10, paddingVertical: 5 },
-  urgentTxt: { fontSize: 12, color: '#DC2626', fontWeight: '600' },
-  jobTitle: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary, lineHeight: 28 },
-  secLabel: { fontSize: 13, color: Colors.textMuted, fontWeight: '500', marginTop: 4 },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  condText: { fontSize: 14, color: '#374151', lineHeight: 22 },
-  progressWrap: { marginTop: 8, gap: 6 },
-  progressTrack: { height: 4, backgroundColor: Colors.divider, borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 2 },
-  progressLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  progressLabel: { fontSize: 12, color: Colors.textMuted },
-  progressDot: { fontSize: 12, color: Colors.textMuted },
-  actionsWrap: { marginTop: 8, gap: 10 },
+  avatarImg: { width: rs(44), height: rs(44), borderRadius: rs(22) },
+  avatarTxt: { fontSize: rf(16), fontWeight: '700', color: '#fff' },
+  company: { fontSize: rf(14), fontWeight: '700', color: Colors.textPrimary },
+  metroRow: { flexDirection: 'row', alignItems: 'center', gap: rs(4), marginTop: rs(2) },
+  metro: { fontSize: rf(12), color: Colors.textMuted },
+  urgentBadge: { flexDirection: 'row', alignItems: 'center', gap: rs(4), backgroundColor: '#FEF2F2', borderRadius: rs(100), paddingHorizontal: rs(10), paddingVertical: rs(5) },
+  urgentTxt: { fontSize: rf(12), color: '#DC2626', fontWeight: '600' },
+  jobTitle: { fontSize: rf(22), fontWeight: '800', color: Colors.textPrimary, lineHeight: rf(28) },
+  secLabel: { fontSize: rf(13), color: Colors.textMuted, fontWeight: '500', marginTop: rs(4) },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: rs(6) },
+  condText: { fontSize: rf(14), color: '#374151', lineHeight: rf(22) },
+  progressWrap: { marginTop: rs(8), gap: rs(6) },
+  progressTrack: { height: rs(4), backgroundColor: Colors.divider, borderRadius: rs(2), overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: rs(2) },
+  progressLabelRow: { flexDirection: 'row', alignItems: 'center', gap: rs(4) },
+  progressLabel: { fontSize: rf(12), color: Colors.textMuted },
+  progressDot: { fontSize: rf(12), color: Colors.textMuted },
+  actionsWrap: { marginTop: rs(8), gap: rs(10) },
 });

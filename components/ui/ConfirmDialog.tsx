@@ -3,6 +3,8 @@ import { Modal, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { PrimaryButton } from './PrimaryButton';
 
+import { rs, rf } from '@/constants/scale';
+
 interface Props {
   visible: boolean;
   title: string;
@@ -35,16 +37,16 @@ export function ConfirmDialog({ visible, title, body, confirmLabel = 'Подтв
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: rs(24) },
   card: {
     backgroundColor: Colors.bg,
     borderRadius: Radius.xl,
-    padding: 28,
+    padding: rs(28),
     width: '100%',
     ...Shadow.strong,
-    gap: 12,
+    gap: rs(12),
   },
-  title: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
-  body: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
-  row: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  title: { fontSize: rf(18), fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
+  body: { fontSize: rf(14), color: Colors.textSecondary, textAlign: 'center', lineHeight: rf(20) },
+  row: { flexDirection: 'row', gap: rs(12), marginTop: rs(8) },
 });

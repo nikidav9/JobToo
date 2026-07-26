@@ -16,6 +16,8 @@ import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { getSupabaseClient } from '@/template';
 import { useApp } from '@/hooks/useApp';
 
+import { rs, rf } from '@/constants/scale';
+
 const ADMIN_PHONE = '89933431523';
 const sb = () => getSupabaseClient();
 
@@ -740,119 +742,119 @@ export default function AnalyticsScreen() {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.outerBg },
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, maxWidth: 1100, alignSelf: 'center', width: '100%' },
+  scrollContent: { padding: rs(16), maxWidth: rs(1100), alignSelf: 'center', width: '100%' },
 
   // header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(12),
     backgroundColor: Colors.card,
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
     ...Shadow.card,
   },
   headerCenter: { alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.textPrimary },
-  headerSub: { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
-  backTxt: { fontSize: 15, color: Colors.primary, fontWeight: '600' },
+  headerTitle: { fontSize: rf(17), fontWeight: '700', color: Colors.textPrimary },
+  headerSub: { fontSize: rf(11), color: Colors.textMuted, marginTop: rs(1) },
+  backTxt: { fontSize: rf(15), color: Colors.primary, fontWeight: '600' },
   refreshBtn: {
     backgroundColor: Colors.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(6),
     borderRadius: Radius.full,
   },
-  refreshTxt: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
+  refreshTxt: { fontSize: rf(13), color: Colors.primary, fontWeight: '600' },
 
   // states
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  accessDenied: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginTop: 12 },
-  loadingTxt: { fontSize: 14, color: Colors.textSecondary, marginTop: 8 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: rs(12) },
+  accessDenied: { fontSize: rf(18), fontWeight: '700', color: Colors.textPrimary, marginTop: rs(12) },
+  loadingTxt: { fontSize: rf(14), color: Colors.textSecondary, marginTop: rs(8) },
 
   // sections
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 20,
-    marginBottom: 10,
+    gap: rs(6),
+    marginTop: rs(20),
+    marginBottom: rs(10),
   },
-  sectionIcon: { fontSize: 16 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
+  sectionIcon: { fontSize: rf(16) },
+  sectionTitle: { fontSize: rf(15), fontWeight: '700', color: Colors.textPrimary },
 
   // kpi cards
   kpiRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: rs(10),
     flexWrap: 'wrap',
-    marginBottom: 4,
+    marginBottom: rs(4),
   },
   kpiCard: {
     flex: 1,
-    minWidth: 140,
+    minWidth: rs(140),
     backgroundColor: Colors.card,
     borderRadius: Radius.md,
-    padding: 14,
+    padding: rs(14),
     ...Shadow.card,
   },
-  kpiWide: { minWidth: 200 },
-  kpiValue: { fontSize: 28, fontWeight: '800', lineHeight: 32 },
-  kpiLabel: { fontSize: 12, color: Colors.textSecondary, marginTop: 4, fontWeight: '500' },
-  kpiSub: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+  kpiWide: { minWidth: rs(200) },
+  kpiValue: { fontSize: rf(28), fontWeight: '800', lineHeight: rf(32) },
+  kpiLabel: { fontSize: rf(12), color: Colors.textSecondary, marginTop: rs(4), fontWeight: '500' },
+  kpiSub: { fontSize: rf(11), color: Colors.textMuted, marginTop: rs(2) },
 
   // chart cards
   chartsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: rs(12),
     flexWrap: 'wrap',
-    marginBottom: 4,
+    marginBottom: rs(4),
   },
   chartCard: {
     backgroundColor: Colors.card,
     borderRadius: Radius.md,
-    padding: 16,
+    padding: rs(16),
     ...Shadow.card,
     flex: 1,
-    minWidth: 280,
+    minWidth: rs(280),
   },
   chartHalf: { flex: 1 },
-  chartTitle: { fontSize: 13, fontWeight: '700', color: Colors.textPrimary, marginBottom: 12 },
+  chartTitle: { fontSize: rf(13), fontWeight: '700', color: Colors.textPrimary, marginBottom: rs(12) },
 
   fullCard: {
     backgroundColor: Colors.card,
     borderRadius: Radius.md,
-    padding: 16,
+    padding: rs(16),
     ...Shadow.card,
-    marginBottom: 4,
+    marginBottom: rs(4),
   },
 
   // empty
-  emptyChart: { height: 120, alignItems: 'center', justifyContent: 'center' },
-  emptyChartTxt: { color: Colors.textMuted, fontSize: 13 },
+  emptyChart: { height: rs(120), alignItems: 'center', justifyContent: 'center' },
+  emptyChartTxt: { color: Colors.textMuted, fontSize: rf(13) },
 
   // horiz bar
-  horizRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
-  horizLabel: { width: 100, fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
+  horizRow: { flexDirection: 'row', alignItems: 'center', marginBottom: rs(10), gap: rs(8) },
+  horizLabel: { width: rs(100), fontSize: rf(12), color: Colors.textSecondary, fontWeight: '500' },
   horizTrack: {
     flex: 1,
-    height: 8,
+    height: rs(8),
     backgroundColor: Colors.divider,
-    borderRadius: 4,
+    borderRadius: rs(4),
     overflow: 'hidden',
   },
-  horizFill: { height: 8, borderRadius: 4 },
-  horizCount: { width: 32, fontSize: 12, color: Colors.textPrimary, fontWeight: '600', textAlign: 'right' },
+  horizFill: { height: rs(8), borderRadius: rs(4) },
+  horizCount: { width: rs(32), fontSize: rf(12), color: Colors.textPrimary, fontWeight: '600', textAlign: 'right' },
 
   // mini bar
   miniBarWrap: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    height: 100,
-    gap: 3,
+    height: rs(100),
+    gap: rs(3),
   },
   miniBarCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
-  miniBarFill: { width: '100%', borderRadius: 2, minHeight: 4 },
-  miniBarLabel: { fontSize: 9, color: Colors.textMuted, marginTop: 3 },
+  miniBarFill: { width: '100%', borderRadius: rs(2), minHeight: rs(4) },
+  miniBarLabel: { fontSize: rf(9), color: Colors.textMuted, marginTop: rs(3) },
 });

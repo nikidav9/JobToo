@@ -17,6 +17,8 @@ import EntryTransition from '@/components/EntryTransition';
 import { OnboardingOverlay } from '@/components/OnboardingOverlay';
 import { setOnboardingTarget } from '@/lib/onboardingTargets';
 
+import { rs, rf } from '@/constants/scale';
+
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const TAB_ROUTES = ['feed', 'matches', 'chats', 'profile'] as const;
@@ -297,10 +299,10 @@ const fS = StyleSheet.create({
   // Outer view: carries the shadow (can't use overflow:hidden here on Android)
   pillShadow: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    height: 64,
-    borderRadius: 28,
+    left: rs(16),
+    right: rs(16),
+    height: rs(64),
+    borderRadius: rs(28),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.13,
@@ -310,7 +312,7 @@ const fS = StyleSheet.create({
   // Inner view: clips blur + indicator to pill shape
   pillClip: {
     flex: 1,
-    borderRadius: 28,
+    borderRadius: rs(28),
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.75)',
@@ -322,9 +324,9 @@ const fS = StyleSheet.create({
   // Sliding orange indicator
   indicator: {
     position: 'absolute',
-    top: 10,     // (64 - 44) / 2
-    height: 44,
-    borderRadius: 20,
+    top: rs(10),     // (64 - 44) / 2
+    height: rs(44),
+    borderRadius: rs(20),
     backgroundColor: Colors.primaryLight,
   },
   // Row of tab items, laid on top of the indicator
@@ -338,10 +340,10 @@ const fS = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: rs(3),
   },
   label: {
-    fontSize: 10,
+    fontSize: rf(10),
     fontWeight: '600',
     color: Colors.primary,
     opacity: 0.45,
@@ -351,15 +353,15 @@ const fS = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -8,
+    top: rs(-4),
+    right: rs(-8),
     backgroundColor: Colors.primary,
-    borderRadius: 100,
-    minWidth: 16,
-    height: 16,
+    borderRadius: rs(100),
+    minWidth: rs(16),
+    height: rs(16),
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: rs(3),
   },
-  badgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  badgeText: { color: '#fff', fontSize: rf(9), fontWeight: '700' },
 });

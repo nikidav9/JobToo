@@ -9,6 +9,8 @@ import { Colors, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { dbSubmitRatingAndMaybeDelete } from '@/services/db';
 
+import { rs, rf } from '@/constants/scale';
+
 export default function RateScreen() {
   const router = useRouter();
   const { likeId, toUserId, toName, vacancyId, role } = useLocalSearchParams<{
@@ -133,31 +135,31 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
+    paddingHorizontal: rs(16), paddingVertical: rs(14),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  skipTxt: { fontSize: 14, color: Colors.textMuted, fontWeight: '500', width: 80 },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
-  content: { alignItems: 'center', paddingHorizontal: 32, paddingVertical: 32, gap: 12, flexGrow: 1 },
-  emoji: { fontSize: 56 },
-  title: { fontSize: 24, fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
-  sub: { fontSize: 15, color: Colors.textMuted, textAlign: 'center' },
-  name: { fontSize: 18, fontWeight: '700', color: Colors.primary, textAlign: 'center' },
-  stars: { flexDirection: 'row', gap: 8, marginVertical: 12 },
-  star: { fontSize: 44, color: Colors.divider },
+  skipTxt: { fontSize: rf(14), color: Colors.textMuted, fontWeight: '500', width: rs(80) },
+  headerTitle: { fontSize: rf(16), fontWeight: '700', color: Colors.textPrimary },
+  content: { alignItems: 'center', paddingHorizontal: rs(32), paddingVertical: rs(32), gap: rs(12), flexGrow: 1 },
+  emoji: { fontSize: rf(56) },
+  title: { fontSize: rf(24), fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
+  sub: { fontSize: rf(15), color: Colors.textMuted, textAlign: 'center' },
+  name: { fontSize: rf(18), fontWeight: '700', color: Colors.primary, textAlign: 'center' },
+  stars: { flexDirection: 'row', gap: rs(8), marginVertical: rs(12) },
+  star: { fontSize: rf(44), color: Colors.divider },
   starActive: { color: '#FBBF24' },
-  ratingLabel: { fontSize: 16, color: Colors.textSecondary, fontWeight: '500', height: 24 },
-  reviewBlock: { width: '100%', gap: 8, marginTop: 8 },
-  reviewTitle: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
+  ratingLabel: { fontSize: rf(16), color: Colors.textSecondary, fontWeight: '500', height: rs(24) },
+  reviewBlock: { width: '100%', gap: rs(8), marginTop: rs(8) },
+  reviewTitle: { fontSize: rf(14), fontWeight: '600', color: Colors.textPrimary },
   reviewInput: {
-    backgroundColor: Colors.surface, borderRadius: 12, padding: 14,
-    fontSize: 14, color: Colors.textPrimary, minHeight: 80,
+    backgroundColor: Colors.surface, borderRadius: rs(12), padding: rs(14),
+    fontSize: rf(14), color: Colors.textPrimary, minHeight: rs(80),
     borderWidth: 1, borderColor: Colors.inputBorder,
   },
-  note: { fontSize: 13, color: Colors.textMuted, textAlign: 'center', lineHeight: 18, marginTop: 8 },
+  note: { fontSize: rf(13), color: Colors.textMuted, textAlign: 'center', lineHeight: rf(18), marginTop: rs(8) },
   submitBtn: {
-    marginTop: 20, backgroundColor: Colors.primary, borderRadius: 100,
-    paddingHorizontal: 40, paddingVertical: 16, width: '100%', alignItems: 'center',
+    marginTop: rs(20), backgroundColor: Colors.primary, borderRadius: rs(100),
+    paddingHorizontal: rs(40), paddingVertical: rs(16), width: '100%', alignItems: 'center',
   },
-  submitBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  submitBtnTxt: { color: '#fff', fontSize: rf(16), fontWeight: '700' },
 });

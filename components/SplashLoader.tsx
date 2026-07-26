@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { rs, rf } from '@/constants/scale';
+
 import {
   BASKET_STROKES, SPARK_STROKES, PRODUCTS, ART_VB_W, ART_VB_H,
   BASKET_DRAW_MS, PROD_FIRST_MS, PROD_STAGGER_MS, PROD_FALL_MS,
@@ -298,11 +300,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   artWrap: { position: 'relative' },
-  bottom: { alignItems: 'center', marginTop: 24 },
-  name: { fontSize: 32, fontWeight: '800', letterSpacing: -0.8, color: WHITE },
+  bottom: { alignItems: 'center', marginTop: rs(24) },
+  name: { fontSize: rf(32), fontWeight: '800', letterSpacing: -0.8, color: WHITE },
   percent: {
-    marginTop: 10,
-    fontSize: 17,
+    marginTop: rs(10),
+    fontSize: rf(17),
     fontWeight: '700',
     fontStyle: 'italic',      // намёк на рукописный счётчик из референса
     letterSpacing: 1.5,

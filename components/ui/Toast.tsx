@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Text, StyleSheet, View } from 'react-native';
 import { Colors } from '@/constants/theme';
 
+import { rs, rf } from '@/constants/scale';
+
 interface Props {
   message: string;
   type: 'success' | 'error' | 'match';
@@ -34,11 +36,11 @@ const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     top: 0,
-    left: 20,
-    right: 20,
+    left: rs(20),
+    right: rs(20),
     zIndex: 999,
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: rs(12),
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
@@ -46,10 +48,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 12,
     elevation: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 10,
+    paddingVertical: rs(12),
+    paddingHorizontal: rs(16),
+    gap: rs(10),
   },
-  bar: { width: 4, height: '100%', borderRadius: 2, position: 'absolute', left: 0, top: 0, bottom: 0 },
-  text: { fontSize: 14, color: Colors.textPrimary, fontWeight: '500', flex: 1, marginLeft: 10 },
+  bar: { width: rs(4), height: '100%', borderRadius: rs(2), position: 'absolute', left: 0, top: 0, bottom: 0 },
+  text: { fontSize: rf(14), color: Colors.textPrimary, fontWeight: '500', flex: 1, marginLeft: rs(10) },
 });

@@ -13,6 +13,8 @@ import { LAVKA_LOGO_DATA_URI } from '@/constants/lavkaLogoData';
 import { dbAddressSuggest } from '@/services/db';
 import { normalizeCompany } from '@/services/storage';
 
+import { rs, rf } from '@/constants/scale';
+
 // Одна карточка в шторке над картой: минимум полей, чтобы список
 // одинаково собирался и для смен, и для постоянных вакансий.
 export type MapListItem = {
@@ -510,53 +512,53 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12,
+    paddingHorizontal: rs(16), paddingTop: rs(12), paddingBottom: rs(12),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  title: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary, flex: 1 },
+  title: { fontSize: rf(18), fontWeight: '800', color: Colors.textPrimary, flex: 1 },
   listBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: Colors.primary, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 8,
+    flexDirection: 'row', alignItems: 'center', gap: rs(6),
+    backgroundColor: Colors.primary, borderRadius: rs(100), paddingHorizontal: rs(14), paddingVertical: rs(8),
   },
-  listTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  emptyTxt: { fontSize: 14, color: Colors.textMuted },
+  listTxt: { color: '#fff', fontSize: rf(14), fontWeight: '700' },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: rs(10) },
+  emptyTxt: { fontSize: rf(14), color: Colors.textMuted },
 
   sheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    borderTopLeftRadius: rs(20), borderTopRightRadius: rs(20),
     shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 16,
     shadowOffset: { width: 0, height: -4 }, elevation: 16,
     overflow: 'hidden',
   },
-  grabWrap: { alignItems: 'center', paddingTop: 8, paddingBottom: 4 },
-  grab: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.divider },
+  grabWrap: { alignItems: 'center', paddingTop: rs(8), paddingBottom: rs(4) },
+  grab: { width: rs(40), height: rs(4), borderRadius: rs(2), backgroundColor: Colors.divider },
   sheetHead: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 16, paddingBottom: 10,
+    flexDirection: 'row', alignItems: 'center', gap: rs(10),
+    paddingHorizontal: rs(16), paddingBottom: rs(10),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  lineDot: { width: 10, height: 10, borderRadius: 5 },
-  sheetTitle: { fontSize: 15, fontWeight: '800', color: Colors.textPrimary, lineHeight: 20 },
-  sheetSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  lineDot: { width: rs(10), height: rs(10), borderRadius: rs(5) },
+  sheetTitle: { fontSize: rf(15), fontWeight: '800', color: Colors.textPrimary, lineHeight: rf(20) },
+  sheetSub: { fontSize: rf(12), color: Colors.textMuted, marginTop: rs(2) },
   sheetClose: {
-    width: 30, height: 30, borderRadius: 15,
+    width: rs(30), height: rs(30), borderRadius: rs(15),
     alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg,
   },
-  sheetList: { padding: 14, gap: 10, paddingBottom: 24 },
+  sheetList: { padding: rs(14), gap: rs(10), paddingBottom: rs(24) },
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: Colors.bg, borderRadius: 14, padding: 12,
+    flexDirection: 'row', alignItems: 'center', gap: rs(12),
+    backgroundColor: Colors.bg, borderRadius: rs(14), padding: rs(12),
   },
-  rowTitle: { fontSize: 14.5, fontWeight: '700', color: Colors.textPrimary },
-  rowCompany: { fontSize: 12.5, color: Colors.textSecondary, marginTop: 2 },
-  rowMeta: { fontSize: 12, color: Colors.textMuted, marginTop: 3 },
-  rowPay: { fontSize: 15, fontWeight: '800', color: Colors.primary },
+  rowTitle: { fontSize: rf(14.5), fontWeight: '700', color: Colors.textPrimary },
+  rowCompany: { fontSize: rf(12.5), color: Colors.textSecondary, marginTop: rs(2) },
+  rowMeta: { fontSize: rf(12), color: Colors.textMuted, marginTop: rs(3) },
+  rowPay: { fontSize: rf(15), fontWeight: '800', color: Colors.primary },
   allBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 12,
-    marginHorizontal: 14, marginTop: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(8),
+    backgroundColor: Colors.primary, borderRadius: rs(14), paddingVertical: rs(12),
+    marginHorizontal: rs(14), marginTop: rs(12),
   },
-  allBtnTxt: { color: '#fff', fontSize: 14.5, fontWeight: '700' },
+  allBtnTxt: { color: '#fff', fontSize: rf(14.5), fontWeight: '700' },
 });

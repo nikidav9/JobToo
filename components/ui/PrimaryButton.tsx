@@ -2,6 +2,8 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
 import { Colors } from '@/constants/theme';
 
+import { rs, rf } from '@/constants/scale';
+
 interface Props {
   label: string;
   onPress: () => void;
@@ -49,10 +51,10 @@ export function PrimaryButton({ label, onPress, disabled, loading, secondary, sm
 const styles = StyleSheet.create({
   btn: {
     width: '100%',
-    borderRadius: 100,
+    borderRadius: rs(100),
     // Боковые поля: высота у кнопки фиксированная, и длинная подпись
     // без них упиралась в края овала и вылезала наружу
-    paddingHorizontal: 14,
+    paddingHorizontal: rs(14),
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,

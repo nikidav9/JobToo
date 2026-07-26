@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { WorkType } from '@/constants/types';
 
+import { rs, rf } from '@/constants/scale';
+
 export const WORK_TYPE_META: Record<WorkType, { label: string; desc: string }> = {
   stocker:          { label: 'Кладовщик',     desc: 'Хранение, приёмка и учёт товаров на складе' },
   cook:             { label: 'Повар',          desc: 'Приготовление блюд на кухне' },
@@ -48,14 +50,14 @@ export function WorkTypeSelector({ selected, onToggle }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 12 },
+  container: { gap: rs(12) },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: rs(14),
     backgroundColor: Colors.bg,
     borderRadius: Radius.lg,
-    padding: 18,
+    padding: rs(18),
     borderWidth: 2,
     borderColor: Colors.inputBorder,
     ...Shadow.card,
@@ -69,12 +71,12 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   info: { flex: 1 },
-  title: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
-  desc: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },
+  title: { fontSize: rf(16), fontWeight: '700', color: Colors.textPrimary },
+  desc: { fontSize: rf(13), color: Colors.textMuted, marginTop: rs(2) },
   circle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: rs(24),
+    height: rs(24),
+    borderRadius: rs(12),
     borderWidth: 1.5,
     borderColor: Colors.inputBorder,
     backgroundColor: Colors.bg,
@@ -82,5 +84,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   circleSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  check: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  check: { color: '#fff', fontSize: rf(13), fontWeight: '700' },
 });

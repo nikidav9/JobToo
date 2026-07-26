@@ -13,6 +13,8 @@ import { useRouter } from 'expo-router';
 import { useApp } from '@/hooks/useApp';
 import { routeForNotification, routeByTitle } from '@/services/notificationRoute';
 import { Colors } from '@/constants/theme';
+import { rs, rf } from '@/constants/scale';
+
 import {
   dbGetNotifications, dbMarkNotifRead, dbMarkAllNotifsRead,
   dbDeleteNotif, dbDeleteAllNotifs,
@@ -219,51 +221,51 @@ export function NotifBell() {
 }
 
 const s = StyleSheet.create({
-  btn: { position: 'relative', padding: 4 },
+  btn: { position: 'relative', padding: rs(4) },
   badge: {
     position: 'absolute', top: 0, right: 0,
-    backgroundColor: Colors.primary, borderRadius: 10,
-    minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+    backgroundColor: Colors.primary, borderRadius: rs(10),
+    minWidth: rs(16), height: rs(16), alignItems: 'center', justifyContent: 'center', paddingHorizontal: rs(3),
   },
-  badgeTxt: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  badgeTxt: { color: '#fff', fontSize: rf(9), fontWeight: '700' },
 
   sheet: { flex: 1, backgroundColor: Colors.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14,
+    paddingHorizontal: rs(20), paddingVertical: rs(14),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  title: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  deleteAllBtn: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: '#FEE2E2' },
-  deleteAllTxt: { fontSize: 12, fontWeight: '600', color: '#DC2626' },
-  cancelBtn: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: Colors.divider },
-  cancelTxt: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
-  markAllBtn: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: Colors.primaryLight },
-  markAllTxt: { fontSize: 12, fontWeight: '600', color: Colors.primary },
-  closeBtn: { padding: 4 },
+  title: { fontSize: rf(18), fontWeight: '700', color: Colors.textPrimary },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: rs(8) },
+  deleteAllBtn: { paddingVertical: rs(4), paddingHorizontal: rs(8), borderRadius: rs(8), backgroundColor: '#FEE2E2' },
+  deleteAllTxt: { fontSize: rf(12), fontWeight: '600', color: '#DC2626' },
+  cancelBtn: { paddingVertical: rs(4), paddingHorizontal: rs(8), borderRadius: rs(8), backgroundColor: Colors.divider },
+  cancelTxt: { fontSize: rf(12), fontWeight: '600', color: Colors.textSecondary },
+  markAllBtn: { paddingVertical: rs(4), paddingHorizontal: rs(8), borderRadius: rs(8), backgroundColor: Colors.primaryLight },
+  markAllTxt: { fontSize: rf(12), fontWeight: '600', color: Colors.primary },
+  closeBtn: { padding: rs(4) },
 
-  list: { paddingVertical: 8 },
+  list: { paddingVertical: rs(8) },
 
-  empty: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 32 },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 17, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8 },
-  emptySub: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', lineHeight: 20 },
+  empty: { alignItems: 'center', paddingTop: rs(80), paddingHorizontal: rs(32) },
+  emptyIcon: { fontSize: rf(48), marginBottom: rs(16) },
+  emptyTitle: { fontSize: rf(17), fontWeight: '600', color: Colors.textPrimary, marginBottom: rs(8) },
+  emptySub: { fontSize: rf(14), color: Colors.textMuted, textAlign: 'center', lineHeight: rf(20) },
 
   item: {
     flexDirection: 'row', alignItems: 'center',
-    paddingLeft: 20, paddingRight: 12, paddingVertical: 14,
+    paddingLeft: rs(20), paddingRight: rs(12), paddingVertical: rs(14),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
     backgroundColor: Colors.bg,
   },
   itemUnread: { backgroundColor: '#FFF8F5' },
   itemContent: { flex: 1, flexDirection: 'row' },
-  itemDot: { width: 20, alignItems: 'center', paddingTop: 5 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary },
+  itemDot: { width: rs(20), alignItems: 'center', paddingTop: rs(5) },
+  dot: { width: rs(8), height: rs(8), borderRadius: rs(4), backgroundColor: Colors.primary },
   itemBody: { flex: 1 },
-  itemTitle: { fontSize: 14, color: Colors.textPrimary, marginBottom: 3 },
+  itemTitle: { fontSize: rf(14), color: Colors.textPrimary, marginBottom: rs(3) },
   itemTitleBold: { fontWeight: '600' },
-  itemText: { fontSize: 13, color: Colors.textSecondary, lineHeight: 18, marginBottom: 5 },
-  itemTime: { fontSize: 11, color: Colors.textMuted },
-  deleteBtn: { padding: 6, marginLeft: 8 },
+  itemText: { fontSize: rf(13), color: Colors.textSecondary, lineHeight: rf(18), marginBottom: rs(5) },
+  itemTime: { fontSize: rf(11), color: Colors.textMuted },
+  deleteBtn: { padding: rs(6), marginLeft: rs(8) },
 });

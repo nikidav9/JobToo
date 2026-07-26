@@ -5,6 +5,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 
+import { rs, rf } from '@/constants/scale';
+
 // Single confetti dot — hooks called at component level (Rules of Hooks compliant)
 function ConfettiDot({ index, color, offsetX, size }: { index: number; color: string; offsetX: number; size: number }) {
   const anim = useRef(new Animated.Value(0)).current;
@@ -123,26 +125,26 @@ export default function MatchScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  body: { padding: 24, alignItems: 'center', gap: 16, paddingBottom: 40 },
-  emoji: { fontSize: 64, marginTop: 20 },
-  matchTitle: { fontSize: 38, fontWeight: '800', color: Colors.primary, letterSpacing: -1 },
-  matchSubtitle: { fontSize: 15, color: '#374151', textAlign: 'center', lineHeight: 22 },
-  infoCard: { width: '100%', backgroundColor: Colors.bg, borderRadius: Radius.lg, padding: 16, ...Shadow.card, gap: 8 },
-  cardBadge: { fontSize: 10, fontWeight: '700', color: Colors.primary, letterSpacing: 1, textTransform: 'uppercase' },
+  body: { padding: rs(24), alignItems: 'center', gap: rs(16), paddingBottom: rs(40) },
+  emoji: { fontSize: rf(64), marginTop: rs(20) },
+  matchTitle: { fontSize: rf(38), fontWeight: '800', color: Colors.primary, letterSpacing: -1 },
+  matchSubtitle: { fontSize: rf(15), color: '#374151', textAlign: 'center', lineHeight: rf(22) },
+  infoCard: { width: '100%', backgroundColor: Colors.bg, borderRadius: Radius.lg, padding: rs(16), ...Shadow.card, gap: rs(8) },
+  cardBadge: { fontSize: rf(10), fontWeight: '700', color: Colors.primary, letterSpacing: 1, textTransform: 'uppercase' },
   divider: { height: 1, backgroundColor: Colors.divider },
-  contactName: { fontSize: 17, fontWeight: '700', color: Colors.textPrimary },
-  contactPhone: { fontSize: 15, fontWeight: '600', color: Colors.primary },
-  vacTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
-  vacMeta: { fontSize: 13, color: '#374151' },
+  contactName: { fontSize: rf(17), fontWeight: '700', color: Colors.textPrimary },
+  contactPhone: { fontSize: rf(15), fontWeight: '600', color: Colors.primary },
+  vacTitle: { fontSize: rf(16), fontWeight: '700', color: Colors.textPrimary },
+  vacMeta: { fontSize: rf(13), color: '#374151' },
   primaryBtn: {
     width: '100%', backgroundColor: Colors.primary,
-    borderRadius: 100, paddingVertical: 16, alignItems: 'center', marginTop: 8,
+    borderRadius: rs(100), paddingVertical: rs(16), alignItems: 'center', marginTop: rs(8),
   },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  primaryBtnText: { color: '#fff', fontSize: rf(16), fontWeight: '700' },
   secondaryBtn: {
     width: '100%', backgroundColor: Colors.bg,
-    borderRadius: 100, borderWidth: 1.5, borderColor: Colors.inputBorder,
-    paddingVertical: 16, alignItems: 'center',
+    borderRadius: rs(100), borderWidth: 1.5, borderColor: Colors.inputBorder,
+    paddingVertical: rs(16), alignItems: 'center',
   },
-  secondaryBtnText: { color: Colors.textPrimary, fontSize: 16, fontWeight: '600' },
+  secondaryBtnText: { color: Colors.textPrimary, fontSize: rf(16), fontWeight: '600' },
 });
