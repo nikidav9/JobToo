@@ -371,11 +371,21 @@ export default function ProfileScreen() {
       // 2. Локальный оптимистичный апдейт через updateUser (без записи в БД)
       // — пропускаем, финальный апдейт будет после загрузки
 
-      // 3. Читаем файл как base64 и конвертируем в Uint8Array
-      const base64Data = await FileSystem.readAsStringAsync(processed.uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      const uint8Array = base64ToUint8Array(base64Data);
+      // 3. Забираем содержимое файла.
+      // На телефоне это путь, и читает его expo-file-system. В браузере тот же
+      // модуль — пустая заглушка без единого метода, а ссылка выглядит как
+      // blob:, поэтому содержимое берём запросом. Раньше звали expo-file-system
+      // всегда, и на вебе смена фото падала.
+      let uint8Array: Uint8Array;
+      if (Platform.OS === 'web') {
+        const resp = await fetch(processed.uri);
+        uint8Array = new Uint8Array(await (await resp.blob()).arrayBuffer());
+      } else {
+        const base64Data = await FileSystem.readAsStringAsync(processed.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        uint8Array = base64ToUint8Array(base64Data);
+      }
 
       // 4. Загружаем через Supabase JS клиент (самый надёжный способ)
       const fileName = `avatar_${currentUser.id}.jpg`;
@@ -388,11 +398,11 @@ export default function ProfileScreen() {
           cacheControl: '3600',
         });
 
-      // Supabase иногда возвращает warning-ошибку даже при успешной загрузке —
-      // просто логируем и продолжаем (фото реально сохраняется).
-      if (uploadError) {
-        console.warn('[Avatar] upload warning (non-fatal):', uploadError.message);
-      }
+      // Не залилось — дальше идти нельзя: в профиль записался бы адрес файла,
+      // которого нет, и вместо аватарки у человека осталась бы пустота. Раньше
+      // ошибку считали безобидной и просто логировали — ровно так же прятались
+      // неудачные загрузки голосовых, которые не работали месяцами.
+      if (uploadError) throw uploadError;
 
       // 5. Получаем публичный URL и синхронизируем с БД
       const { data: urlData } = sb.storage.from('avatars').getPublicUrl(fileName);

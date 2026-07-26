@@ -575,6 +575,25 @@ export default function ChatRoom() {
     return arr;
   };
 
+  /**
+   * Содержимое файла по ссылке, которую дал выбор фото.
+   *
+   * На телефоне это путь к файлу, и читает его expo-file-system. В браузере
+   * тот же модуль — пустая заглушка без единого метода, а ссылка выглядит как
+   * blob:, поэтому содержимое забираем обычным запросом. Раньше здесь звали
+   * expo-file-system всегда, и на вебе отправка фото падала.
+   */
+  const uriToBytes = async (uri: string): Promise<Uint8Array> => {
+    if (IS_WEB) {
+      const resp = await fetch(uri);
+      return new Uint8Array(await (await resp.blob()).arrayBuffer());
+    }
+    const base64Data = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    return base64ToUint8Array(base64Data);
+  };
+
   const sendImage = async (uri: string) => {
     if (!chat || !currentUser || uploadingImage) return;
     setUploadingImage(true);
@@ -584,13 +603,11 @@ export default function ChatRoom() {
         uri, [{ resize: { width: 1280 } }],
         { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
       );
-      const base64Data = await FileSystem.readAsStringAsync(processed.uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      const bytes = await uriToBytes(processed.uri);
       const sb = getSupabaseClient();
       const fileName = `chat/${chat.id}_${Date.now()}.jpg`;
       const { error: upErr } = await sb.storage.from('avatars').upload(
-        fileName, base64ToUint8Array(base64Data),
+        fileName, bytes,
         { contentType: 'image/jpeg', upsert: true, cacheControl: '3600' },
       );
       // Не залилось — не отправляем: иначе собеседник получит сообщение со
