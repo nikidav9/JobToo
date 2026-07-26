@@ -64,7 +64,12 @@ function buildHtml(places: Place[]): string {
 <style>
 html,body,#map{margin:0;padding:0;width:100%;height:100%;}
 .pin{
-  position:relative;display:flex;align-items:center;gap:8px;
+  /* inline-flex и max-content обязательны: Яндекс кладёт разметку метки в
+     контейнер нулевой ширины, и обычный flex схлопывался до одних отступов —
+     21 пиксель. От «таблетки» оставалась белая палочка, а логотип с названием
+     вываливались наружу. */
+  position:relative;display:inline-flex;width:max-content;
+  align-items:center;gap:8px;
   background:#fff;border:1px solid #E5E7EB;border-radius:100px;
   padding:5px 14px 5px 5px;white-space:nowrap;
   box-shadow:0 2px 8px rgba(0,0,0,0.2);
