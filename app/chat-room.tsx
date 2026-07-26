@@ -22,7 +22,8 @@ import { Message, Chat } from '@/constants/types';
 import { nameColorFromString, getInitials, formatDate, uid, nowISO } from '@/services/storage';
 import { dbGetMessages, dbInsertMessage, dbMarkRead, dbIncrementUnread, dbGetLikeByVacancyWorker, dbUpsertLike, dbCheckAndCreateMatch, dbGetLikes, dbGetChatById, dbGetUserById, dbSetPermApplicationStatus } from '@/services/db';
 import { notifyWorkerGotMatch, notifyWorkerNewMessage, notifyEmployerNewMessage,
-  notifyWorkerPermApplicationApproved, notifyWorkerPermApplicationRejected } from '@/services/notifications';
+  notifyWorkerPermApplicationApproved, notifyWorkerPermApplicationRejected,
+  setActiveChat } from '@/services/notifications';
 import { useIsFocused } from '@react-navigation/native';
 import { getSupabaseClient } from '@/template';
 import { getChatSuggestions } from '@/constants/chatSuggestions';
@@ -159,6 +160,14 @@ export default function ChatRoom() {
   // Track whether this chat screen is currently visible — used to suppress
   // push notifications when the user is already reading the conversation.
   const isFocused = useIsFocused();
+
+  // Пока эта переписка открыта, уведомления о сообщениях именно в ней не
+  // показываем: человек и так видит их в списке. Отметку снимаем при уходе с
+  // экрана — иначе чат остался бы «открытым» и заглушил бы себя навсегда.
+  useEffect(() => {
+    setActiveChat(isFocused && chatId ? chatId : null);
+    return () => setActiveChat(null);
+  }, [isFocused, chatId]);
 
   const chatRef = useRef(chats.find(c => c.id === chatId));
   const foundChat = chats.find(c => c.id === chatId);

@@ -10,15 +10,33 @@ const PROXY_URL = process.env.EXPO_PUBLIC_API_URL
   ? `${process.env.EXPO_PUBLIC_API_URL}/api/db.php`
   : 'https://jobtoo.ru/api/db.php';
 
-// Show alerts and play sound for foreground notifications
+// Какая переписка сейчас открыта на экране. Экран чата отмечается здесь, а
+// обработчик ниже сверяет отметку с тем, к какому чату относится уведомление.
+//
+// Зачем: пока человек читает переписку, баннер и звук о новом сообщении в ней
+// же только мешают — сообщение и так появляется в списке у него на глазах.
+// Раньше в chat-room.tsx для этого был заведён isFocused, но им никто не
+// пользовался, и уведомления приходили поверх открытого чата.
+let activeChatId: string | null = null;
+
+export function setActiveChat(chatId: string | null): void {
+  activeChatId = chatId;
+}
+
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async (notification) => {
+    const data = notification.request.content.data as { chatId?: string } | undefined;
+    // Глушим только сообщения из этой же переписки. Всё остальное — отклики,
+    // мэтчи, новые вакансии — показываем как обычно.
+    const reading = !!activeChatId && !!data?.chatId && data.chatId === activeChatId;
+    return {
+      shouldShowAlert: !reading,
+      shouldPlaySound: !reading,
+      shouldSetBadge: !reading,
+      shouldShowBanner: !reading,
+      shouldShowList: !reading,
+    };
+  },
 });
 
 // ─── Android notification channels ───────────────────────────────────────────
