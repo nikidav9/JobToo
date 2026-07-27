@@ -8,7 +8,6 @@ import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
-import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SplashLoader, { useLoadingPercent, DrawnArt, bootElapsed, SPLASH_MIN_MS } from '@/components/SplashLoader';
 import { ICON_WORKER, ICON_EMPLOYER } from '@/constants/roleIcons';
@@ -16,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { hideWebSplash } from '@/lib/webSplash';
 
 import { rs, rf } from '@/constants/scale';
+import { dbCountUsers } from '@/services/db';
 
 const USER_COUNT_KEY = 'cached_user_count';
 
@@ -54,10 +54,13 @@ export default function RootScreen() {
     AsyncStorage.getItem(USER_COUNT_KEY).then(cached => {
       if (cached) { setUserCount(Number(cached)); setUserCountReady(true); }
     }).catch(() => {});
-    // Затем обновляем свежими данными
-    supabase.from('jm_users').select('id', { count: 'exact', head: true })
-      .then(({ count }) => {
-        if (count != null) {
+    // Затем обновляем свежими данными.
+    // Через прокси, а не напрямую в базу: с закрытием базы прямой запрос стал
+    // получать отказ, и экран навсегда застревал на числе из кэша телефона —
+    // в дашборде было 357, а здесь 351.
+    dbCountUsers()
+      .then(count => {
+        if (count > 0) {
           setUserCount(count);
           setUserCountReady(true);
           AsyncStorage.setItem(USER_COUNT_KEY, String(count)).catch(() => {});

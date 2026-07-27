@@ -127,6 +127,36 @@ function sb(string $method, string $table, array $query = [], $body_data = null,
     return is_array($dec) ? $dec : [];
 }
 
+/**
+ * Сколько строк в таблице — без выкачивания самих строк.
+ *
+ * PostgREST отдаёт число в заголовке Content-Range, если попросить
+ * Prefer: count=exact и ограничить выдачу одной строкой. Через sb() так
+ * нельзя: она отдаёт только тело ответа.
+ */
+function sb_count(string $t, array $f = []): int {
+    $q = array_merge(['select' => 'id'], $f);
+    $url = SB_URL . '/rest/v1/' . $t . '?' . http_build_query($q, '', '&', PHP_QUERY_RFC3986);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HEADER         => true,
+        CURLOPT_HTTPHEADER     => [
+            'apikey: ' . SB_KEY,
+            'Authorization: Bearer ' . SB_KEY,
+            'Prefer: count=exact',
+            'Range: 0-0',
+        ],
+        CURLOPT_TIMEOUT        => 20,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $resp = curl_exec($ch);
+    curl_close($ch);
+    if (!is_string($resp)) return 0;
+    // Content-Range: 0-0/357
+    return preg_match('#Content-Range:\s*[^/]+/(\d+)#i', $resp, $m) ? (int)$m[1] : 0;
+}
+
 function sb_select(string $t, array $f = [], string $sel = '*', ?string $ord = null): array {
     $q = array_merge(['select' => $sel], $f);
     if ($ord) $q['order'] = $ord;
@@ -647,6 +677,12 @@ try {
 
         case 'dbGetUsers':
             $data = sb_select('jm_users', [], '*', 'created_at.asc'); break;
+
+        // Только число для приветственного экрана. Раньше он считал сам,
+        // напрямую из базы публичным ключом, — и после закрытия базы получал
+        // отказ, показывая число из кэша телефона, замороженное навсегда.
+        case 'dbCountUsers':
+            $data = sb_count('jm_users'); break;
 
         // Заявка на привязку Telegram: живёт 15 минут, бот заберёт её по «/start»
         case 'tgPrepareLink': {

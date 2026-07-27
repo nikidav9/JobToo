@@ -98,6 +98,15 @@ export async function dbGetUserById(id: string): Promise<User | null> {
   return data ? rowToUser(data) : null;
 }
 
+/** Только число пользователей — для приветственного экрана. */
+export async function dbCountUsers(): Promise<number> {
+  if (IS_NATIVE) { return proxy<number>('dbCountUsers'); }
+  const { count } = await withTimeout(
+    supabase.from('jm_users').select('id', { count: 'exact', head: true })
+  );
+  return count ?? 0;
+}
+
 export async function dbGetUsers(): Promise<User[]> {
   if (IS_NATIVE) { const d = await proxy<any[]>('dbGetUsers'); return d.map(rowToUser); }
   const { data, error } = await withTimeout(

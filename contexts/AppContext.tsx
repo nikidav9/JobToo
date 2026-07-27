@@ -37,6 +37,7 @@ import {
   dbGetPermApplications,
   dbGetPermSaved,
   dbTouchLastSeen,
+  dbWarmup,
   dbClearPushToken,
   dbDeleteWebPushSubscription,
   dbGetNotifications,
@@ -366,9 +367,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-    const interval = setInterval(() => {
-      Promise.resolve(supabase.from('jm_users').select('id').limit(1)).catch(() => {});
-    }, 4 * 60 * 1000);
+    // Через прокси: прямой запрос к таблице после закрытия базы получает
+    // отказ, то есть прогрев перестал что-либо прогревать.
+    const interval = setInterval(() => { dbWarmup(); }, 4 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
