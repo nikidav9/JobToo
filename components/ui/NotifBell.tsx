@@ -1,19 +1,16 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, Modal, StyleSheet,
-  ScrollView, ActivityIndicator,
+  ScrollView, ActivityIndicator, Animated,
 } from 'react-native';
-// Именно отсюда, а не из react-native: тот SafeAreaView работает только на
-// iOS, а на Android остаётся обычным контейнером. Из-за этого содержимое
-// окна залезало под часы и значок сети — на айфоне всё выглядело нормально,
-// а на андроидах нет.
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useApp } from '@/hooks/useApp';
 import { routeForNotification, routeByTitle } from '@/services/notificationRoute';
 import { Colors } from '@/constants/theme';
 import { rs, rf } from '@/constants/scale';
+import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   dbGetNotifications, dbMarkNotifRead, dbMarkAllNotifsRead,
@@ -129,6 +126,9 @@ export function NotifBell() {
   const unread = notifs.filter(n => !n.isRead).length;
   const badge = open ? unread : count;
 
+  const insets = useSafeAreaInsets();
+  const swipe = useSwipeToDismiss(() => setOpen(false), open);
+
   return (
     <>
       <TouchableOpacity onPress={handleOpen} style={s.btn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -140,81 +140,90 @@ export function NotifBell() {
         )}
       </TouchableOpacity>
 
-      <Modal statusBarTranslucent navigationBarTranslucent visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
-        <SafeAreaView style={s.sheet} edges={['top', 'bottom', 'left', 'right']}>
-          <View style={s.header}>
-            <Text style={s.title}>Уведомления</Text>
-            <View style={s.headerRight}>
-              {notifs.length > 0 && (
-                confirmDeleteAll ? (
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                    <TouchableOpacity onPress={handleDeleteAll} style={s.deleteAllBtn}>
-                      <Text style={s.deleteAllTxt}>Подтвердить</Text>
+      <Modal statusBarTranslucent navigationBarTranslucent visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
+        <View style={s.overlay}>
+          {/* Тап по затемнению тоже закрывает — смахивание не единственный выход */}
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setOpen(false)} />
+          <Animated.View style={[s.sheet, { paddingBottom: insets.bottom }, swipe.animStyle]}>
+            {/* Тянуть можно за всю шапку, не только за саму полоску: попасть
+                в полоску пальцем на ходу трудно. Крестика больше нет — он
+                жался к самому краю экрана и налезал на кнопки. */}
+            <View {...swipe.panHandlers}>
+              <SheetHandle />
+              <View style={s.header}>
+                <Text style={s.title}>Уведомления</Text>
+              </View>
+              {(notifs.length > 0 || notifs.some(n => !n.isRead)) && (
+                <View style={s.actions}>
+                  {notifs.length > 0 && (
+                    confirmDeleteAll ? (
+                      <>
+                        <TouchableOpacity onPress={handleDeleteAll} style={s.deleteAllBtn}>
+                          <Text style={s.deleteAllTxt}>Подтвердить</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setConfirmDeleteAll(false)} style={s.cancelBtn}>
+                          <Text style={s.cancelTxt}>Отмена</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <TouchableOpacity onPress={handleDeleteAll} style={s.deleteAllBtn}>
+                        <Text style={s.deleteAllTxt}>Удалить все</Text>
+                      </TouchableOpacity>
+                    )
+                  )}
+                  {notifs.some(n => !n.isRead) && (
+                    <TouchableOpacity onPress={handleMarkAll} style={s.markAllBtn}>
+                      <Text style={s.markAllTxt}>Прочитать все</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setConfirmDeleteAll(false)} style={s.cancelBtn}>
-                      <Text style={s.cancelTxt}>Отмена</Text>
+                  )}
+                </View>
+              )}
+            </View>
+
+            <ScrollView contentContainerStyle={s.list}>
+              {loading ? (
+                <View style={s.empty}>
+                  <ActivityIndicator color={Colors.primary} size="large" />
+                </View>
+              ) : notifs.length === 0 ? (
+                <View style={s.empty}>
+                  <Ionicons name="notifications-outline" size={56} color={Colors.textMuted} style={{ marginBottom: 16 }} />
+                  <Text style={s.emptyTitle}>Нет уведомлений</Text>
+                  <Text style={s.emptySub}>Здесь будут появляться важные уведомления</Text>
+                </View>
+              ) : (
+                notifs.map(n => (
+                  <View key={n.id} style={[s.item, !n.isRead && s.itemUnread]}>
+                    <TouchableOpacity
+                      onPress={() => handleTap(n)}
+                      activeOpacity={0.7}
+                      style={s.itemContent}
+                    >
+                      <View style={s.itemDot}>
+                        {!n.isRead && <View style={s.dot} />}
+                      </View>
+                      <View style={s.itemBody}>
+                        <Text style={[s.itemTitle, !n.isRead && s.itemTitleBold]}>{n.title}</Text>
+                        <Text style={s.itemText}>{n.body}</Text>
+                        <Text style={s.itemTime}>
+                          {new Date(n.createdAt).toLocaleString('ru', {
+                            day: '2-digit', month: '2-digit',
+                            hour: '2-digit', minute: '2-digit',
+                          })}
+                        </Text>
+                      </View>
+                      {/* Стрелка — знак того, что уведомление открывается */}
+                      <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} style={{ alignSelf: 'center' }} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDelete(n.id)} style={s.deleteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="trash-outline" size={18} color={Colors.textMuted} />
                     </TouchableOpacity>
                   </View>
-                ) : (
-                  <TouchableOpacity onPress={handleDeleteAll} style={s.deleteAllBtn}>
-                    <Text style={s.deleteAllTxt}>Удалить все</Text>
-                  </TouchableOpacity>
-                )
+                ))
               )}
-              {notifs.some(n => !n.isRead) && (
-                <TouchableOpacity onPress={handleMarkAll} style={s.markAllBtn}>
-                  <Text style={s.markAllTxt}>Прочитать все</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={() => setOpen(false)} style={s.closeBtn}>
-                <Ionicons name="close" size={22} color={Colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <ScrollView contentContainerStyle={s.list}>
-            {loading ? (
-              <View style={s.empty}>
-                <ActivityIndicator color={Colors.primary} size="large" />
-              </View>
-            ) : notifs.length === 0 ? (
-              <View style={s.empty}>
-                <Ionicons name="notifications-outline" size={56} color={Colors.textMuted} style={{ marginBottom: 16 }} />
-                <Text style={s.emptyTitle}>Нет уведомлений</Text>
-                <Text style={s.emptySub}>Здесь будут появляться важные уведомления</Text>
-              </View>
-            ) : (
-              notifs.map(n => (
-                <View key={n.id} style={[s.item, !n.isRead && s.itemUnread]}>
-                  <TouchableOpacity
-                    onPress={() => handleTap(n)}
-                    activeOpacity={0.7}
-                    style={s.itemContent}
-                  >
-                    <View style={s.itemDot}>
-                      {!n.isRead && <View style={s.dot} />}
-                    </View>
-                    <View style={s.itemBody}>
-                      <Text style={[s.itemTitle, !n.isRead && s.itemTitleBold]}>{n.title}</Text>
-                      <Text style={s.itemText}>{n.body}</Text>
-                      <Text style={s.itemTime}>
-                        {new Date(n.createdAt).toLocaleString('ru', {
-                          day: '2-digit', month: '2-digit',
-                          hour: '2-digit', minute: '2-digit',
-                        })}
-                      </Text>
-                    </View>
-                    {/* Стрелка — знак того, что уведомление открывается */}
-                    <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} style={{ alignSelf: 'center' }} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDelete(n.id)} style={s.deleteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="trash-outline" size={18} color={Colors.textMuted} />
-                  </TouchableOpacity>
-                </View>
-              ))
-            )}
-          </ScrollView>
-        </SafeAreaView>
+            </ScrollView>
+          </Animated.View>
+        </View>
       </Modal>
     </>
   );
@@ -229,21 +238,28 @@ const s = StyleSheet.create({
   },
   badgeTxt: { color: '#fff', fontSize: rf(9), fontWeight: '700' },
 
-  sheet: { flex: 1, backgroundColor: Colors.bg },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: rs(20), paddingVertical: rs(14),
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+  // Не во весь экран: сверху видно затемнение, и сразу понятно, что окно
+  // временное и его можно закрыть.
+  sheet: {
+    maxHeight: '92%', backgroundColor: Colors.bg,
+    borderTopLeftRadius: rs(20), borderTopRightRadius: rs(20),
+  },
+  header: { paddingHorizontal: rs(20), paddingTop: rs(2), paddingBottom: rs(10) },
+  title: { fontSize: rf(18), fontWeight: '700', color: Colors.textPrimary },
+  // Кнопки — отдельной строкой. В одну строку с заголовком они не помещались:
+  // «Прочитать все» упиралось в край экрана.
+  actions: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: rs(8),
+    paddingHorizontal: rs(20), paddingBottom: rs(12),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  title: { fontSize: rf(18), fontWeight: '700', color: Colors.textPrimary },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: rs(8) },
   deleteAllBtn: { paddingVertical: rs(4), paddingHorizontal: rs(8), borderRadius: rs(8), backgroundColor: '#FEE2E2' },
   deleteAllTxt: { fontSize: rf(12), fontWeight: '600', color: '#DC2626' },
   cancelBtn: { paddingVertical: rs(4), paddingHorizontal: rs(8), borderRadius: rs(8), backgroundColor: Colors.divider },
   cancelTxt: { fontSize: rf(12), fontWeight: '600', color: Colors.textSecondary },
   markAllBtn: { paddingVertical: rs(4), paddingHorizontal: rs(8), borderRadius: rs(8), backgroundColor: Colors.primaryLight },
   markAllTxt: { fontSize: rf(12), fontWeight: '600', color: Colors.primary },
-  closeBtn: { padding: rs(4) },
 
   list: { paddingVertical: rs(8) },
 
