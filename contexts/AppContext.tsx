@@ -55,6 +55,10 @@ const NATIVE_POLL_INTERVAL = 8_000;
 // Отметку «был в сети» чаще обновлять незачем: в чате «в сети» держится
 // три минуты, так что двух минут между отметками достаточно.
 const LAST_SEEN_INTERVAL = 120_000;
+// Список пользователей — имена, аватарки, рейтинги. Он тяжёлый: тянет всех
+// разом, поэтому в общий опрос его класть нельзя. Но и застывать до конца
+// сеанса он не должен — раньше его обновляла подписка, которая замолчала.
+const USERS_REFRESH_INTERVAL = 300_000;
 // Polling interval for web (Supabase realtime may be blocked in Russia)
 const WEB_POLL_INTERVAL = 10_000;
 
@@ -423,9 +427,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshLikes(user),
         refreshVacancies(),
         refreshPermVacancies(user),
+        refreshPermApplications(user),
         refreshNotifications(),
         refreshVacancyStats(),
         refreshPermVacancyViews(),
+        refreshSaved(user),
+        refreshPermSaved(user),
       ]).catch(() => {});
     };
     // Immediate poll on mount so new data appears right after login
@@ -438,6 +445,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const touch = () => { if (user.id) dbTouchLastSeen(user.id); };
     touch();
     const seenInterval = setInterval(touch, LAST_SEEN_INTERVAL);
+    const usersInterval = setInterval(() => { refreshUsers().catch(() => {}); }, USERS_REFRESH_INTERVAL);
 
     // Возврат к вкладке — то же, что выход приложения из фона на телефоне.
     // Вкладку могут держать открытой сутками, поэтому без этого отметка
@@ -454,6 +462,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => {
       clearInterval(interval);
       clearInterval(seenInterval);
+      clearInterval(usersInterval);
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', onVisible);
       }
@@ -474,9 +483,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         refreshChats(user),
         refreshVacancies(),
         refreshLikes(user),
+        // Постоянные вакансии и отклики на них раньше держались на живых
+        // подписках. Подписки замолчали, когда мы закрыли базу, а в опрос их
+        // не добавили: работодатель не видел нового отклика до перезапуска
+        // приложения. Запросы дешёвые — оба отфильтрованы по человеку.
+        refreshPermVacancies(user),
+        refreshPermApplications(user),
         refreshNotifications(),
         refreshVacancyStats(),
         refreshPermVacancyViews(),
+        refreshSaved(user),
+        refreshPermSaved(user),
       ]).catch(() => {});
     };
 
@@ -491,6 +508,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const touch = () => { if (user?.id) dbTouchLastSeen(user.id); };
     touch();
     const seenInterval = setInterval(touch, LAST_SEEN_INTERVAL);
+    const usersInterval = setInterval(() => { refreshUsers().catch(() => {}); }, USERS_REFRESH_INTERVAL);
 
     // Also poll immediately when app returns to foreground
     const handleAppState = (state: AppStateStatus) => {
@@ -501,6 +519,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => {
       clearInterval(interval);
       clearInterval(seenInterval);
+      clearInterval(usersInterval);
       sub.remove();
     };
   }, [currentUser?.id]);
@@ -673,9 +692,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       refreshVacancies(),
       refreshLikes(user),
       refreshPermVacancies(user),
+      // Отклики на постоянные вакансии не обновлялись даже здесь — человек
+      // тянул экран вниз, а список оставался прежним.
+      refreshPermApplications(user),
       refreshChats(user),
+      refreshNotifications(),
       refreshVacancyStats(),
       refreshPermVacancyViews(),
+      refreshSaved(user),
+      refreshPermSaved(user),
     ]);
   }, [currentUser]);
 
