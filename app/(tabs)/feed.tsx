@@ -33,7 +33,8 @@ import {
   dbAddPermSaved,
   dbRemovePermSaved,
 } from '@/services/db';
-import { notifyEmployerNewApplicant, notifyEmployerGotMatch, notifyWorkerGotMatch } from '@/services/notifications';
+import { notifyEmployerNewApplicant, notifyEmployerGotMatch, notifyWorkerGotMatch,
+  notifyEmployerNewMessage } from '@/services/notifications';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Chip } from '@/components/ui/Chip';
@@ -47,6 +48,9 @@ import { setOnboardingTarget, setOnboardingFlag } from '@/lib/onboardingTargets'
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
 
 import { rs, rf } from '@/constants/scale';
+import { ApplySheet } from '@/components/feature/ApplySheet';
+import { getChatSuggestions } from '@/constants/chatSuggestions';
+import { vacancyInfoLines, permVacancyInfoLines } from '@/services/vacancyCard';
 
 // ─── Web push permission banner (iOS PWA requires user gesture) ───────────────
 type WPState = 'ask' | 'retry' | 'denied' | 'hidden';
@@ -825,6 +829,8 @@ function WorkerFeed() {
   const pendingLikeIds = useRef<Set<string>>(new Set());
   const swipingRef = useRef(false);
   const messagingRef = useRef(false);
+  // Карточка, по которой человек сейчас пишет отклик (null — окно закрыто)
+  const [applyFor, setApplyFor] = useState<Vacancy | null>(null);
 
   const wantOpacity = pan.x.interpolate({ inputRange: [0, SWIPE_THRESHOLD], outputRange: [0, 1], extrapolate: 'clamp' });
   const skipOpacity = pan.x.interpolate({ inputRange: [-SWIPE_THRESHOLD, 0], outputRange: [1, 0], extrapolate: 'clamp' });
@@ -967,7 +973,10 @@ function WorkerFeed() {
     dbRemoveLike(last.id, user.id).then(() => refreshLikes(user)).catch(() => {});
   }, [dateHistory, selectedDate, currentUser, swiping, refreshLikes, pan]);
 
-  const doMessage = useCallback(async () => {
+  // Отклик на смену. Если переписка с этим работодателем уже есть — просто
+  // открываем её. Если нет, сначала спрашиваем у человека пару слов о себе:
+  // раньше вместо них уходил шаблон от имени системы, и отвечать было нечему.
+  const doMessage = useCallback(() => {
     if (!currentCard || !currentUser || messagingRef.current) return;
     const existingChat = chats.find(
       c => c.employerId === currentCard.employerId && c.workerId === currentUser.id
@@ -976,35 +985,46 @@ function WorkerFeed() {
       router.push({ pathname: '/chat-room', params: { chatId: existingChat.id } });
       return;
     }
+    setApplyFor(currentCard);
+  }, [currentCard, currentUser, chats, router]);
+
+  const sendApply = useCallback(async (message: string) => {
+    const card = applyFor;
+    if (!card || !currentUser || messagingRef.current) return;
     messagingRef.current = true;
     try {
-      await dbUpsertLike(currentCard.id, currentUser.id, currentCard.employerId, {
+      await dbUpsertLike(card.id, currentUser.id, card.employerId, {
         workerLiked: true,
         workerSkipped: false,
       });
       const chatId = await dbCreateChat(
         currentUser.id,
-        currentCard.employerId,
-        currentCard.id,
-        currentCard.title,
-        currentCard.company,
-        `Здравствуйте! Меня заинтересовала ваша вакансия «${currentCard.title}».`,
+        card.employerId,
+        card.id,
+        card.title,
+        card.company,
+        message,
         0,
         1,
+        true,   // сообщение от работника, а не от системы
       );
       refreshChats().catch(() => {});
-      notifyEmployerNewApplicant(
-        currentCard.employerId,
+      // В уведомлении — сами слова человека: работодатель решает, отвечать
+      // ли, по ним, а не по казённому «Новый отклик».
+      notifyEmployerNewMessage(
+        card.employerId,
         `${currentUser.firstName} ${currentUser.lastName}`,
-        currentCard.title,
+        message,
+        chatId,
       ).catch(() => {});
+      setApplyFor(null);
       router.push({ pathname: '/chat-room', params: { chatId } });
     } catch (e) {
-      showToast('Ошибка при открытии чата', 'error');
+      showToast('Не удалось отправить отклик', 'error');
     } finally {
       messagingRef.current = false;
     }
-  }, [currentCard, currentUser, chats, refreshChats, router, showToast]);
+  }, [applyFor, currentUser, refreshChats, router, showToast]);
 
   const swipeCbRef = useRef<((dir: 'want' | 'skip', vx: number) => void) | null>(null);
   const snapBackRef = useRef<(() => void) | null>(null);
@@ -1309,6 +1329,15 @@ function WorkerFeed() {
           </View>
         }
       />
+
+      <ApplySheet
+        visible={!!applyFor}
+        onClose={() => setApplyFor(null)}
+        onSend={sendApply}
+        title="Отклик на смену"
+        info={applyFor ? vacancyInfoLines(applyFor) : []}
+        chips={getChatSuggestions('worker', applyFor)}
+      />
     </View>
   );
 }
@@ -1344,6 +1373,8 @@ function WorkerPermMode() {
   const [filterPicker, setFilterPicker] = useState(false);
   const [minSalary, setMinSalary] = useState(0);
   const [applying, setApplying] = useState<string | null>(null);
+  // Вакансия, по которой человек сейчас пишет отклик (null — окно закрыто)
+  const [permApplyFor, setPermApplyFor] = useState<PermVacancy | null>(null);
   const [chatLoading, setChatLoading] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
 
@@ -1414,15 +1445,39 @@ function WorkerPermMode() {
     tab === 'applied'  ? appliedVacancies :
     savedVacancies;
 
+  // Отклик на постоянную вакансию раньше уходил молча — строка в таблице со
+  // статусом «ожидает», и всё. Теперь сначала спрашиваем пару слов о себе, и
+  // отклик открывает переписку: сказать о себе было негде, а именно сюда
+  // приходит большая часть откликов.
   const applyTo = (v: PermVacancy) : void => {
     if (!currentUser) return;
     if (myAppVacIds.has(v.id) || applying === v.id) { showToast('Уже откликнулись', 'success'); return; }
+    setPermApplyFor(v);
+  };
+
+  const sendPermApply = async (message: string) => {
+    const v = permApplyFor;
+    if (!v || !currentUser) return;
     setApplying(v.id);
-    showToast('Отклик отправлен! 📨', 'success');
-    dbApplyPermVacancy(v.id, currentUser.id, v.employerId)
-      .then(() => refreshPermApplications().catch(() => {}))
-      .catch(e => console.warn('[applyTo]', e))
-      .finally(() => setApplying(null));
+    try {
+      await dbApplyPermVacancy(v.id, currentUser.id, v.employerId, message);
+      showToast('Отклик отправлен! 📨', 'success');
+      setPermApplyFor(null);
+      await Promise.all([
+        refreshPermApplications().catch(() => {}),
+        refreshChats().catch(() => {}),
+      ]);
+      notifyEmployerNewMessage(
+        v.employerId,
+        `${currentUser.firstName} ${currentUser.lastName}`,
+        message,
+      ).catch(() => {});
+    } catch (e) {
+      console.warn('[applyTo]', e);
+      showToast('Не удалось отправить отклик', 'error');
+    } finally {
+      setApplying(null);
+    }
   };
 
   const openPermChat = async (v: PermVacancy, displayCompany: string) => {
@@ -1743,6 +1798,15 @@ function WorkerPermMode() {
         selectedStation={filterStation}
         onSelect={s => setFilterStation(s)}
         onClose={() => setFilterPicker(false)}
+      />
+
+      <ApplySheet
+        visible={!!permApplyFor}
+        onClose={() => setPermApplyFor(null)}
+        onSend={sendPermApply}
+        title="Отклик на вакансию"
+        info={permApplyFor ? permVacancyInfoLines(permApplyFor) : []}
+        chips={getChatSuggestions('worker', null)}
       />
     </View>
   );

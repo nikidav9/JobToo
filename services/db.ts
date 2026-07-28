@@ -553,12 +553,17 @@ export async function dbCreateChat(
   companyName: string,
   systemMessage?: string,
   initialUnreadWorker = 0,
-  initialUnreadEmployer = 0
+  initialUnreadEmployer = 0,
+  /**
+   * Сообщение написал сам работник — тогда оно отправляется от его имени.
+   * Без этого признака отклик уходил от «system» и выглядел автоответчиком.
+   */
+  fromWorker = false,
 ): Promise<string> {
   if (IS_NATIVE) {
     return proxy<string>('dbCreateChat', [
       workerId, employerId, vacancyId, vacTitle, companyName,
-      systemMessage, initialUnreadWorker, initialUnreadEmployer,
+      systemMessage, initialUnreadWorker, initialUnreadEmployer, fromWorker,
     ]);
   }
   const { data: existing } = await withTimeout(
@@ -829,8 +834,12 @@ export async function dbGetPermApplicationsForVacancy(vacancyId: string): Promis
   return (data ?? []).map(rowToPermApp);
 }
 
-export async function dbApplyPermVacancy(vacancyId: string, workerId: string, employerId: string): Promise<void> {
-  if (IS_NATIVE) { await proxy('dbApplyPermVacancy', [vacancyId, workerId, employerId]); return; }
+export async function dbApplyPermVacancy(
+  vacancyId: string, workerId: string, employerId: string,
+  /** Живая строка от работника — с ней отклик открывает переписку. */
+  message?: string,
+): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbApplyPermVacancy', [vacancyId, workerId, employerId, message]); return; }
   const { error } = await withTimeout(
     supabase.from('jm_perm_applications').upsert({
       id: uid(),

@@ -26,6 +26,9 @@ import { METRO_LINES } from '@/constants/metro';
 import { notifyEmployerNewPermApplicant } from '@/services/notifications';
 
 import { rs, rf } from '@/constants/scale';
+import { ApplySheet } from '@/components/feature/ApplySheet';
+import { permVacancyInfoLines } from '@/services/vacancyCard';
+import { getChatSuggestions } from '@/constants/chatSuggestions';
 
 export default function PermVacancyDetailScreen() {
   const router = useRouter();
@@ -39,6 +42,8 @@ export default function PermVacancyDetailScreen() {
   } = useApp();
 
   const [applying, setApplying] = useState(false);
+
+  const [applyOpen, setApplyOpen] = useState(false);
   const [authModalDismissed, setAuthModalDismissed] = useState(Platform.OS === 'web');
   const [guestVacancy, setGuestVacancy] = useState<any>(null);
 
@@ -169,11 +174,20 @@ export default function PermVacancyDetailScreen() {
     );
   }
 
-  const applyTo = async () => {
+  // Сначала спрашиваем пару слов о себе — отклик уходит первым сообщением от
+  // имени человека и открывает переписку. Молчаливый отклик работодатель
+  // видел строкой в списке и решал вслепую.
+  const applyTo = () => {
     if (!currentUser || isApplied || applying) return;
+    setApplyOpen(true);
+  };
+
+  const sendApply = async (message: string) => {
+    if (!currentUser) return;
     setApplying(true);
     try {
-      await dbApplyPermVacancy(vacancy.id, currentUser.id, vacancy.employerId);
+      await dbApplyPermVacancy(vacancy.id, currentUser.id, vacancy.employerId, message);
+      setApplyOpen(false);
       await refreshPermApplications();
       notifyEmployerNewPermApplicant(
         vacancy.employerId,
@@ -184,7 +198,7 @@ export default function PermVacancyDetailScreen() {
       ).catch(() => {});
       showToast('Отклик отправлен! 📨', 'success');
     } catch {
-      showToast('Ошибка при отклике', 'error');
+      showToast('Не удалось отправить отклик', 'error');
     } finally {
       setApplying(false);
     }
@@ -433,6 +447,15 @@ export default function PermVacancyDetailScreen() {
       ) : null}
 
       {authModalJSX}
+
+      <ApplySheet
+        visible={applyOpen}
+        onClose={() => setApplyOpen(false)}
+        onSend={sendApply}
+        title="Отклик на вакансию"
+        info={permVacancyInfoLines(vacancy)}
+        chips={getChatSuggestions('worker', null)}
+      />
 
       {isGuest && Platform.OS === 'web' && (
         <View style={styles.guestBar}>

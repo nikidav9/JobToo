@@ -299,6 +299,66 @@ function fmt_date_ru(string $iso): string {
     return $days[(int)date('w', $ts)] . ' ' . date('d.m', $ts);
 }
 
+/**
+ * Завести переписку по отклику (или подхватить существующую).
+ *
+ * Чат один на пару людей, а не на каждую вакансию: директор с тремя сменами
+ * получал три отдельные переписки с одним человеком, и разговор рассыпался.
+ *
+ * Первым сообщением идёт карточка вакансии — от системы, это справка. А вот
+ * сам отклик пишет человек, и отправляется он от его имени. Раньше и отклик
+ * слался от «system» шаблоном «Меня заинтересовала ваша вакансия»: на той
+ * стороне видели автоответчик, и отвечать было нечему — из 132 чатов в 50
+ * не прозвучало ни одного живого слова.
+ */
+function chat_ensure(string $wid, string $eid, string $vid, string $vt, string $cn,
+                     ?string $sm, int $uw, int $ue, bool $fromWorker = false): string {
+    $author = $fromWorker ? $wid : 'system';
+
+    $ex = sb_single('jm_chats',
+        ['worker_id' => 'eq.' . $wid, 'employer_id' => 'eq.' . $eid],
+        'id,vacancy_id,unread_worker,unread_employer');
+
+    if ($ex) {
+        $cid = $ex['id'];
+        // Та же вакансия — ничего не добавляем, чат уже про неё.
+        if ($vid !== '' && ($ex['vacancy_id'] ?? '') !== $vid) {
+            sb_update('jm_chats', ['id' => 'eq.' . $cid], [
+                'vacancy_id' => $vid,
+                'vac_title' => $vt,
+                'company_name' => $cn,
+                'unread_worker' => (int)($ex['unread_worker'] ?? 0) + $uw,
+                'unread_employer' => (int)($ex['unread_employer'] ?? 0) + $ue,
+            ]);
+            $card = vacancy_card_text($vid);
+            if ($card) {
+                msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
+                    'text' => $card, 'created_at' => now_iso()]);
+            }
+            if ($sm) {
+                msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => $author,
+                    'text' => $sm, 'created_at' => now_iso()]);
+            }
+        }
+        return $cid;
+    }
+
+    $cid = uid();
+    sb_insert('jm_chats', ['id' => $cid, 'vacancy_id' => $vid, 'worker_id' => $wid,
+        'employer_id' => $eid, 'vac_title' => $vt, 'company_name' => $cn,
+        'unread_worker' => $uw, 'unread_employer' => $ue, 'created_at' => now_iso()]);
+    $card = vacancy_card_text($vid);
+    if ($card) {
+        msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
+            'text' => $card, 'created_at' => now_iso()]);
+    }
+    if ($sm) {
+        msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => $author,
+            'text' => $sm, 'created_at' => now_iso()]);
+    }
+    return $cid;
+}
+
 function vacancy_card_text(string $vid): ?string {
     if (trim($vid) === '') return null;
 
@@ -1191,52 +1251,14 @@ try {
         }
 
         case 'dbCreateChat': {
-            [$wid, $eid, $vid, $vt, $cn, $sm, $uw, $ue] =
-                [$args[0], $args[1], $args[2], $args[3], $args[4], $args[5] ?? null, $args[6] ?? 0, $args[7] ?? 0];
-            // Чат один на пару людей, а не на каждую вакансию. Раньше директор
-            // с тремя сменами получал три отдельные переписки с одним и тем же
-            // человеком, и разговор рассыпался.
-            $ex = sb_single('jm_chats',
-                ['worker_id' => 'eq.' . $wid, 'employer_id' => 'eq.' . $eid],
-                'id,vacancy_id,unread_worker,unread_employer');
-
-            if ($ex) {
-                $cid = $ex['id'];
-                // Та же вакансия — ничего не добавляем, чат уже про неё.
-                if ($vid !== '' && ($ex['vacancy_id'] ?? '') !== $vid) {
-                    // Переводим чат на новую вакансию: панель решений и статус
-                    // отклика смотрят на последнюю.
-                    sb_update('jm_chats', ['id' => 'eq.' . $cid], [
-                        'vacancy_id' => $vid,
-                        'vac_title' => $vt,
-                        'company_name' => $cn,
-                        'unread_worker' => (int)($ex['unread_worker'] ?? 0) + (int)$uw,
-                        'unread_employer' => (int)($ex['unread_employer'] ?? 0) + (int)$ue,
-                    ]);
-                    $card = vacancy_card_text($vid);
-                    if ($card) {
-                        msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
-                            'text' => $card, 'created_at' => now_iso()]);
-                    }
-                    if ($sm) {
-                        msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
-                            'text' => $sm, 'created_at' => now_iso()]);
-                    }
-                }
-                $data = $cid; break;
-            }
-
-            $cid = uid();
-            sb_insert('jm_chats', ['id' => $cid, 'vacancy_id' => $vid, 'worker_id' => $wid,
-                'employer_id' => $eid, 'vac_title' => $vt, 'company_name' => $cn,
-                'unread_worker' => $uw, 'unread_employer' => $ue, 'created_at' => now_iso()]);
-            $card = vacancy_card_text($vid);
-            if ($card) {
-                msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
-                    'text' => $card, 'created_at' => now_iso()]);
-            }
-            if ($sm) msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system', 'text' => $sm, 'created_at' => now_iso()]);
-            $data = $cid; break;
+            // Девятый аргумент — «сообщение написал сам работник». Тогда оно и
+            // отправляется от его имени, а не от системы.
+            [$wid, $eid, $vid, $vt, $cn, $sm, $uw, $ue, $fromWorker] =
+                [$args[0], $args[1], $args[2], $args[3], $args[4], $args[5] ?? null,
+                 $args[6] ?? 0, $args[7] ?? 0, !empty($args[8])];
+            $data = chat_ensure($wid, $eid, (string)$vid, (string)$vt, (string)$cn,
+                                $sm, (int)$uw, (int)$ue, $fromWorker);
+            break;
         }
 
         case 'dbMarkRead': {
@@ -1435,11 +1457,26 @@ try {
         case 'dbGetPermApplicationsForVacancy':
             $data = sb_select('jm_perm_applications', ['vacancy_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;
 
-        case 'dbApplyPermVacancy':
+        case 'dbApplyPermVacancy': {
+            [$vid, $wid, $eid, $sm] = [$args[0], $args[1], $args[2], $args[3] ?? null];
             sb_upsert('jm_perm_applications', [
-                'id' => uid(), 'vacancy_id' => $args[0], 'worker_id' => $args[1],
-                'employer_id' => $args[2], 'status' => 'pending', 'created_at' => now_iso(),
-            ], 'vacancy_id,worker_id'); break;
+                'id' => uid(), 'vacancy_id' => $vid, 'worker_id' => $wid,
+                'employer_id' => $eid, 'status' => 'pending', 'created_at' => now_iso(),
+            ], 'vacancy_id,worker_id');
+
+            // Отклик на постоянную вакансию раньше уходил молча: строка в
+            // таблице со статусом «ожидает», и всё. Работодатель видел имя в
+            // списке и решал вслепую, а сказать о себе человеку было негде —
+            // при том что именно на постоянные приходится большая часть
+            // откликов. Теперь отклик открывает переписку, как и на сменах.
+            if ($sm) {
+                $pv = sb_single('jm_perm_vacancies', ['id' => 'eq.' . $vid], 'title,company');
+                $data = chat_ensure($wid, $eid, (string)$vid,
+                    (string)($pv['title'] ?? ''), (string)($pv['company'] ?? ''),
+                    $sm, 0, 1, true);
+            }
+            break;
+        }
 
         case 'dbSetPermApplicationStatus':
             sb_update('jm_perm_applications', ['id' => 'eq.' . $args[0]], ['status' => $args[1]]); break;
