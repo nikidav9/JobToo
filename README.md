@@ -171,6 +171,14 @@ EXPO_TOKEN=<токен> npx eas-cli build --platform android --profile productio
 ```
 Runtime version: `1.3.0` (задаётся в `app.json`)
 
+**Перед первой сборкой** заведите на expo.dev (Project → Environment variables)
+переменные `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_APP_SECRET` и
+`EXPO_PUBLIC_YANDEX_MAPS_KEY`. В `eas.json` их значений больше нет: файл лежит
+в открытом репозитории, и ключ из него пережил бы любую смену секретов. Для
+обновлений по воздуху это неважно — там значения приходят из GitHub Secrets,
+— но собранный без них бинарник останется без живого чата, загрузки файлов и
+карты. Список всех переменных с пояснениями — в `.env.example`.
+
 ### OTA-обновление (без пересборки)
 ```bash
 EXPO_TOKEN=<токен> npx eas-cli update --branch production --message "описание"
