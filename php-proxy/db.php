@@ -157,6 +157,28 @@ function sb_count(string $t, array $f = []): int {
     return preg_match('#Content-Range:\s*[^/]+/(\d+)#i', $resp, $m) ? (int)$m[1] : 0;
 }
 
+// Поля пользователя, которые можно отдавать клиенту.
+//
+// Раньше здесь стояла звёздочка, и вместе с профилем наружу уходило поле
+// password. Пропуск к db.php публичен по своей природе — он лежит в бандле
+// сайта, — так что одним запросом dbGetUsers выгружалась вся база: телефон
+// и пароль каждого. Перечисляем поля поимённо: добавится новое, оно не
+// просочится само собой.
+define('USER_PUBLIC_COLS', implode(',', [
+    'id', 'role', 'phone', 'first_name', 'last_name', 'age',
+    'metro_line_id', 'metro_station', 'work_types', 'company', 'bio',
+    'avatar_url', 'avg_rating', 'rating_count', 'is_blocked',
+    'created_at', 'push_token', 'telegram_id', 'last_seen_at',
+]));
+
+// bcrypt-хеш от пароля, положенного как есть, отличается началом строки.
+// Версии три — $2a$, $2b$, $2y$: приложение хеширует библиотекой bcryptjs
+// и даёт $2b$, PHP даёт $2y$, и проверить чужой хеш умеет каждый из них
+// (проверено в обе стороны).
+function is_bcrypt(string $s): bool {
+    return (bool)preg_match('/^\$2[aby]\$/', $s);
+}
+
 function sb_select(string $t, array $f = [], string $sel = '*', ?string $ord = null): array {
     $q = array_merge(['select' => $sel], $f);
     if ($ord) $q['order'] = $ord;
@@ -738,10 +760,10 @@ try {
 
         // ── Users ──────────────────────────────────────────────────────────────
         case 'dbGetUserById':
-            $data = sb_single('jm_users', ['id' => 'eq.' . $args[0]]); break;
+            $data = sb_single('jm_users', ['id' => 'eq.' . $args[0]], USER_PUBLIC_COLS); break;
 
         case 'dbGetUsers':
-            $data = sb_select('jm_users', [], '*', 'created_at.asc'); break;
+            $data = sb_select('jm_users', [], USER_PUBLIC_COLS, 'created_at.asc'); break;
 
         // Только число для приветственного экрана. Раньше он считал сам,
         // напрямую из базы публичным ключом, — и после закрытия базы получал
@@ -765,8 +787,70 @@ try {
             } catch (\Throwable $e) { /* колонки нет — не беда */ }
             break;
 
-        case 'dbUpsertUser':
-            sb_upsert('jm_users', $args[0], 'id'); break;
+        // Пароль хешируется здесь, на сервере. Раньше приложение клало его в
+        // базу как есть, и с конца июня так набралось 176 паролей открытым
+        // текстом. Уже готовый хеш второй раз не трогаем: этой же операцией
+        // сохраняется профиль целиком, и пароль в нём приезжает обратно.
+        case 'dbUpsertUser': {
+            $u = $args[0];
+            // Пустой пароль — это не «сотри пароль», а «в профиле его нет».
+            // После того как вход перестал отдавать пароль наружу, сохранение
+            // профиля присылает сюда пустую строку — записать её значит
+            // запереть человека без единой ошибки.
+            if (empty($u['password'])) {
+                unset($u['password']);
+            } elseif (!is_bcrypt($u['password'])) {
+                $u['password'] = password_hash((string)$u['password'], PASSWORD_BCRYPT);
+            }
+            sb_upsert('jm_users', $u, 'id'); break;
+        }
+
+        // Вход. Сверка переехала сюда с клиента: раньше приложение спрашивало
+        // профиль по номеру телефона и сравнивало пароль у себя — а значит
+        // пароль (или его хеш) уходил наружу всякому, кто знает номер.
+        //
+        // Принимаем обе формы. Пока у части людей пароль лежит открытым
+        // текстом, отказывать им нельзя; зато при удачном входе такой пароль
+        // тут же превращается в хеш — база вычищается сама, по мере того как
+        // люди заходят.
+        case 'dbLogin': {
+            $phone = preg_replace('/\D+/', '', (string)($args[0] ?? ''));
+            $pass  = (string)($args[1] ?? '');
+            $row = $phone === '' ? null : sb_single('jm_users', ['phone' => 'eq.' . $phone]);
+            if (!$row || $pass === '' || empty($row['password'])) { $data = null; break; }
+
+            $stored = (string)$row['password'];
+            $ok = is_bcrypt($stored) ? password_verify($pass, $stored) : hash_equals($stored, $pass);
+            if (!$ok) { $data = null; break; }
+
+            if (!is_bcrypt($stored)) {
+                try {
+                    sb_update('jm_users', ['id' => 'eq.' . $row['id']],
+                        ['password' => password_hash($pass, PASSWORD_BCRYPT)]);
+                } catch (\Throwable $e) { /* вход важнее, чем перевод в хеш */ }
+            }
+
+            unset($row['password']);
+            $data = $row; break;
+        }
+
+        // Смена пароля в профиле. Тоже на сервере — на клиенте старый пароль
+        // сравнивался строкой, то есть для всех, у кого уже хеш, смена пароля
+        // попросту не работала.
+        case 'dbChangePassword': {
+            $row = sb_single('jm_users', ['id' => 'eq.' . ($args[0] ?? '')], 'id,password');
+            $old = (string)($args[1] ?? '');
+            $new = (string)($args[2] ?? '');
+            if (!$row || $new === '') { $data = ['ok' => false, 'reason' => 'not_found']; break; }
+
+            $stored = (string)($row['password'] ?? '');
+            $ok = is_bcrypt($stored) ? password_verify($old, $stored) : hash_equals($stored, $old);
+            if (!$ok) { $data = ['ok' => false, 'reason' => 'wrong_password']; break; }
+
+            sb_update('jm_users', ['id' => 'eq.' . $row['id']],
+                ['password' => password_hash($new, PASSWORD_BCRYPT)]);
+            $data = ['ok' => true]; break;
+        }
 
         case 'dbWarmup':
             // Раньше просто возвращалось true — прогревался только PHP, а сама

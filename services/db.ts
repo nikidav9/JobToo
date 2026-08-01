@@ -116,8 +116,31 @@ export async function dbGetUsers(): Promise<User[]> {
   return (data ?? []).map(rowToUser);
 }
 
+/**
+ * Вход. Пароль сверяет сервер и возвращает профиль уже без пароля.
+ *
+ * Раньше приложение спрашивало профиль по номеру телефона и сравнивало
+ * пароль у себя — то есть пароль уходил наружу всякому, кто знает номер.
+ */
+export async function dbLogin(phone: string, password: string): Promise<User | null> {
+  const d = await proxy<any>('dbLogin', [phone, password]);
+  return d ? rowToUser(d) : null;
+}
+
+/** Смена пароля: старый сверяет сервер, новый он же и хеширует. */
+export async function dbChangePassword(
+  userId: string,
+  oldPassword: string,
+  newPassword: string
+): Promise<{ ok: boolean; reason?: string }> {
+  return proxy<{ ok: boolean; reason?: string }>('dbChangePassword', [userId, oldPassword, newPassword]);
+}
+
 export async function dbUpsertUser(u: User): Promise<void> {
   const { avg_rating, rating_count, ...row } = userToRow(u);
+  // Пустой пароль не отправляем: он означает «профиль пришёл без пароля»
+  // (вход его больше не отдаёт), а не «стереть пароль».
+  if (!row.password) delete (row as Partial<typeof row>).password;
   if (IS_NATIVE) { await proxy('dbUpsertUser', [row]); return; }
   const { error } = await withTimeout(
     supabase.from('jm_users').upsert(row, { onConflict: 'id' })

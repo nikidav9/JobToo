@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { getInitials, nameColorFromString } from '@/services/storage';
-import { dbGetRatingsForUser, UserRating } from '@/services/db';
+import { dbGetRatingsForUser, dbChangePassword, UserRating } from '@/services/db';
 import { getSupabaseClient } from '@/template';
 import { resetOnboarding } from '@/components/OnboardingOverlay';
 import { TabHeader } from '@/components/ui/TabHeader';
@@ -932,9 +932,6 @@ export default function ProfileScreen() {
                   if (!curPassword || !newPassword || !confirmPassword) {
                     showToast('Заполните все поля', 'error'); return;
                   }
-                  if (curPassword !== currentUser.password) {
-                    showToast('Неверный текущий пароль', 'error'); return;
-                  }
                   if (newPassword.length < 6) {
                     showToast('Пароль должен быть не менее 6 символов', 'error'); return;
                   }
@@ -943,7 +940,13 @@ export default function ProfileScreen() {
                   }
                   setSavingPassword(true);
                   try {
-                    await updateUser({ ...currentUser, password: newPassword });
+                    // Текущий пароль сверяет сервер. Раньше сравнивали здесь,
+                    // строкой с currentUser.password, — и для всех, у кого в
+                    // базе уже хеш, смена пароля просто не проходила.
+                    const res = await dbChangePassword(currentUser.id, curPassword, newPassword);
+                    if (!res.ok) {
+                      showToast('Неверный текущий пароль', 'error'); return;
+                    }
                     setCurPassword(''); setNewPassword(''); setConfirmPassword('');
                     setShowSettings(false);
                     showToast('Пароль изменён', 'success');

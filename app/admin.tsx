@@ -246,12 +246,9 @@ export default function AdminScreen() {
         <Text style={styles.cardLabel}>Тел:</Text>
         <Text style={styles.cardVal}>{item.phone}</Text>
       </View>
-      {item.password ? (
-        <View style={styles.cardRow}>
-          <Text style={styles.cardLabel}>Пароль:</Text>
-          <Text style={[styles.cardVal, { fontFamily: 'monospace', color: Colors.primary }]}>{item.password}</Text>
-        </View>
-      ) : null}
+      {/* Пароль здесь больше не показываем. Ради этой строчки список
+          пользователей приезжал на устройство вместе с паролями всех —
+          а пропуск к этому запросу лежит в бандле сайта, открытый. */}
       {item.company ? (
         <View style={styles.cardRow}>
           <Text style={styles.cardLabel}>Компания:</Text>
