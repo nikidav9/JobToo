@@ -6,6 +6,34 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+/**
+ * Ключ к базе для самой функции.
+ *
+ * Supabase подставляет его сюда сам, но в двух видах. Старый —
+ * SUPABASE_SERVICE_ROLE_KEY, обычная строка. Новый — SUPABASE_SECRET_KEYS, и
+ * там уже JSON вида {"default": "sb_secret_…"}. Как только старые JWT-ключи в
+ * проекте отключают, прежняя переменная остаётся на месте, но перестаёт
+ * работать, и рассылки падают с «Legacy API keys are disabled».
+ *
+ * Поэтому берём новый, если он есть, и старый как запасной: так функция живёт
+ * и до отключения старых ключей, и после.
+ */
+function serviceKey(): string {
+  const fresh = Deno.env.get('SUPABASE_SECRET_KEYS')
+  if (fresh) {
+    try {
+      const parsed = JSON.parse(fresh)
+      const value = parsed.default ?? Object.values(parsed)[0]
+      if (typeof value === 'string' && value) return value
+    } catch {
+      // Не JSON — значит формат сменился снова; падаем на старую переменную.
+    }
+  }
+  const legacy = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (legacy) return legacy
+  throw new Error('Ни SUPABASE_SECRET_KEYS, ни SUPABASE_SERVICE_ROLE_KEY не заданы')
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -15,10 +43,17 @@ serve(async (req) => {
     const { target, title, body, metro, userId, mode } = await req.json()
     // mode: 'push' (Expo push, default) | 'inapp' (jm_notifications) | 'both'
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    )
+    // Рассылка всем — только по явной просьбе. Раньше запрос без target и без
+    // userId молча уходил всем, у кого есть токен: так 96 человек получили
+    // «проверку» с проверочного вызова.
+    if (!userId && !target) {
+      return new Response(
+        JSON.stringify({ error: 'Нужен userId или target (all / workers / employers / metro)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey())
 
     // ── Resolve target user IDs / push tokens ─────────────────────────────────
     let userIds: string[] = []
