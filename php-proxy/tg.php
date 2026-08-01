@@ -22,7 +22,12 @@ function jt_secret(string $name, string $fallback = ''): string {
     return $fallback;
 }
 
-define('TG_BOT_TOKEN', jt_secret('TG_BOT_TOKEN', '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug'));
+// Запасного значения тут нарочно нет. Прежний токен утёк вместе с открытым
+// репозиторием, и посторонний переписывал боту описание на рекламу. Токен
+// отозван и живёт только в GitHub Secrets (TG_BOT_TOKEN), откуда выкладка
+// собирает app_secrets.php. Если он не задан — лучше явная тишина, чем
+// работа на ключе, который знает чужой.
+define('TG_BOT_TOKEN', jt_secret('TG_BOT_TOKEN'));
 
 // Ключ доступа к базе — та же схема, что и в db.php: сервисный ключ с
 // хостинга, анонимный лишь как запасной вариант. Подробности там же.

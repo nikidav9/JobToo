@@ -507,7 +507,12 @@ function fill_coords(array $row): array {
 
 // ─── Telegram Mini App ────────────────────────────────────────────────────────
 
-define('TG_BOT_TOKEN', jt_secret('TG_BOT_TOKEN', '8718898225:AAEOUiK23gH_MKRnorhSFx5SDn8otcl2_ug'));
+// Запасного значения тут нарочно нет. Прежний токен утёк вместе с открытым
+// репозиторием, и посторонний переписывал боту описание на рекламу. Токен
+// отозван и живёт только в GitHub Secrets (TG_BOT_TOKEN), откуда выкладка
+// собирает app_secrets.php. Если он не задан — лучше явная тишина, чем
+// работа на ключе, который знает чужой.
+define('TG_BOT_TOKEN', jt_secret('TG_BOT_TOKEN'));
 define('DASHBOARD_URL', getenv('DASHBOARD_URL') ?: 'https://dashboard-nujus-projects.vercel.app');
 define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025)); // группа «ПОДРАБОТКИ»
 define('YANDEX_SUGGEST_KEY', jt_secret('YANDEX_SUGGEST_KEY', '44152824-d925-46ab-b464-3ce4d9fd50c7')); // Suggest API (адреса)
@@ -1529,6 +1534,60 @@ try {
             }
             $lr = sb_single('jm_likes', ['id' => 'eq.' . $lid], 'worker_rated,employer_rated');
             $data = ['bothRated' => !empty($lr['worker_rated']) && !empty($lr['employer_rated'])]; break;
+        }
+
+        // ── Телеграм: пост в общую группу ─────────────────────────────────────
+        // Объявления для всех разом — в группу «ПОДРАБОТКИ», а не письмами
+        // каждому. Адрес группы берётся из настроек сервера и не приходит
+        // в запросе: APP_SECRET лежит в открытом коде, и с параметром-адресом
+        // ботом можно было бы писать в любой чат.
+        case 'tgPostToGroup': {
+            if (TG_BOT_TOKEN === '') { $data = ['ok' => false, 'error' => 'TG_BOT_TOKEN не задан на сервере']; break; }
+            if (TG_GROUP_CHAT_ID === 0) { $data = ['ok' => false, 'error' => 'Группа не настроена']; break; }
+            $text = trim((string)($args[0] ?? ''));
+            if ($text === '') { $data = ['ok' => false, 'error' => 'Пустой текст']; break; }
+            $data = ['sent' => tg_send_message(TG_GROUP_CHAT_ID, $text, true), 'chat' => TG_GROUP_CHAT_ID];
+            break;
+        }
+
+        // ── Телеграм: переустановка вебхука ───────────────────────────────────
+        // Нужна после смены токена бота. Токен при этом никуда не передаётся —
+        // сервер берёт его сам из app_secrets.php.
+        //
+        // Адрес зашит здесь намеренно и не берётся из запроса: APP_SECRET лежит
+        // в открытом коде, и с параметром-адресом любой желающий увёл бы
+        // вебхук на себя вместе со всеми сообщениями людей.
+        case 'tgSetWebhook': {
+            $token = TG_BOT_TOKEN;
+            if ($token === '') { $data = ['ok' => false, 'error' => 'TG_BOT_TOKEN не задан на сервере']; break; }
+            $url = rtrim(DASHBOARD_URL, '/') . '/api/tg';
+            $ch = curl_init('https://api.telegram.org/bot' . $token . '/setWebhook');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_POSTFIELDS => json_encode([
+                    'url' => $url,
+                    'secret_token' => jt_secret('APP_SECRET'),
+                    'allowed_updates' => ['message', 'callback_query'],
+                    'drop_pending_updates' => false,
+                ]),
+            ]);
+            $resp = curl_exec($ch); curl_close($ch);
+            $data = ['target' => $url, 'telegram' => json_decode($resp ?: 'null', true)];
+            break;
+        }
+
+        // ── Телеграм: что сейчас с вебхуком ───────────────────────────────────
+        case 'tgWebhookInfo': {
+            $token = TG_BOT_TOKEN;
+            if ($token === '') { $data = ['ok' => false, 'error' => 'TG_BOT_TOKEN не задан на сервере']; break; }
+            $ch = curl_init('https://api.telegram.org/bot' . $token . '/getWebhookInfo');
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15]);
+            $resp = curl_exec($ch); curl_close($ch);
+            $data = json_decode($resp ?: 'null', true);
+            break;
         }
 
         // ── Push tokens ────────────────────────────────────────────────────────
