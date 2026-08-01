@@ -37,6 +37,7 @@ jobs:
           cp php-proxy/db.php dist/api/db.php
           cp php-proxy/tg.php dist/api/tg.php
           cp php-proxy/admin.php dist/api/admin.php
+          cp php-proxy/tgtool.php dist/api/tgtool.php
           cp assets/images/favicon.ico dist/favicon.ico
           cp public/.htaccess dist/.htaccess
 
