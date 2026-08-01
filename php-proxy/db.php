@@ -540,7 +540,6 @@ function fill_coords(array $row): array {
 define('TG_BOT_TOKEN', jt_secret('TG_BOT_TOKEN'));
 define('DASHBOARD_URL', getenv('DASHBOARD_URL') ?: 'https://dashboard-nujus-projects.vercel.app');
 define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025)); // группа «ПОДРАБОТКИ»
-define('YANDEX_SUGGEST_KEY', jt_secret('YANDEX_SUGGEST_KEY')); // Suggest API (адреса)
 
 /**
  * Validates Telegram WebApp initData signature (HMAC per official spec).

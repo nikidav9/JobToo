@@ -23,7 +23,4 @@ return [
 
     // Токен бота из @BotFather.
     'TG_BOT_TOKEN'    => '',
-
-    // Ключ Yandex Suggest API (подсказки адресов).
-    'YANDEX_SUGGEST_KEY' => '',
 ];
