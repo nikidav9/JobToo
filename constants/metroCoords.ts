@@ -247,5 +247,7 @@ export const METRO_COORDS: Record<string, [number, number]> = {
 // Центр карты по умолчанию — центр Москвы
 export const MOSCOW_CENTER: [number, number] = [55.751244, 37.618423];
 
-// Ключ JavaScript API Яндекс.Карт (клиентский; ограничьте по домену в кабинете Яндекса)
-export const YANDEX_MAPS_API_KEY = 'b7ce8cce-eb52-4fc9-afb5-64f4386c08dc';
+// Ключ JavaScript API Яндекс.Карт. Клиентский — он неизбежно попадает в бандл,
+// поэтому защита у него одна: ограничение по домену в кабинете Яндекса.
+// В коде не держим, чтобы смена ключа не оставляла позади рабочую копию.
+export const YANDEX_MAPS_API_KEY = process.env.EXPO_PUBLIC_YANDEX_MAPS_KEY ?? '';

@@ -57,8 +57,7 @@
 | Язык | TypeScript |
 | Состояние | React Context (AppContext) |
 | База данных | Supabase (PostgreSQL) |
-| API (нативное) | PHP-прокси (`jobtoo.ru/api/db.php`) |
-| API (Vercel) | Vercel Serverless + `lib/db-dispatch.ts` |
+| API | PHP-прокси (`jobtoo.ru/api/db.php`) — единственный путь к базе |
 | Push-уведомления | Expo Push API + Supabase Edge Functions |
 | Admin Dashboard | Next.js 14 + Tailwind CSS |
 | Сборка | EAS Build (Android APK / AAB, iOS IPA) |
@@ -78,16 +77,13 @@
 │   chats, profile     candidates, chats           │
 └────────────────────┬────────────────────────────┘
                      │ HTTP POST { fn, args }
-          ┌──────────┴──────────┐
-          │                     │
-   ┌──────▼──────┐    ┌────────▼────────┐
-   │  PHP-прокси  │    │ Vercel Serverless│
-   │ jobtoo.ru/  │    │  api/db.ts      │
-   │ api/db.php  │    │  (lib/db-dispatch│
-   └──────┬──────┘    └────────┬────────┘
-          │                    │
-          └──────────┬─────────┘
                      │
+              ┌──────▼──────┐
+              │  PHP-прокси  │
+              │ jobtoo.ru/  │
+              │ api/db.php  │
+              └──────┬──────┘
+                     │ сервисный ключ, наружу не уходит
            ┌─────────▼──────────┐
            │  Supabase (Postgres)│
            │  jm_users           │
@@ -255,7 +251,6 @@ JobMatch/
 │
 ├── lib/
 │   ├── supabase.ts           # Supabase клиент (для web-режима)
-│   └── db-dispatch.ts        # Обработчик всех DB-функций (Vercel serverless)
 │
 ├── api/
 │   └── db.ts                 # Vercel serverless handler

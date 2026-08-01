@@ -22,12 +22,12 @@ import { NextResponse } from 'next/server'
 const TARGET = 'https://jobtoo.ru/api/tg.php'
 
 export async function POST(req: Request) {
+  // Без запасного значения в коде: пустой секрет должен отклонять всё, а не
+  // молча пропускать по забытому в репозитории ключу.
   const expected =
-    process.env.EXPO_PUBLIC_APP_SECRET ||
-    process.env.NEXT_PUBLIC_APP_SECRET ||
-    'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6'
+    process.env.EXPO_PUBLIC_APP_SECRET || process.env.NEXT_PUBLIC_APP_SECRET
 
-  if (req.headers.get('x-telegram-bot-api-secret-token') !== expected) {
+  if (!expected || req.headers.get('x-telegram-bot-api-secret-token') !== expected) {
     return NextResponse.json({ ok: false }, { status: 401 })
   }
 

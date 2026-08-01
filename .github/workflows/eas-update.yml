@@ -34,6 +34,7 @@ jobs:
           EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
           EXPO_PUBLIC_APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
           EXPO_PUBLIC_DASHBOARD_URL: ${{ secrets.EXPO_PUBLIC_DASHBOARD_URL }}
+          EXPO_PUBLIC_YANDEX_MAPS_KEY: ${{ secrets.EXPO_PUBLIC_YANDEX_MAPS_KEY }}
         run: |
           SAFE_MSG=$(echo "$COMMIT_MSG" | head -1 | cut -c1-100)
           eas update --channel production --message "$SAFE_MSG" --non-interactive

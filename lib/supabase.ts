@@ -21,9 +21,26 @@ const storage =
       }
     : AsyncStorage;
 
+// Этим клиентом остались две вещи: живые обновления чата (channel) и загрузка
+// файлов в Storage. Всё остальное ходит через db.php — см. IS_NATIVE в
+// services/db.ts.
+//
+// Ключ берём только из окружения. Запасного значения в коде нет намеренно:
+// прежнее пережило смену ключей и продолжало бы работать втихую, а забытый
+// в коде ключ — ровно то, из-за чего пришлось всё это переделывать.
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error(
+    '[supabase] Не заданы EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY. ' +
+      'Живые обновления чата и загрузка файлов работать не будут.'
+  );
+}
+
 export const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://bbiqmkeysalwdonlnylb.supabase.co',
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiaXFta2V5c2Fsd2RvbmxueWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTI5NTIsImV4cCI6MjA5MzM4ODk1Mn0.HHYjTdjdP6lN-GosNfGypts6Kg-2CYyoMPMTnLfdfJQ',
+  SUPABASE_URL,
+  SUPABASE_KEY,
   {
     auth: {
       storage,

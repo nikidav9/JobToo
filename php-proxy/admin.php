@@ -17,7 +17,6 @@ define('SB_URL', 'https://bbiqmkeysalwdonlnylb.supabase.co');
 
 // Ключ — та же схема, что в db.php: сервисный с хостинга, анонимный как
 // запасной вариант. Подробности там же.
-define('SB_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiaXFta2V5c2Fsd2RvbmxueWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTI5NTIsImV4cCI6MjA5MzM4ODk1Mn0.HHYjTdjdP6lN-GosNfGypts6Kg-2CYyoMPMTnLfdfJQ');
 
 function sb_resolve_key(): string {
     $env = getenv('SB_SERVICE_KEY');
@@ -29,7 +28,11 @@ function sb_resolve_key(): string {
         if (is_string($v) && trim($v) !== '') return trim($v);
     }
 
-    return SB_ANON_KEY;
+    // Запасного ключа в коде больше нет. Прежний анонимный лежал здесь на
+    // случай «чтобы ничего не легло» — но он же пережил бы смену ключей и
+    // работал бы дальше втихую. Пусто — значит запросы честно упадут, и это
+    // видно сразу, а не через месяц.
+    return '';
 }
 
 define('SB_KEY', sb_resolve_key());

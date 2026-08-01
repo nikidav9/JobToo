@@ -12,7 +12,7 @@ const DB_TIMEOUT = 12_000;
 const IS_NATIVE = true; // always proxy through jobtoo.ru — Supabase is blocked in Russia from browsers
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://jobtoo.ru';
 
-const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6';
+const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET ?? '';
 
 async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
   const res = await fetch(`${API_BASE}/api/db.php`, {

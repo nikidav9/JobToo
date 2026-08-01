@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabase'
 import { logActivity } from './activity-log'
+import { getToken } from './adminApi'
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ export async function resetPassword(userId: string): Promise<string> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-app-secret': process.env.NEXT_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6',
+      'X-Admin-Token': getToken(),
     },
     body: JSON.stringify({ userId }),
   })
@@ -205,7 +206,7 @@ async function trySendWebPushToUser(userId: string, title: string, body: string)
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-app-secret': process.env.NEXT_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6',
+        'X-Admin-Token': getToken(),
       },
       body: JSON.stringify({
         subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
@@ -235,13 +236,13 @@ export async function broadcastTelegram(
   body: string,
   role: 'all' | 'worker' | 'employer' = 'all',
 ): Promise<{ sent: number; total: number }> {
-  const res = await fetch('https://jobtoo.ru/api/db.php', {
+  const res = await fetch('/api/admin/tg-broadcast', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-App-Secret': process.env.NEXT_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6',
+      'X-Admin-Token': getToken(),
     },
-    body: JSON.stringify({ fn: 'tgBroadcast', args: [title, body, role] }),
+    body: JSON.stringify({ title, body, role }),
   })
   const data = await res.json()
   if (!res.ok || data.error) throw new Error(data.error ?? 'Ошибка Telegram-рассылки')
@@ -254,7 +255,7 @@ export async function broadcastWebPush(title: string, body: string): Promise<{ s
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-app-secret': process.env.NEXT_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6',
+      'X-Admin-Token': getToken(),
     },
     body: JSON.stringify({ title, body }),
   })

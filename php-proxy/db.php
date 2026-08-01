@@ -19,7 +19,6 @@ define('SB_URL', 'https://bbiqmkeysalwdonlnylb.supabase.co');
 //
 // Как только сервисный ключ окажется на хостинге — можно применять
 // миграцию 013_lock_down_rls.sql и закрывать базу от анонимного доступа.
-define('SB_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiaXFta2V5c2Fsd2RvbmxueWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTI5NTIsImV4cCI6MjA5MzM4ODk1Mn0.HHYjTdjdP6lN-GosNfGypts6Kg-2CYyoMPMTnLfdfJQ');
 
 function sb_resolve_key(): string {
     $env = getenv('SB_SERVICE_KEY');
@@ -31,7 +30,11 @@ function sb_resolve_key(): string {
         if (is_string($v) && trim($v) !== '') return trim($v);
     }
 
-    return SB_ANON_KEY;
+    // Запасного ключа в коде больше нет. Прежний анонимный лежал здесь на
+    // случай «чтобы ничего не легло» — но он же пережил бы смену ключей и
+    // работал бы дальше втихую. Пусто — значит запросы честно упадут, и это
+    // видно сразу, а не через месяц.
+    return '';
 }
 
 define('SB_KEY', sb_resolve_key());
@@ -53,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // перестаёт работать сам собой.
 $provided = $_SERVER['HTTP_X_APP_SECRET'] ?? '';
 $accepted = array_filter([
-    jt_secret('APP_SECRET', 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6'),
+    jt_secret('APP_SECRET'),
     jt_secret('APP_SECRET_PREV'),
 ]);
 $ok = false;
@@ -537,7 +540,7 @@ function fill_coords(array $row): array {
 define('TG_BOT_TOKEN', jt_secret('TG_BOT_TOKEN'));
 define('DASHBOARD_URL', getenv('DASHBOARD_URL') ?: 'https://dashboard-nujus-projects.vercel.app');
 define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025)); // группа «ПОДРАБОТКИ»
-define('YANDEX_SUGGEST_KEY', jt_secret('YANDEX_SUGGEST_KEY', '44152824-d925-46ab-b464-3ce4d9fd50c7')); // Suggest API (адреса)
+define('YANDEX_SUGGEST_KEY', jt_secret('YANDEX_SUGGEST_KEY')); // Suggest API (адреса)
 
 /**
  * Validates Telegram WebApp initData signature (HMAC per official spec).
@@ -725,7 +728,7 @@ function broadcast_workers(string $title, string $body, string $tgHtml, string $
     try {
         $workerIds = array_flip(array_column($all, 'id'));
         $subs = sb_select('jm_web_push_subscriptions', [], 'user_id,endpoint,p256dh,auth');
-        $appSecret = jt_secret('APP_SECRET', 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6');
+        $appSecret = jt_secret('APP_SECRET');
         foreach ($subs as $s) {
             if (!isset($workerIds[$s['user_id']]) || empty($s['endpoint'])) continue;
             $ch = curl_init(DASHBOARD_URL . '/api/webpush/send');

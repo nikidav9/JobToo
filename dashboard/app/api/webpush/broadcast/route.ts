@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import webpush from 'web-push'
+import { isAdmin } from '@/lib/requireAdmin'
 import { serverSupabase } from '@/lib/serverSupabase'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-app-secret',
+  'Access-Control-Allow-Headers': 'Content-Type, x-admin-token, x-app-secret',
 }
 
 export async function OPTIONS() {
@@ -13,9 +14,12 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: Request) {
+  // Пускаем либо вошедшего в дашборд, либо сервер приложения с APP_SECRET:
+  // рассылки зовёт и то, и другое. Публичного запасного значения больше нет.
   const secret = req.headers.get('x-app-secret')
-  const expectedSecret = process.env.EXPO_PUBLIC_APP_SECRET || process.env.NEXT_PUBLIC_APP_SECRET || 'ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6'
-  if (secret !== expectedSecret) {
+  const expectedSecret = process.env.EXPO_PUBLIC_APP_SECRET || process.env.NEXT_PUBLIC_APP_SECRET
+  const bySecret = Boolean(expectedSecret) && secret === expectedSecret
+  if (!bySecret && !(await isAdmin(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS })
   }
 
@@ -24,10 +28,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'title and body required' }, { status: 400, headers: CORS })
   }
 
+  // Приватный ключ VAPID — настоящий секрет: с ним можно рассылать пуши от
+  // имени JobToo. Запасного значения в коде нет; нет переменной — нет рассылки.
+  const vapidPublic = process.env.VAPID_PUBLIC_KEY
+  const vapidPrivate = process.env.VAPID_PRIVATE_KEY
+  if (!vapidPublic || !vapidPrivate) {
+    return NextResponse.json(
+      { error: 'VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY не заданы на сервере' },
+      { status: 500, headers: CORS }
+    )
+  }
   webpush.setVapidDetails(
     process.env.VAPID_SUBJECT || 'mailto:admin@jobtoo.ru',
-    process.env.VAPID_PUBLIC_KEY || 'BMps5FNvS_ODiL0Rf2d76P8cy_xLh2C7EVXb9mHABkZLQz58mwUzTVzkle_5R0ACYR0IGD-zuS4cuYEhuvCMYE4',
-    process.env.VAPID_PRIVATE_KEY || 'cH1PAj57qEc7EoaxILsIeAxPyAWWxLO0dUQnIictJgw',
+    vapidPublic,
+    vapidPrivate,
   )
 
   let supabase
