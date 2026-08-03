@@ -1018,9 +1018,12 @@ try {
             }
             foreach ($byEmp as $eid => $cnt) {
                 $emp = sb_single('jm_users', ['id' => 'eq.' . $eid], 'telegram_id,push_token');
+                // Приходит через сутки после отклика — ровно посередине срока,
+                // поэтому называем и остаток: «ещё день» точнее, чем «ответьте».
                 $title = '⏳ Кандидаты ждут ответа';
                 $body = "У вас {$cnt} " . ($cnt === 1 ? 'необработанная заявка' : 'необработанных заявок')
-                    . ' на вакансии. Ответьте — иначе кандидаты уйдут к другим.';
+                    . ' на вакансии. Остался день: через 2 дня после отклика заявка закрывается'
+                    . ' автоматически, и кандидат уходит к другим.';
                 sb_insert('jm_notifications', ['user_id' => $eid, 'title' => $title, 'body' => $body]);
                 if ($emp && !empty($emp['telegram_id'])) {
                     tg_send_message((int)$emp['telegram_id'], $title . "\n\n" . $body, true);
@@ -1057,11 +1060,16 @@ try {
                 $result['weeklyPermDigest'] = post_weekly_perm_digest();
             }
 
-            // ── 1б. Авто-отклонение заявок, висящих без ответа 7+ дней ──
-            $cut7d = gmdate('Y-m-d\TH:i:s\Z', time() - 7 * 86400);
+            // ── 1б. Авто-отклонение заявок, висящих без ответа 2+ суток ──
+            //
+            // Было семь дней. По чатам видно, что столько ждать незачем: из 65
+            // случаев, когда директор ответил, 49 ответов пришли в первый час,
+            // 56 — за сутки и лишь 9 позже. Неделя не добавляла шансов, зато всё
+            // это время человек сидел без ответа и уходил насовсем.
+            $cutStale = gmdate('Y-m-d\TH:i:s\Z', time() - 2 * 86400);
             $stale = sb_select('jm_perm_applications', [
                 'status' => 'eq.pending',
-                'created_at' => 'lt.' . $cut7d,
+                'created_at' => 'lt.' . $cutStale,
             ], 'id,worker_id,vacancy_id');
             $result['autoRejected'] = 0;
             foreach ($stale as $srow) {
@@ -1069,7 +1077,7 @@ try {
                 $vac = sb_single('jm_perm_vacancies', ['id' => 'eq.' . $srow['vacancy_id']], 'title');
                 $vt = $vac ? $vac['title'] : 'вакансию';
                 $wTitle = 'Отклик закрыт без ответа';
-                $wBody = "Директор не ответил на ваш отклик на «{$vt}» за 7 дней. "
+                $wBody = "Директор не ответил на ваш отклик на «{$vt}» за 2 дня. "
                     . 'Не ждите — посмотрите другие вакансии и смены рядом, отклик в два тапа.';
                 sb_insert('jm_notifications', ['user_id' => $srow['worker_id'], 'title' => $wTitle, 'body' => $wBody]);
                 $wu = sb_single('jm_users', ['id' => 'eq.' . $srow['worker_id']], 'telegram_id,push_token');
@@ -1082,12 +1090,12 @@ try {
                 $result['autoRejected']++;
             }
 
-            // ── 1в. То же для откликов на смены: 7+ дней без решения директора ──
+            // ── 1в. То же для откликов на смены: 2+ суток без решения директора ──
             $staleLikes = sb_select('jm_likes', [
                 'worker_liked' => 'eq.true',
                 'is_match' => 'eq.false',
                 'employer_liked' => 'is.null',
-                'created_at' => 'lt.' . $cut7d,
+                'created_at' => 'lt.' . $cutStale,
             ], 'id,worker_id,vacancy_id');
             $result['autoRejectedShifts'] = 0;
             foreach ($staleLikes as $lrow) {
@@ -1095,7 +1103,7 @@ try {
                 $svac = sb_single('jm_vacancies', ['id' => 'eq.' . $lrow['vacancy_id']], 'title');
                 $st = $svac ? $svac['title'] : 'смену';
                 $wTitle = 'Отклик закрыт без ответа';
-                $wBody = "Директор не ответил на ваш отклик на смену «{$st}» за 7 дней. "
+                $wBody = "Директор не ответил на ваш отклик на смену «{$st}» за 2 дня. "
                     . 'Посмотрите свежие смены рядом — отклик в два тапа.';
                 sb_insert('jm_notifications', ['user_id' => $lrow['worker_id'], 'title' => $wTitle, 'body' => $wBody]);
                 $result['autoRejectedShifts']++;
