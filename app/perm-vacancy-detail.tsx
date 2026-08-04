@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
@@ -342,7 +343,13 @@ export default function PermVacancyDetailScreen() {
             <Text style={styles.sectionTitle}>Работодатель</Text>
           </View>
           <View style={styles.employerCard}>
-            <LavkaLogo size={48} />
+            {/* Фото директора, если он его добавил: логотип компании одинаков у
+                всех, а человек за вакансией у каждой свой. */}
+            {employer?.avatarUrl ? (
+              <Image source={{ uri: employer.avatarUrl }} style={styles.employerAvatar} contentFit="cover" transition={150} />
+            ) : (
+              <LavkaLogo size={48} />
+            )}
             <View style={{ flex: 1, gap: 3 }}>
               <Text style={styles.employerName}>{employerDisplayName}</Text>
               {employer?.metroStation ? (

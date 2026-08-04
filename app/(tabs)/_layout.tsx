@@ -13,6 +13,7 @@ import { BlurView } from 'expo-blur';
 import { Colors } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import NotificationPermissionSheet from '@/components/NotificationPermissionSheet';
+import CompleteProfileSheet from '@/components/CompleteProfileSheet';
 import EntryTransition from '@/components/EntryTransition';
 import { OnboardingOverlay } from '@/components/OnboardingOverlay';
 import { setOnboardingTarget } from '@/lib/onboardingTargets';
@@ -268,6 +269,7 @@ export default function TabLayout() {
         <Tabs.Screen name="profile" options={{ tabBarIcon: () => null }} />
       </Tabs>
       <NotificationPermissionSheet />
+      <CompleteProfileSheet />
       <EntryTransition />
       <OnboardingOverlay />
     </View>

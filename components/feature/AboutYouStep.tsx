@@ -24,19 +24,18 @@ import { rs, rf } from '@/constants/scale';
  * нажатие: пустое поле с курсором отпугивает сильнее, чем просьба выбрать.
  */
 
-export const BIO_MIN_LENGTH = 30;
+export const BIO_MIN_LENGTH = 10;
+export const BIO_MAX_LENGTH = 300;
 
-const WORKER_HINTS = [
-  'Работал на складе, знаю сборку заказов и приёмку товара.',
-  'Без опыта, но быстро учусь и готов выходить в любые смены.',
-  'Ищу подработку по выходным, есть опыт в торговом зале.',
-];
+// Подсказка прямо в поле, серым: пустое поле с курсором не объясняет, о чём
+// писать, и человек пишет «ищу работу» — то есть ничего.
+const WORKER_PLACEHOLDER =
+  'Есть ли опыт и где работали. Что умеете: собирать заказы, размещать товар, '
+  + 'работать с терминалом. Когда удобно выходить.';
 
-const EMPLOYER_HINTS = [
-  'Даркстор в центре, смены по 4–8 часов, выплаты еженедельно.',
-  'Небольшая команда, берём и без опыта — всему учим на месте.',
-  'Работаем круглосуточно, удобные графики, оплата два раза в месяц.',
-];
+const EMPLOYER_PLACEHOLDER =
+  'Что за точка и где: адрес, ближайшее метро. Какой коллектив. Сколько заказов '
+  + 'в смену. Как устроена разгрузка — подвал, рампа, лифт.';
 
 const MIN_AGE = 16;
 const MAX_AGE = 75;
@@ -54,7 +53,7 @@ type Props = {
 export function AboutYouStep({ role, age, onAgeChange, bio, onBioChange, photoUri, onPhotoChange }: Props) {
   const [picking, setPicking] = useState(false);
   const isWorker = role === 'worker';
-  const hints = isWorker ? WORKER_HINTS : EMPLOYER_HINTS;
+  const placeholder = isWorker ? WORKER_PLACEHOLDER : EMPLOYER_PLACEHOLDER;
 
   const pick = async () => {
     if (picking) return;
@@ -130,24 +129,17 @@ export function AboutYouStep({ role, age, onAgeChange, bio, onBioChange, photoUr
       <TextInput
         value={bio}
         onChangeText={onBioChange}
-        placeholder={isWorker ? 'Пара слов об опыте и о том, когда вам удобно работать' : 'Чем занимаетесь и какие условия предлагаете'}
-        placeholderTextColor={Colors.textMuted}
+        placeholder={placeholder}
+        placeholderTextColor="#9CA3AF"
         style={st.bioInput}
         multiline
-        maxLength={500}
+        maxLength={BIO_MAX_LENGTH}
       />
       <Text style={[st.counter, bio.trim().length < BIO_MIN_LENGTH && st.counterLow]}>
         {bio.trim().length < BIO_MIN_LENGTH
           ? `Ещё ${BIO_MIN_LENGTH - bio.trim().length} символов`
-          : `${bio.trim().length} символов`}
+          : `${bio.trim().length} из ${BIO_MAX_LENGTH}`}
       </Text>
-
-      <Text style={st.hintsLabel}>Или выберите готовое и поправьте под себя:</Text>
-      {hints.map(h => (
-        <TouchableOpacity key={h} style={st.hint} onPress={() => onBioChange(h)} activeOpacity={0.8}>
-          <Text style={st.hintText}>{h}</Text>
-        </TouchableOpacity>
-      ))}
     </View>
   );
 }
@@ -195,10 +187,4 @@ const st = StyleSheet.create({
   counterLow: { color: '#B45309' },
   err: { fontSize: rf(12), color: '#DC2626', marginBottom: rs(10) },
 
-  hintsLabel: { fontSize: rf(12), color: Colors.textMuted, marginBottom: rs(8) },
-  hint: {
-    backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FED7AA',
-    borderRadius: Radius.md, padding: rs(10), marginBottom: rs(8),
-  },
-  hintText: { fontSize: rf(13), color: '#92400E', lineHeight: rf(18) },
 });
