@@ -109,6 +109,24 @@ export type UserStats =
   | { enough: false }
   | { enough: true; chats: number; answered: number; medianSeconds: number | null };
 
+/**
+ * Отзывчивость сразу по всем — для карточек в ленте.
+ *
+ * Поштучно нельзя: на экране десяток вакансий, и запрос на каждую превратил бы
+ * ленту в слайд-шоу. В карте только те, о ком есть что сказать: остальных в
+ * ней просто нет.
+ */
+export type Responsiveness = { chats: number; answered: number; medianSeconds: number | null };
+
+export async function dbResponsivenessMap(): Promise<Record<string, Responsiveness>> {
+  try {
+    return await proxy<Record<string, Responsiveness>>('dbResponsivenessMap');
+  } catch {
+    // Лента важнее подписи: не сложилось — карточки просто без неё.
+    return {};
+  }
+}
+
 export async function dbUserStats(userId: string): Promise<UserStats> {
   try {
     return await proxy<UserStats>('dbUserStats', [userId]);

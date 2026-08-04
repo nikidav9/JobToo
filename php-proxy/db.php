@@ -931,6 +931,58 @@ try {
         //
         // Пока чатов меньше двух, ничего не показываем: одна переписка о
         // человеке не говорит ничего, а выглядит как приговор.
+        // Отзывчивость сразу по всем — для карточек в ленте.
+        //
+        // Поштучно нельзя: на экране десяток вакансий, и запрос на каждую
+        // превратил бы ленту в слайд-шоу. Данных мало (сотни чатов и
+        // сообщений), так что считаем всё за два запроса и отдаём картой.
+        case 'dbResponsivenessMap': {
+            $chats = sb_select('jm_chats', [], 'id,worker_id,employer_id,created_at');
+            $msgs = sb_select('jm_messages', [], 'chat_id,sender_id,created_at', 'created_at.asc');
+            $byChat = [];
+            foreach ($msgs as $m) {
+                if ($m['sender_id'] === 'system' || $m['sender_id'] === 'system_safety') continue;
+                $byChat[$m['chat_id']][] = $m;
+            }
+            // Пустой чат считаем молчанием, только когда срок ответа уже вышел:
+            // те же двое суток, что и у авто-закрытия отклика.
+            $staleBefore = time() - 2 * 86400;
+            $acc = [];
+            foreach ($chats as $c) {
+                foreach ([$c['worker_id'], $c['employer_id']] as $uid) {
+                    if (!$uid) continue;
+                    if (!isset($acc[$uid])) $acc[$uid] = ['chats' => 0, 'answered' => 0, 'lags' => []];
+                    $ms = $byChat[$c['id']] ?? [];
+                    if (!$ms) {
+                        if (strtotime($c['created_at']) < $staleBefore) $acc[$uid]['chats']++;
+                        continue;
+                    }
+                    // Разговор, который человек завёл сам, о нём не говорит.
+                    if ($ms[0]['sender_id'] === $uid) continue;
+                    $acc[$uid]['chats']++;
+                    foreach ($ms as $m) {
+                        if ($m['sender_id'] === $uid) {
+                            $acc[$uid]['answered']++;
+                            $acc[$uid]['lags'][] = max(0, strtotime($m['created_at']) - strtotime($ms[0]['created_at']));
+                            break;
+                        }
+                    }
+                }
+            }
+            $out = [];
+            foreach ($acc as $uid => $a) {
+                if ($a['chats'] < 2) continue;
+                sort($a['lags']);
+                $out[$uid] = [
+                    'chats' => $a['chats'],
+                    'answered' => $a['answered'],
+                    // Медиана по одному ответу — это просто тот единственный случай.
+                    'medianSeconds' => count($a['lags']) >= 2 ? $a['lags'][intdiv(count($a['lags']), 2)] : null,
+                ];
+            }
+            $data = $out; break;
+        }
+
         case 'dbUserStats': {
             $uid = (string)($args[0] ?? '');
             if ($uid === '') { $data = null; break; }

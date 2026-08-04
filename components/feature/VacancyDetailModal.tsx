@@ -4,6 +4,8 @@ import {
   TouchableOpacity, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useApp } from '@/hooks/useApp';
+import { ReplyBadge } from '@/components/feature/ReplyBadge';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { User, Vacancy } from '@/constants/types';
@@ -24,6 +26,7 @@ interface Props {
 }
 
 export function VacancyDetailModal({ vacancy, visible, onClose, employer, actions }: Props) {
+  const { responsivenessMap } = useApp();
   const insets = useSafeAreaInsets();
   const { panHandlers, animStyle } = useSwipeToDismiss(onClose, visible);
   if (!vacancy) return null;
@@ -64,6 +67,11 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
             </View>
 
             <Text style={styles.jobTitle}>{vacancy.title}</Text>
+
+            {/* Как отвечает этот директор — до отклика, а не после.
+                В профиль перед откликом заходят единицы, а без ответа
+                остаются 45% чатов. */}
+            <ReplyBadge stats={employer ? responsivenessMap[employer.id] : null} />
 
             {/* Chips: time, date */}
             <View style={styles.row}>
