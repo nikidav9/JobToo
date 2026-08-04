@@ -56,20 +56,20 @@ export function lastSeenLabel(lastSeenAt?: string | null): string | null {
 export function replySpeedLabel(medianSeconds?: number | null): string | null {
   if (medianSeconds == null) return null;
   const mins = Math.round(medianSeconds / 60);
-  if (mins <= 15) return 'обычно отвечает сразу';
-  if (mins <= 60) return 'обычно отвечает в течение часа';
+  if (mins <= 15) return 'сразу';
+  if (mins <= 60) return 'в течение часа';
   const hours = Math.round(mins / 60);
-  if (hours < 24) return `обычно отвечает за ${hours} ${plural(hours, 'час', 'часа', 'часов')}`;
+  if (hours < 24) return `около ${hours} ${plural(hours, 'часа', 'часов', 'часов')}`;
   const days = Math.max(1, Math.round(hours / 24));
-  return `обычно отвечает за ${days} ${plural(days, 'день', 'дня', 'дней')}`;
+  return `около ${days} ${plural(days, 'дня', 'дней', 'дней')}`;
 }
 
 /** «отвечает примерно в 8 случаях из 10» — доля переписок, где вообще ответил. */
 export function replyRateLabel(answered: number, chats: number): string | null {
   if (chats < 2) return null;
-  if (answered === 0) return 'пока ни разу не ответил(а)';
-  if (answered === chats) return 'отвечает всегда';
-  return `отвечает примерно в ${Math.round((answered / chats) * 10)} случаях из 10`;
+  if (answered === 0) return `ни разу из ${chats}`;
+  if (answered === chats) return `всегда, ${chats} из ${chats}`;
+  return `${answered} из ${chats} переписок`;
 }
 
 function plural(n: number, one: string, few: string, many: string): string {

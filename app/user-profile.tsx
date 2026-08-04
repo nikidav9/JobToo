@@ -295,8 +295,11 @@ export default function UserProfileScreen() {
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <View style={styles.infoRow}>
+      {/* Подпись не сжимаем, значение переносим внутри своей колонки: без
+          этого длинная строка наползала на подпись — «отвечает примерно в 7
+          случаях из 10» ложилось прямо поверх слова «Отвечает». */}
       <Text style={styles.infoLabel}>{label}</Text>
-      {value}
+      <View style={styles.infoValue}>{value}</View>
     </View>
   );
 }
@@ -342,9 +345,10 @@ const styles = StyleSheet.create({
     gap: rs(10), ...Shadow.card,
   },
   sectionTitle: { fontSize: rf(13), fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: rs(2) },
-  infoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: rs(6), borderTopWidth: 1, borderTopColor: Colors.divider },
-  infoLabel: { fontSize: rf(14), color: Colors.textMuted },
-  valText: { fontSize: rf(14), fontWeight: '600', color: Colors.textPrimary },
+  infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: rs(12), paddingVertical: rs(8), borderTopWidth: 1, borderTopColor: Colors.divider },
+  infoLabel: { fontSize: rf(14), color: Colors.textMuted, flexShrink: 0 },
+  infoValue: { flex: 1, alignItems: 'flex-end' },
+  valText: { fontSize: rf(14), fontWeight: '600', color: Colors.textPrimary, textAlign: 'right' },
   metroVal: { flexDirection: 'row', alignItems: 'center', gap: rs(6) },
   lineDot: { width: rs(10), height: rs(10), borderRadius: rs(5) },
   bioText: { fontSize: rf(15), color: Colors.textPrimary, lineHeight: rf(22) },
