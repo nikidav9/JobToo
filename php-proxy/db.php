@@ -934,7 +934,7 @@ try {
         case 'dbUserStats': {
             $uid = (string)($args[0] ?? '');
             if ($uid === '') { $data = null; break; }
-            $chats = sb_select('jm_chats', ['or' => "(worker_id.eq.{$uid},employer_id.eq.{$uid})"], 'id');
+            $chats = sb_select('jm_chats', ['or' => "(worker_id.eq.{$uid},employer_id.eq.{$uid})"], 'id,created_at');
             $ids = array_map(fn($c) => $c['id'], $chats);
             if (!$ids) { $data = ['enough' => false]; break; }
             // Одним запросом на все чаты разом: по запросу на чат открытие
@@ -948,8 +948,22 @@ try {
                 if ($m['sender_id'] === 'system' || $m['sender_id'] === 'system_safety') continue;
                 $byChat[$m['chat_id']][] = $m;
             }
+            // Пустой чат — тот, где не написал никто. Считаем его молчанием,
+            // но только когда разговор уже точно не состоится: срок ответа на
+            // отклик двое суток, после него ждать нечего. Свежие пустые чаты
+            // не в счёт — иначе директор получал бы клеймо за переписку,
+            // которая началась час назад.
+            //
+            // Без этого метрика молчала почти у всех: у директора с 16 чатами
+            // двенадцать были пустыми, и в расчёт попадал ровно один.
+            $staleBefore = time() - 2 * 86400;
             $total = 0; $answered = 0; $lags = [];
-            foreach ($byChat as $ms) {
+            foreach ($chats as $c) {
+                $ms = $byChat[$c['id']] ?? [];
+                if (!$ms) {
+                    if (strtotime($c['created_at']) < $staleBefore) $total++;
+                    continue;
+                }
                 // Чат, который завёл он сам, об отзывчивости не говорит.
                 if ($ms[0]['sender_id'] === $uid) continue;
                 $total++;
@@ -963,7 +977,10 @@ try {
             }
             if ($total < 2) { $data = ['enough' => false]; break; }
             sort($lags);
-            $median = $lags ? $lags[intdiv(count($lags), 2)] : null;
+            // Скорость показываем только при двух ответах и больше: медиана по
+            // одному — это просто тот единственный случай, а в профиле она
+            // выглядит как «обычно отвечает за 12 дней».
+            $median = count($lags) >= 2 ? $lags[intdiv(count($lags), 2)] : null;
             $data = [
                 'enough' => true,
                 'chats' => $total,

@@ -1,0 +1,65 @@
+name: Run Supabase migrations
+
+# Применяет только те файлы миграций, что пришли с этим пушем.
+#
+# Раньше миграции накатывались руками через SQL-редактор, и по репозиторию было
+# не понять, какие из них уже применены. Прогонять всю папку каждый раз тоже
+# нельзя: старые файлы не рассчитаны на повторный запуск.
+#
+# Ходим в Management API, а не через supabase CLI: для `db push` нужен ещё и
+# пароль от базы, а тут хватает того же токена, которым выкладываются функции.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Нужен предыдущий коммит, иначе не с чем сравнивать.
+          fetch-depth: 2
+
+      - name: Apply new migrations
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: bbiqmkeysalwdonlnylb
+        run: |
+          set -euo pipefail
+
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Секрет SUPABASE_ACCESS_TOKEN не задан"
+            exit 1
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FILES=$(git show --name-only --pretty=format: HEAD -- 'supabase/migrations/*.sql')
+          else
+            FILES=$(git diff --name-only --diff-filter=AM ${{ github.event.before }} ${{ github.sha }} -- 'supabase/migrations/*.sql' || true)
+          fi
+
+          if [ -z "$FILES" ]; then
+            echo "Новых миграций нет"
+            exit 0
+          fi
+
+          for f in $FILES; do
+            echo "── $f ─────────────────────────────────────────"
+            BODY=$(jq -Rs '{query: .}' < "$f")
+            CODE=$(curl -sS -o /tmp/resp.json -w '%{http_code}' \
+              -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$BODY")
+            if [ "$CODE" -ge 300 ]; then
+              echo "::error::$f не применилась (HTTP $CODE)"
+              cat /tmp/resp.json
+              exit 1
+            fi
+            echo "применена, ответ: $(head -c 200 /tmp/resp.json)"
+          done
