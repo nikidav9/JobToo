@@ -22,6 +22,7 @@ const NAV = [
   { href: '/users', label: 'Юзеры', icon: IconUsers },
   { href: '/last-seen', label: 'Последний вход', icon: IconClock },
   { href: '/vacancies', label: 'Вакансии', icon: IconJobs },
+  { href: '/outreach', label: 'Обзвон', icon: IconJobs },
   { href: '/matching', label: 'Матчи', icon: IconMatch },
   { href: '/engagement', label: 'Активность', icon: IconPulse },
   { href: '/quality', label: 'Качество', icon: IconStar },

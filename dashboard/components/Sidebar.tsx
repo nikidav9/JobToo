@@ -16,6 +16,7 @@ const NAV = [
   { href: '/reviews',     icon: IconReview,   label: 'Отзывы' },
   { href: '/moderation',  icon: IconShield,   label: 'Модерация' },
   { href: '/tickets',     icon: IconTicket,   label: 'Тикеты' },
+  { href: '/outreach',    icon: IconPhone,    label: 'Обзвон' },
   { href: '/broadcast',      icon: IconBell,     label: 'Рассылка' },
 ]
 
@@ -194,6 +195,9 @@ function IconReview({ style }: { style?: React.CSSProperties }) {
 }
 function IconShield({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M8 1.5L2.5 4v4c0 3 2.5 5.5 5.5 6 3-0.5 5.5-3 5.5-6V4L8 1.5z"/></svg>
+}
+function IconPhone({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M5.5 2H3a1 1 0 0 0-1 1c0 6 5 11 11 11a1 1 0 0 0 1-1v-2.5l-3-1-1.5 1.5a9 9 0 0 1-4-4L7 5.5 5.5 2z"/></svg>
 }
 function IconBell({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"><path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 3 1 4 1 4H2.5s1-1 1-4A4.5 4.5 0 0 1 8 1.5z"/><path d="M6.5 13.5a1.5 1.5 0 0 0 3 0"/></svg>
