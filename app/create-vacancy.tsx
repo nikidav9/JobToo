@@ -74,6 +74,18 @@ const ROLE_NORM: Record<string, { label: string; unit: string; hint: string; min
 // Максимум дней в мультидневной публикации за один раз
 const MAX_MULTI_DAYS = 14;
 
+// И насколько далеко вперёд вообще можно ставить дату. Раньше границы не было:
+// у выбора даты стоял только minimumDate, поэтому смену можно было выложить
+// хоть на март следующего года. Так и появилась серия до 10 сентября.
+// Тот же предел проверяется на сервере — форма живёт в приложении, а оно у
+// людей на руках бывает старым.
+const HORIZON_DAYS = 14;
+function horizonDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + HORIZON_DAYS);
+  return d;
+}
+
 type PickerMode = 'date' | 'endDate' | 'timeStart' | 'timeEnd' | null;
 
 export default function CreateVacancy() {
@@ -243,6 +255,12 @@ export default function CreateVacancy() {
     if (!isEdit && multiDay) {
       const n = getDatesBetween(selectedDate, selectedEndDate).length;
       if (n > MAX_MULTI_DAYS) e.multiDay = `Максимум ${MAX_MULTI_DAYS} дней за одну публикацию`;
+    }
+    // Календарь дальше горизонта уже не пускает, но дата могла прийти из
+    // «повторить смену» или из правки старой записи.
+    const last = !isEdit && multiDay ? selectedEndDate : selectedDate;
+    if (formatISODate(last) > formatISODate(horizonDate())) {
+      e.multiDay = `Смену можно выложить не дальше чем на ${HORIZON_DAYS} дней вперёд`;
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -453,7 +471,7 @@ export default function CreateVacancy() {
               <View style={styles.pickerField}>
                 <Ionicons name="calendar-outline" size={18} color={Colors.textMuted} />
                 {/* @ts-ignore */}
-                <input type="date" value={formatISODate(selectedDate)} min={formatISODate(new Date())}
+                <input type="date" value={formatISODate(selectedDate)} min={formatISODate(new Date())} max={formatISODate(horizonDate())}
                   onChange={(e: any) => e.target.value && applyDate('date', parseISOToDate(e.target.value))}
                   style={{ flex: 1, border: 'none', background: 'transparent', fontSize: rf(16), color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
               </View>
@@ -465,7 +483,7 @@ export default function CreateVacancy() {
               </TouchableOpacity>
             )}
             {Platform.OS === 'android' && pickerMode === 'date' ? (
-              <DateTimePicker value={selectedDate} mode="date" display="calendar" minimumDate={new Date()} onChange={onAndroidChange} />
+              <DateTimePicker value={selectedDate} mode="date" display="calendar" minimumDate={new Date()} maximumDate={horizonDate()} onChange={onAndroidChange} />
             ) : null}
 
             {multiDay ? (
@@ -474,7 +492,7 @@ export default function CreateVacancy() {
                   <View style={styles.pickerField}>
                     <Ionicons name="calendar-outline" size={18} color={Colors.textMuted} />
                     {/* @ts-ignore */}
-                    <input type="date" value={formatISODate(selectedEndDate)} min={formatISODate(selectedDate)}
+                    <input type="date" value={formatISODate(selectedEndDate)} min={formatISODate(selectedDate)} max={formatISODate(horizonDate())}
                       onChange={(e: any) => e.target.value && applyDate('endDate', parseISOToDate(e.target.value))}
                       style={{ flex: 1, border: 'none', background: 'transparent', fontSize: rf(16), color: '#111111', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }} />
                   </View>
@@ -486,7 +504,7 @@ export default function CreateVacancy() {
                   </TouchableOpacity>
                 )}
                 {Platform.OS === 'android' && pickerMode === 'endDate' ? (
-                  <DateTimePicker value={selectedEndDate} mode="date" display="calendar" minimumDate={selectedDate} onChange={onAndroidChange} />
+                  <DateTimePicker value={selectedEndDate} mode="date" display="calendar" minimumDate={selectedDate} maximumDate={horizonDate()} onChange={onAndroidChange} />
                 ) : null}
 
                 {daysInRange.length > 0 ? (
@@ -678,6 +696,7 @@ export default function CreateVacancy() {
                     display="spinner"
                     is24Hour
                     minimumDate={pickerMode === 'date' ? new Date() : pickerMode === 'endDate' ? selectedDate : undefined}
+                    maximumDate={pickerMode === 'date' || pickerMode === 'endDate' ? horizonDate() : undefined}
                     onChange={onIOSChange}
                     style={styles.iosPicker}
                     textColor="#111111"

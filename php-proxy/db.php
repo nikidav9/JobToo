@@ -510,6 +510,42 @@ function geocode_address(string $address, int $timeout = 6): ?array {
     return null;
 }
 
+// Горизонт публикации смен: не дальше двух недель вперёд и не больше
+// четырнадцати дат за одну публикацию.
+//
+// Ограничение было только в форме создания, а форма живёт в приложении, и
+// приложение у людей на руках бывает старым. Так и вышло: 10 июля в 08:23:58
+// одним запросом приехали 63 смены на каждый день до 10 сентября. Правило,
+// которое проверяется только на клиенте, — не правило.
+define('VACANCY_HORIZON_DAYS', 14);
+
+function vacancy_dates_guard(array $rows): void {
+    $today = new DateTimeImmutable('today', new DateTimeZone('Europe/Moscow'));
+    $limit = $today->modify('+' . VACANCY_HORIZON_DAYS . ' days');
+    $dates = [];
+    foreach ($rows as $r) {
+        $d = trim((string)($r['date'] ?? ''));
+        if ($d === '') continue;
+        $dates[$d] = true;
+        $when = DateTimeImmutable::createFromFormat('Y-m-d', $d, new DateTimeZone('Europe/Moscow'));
+        if (!$when) {
+            throw new RuntimeException('Не разобрал дату смены: ' . $d);
+        }
+        if ($when > $limit) {
+            throw new RuntimeException(
+                'Смену можно выложить не дальше чем на ' . VACANCY_HORIZON_DAYS . ' дней вперёд. '
+                . 'Дата ' . $d . ' слишком далеко.'
+            );
+        }
+    }
+    if (count($dates) > VACANCY_HORIZON_DAYS) {
+        throw new RuntimeException(
+            'За одну публикацию можно выложить не больше ' . VACANCY_HORIZON_DAYS . ' дней, '
+            . 'а пришло ' . count($dates) . '.'
+        );
+    }
+}
+
 // Дописываем координаты в строку вакансии перед сохранением. Без этого метка
 // на карте не появляется вовсе: раньше телефон геокодировал адреса сам при
 // каждом открытии карты, и пока все тридцать запросов не пройдут, на карте
@@ -886,6 +922,57 @@ try {
         case 'dbCheckPhoneExists':
             $data = sb_single('jm_users', ['phone' => 'eq.' . $args[0]], 'id') !== null; break;
 
+        // Как быстро человек отвечает — для чужого профиля.
+        //
+        // Считаем по переписке: в каждом чате берём первое сообщение и первый
+        // ответ этого человека. Отвечает он далеко не всегда — из 143 чатов
+        // ответ был в 65, — и именно это директору с работником полезнее всего
+        // знать заранее, до того как потратить отклик.
+        //
+        // Пока чатов меньше двух, ничего не показываем: одна переписка о
+        // человеке не говорит ничего, а выглядит как приговор.
+        case 'dbUserStats': {
+            $uid = (string)($args[0] ?? '');
+            if ($uid === '') { $data = null; break; }
+            $chats = sb_select('jm_chats', ['or' => "(worker_id.eq.{$uid},employer_id.eq.{$uid})"], 'id');
+            $ids = array_map(fn($c) => $c['id'], $chats);
+            if (!$ids) { $data = ['enough' => false]; break; }
+            // Одним запросом на все чаты разом: по запросу на чат открытие
+            // профиля у человека с полутора десятками переписок ждало бы секунды.
+            $all = sb_select('jm_messages',
+                ['chat_id' => 'in.(' . implode(',', $ids) . ')'],
+                'chat_id,sender_id,created_at', 'created_at.asc');
+            $byChat = [];
+            foreach ($all as $m) {
+                // Системные сообщения не в счёт: их пишет не человек.
+                if ($m['sender_id'] === 'system' || $m['sender_id'] === 'system_safety') continue;
+                $byChat[$m['chat_id']][] = $m;
+            }
+            $total = 0; $answered = 0; $lags = [];
+            foreach ($byChat as $ms) {
+                // Чат, который завёл он сам, об отзывчивости не говорит.
+                if ($ms[0]['sender_id'] === $uid) continue;
+                $total++;
+                foreach ($ms as $m) {
+                    if ($m['sender_id'] === $uid) {
+                        $answered++;
+                        $lags[] = max(0, strtotime($m['created_at']) - strtotime($ms[0]['created_at']));
+                        break;
+                    }
+                }
+            }
+            if ($total < 2) { $data = ['enough' => false]; break; }
+            sort($lags);
+            $median = $lags ? $lags[intdiv(count($lags), 2)] : null;
+            $data = [
+                'enough' => true,
+                'chats' => $total,
+                'answered' => $answered,
+                'medianSeconds' => $median,
+            ];
+            break;
+        }
+
         case 'dbGetUserByPhone':
             $data = sb_single('jm_users', ['phone' => 'eq.' . $args[0]]); break;
 
@@ -1204,12 +1291,14 @@ try {
             $data = sb_select('jm_vacancies', [], '*', 'created_at.desc'); break;
 
         case 'dbUpsertVacancy':
+            vacancy_dates_guard([$args[0]]);
             sb_upsert('jm_vacancies', fill_coords($args[0]), 'id'); break;
 
         case 'dbUpsertVacancyBatch': {
             // $args[0] — массив строк вакансий, пишется одним запросом.
             // Один адрес на всю пачку смен, поэтому геокодируем его однажды.
             $rows = $args[0];
+            vacancy_dates_guard($rows);
             $cache = [];
             foreach ($rows as $k => $r) {
                 $a = trim((string)($r['address'] ?? ''));
@@ -1224,6 +1313,7 @@ try {
         case 'dbUpdateVacancy':
             // Если правят адрес, координаты пересчитываем: иначе метка
             // осталась бы висеть на старом месте.
+            vacancy_dates_guard([$args[1]]);
             sb_update('jm_vacancies', ['id' => 'eq.' . $args[0]], fill_coords($args[1])); break;
 
         // ── Likes ──────────────────────────────────────────────────────────────
