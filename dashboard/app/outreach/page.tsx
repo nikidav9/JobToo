@@ -33,6 +33,7 @@ type Employer = {
 }
 
 type Pub = { employer_id: string | null; created_at: string }
+type Vac = { id: string; created_at: string; workers_found: number | null }
 
 const DAY = 86_400_000
 
@@ -59,6 +60,8 @@ function ago(iso: string | null, now: number): string {
 export default function OutreachPage() {
   const [emps, setEmps] = useState<Employer[]>([])
   const [pubs, setPubs] = useState<Pub[]>([])
+  const [weekVacs, setWeekVacs] = useState<Vac[]>([])
+  const [copied, setCopied] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [updated, setUpdated] = useState('')
   const [now, setNow] = useState(Date.now())
@@ -73,11 +76,12 @@ export default function OutreachPage() {
         .from('jm_users')
         .select('id,first_name,last_name,phone,company,telegram_id,push_token,last_seen_at,created_at')
         .eq('role', 'employer'),
-      supabase.from('jm_vacancies').select('employer_id,created_at'),
+      supabase.from('jm_vacancies').select('employer_id,created_at,id,workers_found'),
       supabase.from('jm_perm_vacancies').select('employer_id,created_at'),
     ])
     setEmps((u ?? []) as Employer[])
     setPubs([...((v ?? []) as Pub[]), ...((p ?? []) as Pub[])])
+    setWeekVacs((v ?? []) as unknown as Vac[])
     setNow(Date.now())
     setUpdated(new Date().toLocaleTimeString('ru'))
     setLoading(false)
@@ -134,10 +138,47 @@ export default function OutreachPage() {
       })
   }, [rows, bucket, q, marks])
 
+  // Главный довод в разговоре: сколько смен за последнюю неделю нашли
+  // человека. Считаем здесь же, чтобы в тексте стояло сегодняшнее число, а
+  // не выдумка.
+  const week = useMemo(() => {
+    const since = now - 7 * DAY
+    const recent = weekVacs.filter(v => new Date(v.created_at).getTime() >= since)
+    return { total: recent.length, filled: recent.filter(v => (v.workers_found ?? 0) > 0).length }
+  }, [weekVacs, now])
+
   const potential = useMemo(
     () => rows.filter(r => r.bucket === 'lapsed').reduce((s, r) => s + r.published, 0),
     [rows]
   )
+
+  function messageFor(r: { first_name: string | null; published: number; lastPublish: string | null }): string {
+    const name = r.first_name?.trim() || 'Здравствуйте'
+    const when = r.lastPublish
+      ? new Date(r.lastPublish).toLocaleDateString('ru', { day: 'numeric', month: 'long' })
+      : null
+    const proof = week.total > 0
+      ? `За последнюю неделю из ${week.total} выложенных смен человек нашёлся на ${week.filled}.`
+      : ''
+    return [
+      `${name}, здравствуйте! Это Никита из JobToo.`,
+      when
+        ? `Вы выкладывали у нас смены — последний раз ${when}, всего ${r.published}.`
+        : 'Вы регистрировались у нас как работодатель.',
+      proof,
+      'Если нужны люди на ближайшие дни — выложите смену, это минута: jobtoo.ru',
+    ].filter(Boolean).join('\n\n')
+  }
+
+  async function copyMessage(r: { id: string; first_name: string | null; published: number; lastPublish: string | null }) {
+    try {
+      await navigator.clipboard.writeText(messageFor(r))
+      setCopied(r.id)
+      setTimeout(() => setCopied(c => (c === r.id ? null : c)), 2000)
+    } catch {
+      // Буфер недоступен — не страшно, текст всегда можно набрать руками.
+    }
+  }
 
   function toggleCall(id: string) {
     const next = marks[id] ? null : { at: new Date().toISOString(), note: '' }
@@ -253,6 +294,34 @@ export default function OutreachPage() {
                   <div style={{ fontSize: 12.5, color: 'var(--ink-3)', flex: '0 0 auto', minWidth: 130 }}>
                     заходил {ago(r.last_seen_at, now)}
                   </div>
+
+                  {/* Телеграм по номеру: t.me/+<цифры> открывает контакт, если
+                      человек там есть. Текст подставить в ссылку нельзя —
+                      телеграм такого не умеет, — поэтому рядом кнопка,
+                      кладущая готовое сообщение в буфер. */}
+                  <a
+                    href={`https://t.me/+${(r.phone ?? '').replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      padding: '7px 12px', borderRadius: 8, fontSize: 13, textDecoration: 'none',
+                      border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--accent)',
+                      flex: '0 0 auto',
+                    }}
+                  >
+                    Telegram
+                  </a>
+
+                  <button
+                    onClick={() => copyMessage(r)}
+                    style={{
+                      padding: '7px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                      border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink-2)',
+                      flex: '0 0 auto',
+                    }}
+                  >
+                    {copied === r.id ? 'Скопировано' : 'Текст'}
+                  </button>
 
                   <button
                     onClick={() => toggleCall(r.id)}
