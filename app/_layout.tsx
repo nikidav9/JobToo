@@ -201,7 +201,20 @@ export default function RootLayout() {
             <Stack.Screen name="admin" />
             <Stack.Screen name="user-profile" />
             <Stack.Screen name="create-perm-vacancy" />
-            <Stack.Screen name="perm-applications" />
+            {/* Отклики открываются шторкой, а не отдельным экраном: директор
+                смотрит их «между делом» и возвращается к списку вакансий, а
+                полноэкранная страница с кнопкой «Назад» каждый раз выбивает
+                его из контекста. Такой же шторкой уже открываются
+                просмотревшие вакансию. */}
+            <Stack.Screen
+              name="perm-applications"
+              options={{
+                presentation: 'formSheet',
+                sheetGrabberVisible: true,
+                sheetAllowedDetents: [0.92],
+                sheetCornerRadius: 24,
+              }}
+            />
             <Stack.Screen name="perm-vacancy-detail" />
           </Stack>
           <ToastLayer />

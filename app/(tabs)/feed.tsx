@@ -313,8 +313,16 @@ function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId
       setLoading(true);
       try {
         const ids = await (kind === 'perm' ? dbGetPermVacancyViewers(vacancyId) : dbGetVacancyViewers(vacancyId));
-        const fetched = await Promise.all(ids.map(id => dbGetUserById(id)));
-        setViewers(fetched.filter(Boolean) as User[]);
+        // Список пользователей уже загружен в контекст, поэтому берём оттуда.
+        // Раньше на каждого шёл отдельный запрос: на 58 просмотревших это
+        // 58 обращений к серверу, и шторка висела с крутилкой полминуты.
+        const known = new Map<string, User>(users.map((u: User) => [u.id, u]));
+        const missing = ids.filter((id: string) => !known.has(id));
+        const fetched = missing.length
+          ? (await Promise.all(missing.map(id => dbGetUserById(id)))).filter(Boolean) as User[]
+          : [];
+        fetched.forEach((u: User) => known.set(u.id, u));
+        setViewers(ids.map((id: string) => known.get(id)).filter(Boolean) as User[]);
       } catch {
         showToast('Ошибка загрузки', 'error');
       } finally {
@@ -361,7 +369,11 @@ function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId
             </View>
           </View>
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 40 }} color={Colors.primary} />
+          // Чуть выше середины: ровно по центру пустой шторки крутилка
+          // выглядит потерянной.
+          <View style={wS.loaderWrap}>
+            <ActivityIndicator color={Colors.primary} />
+          </View>
         ) : viewers.length === 0 ? (
           <View style={wS.empty}>
             <Text style={{ fontSize: rf(36) }}>👀</Text>
@@ -438,9 +450,15 @@ function WorkerListModal({
 
         const workerIds = [...new Set(vacLikes.map(l => l.workerId))];
         if (workerIds.length > 0) {
-          const fetched = await Promise.all(workerIds.map(id => dbGetUserById(id)));
-          const valid = fetched.filter(Boolean) as User[];
-          setLocalWorkers(valid);
+          // Как и у просмотревших: сначала из памяти, запросы только за теми,
+          // кого там нет.
+          const known = new Map<string, User>(users.map((u: User) => [u.id, u]));
+          const missing = workerIds.filter((id: string) => !known.has(id));
+          const fetched = missing.length
+            ? (await Promise.all(missing.map(id => dbGetUserById(id)))).filter(Boolean) as User[]
+            : [];
+          fetched.forEach((u: User) => known.set(u.id, u));
+          setLocalWorkers(workerIds.map((id: string) => known.get(id)).filter(Boolean) as User[]);
         }
       } catch (e) {
         console.warn('[WorkerListModal] init error', e);
@@ -752,6 +770,9 @@ const wS = StyleSheet.create({
   sheetTitle: { fontSize: rf(18), fontWeight: '700', color: Colors.textPrimary },
   vacSubtitle: { fontSize: rf(12), color: Colors.textMuted, paddingHorizontal: rs(20), paddingBottom: rs(12), borderBottomWidth: 1, borderBottomColor: Colors.divider },
   empty: { alignItems: 'center', padding: rs(48), gap: rs(10) },
+  // Крутилка чуть выше середины: строго по центру пустой шторки она выглядит
+  // потерянной, а взгляд при открытии идёт по верхней трети.
+  loaderWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: rs(90) },
   emptyTxt: { fontSize: rf(14), color: Colors.textMuted, textAlign: 'center' },
   card: { backgroundColor: Colors.surface, borderRadius: Radius.md, padding: rs(14), gap: rs(10) },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: rs(12) },

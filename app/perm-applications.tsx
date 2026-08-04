@@ -4,10 +4,10 @@
  */
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, FlatList,
+  View, Text, StyleSheet, FlatList, Platform,
   TouchableOpacity, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SheetHandle } from '@/components/ui/Sheet';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
@@ -171,13 +171,13 @@ export default function PermApplicationsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.safe}>
+      {/* Шторку закрывают, потянув вниз, — кнопка «Назад» здесь была бы второй
+          дверью в ту же сторону. Ручку рисует сам системный лист, но на
+          Android его нет, поэтому свою оставляем. */}
+      {Platform.OS === 'android' ? <SheetHandle /> : null}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backTxt}>← Назад</Text>
-        </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{vacancy?.title ?? 'Отклики'}</Text>
-        <View style={{ width: 60 }} />
       </View>
 
       {apps.length === 0 ? (
@@ -196,14 +196,13 @@ export default function PermApplicationsScreen() {
           renderItem={renderApp}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: rs(16), paddingVertical: rs(14),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
