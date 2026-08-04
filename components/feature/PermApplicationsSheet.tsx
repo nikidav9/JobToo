@@ -1,15 +1,20 @@
 /**
- * Permanent job applications screen — employer view
- * Shows workers who applied to a specific permanent vacancy
+ * Отклики на постоянную вакансию — то, что видит директор.
+ *
+ * Шторка, а не отдельный экран: директор смотрит отклики между делом и
+ * возвращается к списку вакансий, а полноэкранная страница каждый раз
+ * выбивала его из контекста. Системную шторку навигации взять не вышло —
+ * она задаётся нативной частью, а обновления по воздуху меняют только JS,
+ * — поэтому та же, что и у «Просмотрели вакансию».
  */
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, Platform,
+  View, Text, StyleSheet, FlatList, Modal, Animated,
   TouchableOpacity, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { SheetHandle } from '@/components/ui/Sheet';
+import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import { Image } from 'expo-image';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { PermApplication } from '@/constants/types';
@@ -34,9 +39,9 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
   hired:    { label: '✅ Кандидат закрыт', color: '#4F46E5',    bg: '#EEF2FF' },
 };
 
-export default function PermApplicationsScreen() {
+export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: string; onClose: () => void }) {
   const router = useRouter();
-  const { vacancyId } = useLocalSearchParams<{ vacancyId: string }>();
+  const swipe = useSwipeToDismiss(onClose);
   const { currentUser, users, permVacancies, permApplications, refreshPermApplications, refreshChats, showToast } = useApp();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -77,6 +82,7 @@ export default function PermApplicationsScreen() {
       await refreshPermApplications();
       await refreshChats(currentUser);
       showToast('Одобрено! Чат открыт 🎉', 'match');
+      onClose();
       router.push({ pathname: '/chat-room', params: { chatId } });
     } catch (e) {
       showToast('Ошибка', 'error');
@@ -121,7 +127,7 @@ export default function PermApplicationsScreen() {
       <View style={styles.card}>
         <TouchableOpacity
           style={styles.workerRow}
-          onPress={() => router.push({ pathname: '/user-profile', params: { userId: worker.id } })}
+          onPress={() => { onClose(); router.push({ pathname: '/user-profile', params: { userId: worker.id } }); }}
           activeOpacity={0.8}
         >
           {worker.avatarUrl ? (
@@ -171,14 +177,19 @@ export default function PermApplicationsScreen() {
   };
 
   return (
-    <View style={styles.safe}>
-      {/* Шторку закрывают, потянув вниз, — кнопка «Назад» здесь была бы второй
-          дверью в ту же сторону. Ручку рисует сам системный лист, но на
-          Android его нет, поэтому свою оставляем. */}
-      {Platform.OS === 'android' ? <SheetHandle /> : null}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle} numberOfLines={1}>{vacancy?.title ?? 'Отклики'}</Text>
-      </View>
+    <Modal statusBarTranslucent navigationBarTranslucent visible animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+        <Animated.View style={[styles.sheet, swipe.animStyle]}>
+          {/* Тянут за верх, как и в шторке «Просмотрели вакансию»: ниже
+              прокручиваемый список, и перехватывать там любое движение
+              нельзя — читать станет невозможно. */}
+          <View {...swipe.panHandlers}>
+            <SheetHandle />
+            <View style={styles.header}>
+              <Text style={styles.headerTitle} numberOfLines={1}>{vacancy?.title ?? 'Отклики'}</Text>
+            </View>
+          </View>
 
       {apps.length === 0 ? (
         <View style={styles.empty}>
@@ -196,12 +207,15 @@ export default function PermApplicationsScreen() {
           renderItem={renderApp}
         />
       )}
-    </View>
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.bg },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: Colors.bg, borderTopLeftRadius: rs(24), borderTopRightRadius: rs(24), maxHeight: '88%', paddingBottom: rs(12) },
   header: {
     paddingHorizontal: rs(16), paddingVertical: rs(14),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,

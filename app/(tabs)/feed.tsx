@@ -44,6 +44,7 @@ import { LavkaLogo } from '@/components/ui/LavkaLogo';
 import { TabHeader } from '@/components/ui/TabHeader';
 import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import { MetroMap, MapListItem } from '@/components/feature/MetroMap';
+import { PermApplicationsSheet } from '@/components/feature/PermApplicationsSheet';
 import { setOnboardingTarget, setOnboardingFlag } from '@/lib/onboardingTargets';
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
 
@@ -1860,6 +1861,9 @@ function EmployerHome() {
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
   const [closingPermIds, setClosingPermIds] = useState<Set<string>>(new Set());
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  // Отклики на постоянную вакансию — шторкой поверх списка, а не отдельным
+  // экраном: директор смотрит их между делом и возвращается к вакансиям.
+  const [appsVacancyId, setAppsVacancyId] = useState<string | null>(null);
   const [deletingPermIds, setDeletingPermIds] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [confirmDeletePerm, setConfirmDeletePerm] = useState<string | null>(null);
@@ -2121,7 +2125,7 @@ function EmployerHome() {
                 </View>
                 <TouchableOpacity
                   style={pS.appStatBtn}
-                  onPress={() => router.push({ pathname: '/perm-applications', params: { vacancyId: v.id } })}
+                  onPress={() => setAppsVacancyId(v.id)}
                   activeOpacity={0.8}
                 >
                   <Text style={pS.appStatNum}>{permApplicantCount(v.id)}</Text>
@@ -2196,6 +2200,10 @@ function EmployerHome() {
             </View>
           </View>
         </View>
+      ) : null}
+
+      {appsVacancyId ? (
+        <PermApplicationsSheet vacancyId={appsVacancyId} onClose={() => setAppsVacancyId(null)} />
       ) : null}
 
       {/* Плавающая кнопка создания — видна и когда вакансии уже есть */}
