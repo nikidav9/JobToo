@@ -152,25 +152,59 @@ export default function OutreachPage() {
     [rows]
   )
 
-  function messageFor(r: { first_name: string | null; published: number; lastPublish: string | null }): string {
+  /**
+   * Текст первого сообщения.
+   *
+   * Не продаём, а спрашиваем: у нас тридцать замолчавших директоров и ни
+   * одной проверенной причины, почему они перестали. Пока причина неизвестна,
+   * любое «выложите смену» — это угадывание, и человек на него не отвечает.
+   *
+   * Вопрос разный, потому что положения разные: у того, кто выложил двенадцать
+   * смен и пропал, и у того, кто не выложил ни одной, причины не совпадают.
+   */
+  function messageFor(r: {
+    first_name: string | null
+    published: number
+    lastPublish: string | null
+    bucket: Bucket
+  }): string {
     const name = r.first_name?.trim() || 'Здравствуйте'
     const when = r.lastPublish
       ? new Date(r.lastPublish).toLocaleDateString('ru', { day: 'numeric', month: 'long' })
       : null
-    const proof = week.total > 0
-      ? `За последнюю неделю из ${week.total} выложенных смен человек нашёлся на ${week.filled}.`
-      : ''
+
+    const opening = `${name}, здравствуйте! Это Никита из JobToo.`
+    const closing = 'Скажите честно, как есть — мне это нужно, чтобы починить. Отвечу на любой вопрос.'
+
+    if (r.bucket === 'never') {
+      return [
+        opening,
+        'Вы зарегистрировались у нас как работодатель, но так ни одной смены и не выложили.',
+        'Хочу понять, что помешало: не подошли условия, неудобно выкладывать, не было нужды в людях — или просто не дошли руки?',
+        closing,
+      ].join('\n\n')
+    }
+
+    if (r.bucket === 'active') {
+      return [
+        opening,
+        when ? `Вижу, вы выкладываете смены — последняя ${when}, всего ${r.published}.` : 'Вижу, вы выкладываете смены.',
+        'Хочу спросить: что мешает выкладывать чаще? Что в приложении неудобно или чего не хватает?',
+        closing,
+      ].join('\n\n')
+    }
+
     return [
-      `${name}, здравствуйте! Это Никита из JobToo.`,
+      opening,
       when
-        ? `Вы выкладывали у нас смены — последний раз ${when}, всего ${r.published}.`
-        : 'Вы регистрировались у нас как работодатель.',
-      proof,
-      'Если нужны люди на ближайшие дни — выложите смену, это минута: jobtoo.ru',
-    ].filter(Boolean).join('\n\n')
+        ? `Вы выкладывали у нас смены — всего ${r.published}, последнюю ${when}. А потом перестали.`
+        : 'Вы выкладывали у нас смены, а потом перестали.',
+      'Хочу понять причину: люди не пришли, пришли не те, неудобно выкладывать — или что-то другое?',
+      closing,
+    ].join('\n\n')
   }
 
-  async function copyMessage(r: { id: string; first_name: string | null; published: number; lastPublish: string | null }) {
+  async function copyMessage(r: { id: string; first_name: string | null; published: number; lastPublish: string | null; bucket: Bucket }) {
     try {
       await navigator.clipboard.writeText(messageFor(r))
       setCopied(r.id)
@@ -211,6 +245,12 @@ export default function OutreachPage() {
           <KpiCard label="Публикуют сейчас" value={counts.active} color="var(--positive)" sub="за последние 7 дней" />
           <KpiCard label="Замолчали" value={counts.lapsed} color="var(--negative)" sub="публиковали раньше" />
           <KpiCard label="Смен от замолчавших" value={potential} sub="столько они выложили, пока были активны" />
+          <KpiCard
+            label="Смен закрыто за неделю"
+            value={week.total ? `${week.filled} из ${week.total}` : '—'}
+            color="var(--positive)"
+            sub="держите под рукой: это ответ на «а люди у вас есть»"
+          />
           <KpiCard label="Обзвонено" value={Object.keys(marks).length} sub="отметки хранятся в этом браузере" />
         </div>
 
