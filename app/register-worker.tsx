@@ -11,6 +11,8 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { PhoneInput } from '@/components/feature/PhoneInput';
 import { MetroPicker } from '@/components/feature/MetroPicker';
 import { WorkTypeSelector } from '@/components/feature/WorkTypeSelector';
+import { AboutYouStep, isAboutYouComplete } from '@/components/feature/AboutYouStep';
+import { uploadAvatar } from '@/services/avatarUpload';
 import { useApp } from '@/hooks/useApp';
 import { uid, nowISO, isPhoneComplete, extractPhoneDigits } from '@/services/storage';
 import { dbCheckPhoneExists, dbWarmup } from '@/services/db';
@@ -22,7 +24,7 @@ import { firstUnmetRule } from '@/constants/passwordRules';
 import { rs, rf } from '@/constants/scale';
 
 // Steps: 1-Phone, 2-Password, 3-Name, 4-Legal, 5-Metro, 6-WorkType
-const TOTAL = 6;
+const TOTAL = 7;
 const SUPPORT_EMAIL = 'zpouches@yandex.ru';
 
 export default function RegisterWorker() {
@@ -40,6 +42,9 @@ export default function RegisterWorker() {
   const [metroLineName, setMetroLineName] = useState('');
   const [metroStation, setMetroStation] = useState('');
   const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
+  const [age, setAge] = useState('');
+  const [bio, setBio] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [metroPicker, setMetroPicker] = useState(false);
   const [checking, setChecking] = useState(false);
   const [phoneError, setPhoneError] = useState('');
@@ -96,8 +101,20 @@ export default function RegisterWorker() {
     if (finishing) return;
     setFinishing(true);
     try {
+      const id = uid();
+      // Фото заливаем до создания профиля: имя файла завязано на id, а если
+      // загрузка не удалась — регистрацию из-за этого рушить нельзя, фото
+      // необязательное.
+      let avatarUrl: string | undefined;
+      if (photoUri) {
+        try {
+          avatarUrl = await uploadAvatar(photoUri, id);
+        } catch (e) {
+          console.warn('[RegisterWorker] avatar upload failed', e);
+        }
+      }
       const user = {
-        id: uid(),
+        id,
         role: 'worker' as const,
         phone: extractPhoneDigits(phone),
         password,
@@ -106,6 +123,9 @@ export default function RegisterWorker() {
         metroLineId,
         metroStation,
         workTypes,
+        age: Number(age),
+        bio: bio.trim(),
+        avatarUrl,
         createdAt: nowISO(),
       };
       await registerUser(user);
@@ -295,7 +315,27 @@ export default function RegisterWorker() {
               <Text style={styles.subtitle}>Выбери специализацию</Text>
               <WorkTypeSelector selected={workTypes} onToggle={toggleWork} />
               <View style={{ marginTop: 28 }}>
-                <PrimaryButton label="Начать поиск →" onPress={finish} loading={finishing} disabled={workTypes.length === 0 || finishing} />
+                <PrimaryButton label="Продолжить →" onPress={next} disabled={workTypes.length === 0} />
+              </View>
+            </View>
+          )}
+
+          {/* Step 7: О себе — фото, возраст, описание */}
+          {step === 7 && (
+            <View style={styles.stepContent}>
+              <AboutYouStep
+                role="worker"
+                age={age} onAgeChange={setAge}
+                bio={bio} onBioChange={setBio}
+                photoUri={photoUri} onPhotoChange={setPhotoUri}
+              />
+              <View style={{ marginTop: 20 }}>
+                <PrimaryButton
+                  label="Начать поиск →"
+                  onPress={finish}
+                  loading={finishing}
+                  disabled={!isAboutYouComplete(age, bio) || finishing}
+                />
               </View>
             </View>
           )}

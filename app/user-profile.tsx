@@ -10,7 +10,8 @@ import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { METRO_LINES } from '@/constants/metro';
 import { nameColorFromString, getInitials } from '@/services/storage';
-import { dbGetRatingsForUser, dbGetUserById, UserRating } from '@/services/db';
+import { dbGetRatingsForUser, dbGetUserById, dbUserStats, UserRating, UserStats } from '@/services/db';
+import { lastSeenLabel, replySpeedLabel, replyRateLabel } from '@/services/presence';
 import { getSupabaseClient } from '@/template';
 
 import { rs, rf } from '@/constants/scale';
@@ -70,6 +71,7 @@ export default function UserProfileScreen() {
   const [loadingRatings, setLoadingRatings] = useState(false);
   const [fetchedUser, setFetchedUser] = useState<import('@/constants/types').User | null>(null);
   const [fetchingUser, setFetchingUser] = useState(false);
+  const [stats, setStats] = useState<UserStats | null>(null);
 
   const contextUser = users.find(u => u.id === userId);
   const user = contextUser ?? fetchedUser;
@@ -94,6 +96,12 @@ export default function UserProfileScreen() {
   useEffect(() => {
     if (!userId) return;
     fetchRatings(userId);
+  }, [userId]);
+
+  // Отзывчивость считает сервер: сообщения всех чатов на клиент не грузятся.
+  useEffect(() => {
+    if (!userId) return;
+    dbUserStats(userId).then(setStats).catch(() => {});
   }, [userId]);
 
   // Real-time: refresh ratings list when a new rating is submitted for this user (web only)
@@ -219,6 +227,31 @@ export default function UserProfileScreen() {
                 </>
               )}
             </View>
+
+            {/* Активность: был в сети и как отвечает.
+                Пока переписок меньше двух, про отзывчивость молчим — по одному
+                чату вывод делать нельзя, а выглядел бы он как приговор. */}
+            {(() => {
+              const seen = lastSeenLabel(user.lastSeenAt);
+              const enough = stats?.enough === true ? stats : null;
+              const speed = enough ? replySpeedLabel(enough.medianSeconds) : null;
+              const rate = enough ? replyRateLabel(enough.answered, enough.chats) : null;
+              if (!seen && !speed && !rate) return null;
+              return (
+                <View style={styles.infoCard}>
+                  <Text style={styles.sectionTitle}>Активность</Text>
+                  {seen ? (
+                    <InfoRow label="В сети" value={<Text style={styles.valText}>{seen}</Text>} />
+                  ) : null}
+                  {rate ? (
+                    <InfoRow label="Отвечает" value={<Text style={styles.valText}>{rate}</Text>} />
+                  ) : null}
+                  {speed ? (
+                    <InfoRow label="Скорость" value={<Text style={styles.valText}>{speed}</Text>} />
+                  ) : null}
+                </View>
+              );
+            })()}
 
             {/* Bio */}
             {user.bio ? (

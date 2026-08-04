@@ -9,11 +9,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
-import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
+import { uploadAvatar } from '@/services/avatarUpload';
 import { getInitials, nameColorFromString } from '@/services/storage';
 import { dbGetRatingsForUser, dbChangePassword, UserRating } from '@/services/db';
 import { getSupabaseClient } from '@/template';
@@ -274,6 +273,7 @@ export default function ProfileScreen() {
   const [editWorkTypes, setEditWorkTypes] = useState<WorkType[]>([]);
   const [editCompany, setEditCompany] = useState<CompanyOption | ''>('');
   const [editBio, setEditBio] = useState('');
+  const [editAge, setEditAge] = useState('');
 
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
@@ -301,6 +301,7 @@ export default function ProfileScreen() {
     const savedCompany = currentUser.company ?? '';
     setEditCompany(COMPANY_OPTIONS.includes(savedCompany as CompanyOption) ? savedCompany as CompanyOption : '');
     setEditBio(currentUser.bio ?? '');
+    setEditAge(currentUser.age ? String(currentUser.age) : '');
   };
 
   const saveEdit = async () => {
@@ -308,7 +309,11 @@ export default function ProfileScreen() {
     setSavingEdit(true);
     try {
       const updated = { ...currentUser };
-      if (editSection === 'personal') { updated.phone = editPhone; updated.lastName = editLast; updated.firstName = editFirst; }
+      if (editSection === 'personal') {
+        updated.phone = editPhone; updated.lastName = editLast; updated.firstName = editFirst;
+        // Пустое поле — «не указан», а не ноль: иначе в карточке появилось бы «0 лет».
+        updated.age = editAge.trim() === '' ? undefined : Number(editAge);
+      }
       if (editSection === 'metro') { updated.metroLineId = editMetroLineId; updated.metroStation = editMetroStation; }
       if (editSection === 'worktypes') updated.workTypes = editWorkTypes;
       if (editSection === 'company') { updated.company = editCompany; updated.bio = editBio; }
@@ -325,91 +330,16 @@ export default function ProfileScreen() {
   };
 
   // ── Base64 → Uint8Array (без atob — работает на всех RN платформах) ─────
-  const base64ToUint8Array = (base64: string): Uint8Array => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    const lookup = new Uint8Array(256);
-    for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
-    const clean = base64.replace(/=/g, '');
-    const len = clean.length;
-    const bufLen = Math.floor((len * 3) / 4);
-    const buf = new Uint8Array(bufLen);
-    let p = 0;
-    for (let i = 0; i < len; i += 4) {
-      const a = lookup[clean.charCodeAt(i)];
-      const b = lookup[clean.charCodeAt(i + 1)];
-      const c = lookup[clean.charCodeAt(i + 2)] ?? 0;
-      const d = lookup[clean.charCodeAt(i + 3)] ?? 0;
-      buf[p++] = (a << 2) | (b >> 4);
-      if (p < bufLen) buf[p++] = ((b & 15) << 4) | (c >> 2);
-      if (p < bufLen) buf[p++] = ((c & 3) << 6) | d;
-    }
-    return buf;
-  };
-
   // ── Shared upload helper ──────────────────────────────────────────────────
+  // Обрезка, сжатие и заливка живут в services/avatarUpload: та же логика
+  // понадобилась при регистрации, а мест, где легко ошибиться, там два —
+  // чтение файла в браузере и обязательная проверка ошибки загрузки.
   const processAndUpload = async (sourceUri: string) => {
     setUploadingPhoto(true);
     const prevAvatarUrl = currentUser.avatarUrl;
     try {
-      // 1. Crop + resize + compress через ImageManipulator
-      const info = await ImageManipulator.manipulateAsync(sourceUri, [], { format: ImageManipulator.SaveFormat.JPEG });
-      const w = info.width;
-      const h = info.height;
-      const size = Math.min(w, h);
-      const originX = Math.floor((w - size) / 2);
-      const originY = Math.floor((h - size) / 2);
-
-      const processed = await ImageManipulator.manipulateAsync(
-        sourceUri,
-        [
-          { crop: { originX, originY, width: size, height: size } },
-          { resize: { width: 600, height: 600 } },
-        ],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-      );
-
-      // 2. Локальный оптимистичный апдейт через updateUser (без записи в БД)
-      // — пропускаем, финальный апдейт будет после загрузки
-
-      // 3. Забираем содержимое файла.
-      // На телефоне это путь, и читает его expo-file-system. В браузере тот же
-      // модуль — пустая заглушка без единого метода, а ссылка выглядит как
-      // blob:, поэтому содержимое берём запросом. Раньше звали expo-file-system
-      // всегда, и на вебе смена фото падала.
-      let uint8Array: Uint8Array;
-      if (Platform.OS === 'web') {
-        const resp = await fetch(processed.uri);
-        uint8Array = new Uint8Array(await (await resp.blob()).arrayBuffer());
-      } else {
-        const base64Data = await FileSystem.readAsStringAsync(processed.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        uint8Array = base64ToUint8Array(base64Data);
-      }
-
-      // 4. Загружаем через Supabase JS клиент (самый надёжный способ)
-      const fileName = `avatar_${currentUser.id}.jpg`;
-      const sb = getSupabaseClient();
-      const { error: uploadError } = await sb.storage
-        .from('avatars')
-        .upload(fileName, uint8Array, {
-          contentType: 'image/jpeg',
-          upsert: true,
-          cacheControl: '3600',
-        });
-
-      // Не залилось — дальше идти нельзя: в профиль записался бы адрес файла,
-      // которого нет, и вместо аватарки у человека осталась бы пустота. Раньше
-      // ошибку считали безобидной и просто логировали — ровно так же прятались
-      // неудачные загрузки голосовых, которые не работали месяцами.
-      if (uploadError) throw uploadError;
-
-      // 5. Получаем публичный URL и синхронизируем с БД
-      const { data: urlData } = sb.storage.from('avatars').getPublicUrl(fileName);
-      const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-
-      const updated = { ...currentUser, avatarUrl };
-      await updateUser(updated);
+      const avatarUrl = await uploadAvatar(sourceUri, currentUser.id);
+      await updateUser({ ...currentUser, avatarUrl });
       showToast('Фото обновлено', 'success');
     } catch (e) {
       console.error('[Avatar] processAndUpload error', e);
@@ -571,6 +501,7 @@ export default function ProfileScreen() {
             { label: 'Телефон', value: currentUser.phone },
             { label: 'Фамилия', value: currentUser.lastName },
             { label: 'Имя', value: currentUser.firstName },
+            { label: 'Возраст', value: currentUser.age ? `${currentUser.age}` : 'Не указан' },
           ]}
         />
 
@@ -767,6 +698,13 @@ export default function ProfileScreen() {
                 <AppInput label="Телефон" value={editPhone} onChangeText={setEditPhone} keyboardType="phone-pad" />
                 <AppInput label="Фамилия" value={editLast} onChangeText={setEditLast} />
                 <AppInput label="Имя" value={editFirst} onChangeText={setEditFirst} />
+                <AppInput
+                  label="Возраст"
+                  value={editAge}
+                  onChangeText={(t: string) => setEditAge(t.replace(/\D/g, '').slice(0, 2))}
+                  keyboardType="number-pad"
+                  placeholder="25"
+                />
               </View>
             )}
             {editSection === 'metro' && (

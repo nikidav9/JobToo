@@ -14,11 +14,13 @@ import { uid, nowISO, isPhoneComplete, extractPhoneDigits } from '@/services/sto
 import { dbCheckPhoneExists, dbWarmup } from '@/services/db';
 import { PasswordRules } from '@/components/ui/PasswordRules';
 import { firstUnmetRule } from '@/constants/passwordRules';
+import { AboutYouStep, isAboutYouComplete } from '@/components/feature/AboutYouStep';
+import { uploadAvatar } from '@/services/avatarUpload';
 
 import { rs, rf } from '@/constants/scale';
 
 // Steps: 1-Phone, 2-Password, 3-Name+Company, 4-Legal
-const TOTAL = 4;
+const TOTAL = 5;
 const SUPPORT_EMAIL = 'zpouches@yandex.ru';
 const COMPANY_OPTIONS = ['Лавка'] as const;
 type CompanyOption = typeof COMPANY_OPTIONS[number];
@@ -34,6 +36,9 @@ export default function RegisterEmployer() {
   const [lastName, setLastName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [company, setCompany] = useState<CompanyOption | ''>('');
+  const [age, setAge] = useState('');
+  const [bio, setBio] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
   const [checking, setChecking] = useState(false);
   const [phoneError, setPhoneError] = useState('');
@@ -85,14 +90,27 @@ export default function RegisterEmployer() {
     if (finishing) return;
     setFinishing(true);
     try {
+      const id = uid();
+      // Фото необязательное: не залилось — регистрацию из-за этого не рушим.
+      let avatarUrl: string | undefined;
+      if (photoUri) {
+        try {
+          avatarUrl = await uploadAvatar(photoUri, id);
+        } catch (e) {
+          console.warn('[RegisterEmployer] avatar upload failed', e);
+        }
+      }
       const user = {
-        id: uid(),
+        id,
         role: 'employer' as const,
         phone: extractPhoneDigits(phone),
         password,
         lastName,
         firstName,
         company: company || '',
+        age: Number(age),
+        bio: bio.trim(),
+        avatarUrl,
         createdAt: nowISO(),
       };
       await registerUser(user);
@@ -247,7 +265,27 @@ export default function RegisterEmployer() {
               </TouchableOpacity>
 
               <View style={{ marginTop: 16 }}>
-                <PrimaryButton label="Начать работу →" onPress={finish} loading={finishing} disabled={!agreed || finishing} />
+                <PrimaryButton label="Продолжить →" onPress={next} disabled={!agreed} />
+              </View>
+            </View>
+          )}
+
+          {/* Step 5: О компании — фото, возраст, описание */}
+          {step === 5 && (
+            <View style={styles.stepContent}>
+              <AboutYouStep
+                role="employer"
+                age={age} onAgeChange={setAge}
+                bio={bio} onBioChange={setBio}
+                photoUri={photoUri} onPhotoChange={setPhotoUri}
+              />
+              <View style={{ marginTop: 20 }}>
+                <PrimaryButton
+                  label="Начать работу →"
+                  onPress={finish}
+                  loading={finishing}
+                  disabled={!isAboutYouComplete(age, bio) || finishing}
+                />
               </View>
             </View>
           )}

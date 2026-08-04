@@ -98,6 +98,26 @@ export async function dbGetUserById(id: string): Promise<User | null> {
   return data ? rowToUser(data) : null;
 }
 
+/**
+ * Насколько человек отзывчив — для чужого профиля.
+ *
+ * `enough: false` означает «переписок слишком мало, чтобы судить»: по одному
+ * чату вывод делать нельзя, а выглядел бы он как приговор. В этом случае блок
+ * в профиле не показываем вовсе.
+ */
+export type UserStats =
+  | { enough: false }
+  | { enough: true; chats: number; answered: number; medianSeconds: number | null };
+
+export async function dbUserStats(userId: string): Promise<UserStats> {
+  try {
+    return await proxy<UserStats>('dbUserStats', [userId]);
+  } catch {
+    // Профиль важнее статистики: не сложилось — просто не показываем блок.
+    return { enough: false };
+  }
+}
+
 /** Только число пользователей — для приветственного экрана. */
 export async function dbCountUsers(): Promise<number> {
   if (IS_NATIVE) { return proxy<number>('dbCountUsers'); }

@@ -46,3 +46,36 @@ export function lastSeenLabel(lastSeenAt?: string | null): string | null {
   const year = d.getFullYear() === now.getFullYear() ? '' : ` ${d.getFullYear()}`;
   return `был(а) ${d.getDate()} ${MONTHS_RU[d.getMonth()]}${year}`;
 }
+
+// ── Отзывчивость ────────────────────────────────────────────────────────────
+// Показываем в чужом профиле, чтобы человек понимал, стоит ли писать. Из 143
+// чатов ответ пришёл в 65 — половина откликов уходит в пустоту, и узнают об
+// этом только через двое суток, когда отклик закроется сам.
+
+/** «обычно отвечает в течение часа» — из медианы задержки первого ответа. */
+export function replySpeedLabel(medianSeconds?: number | null): string | null {
+  if (medianSeconds == null) return null;
+  const mins = Math.round(medianSeconds / 60);
+  if (mins <= 15) return 'обычно отвечает сразу';
+  if (mins <= 60) return 'обычно отвечает в течение часа';
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `обычно отвечает за ${hours} ${plural(hours, 'час', 'часа', 'часов')}`;
+  const days = Math.max(1, Math.round(hours / 24));
+  return `обычно отвечает за ${days} ${plural(days, 'день', 'дня', 'дней')}`;
+}
+
+/** «отвечает примерно в 8 случаях из 10» — доля переписок, где вообще ответил. */
+export function replyRateLabel(answered: number, chats: number): string | null {
+  if (chats < 2) return null;
+  if (answered === 0) return 'пока ни разу не ответил(а)';
+  if (answered === chats) return 'отвечает всегда';
+  return `отвечает примерно в ${Math.round((answered / chats) * 10)} случаях из 10`;
+}
+
+function plural(n: number, one: string, few: string, many: string): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
