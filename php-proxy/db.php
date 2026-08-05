@@ -1423,6 +1423,46 @@ try {
             break;
         }
 
+        // args: [[userId, …], template] — личное сообщение боту каждому из списка.
+        //
+        // Не рассылка: спрашиваем у конкретных людей о конкретном, и текст
+        // обращается по имени — {name} подставляется. Кнопки «Открыть JobToo»
+        // тут нет намеренно: мы задаём вопрос, а не зовём в приложение, и
+        // кнопка превратила бы вопрос в рекламу.
+        case 'tgSendToUsers': {
+            @set_time_limit(300);
+            $ids = is_array($args[0] ?? null) ? $args[0] : [];
+            $tpl = (string)($args[1] ?? '');
+            if (empty($ids) || $tpl === '') { $data = ['error' => 'нужны список и текст']; break; }
+            $sent = []; $skipped = [];
+            foreach ($ids as $uid) {
+                $u = sb_single('jm_users', ['id' => 'eq.' . $uid], 'id,first_name,telegram_id');
+                if (!$u || empty($u['telegram_id'])) { $skipped[] = $uid; continue; }
+                $name = htmlspecialchars((string)($u['first_name'] ?? ''), ENT_QUOTES, 'UTF-8');
+                $text = str_replace('{name}', $name, $tpl);
+                if (tg_send_message((int)$u['telegram_id'], $text)) $sent[] = $uid;
+                else $skipped[] = $uid;
+            }
+            $data = ['sent' => count($sent), 'skipped' => $skipped];
+            break;
+        }
+
+        // Кому бот пересылает то, что люди пишут ему в личку.
+        case 'botAdminGet':
+            $data = sb_single('jm_settings', ['key' => 'eq.admin_chat_id'], 'value'); break;
+
+        case 'botAdminSet': {
+            $v = trim((string)($args[0] ?? ''));
+            if ($v === '') { sb_delete('jm_settings', ['key' => 'eq.admin_chat_id']); $data = null; break; }
+            sb_upsert('jm_settings', ['key' => 'admin_chat_id', 'value' => $v, 'updated_at' => now_iso()], 'key');
+            $data = $v; break;
+        }
+
+        // Ящик входящих боту — для дашборда.
+        case 'botInbox':
+            $data = sb_select('jm_bot_messages', ['limit' => (string)((int)($args[0] ?? 100))],
+                '*', 'created_at.desc'); break;
+
         // args: [userId] — отвязать Telegram от аккаунта
         case 'tgUnbindTelegram': {
             sb_update('jm_users', ['id' => 'eq.' . $args[0]], ['telegram_id' => null]);

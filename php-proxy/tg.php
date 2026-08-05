@@ -55,7 +55,8 @@ header('Content-Type: application/json; charset=utf-8');
 
 // ── Supabase helpers ──────────────────────────────────────────────────────────
 
-function sb(string $method, string $table, array $query = [], $body_data = null): array {
+function sb(string $method, string $table, array $query = [], $body_data = null,
+           string $prefer = 'return=minimal'): array {
     $url = SB_URL . '/rest/v1/' . $table;
     if (!empty($query)) $url .= '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
     $ch = curl_init($url);
@@ -66,7 +67,7 @@ function sb(string $method, string $table, array $query = [], $body_data = null)
             'apikey: ' . SB_KEY,
             'Authorization: Bearer ' . SB_KEY,
             'Content-Type: application/json',
-            'Prefer: return=minimal',
+            'Prefer: ' . $prefer,
         ],
         CURLOPT_TIMEOUT => 15,
         CURLOPT_SSL_VERIFYPEER => true,
@@ -89,6 +90,20 @@ function uid(): string {
 function now_iso(): string {
     $ms = intval(microtime(true) * 1000) % 1000;
     return gmdate('Y-m-d\TH:i:s') . '.' . str_pad((string)$ms, 3, '0', STR_PAD_LEFT) . 'Z';
+}
+
+// ── Настройки ────────────────────────────────────────────────────────────────
+// Пока в них лежит одно: кому пересылать то, что люди пишут боту.
+
+function setting_get(string $key): string {
+    $row = sb_one('jm_settings', ['key' => 'eq.' . $key], 'value');
+    return (string)($row['value'] ?? '');
+}
+
+function setting_set(string $key, string $value): void {
+    sb('POST', 'jm_settings', ['on_conflict' => 'key'],
+        [['key' => $key, 'value' => $value, 'updated_at' => now_iso()]],
+        'return=minimal,resolution=merge-duplicates');
 }
 
 /** Создаёт чат работник↔директор по вакансии (или возвращает существующий) */
@@ -365,20 +380,110 @@ if (preg_match('/^\/start\s*$/', $text)) {
 }
 
 if (str_starts_with($text, '/start')) {
-    $reply = "Привет" . ($firstName !== '' ? ", $firstName" : '') . "! 👋\n\n"
-        . "<b>JobToo</b> — подработки и постоянные вакансии на складах Москвы.\n\n"
-        . "⚡ Смены рядом с твоим метро\n"
-        . "💼 Постоянная работа от проверенных директоров\n"
-        . "💬 Отклик и чат с работодателем в два тапа\n\n"
-        . "Открой приложение — без установки, прямо здесь 👇";
-} else {
-    $reply = "Все смены и вакансии — в приложении 👇";
+    tg('sendMessage', [
+        'chat_id' => $chatId,
+        'text' => "Привет" . ($firstName !== '' ? ", $firstName" : '') . "! 👋\n\n"
+            . "<b>JobToo</b> — подработки и постоянные вакансии на складах Москвы.\n\n"
+            . "⚡ Смены рядом с твоим метро\n"
+            . "💼 Постоянная работа от проверенных директоров\n"
+            . "💬 Отклик и чат с работодателем в два тапа\n\n"
+            . "Открой приложение — без установки, прямо здесь 👇",
+        'parse_mode' => 'HTML',
+        'reply_markup' => ['inline_keyboard' => [[
+            ['text' => '🚀 Открыть JobToo', 'url' => 'https://t.me/JobToo_bot/app'],
+        ]]],
+    ]);
+    echo json_encode(['ok' => true]); exit;
+}
+
+// ── Живые сообщения боту ─────────────────────────────────────────────────────
+//
+// Раньше на любое человеческое сообщение бот отвечал «Все смены и вакансии —
+// в приложении 👇» и выбрасывал его. Мы даже не знали, сколько людей нам
+// писали: следов не оставалось.
+//
+// Всплыло, когда понадобилось спросить работников, почему они заходят и не
+// откликаются. Спрашивать через бота было бессмысленно — ответы утекали бы
+// в никуда.
+
+$adminChat = (int)setting_get('admin_chat_id');
+
+// Кому пересылать. Один раз: первый, кто скажет боту это слово, и становится
+// адресатом. Переназначить можно через прокси (fn botAdminSet) — то есть
+// зная X-App-Secret, а не угадав команду.
+if (preg_match('/^\/admin$/i', $text)) {
+    if ($adminChat === 0) {
+        setting_set('admin_chat_id', (string)$chatId);
+        tg('sendMessage', ['chat_id' => $chatId,
+            'text' => "✅ Готово. Сюда будут приходить сообщения, которые люди пишут боту.\n\n"
+                    . "Чтобы ответить — просто ответьте (reply) на пересланное сообщение, "
+                    . "и человек получит ваш текст от бота."]);
+    } else {
+        tg('sendMessage', ['chat_id' => $chatId,
+            'text' => $chatId === $adminChat
+                ? 'Вы уже назначены получателем.'
+                : 'Получатель уже назначен.']);
+    }
+    echo json_encode(['ok' => true]); exit;
+}
+
+// Ответ администратора реплаем на пересланное — доносим человеку. Адрес
+// зашит в самом пересланном сообщении меткой #w<id>: держать переписку
+// в памяти негде, а реплай её и так помнит.
+if ($adminChat !== 0 && $chatId === $adminChat && $text !== '') {
+    $src = (string)($msg['reply_to_message']['text'] ?? '');
+    if ($src !== '' && preg_match('/#w(\d+)/', $src, $rm)) {
+        $to = (int)$rm[1];
+        $ok = tg('sendMessage', ['chat_id' => $to, 'text' => $text]);
+        tg('sendMessage', ['chat_id' => $chatId,
+            'text' => ($ok['ok'] ?? false) ? '✅ Отправлено' : '⚠️ Не доставлено']);
+        sb('PATCH', 'jm_bot_messages', ['telegram_id' => 'eq.' . $to, 'answered' => 'is.false'],
+            ['answered' => true]);
+        echo json_encode(['ok' => true]); exit;
+    }
+}
+
+// Всё остальное — сохраняем и пересылаем.
+if ($text !== '' && $chatId !== $adminChat) {
+    $u = sb_one('jm_users', ['telegram_id' => 'eq.' . $chatId],
+        'id,first_name,last_name,phone,role,metro_station');
+    sb('POST', 'jm_bot_messages', [], [
+        'id' => uid(),
+        'user_id' => $u['id'] ?? null,
+        'telegram_id' => $chatId,
+        'name' => trim(($u['first_name'] ?? $firstName) . ' ' . ($u['last_name'] ?? '')),
+        'username' => $msg['from']['username'] ?? null,
+        'text' => $text,
+        'created_at' => now_iso(),
+    ]);
+
+    if ($adminChat !== 0) {
+        $who = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: $firstName ?: 'Без имени';
+        $meta = array_filter([
+            $u['role'] ?? null,
+            $u['phone'] ?? null,
+            $u['metro_station'] ?? null,
+        ]);
+        tg('sendMessage', [
+            'chat_id' => $adminChat,
+            'text' => "📩 <b>" . htmlspecialchars($who, ENT_QUOTES, 'UTF-8') . "</b>"
+                . ($meta ? "\n" . htmlspecialchars(implode(' · ', $meta), ENT_QUOTES, 'UTF-8') : '')
+                . "\n\n" . htmlspecialchars($text, ENT_QUOTES, 'UTF-8')
+                . "\n\n<i>Ответьте на это сообщение — человек получит ваш текст.</i> #w{$chatId}",
+            'parse_mode' => 'HTML',
+        ]);
+    }
+
+    // Человеку — что его услышали. Обещать ответ можно: сообщение лежит в
+    // ящике и пришло живому человеку, а не в пустоту, как раньше.
+    tg('sendMessage', ['chat_id' => $chatId,
+        'text' => 'Спасибо, получили — ответим здесь же.']);
+    echo json_encode(['ok' => true]); exit;
 }
 
 tg('sendMessage', [
     'chat_id' => $chatId,
-    'text' => $reply,
-    'parse_mode' => 'HTML',
+    'text' => 'Все смены и вакансии — в приложении 👇',
     'reply_markup' => ['inline_keyboard' => [[
         ['text' => '🚀 Открыть JobToo', 'url' => 'https://t.me/JobToo_bot/app'],
     ]]],
