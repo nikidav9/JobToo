@@ -30,6 +30,8 @@ import {
 } from '@/services/notifications';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
+import { ApplySheet } from '@/components/feature/ApplySheet';
+import { PERM_APPROVE_SUGGESTIONS } from '@/constants/chatSuggestions';
 
 import { rs, rf } from '@/constants/scale';
 
@@ -444,6 +446,7 @@ function EmployerMatches() {
     permApplications, permVacancies, refreshPermApplications, refreshChats,
   } = useApp();
   const [actionLoading, setLoading] = useState<string | null>(null);
+  const [approvingApp, setApprovingApp] = useState<PermApplication | null>(null);
   const [tab, setTab] = useState<'pending' | 'matched' | 'completed'>('pending');
   const [refreshing, setRefreshing] = useState(false);
   const tabBarHeight = useBottomTabBarHeight();
@@ -626,7 +629,12 @@ function EmployerMatches() {
     }
   };
 
-  const approvePermApp = async (app: PermApplication) => {
+  /**
+   * Одобрение — это первое сообщение директора, а не уведомление о нём.
+   * Шаблон «свяжитесь с кандидатом» уходил обеим сторонам, и обе ждали
+   * друг друга: переписка так и оставалась пустой.
+   */
+  const approvePermApp = async (app: PermApplication, message: string) => {
     const vacancy = permVacancies.find((v: PermVacancy) => v.id === app.vacancyId);
     if (!vacancy) return;
     setLoading(app.id);
@@ -639,10 +647,12 @@ function EmployerMatches() {
         app.vacancyId,
         vacancy.title,
         vacancy.company,
-        `🎉 Поздравляем! Вы одобрены на вакансию «${vacancy.title}». Свяжитесь с кандидатом для уточнения деталей.`,
+        message,
         1,
         0,
+        'employer',
       );
+      setApprovingApp(null);
       await refreshPermApplications();
       await refreshChats(currentUser);
       showToast('Одобрено! Чат открыт 🎉', 'match');
@@ -698,6 +708,17 @@ function EmployerMatches() {
       setLoading(null);
     }
   };
+
+  const approveInfo = (() => {
+    if (!approvingApp) return [];
+    const w = getWorker(approvingApp.workerId);
+    const vac = permVacancies.find((v: PermVacancy) => v.id === approvingApp.vacancyId);
+    return [
+      w ? `${w.firstName} ${w.lastName}`.trim() || 'Кандидат' : 'Кандидат',
+      `Вакансия: ${vac?.title ?? '—'}`,
+      vac?.metroStation ? `Где: 🚇 ${vac.metroStation}` : `Компания: ${vac?.company ?? '—'}`,
+    ];
+  })();
 
   const renderPermApp = (app: PermApplication) => {
     const vacancy = permVacancies.find((v: PermVacancy) => v.id === app.vacancyId);
@@ -837,7 +858,7 @@ function EmployerMatches() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.acceptBtn, isLoading && { opacity: 0.5 }]}
-              onPress={() => approvePermApp(app)}
+              onPress={() => setApprovingApp(app)}
               disabled={!!actionLoading}
               activeOpacity={0.8}
             >
@@ -1117,6 +1138,19 @@ function EmployerMatches() {
           renderItem={renderItem}
         />
       )}
+
+      <ApplySheet
+        visible={!!approvingApp}
+        onClose={() => setApprovingApp(null)}
+        onSend={msg => approvingApp ? approvePermApp(approvingApp, msg) : undefined}
+        title="Одобрить кандидата"
+        info={approveInfo}
+        chips={PERM_APPROVE_SUGGESTIONS}
+        label="Напишите кандидату первым"
+        placeholder="Например: здравствуйте! Готовы вас взять, когда сможете выйти?"
+        sendLabel="Одобрить и отправить"
+        hint="Кандидат ждёт вашего слова — без сообщения переписка так и останется пустой"
+      />
     </SafeAreaView>
   );
 }

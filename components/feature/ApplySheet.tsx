@@ -34,9 +34,21 @@ type Props = {
   info: string[];
   chips: ApplyChip[];
   title?: string;
+  /**
+   * Тем же окном директор пишет первое сообщение одобренному кандидату,
+   * поэтому подписи — параметры, а не константы: «Отправить отклик» на
+   * стороне работодателя звучало бы наоборот.
+   */
+  label?: string;
+  placeholder?: string;
+  sendLabel?: string;
+  hint?: string;
 };
 
-export function ApplySheet({ visible, onClose, onSend, info, chips, title }: Props) {
+export function ApplySheet({
+  visible, onClose, onSend, info, chips, title,
+  label, placeholder, sendLabel, hint,
+}: Props) {
   const insets = useSafeAreaInsets();
   const swipe = useSwipeToDismiss(onClose, visible);
   const [text, setText] = useState('');
@@ -79,12 +91,12 @@ export function ApplySheet({ visible, onClose, onSend, info, chips, title }: Pro
               </View>
             )}
 
-            <Text style={s.label}>Напишите пару слов о себе</Text>
+            <Text style={s.label}>{label ?? 'Напишите пару слов о себе'}</Text>
             <TextInput
               style={s.input}
               value={text}
               onChangeText={setText}
-              placeholder="Например: есть опыт на складе, могу выйти в субботу"
+              placeholder={placeholder ?? 'Например: есть опыт на складе, могу выйти в субботу'}
               placeholderTextColor={Colors.textMuted}
               multiline
               maxLength={300}
@@ -111,12 +123,12 @@ export function ApplySheet({ visible, onClose, onSend, info, chips, title }: Pro
             >
               {sending
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={s.sendTxt}>Отправить отклик</Text>}
+                : <Text style={s.sendTxt}>{sendLabel ?? 'Отправить отклик'}</Text>}
             </TouchableOpacity>
 
             {!enough && (
               <Text style={s.hint}>
-                Пара слов о себе поднимает шанс ответа — работодатель увидит человека, а не шаблон
+                {hint ?? 'Пара слов о себе поднимает шанс ответа — работодатель увидит человека, а не шаблон'}
               </Text>
             )}
           </Animated.View>

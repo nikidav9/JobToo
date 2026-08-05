@@ -514,7 +514,7 @@ export async function notifyWorkerPermApplicationApproved(
   await pushTo(
     workerId,
     '✅ Заявка одобрена!',
-    `${companyName} одобрили вашу заявку на «${vacancyTitle}». Свяжитесь с работодателем!`,
+    `${companyName} одобрили вашу заявку на «${vacancyTitle}» и написали вам — ответьте в чате.`,
     'perm_approved', 'matches',
   );
 }

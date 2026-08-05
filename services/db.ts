@@ -616,15 +616,18 @@ export async function dbCreateChat(
   initialUnreadWorker = 0,
   initialUnreadEmployer = 0,
   /**
-   * Сообщение написал сам работник — тогда оно отправляется от его имени.
-   * Без этого признака отклик уходил от «system» и выглядел автоответчиком.
+   * Кто написал первое сообщение: `true` или `'worker'` — работник,
+   * `'employer'` — работодатель, иначе система.
+   *
+   * Без этого признака сообщение уходило от «system» и выглядело
+   * автоответчиком, на который никто не отвечает.
    */
-  fromWorker = false,
+  author: boolean | 'worker' | 'employer' = false,
 ): Promise<string> {
   if (IS_NATIVE) {
     return proxy<string>('dbCreateChat', [
       workerId, employerId, vacancyId, vacTitle, companyName,
-      systemMessage, initialUnreadWorker, initialUnreadEmployer, fromWorker,
+      systemMessage, initialUnreadWorker, initialUnreadEmployer, author,
     ]);
   }
   const { data: existing } = await withTimeout(

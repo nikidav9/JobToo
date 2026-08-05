@@ -335,10 +335,20 @@ function fmt_date_ru(string $iso): string {
  * слался от «system» шаблоном «Меня заинтересовала ваша вакансия»: на той
  * стороне видели автоответчик, и отвечать было нечему — из 132 чатов в 50
  * не прозвучало ни одного живого слова.
+ *
+ * $from — кто написал первое сообщение: true или 'worker' — работник,
+ * 'employer' — работодатель, всё остальное — система.
+ *
+ * Работодатель появился здесь после разбора чата, где директор одобрила
+ * кандидата и оба замолчали: чат открылся шаблоном «Поздравляем, свяжитесь с
+ * кандидатом», и каждый стал ждать другого. На вопрос «почему перестали»
+ * директор ответила: «не удобно, ни кто не писал» — буквально так и было,
+ * два системных сообщения и ни одного человеческого.
  */
 function chat_ensure(string $wid, string $eid, string $vid, string $vt, string $cn,
-                     ?string $sm, int $uw, int $ue, bool $fromWorker = false): string {
-    $author = $fromWorker ? $wid : 'system';
+                     ?string $sm, int $uw, int $ue, bool|string $from = false): string {
+    $author = ($from === true || $from === 'worker') ? $wid
+            : ($from === 'employer' ? $eid : 'system');
 
     $ex = sb_single('jm_chats',
         ['worker_id' => 'eq.' . $wid, 'employer_id' => 'eq.' . $eid],
@@ -346,8 +356,12 @@ function chat_ensure(string $wid, string $eid, string $vid, string $vt, string $
 
     if ($ex) {
         $cid = $ex['id'];
-        // Та же вакансия — ничего не добавляем, чат уже про неё.
-        if ($vid !== '' && ($ex['vacancy_id'] ?? '') !== $vid) {
+        // Карточку вакансии повторять незачем — чат уже про неё. А вот живое
+        // сообщение уходит всегда: директор одобряет кандидата в той же
+        // переписке, которую тот открыл своим откликом, и на «та же вакансия —
+        // ничего не добавляем» его первые слова пропадали молча.
+        $newVac = $vid !== '' && ($ex['vacancy_id'] ?? '') !== $vid;
+        if ($newVac) {
             sb_update('jm_chats', ['id' => 'eq.' . $cid], [
                 'vacancy_id' => $vid,
                 'vac_title' => $vt,
@@ -360,10 +374,15 @@ function chat_ensure(string $wid, string $eid, string $vid, string $vt, string $
                 msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => 'system',
                     'text' => $card, 'created_at' => now_iso()]);
             }
-            if ($sm) {
-                msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => $author,
-                    'text' => $sm, 'created_at' => now_iso()]);
-            }
+        } elseif ($sm !== null && $sm !== '' && ($uw > 0 || $ue > 0)) {
+            sb_update('jm_chats', ['id' => 'eq.' . $cid], [
+                'unread_worker' => (int)($ex['unread_worker'] ?? 0) + $uw,
+                'unread_employer' => (int)($ex['unread_employer'] ?? 0) + $ue,
+            ]);
+        }
+        if ($sm !== null && $sm !== '') {
+            msg_insert(['id' => uid(), 'chat_id' => $cid, 'sender_id' => $author,
+                'text' => $sm, 'created_at' => now_iso()]);
         }
         return $cid;
     }
@@ -1607,13 +1626,16 @@ try {
         }
 
         case 'dbCreateChat': {
-            // Девятый аргумент — «сообщение написал сам работник». Тогда оно и
+            // Девятый аргумент — автор первого сообщения: true/'worker' —
+            // работник, 'employer' — работодатель, иначе система. Оно и
             // отправляется от его имени, а не от системы.
-            [$wid, $eid, $vid, $vt, $cn, $sm, $uw, $ue, $fromWorker] =
+            [$wid, $eid, $vid, $vt, $cn, $sm, $uw, $ue] =
                 [$args[0], $args[1], $args[2], $args[3], $args[4], $args[5] ?? null,
-                 $args[6] ?? 0, $args[7] ?? 0, !empty($args[8])];
+                 $args[6] ?? 0, $args[7] ?? 0];
+            $author = $args[8] ?? false;
             $data = chat_ensure($wid, $eid, (string)$vid, (string)$vt, (string)$cn,
-                                $sm, (int)$uw, (int)$ue, $fromWorker);
+                                $sm, (int)$uw, (int)$ue,
+                                is_string($author) ? $author : (bool)$author);
             break;
         }
 

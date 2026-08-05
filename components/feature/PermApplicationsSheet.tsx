@@ -24,13 +24,13 @@ import { rs, rf } from '@/constants/scale';
 import {
   dbSetPermApplicationStatus,
   dbCreateChat,
-  dbInsertMessage,
-  dbIncrementUnread,
 } from '@/services/db';
 import {
   notifyWorkerPermApplicationApproved,
   notifyWorkerPermApplicationRejected,
 } from '@/services/notifications';
+import { ApplySheet } from '@/components/feature/ApplySheet';
+import { PERM_APPROVE_SUGGESTIONS } from '@/constants/chatSuggestions';
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   pending:  { label: '⏳ На рассмотрении', color: '#92400E', bg: '#FFF7ED' },
@@ -45,6 +45,7 @@ export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: strin
   const { currentUser, users, permVacancies, permApplications, refreshPermApplications, refreshChats, showToast } = useApp();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [approving, setApproving] = useState<PermApplication | null>(null);
 
   const vacancy = permVacancies.find(v => v.id === vacancyId);
   const apps = permApplications.filter(a => a.vacancyId === vacancyId);
@@ -55,35 +56,39 @@ export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: strin
     setRefreshing(false);
   };
 
-  const approve = async (app: PermApplication) => {
+  /** Одобрение — это первое сообщение директора, а не уведомление о нём. */
+  const approve = async (app: PermApplication, message: string) => {
     if (!currentUser || !vacancy) return;
     setActionLoading(app.id);
     try {
       await dbSetPermApplicationStatus(app.id, 'approved');
-      const worker = users.find(u => u.id === app.workerId);
-      if (worker && vacancy) {
-        notifyWorkerPermApplicationApproved(
-          app.workerId,
-          vacancy.company,
-          vacancy.title,
-        ).catch(() => {});
-      }
-      // Open chat automatically
+      notifyWorkerPermApplicationApproved(
+        app.workerId,
+        vacancy.company,
+        vacancy.title,
+      ).catch(() => {});
       const chatId = await dbCreateChat(
         app.workerId,
         currentUser.id,
         app.vacancyId,
         vacancy.title,
         vacancy.company,
-        `🎉 Поздравляем! Вы одобрены на вакансию «${vacancy.title}». Свяжитесь с кандидатом для уточнения деталей.`,
+        message,
         1,
         0,
+        'employer',
       );
+      setApproving(null);
       await refreshPermApplications();
       await refreshChats(currentUser);
       showToast('Одобрено! Чат открыт 🎉', 'match');
-      onClose();
-      router.push({ pathname: '/chat-room', params: { chatId } });
+      // Окно письма лежит внутри этой шторки, и убирать оба разом нельзя:
+      // на iOS второе закрытие приходит, пока первое ещё идёт, и экран
+      // остаётся под затемнением. Поэтому закрываем по очереди.
+      setTimeout(() => {
+        onClose();
+        router.push({ pathname: '/chat-room', params: { chatId } });
+      }, 300);
     } catch (e) {
       showToast('Ошибка', 'error');
     } finally {
@@ -111,6 +116,15 @@ export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: strin
       setActionLoading(null);
     }
   };
+
+  const approvingWorker = approving ? users.find(u => u.id === approving.workerId) : undefined;
+  const approvingInfo = approving && vacancy
+    ? [
+        approvingWorker ? `${approvingWorker.firstName} ${approvingWorker.lastName}` : 'Кандидат',
+        `Вакансия: ${vacancy.title}`,
+        vacancy.metroStation ? `Где: 🚇 ${vacancy.metroStation}` : `Компания: ${vacancy.company}`,
+      ]
+    : [];
 
   const renderApp = ({ item: app }: { item: PermApplication }) => {
     const worker = users.find(u => u.id === app.workerId);
@@ -165,7 +179,7 @@ export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: strin
             <TouchableOpacity
               style={[styles.approveBtn, isLoading && { opacity: 0.5 }]}
               disabled={!!actionLoading}
-              onPress={() => approve(app)}
+              onPress={() => setApproving(app)}
               activeOpacity={0.8}
             >
               {isLoading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.approveBtnTxt}>✅ Одобрить + Чат</Text>}
@@ -209,6 +223,19 @@ export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: strin
       )}
         </Animated.View>
       </View>
+
+      <ApplySheet
+        visible={!!approving}
+        onClose={() => setApproving(null)}
+        onSend={msg => approving ? approve(approving, msg) : undefined}
+        title="Одобрить кандидата"
+        info={approvingInfo}
+        chips={PERM_APPROVE_SUGGESTIONS}
+        label="Напишите кандидату первым"
+        placeholder="Например: здравствуйте! Готовы взять, когда сможете выйти?"
+        sendLabel="Одобрить и отправить"
+        hint="Кандидат ждёт вашего слова — без сообщения переписка так и останется пустой"
+      />
     </Modal>
   );
 }
