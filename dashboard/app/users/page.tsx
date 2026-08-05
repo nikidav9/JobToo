@@ -5,7 +5,7 @@ import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
-import { blockUser, resetPassword, sendBothToUser, deleteUser } from '@/lib/admin-actions'
+import { blockUser, resetPassword, sendBothToUser, deleteUser, changeRole } from '@/lib/admin-actions'
 import { downloadCSV } from '@/lib/csv-export'
 import { getVerifiedUsers, setUserVerified } from '@/lib/verification'
 import {
@@ -255,6 +255,7 @@ export default function UsersPage() {
   const [pushText, setPushText] = useState<Record<string, string>>({})
   const [verifiedSet, setVerifiedSet] = useState<Set<string>>(new Set())
   const [confirmDelete, setConfirmDelete] = useState<Record<string, boolean>>({})
+  const [confirmRole, setConfirmRole] = useState<Record<string, boolean>>({})
 
   useEffect(() => { setVerifiedSet(getVerifiedUsers()) }, [])
 
@@ -295,6 +296,27 @@ export default function UsersPage() {
       setA(u.id + '_push', 'ok', 'Отправлено')
       setPushText(prev => ({ ...prev, [u.id]: '' }))
     } catch (e: any) { setA(u.id + '_push', 'err', e.message) }
+  }
+
+  // Смена роли с подтверждением: у бывшего работодателя закроются вакансии,
+  // и вернуть их обратно одним нажатием уже не выйдет.
+  async function handleRole(u: any) {
+    const target = u.role === 'worker' ? 'employer' : 'worker'
+    if (!confirmRole[u.id]) {
+      setConfirmRole(prev => ({ ...prev, [u.id]: true }))
+      setTimeout(() => setConfirmRole(prev => ({ ...prev, [u.id]: false })), 4000)
+      return
+    }
+    setConfirmRole(prev => ({ ...prev, [u.id]: false }))
+    setA(u.id + '_role', 'loading')
+    try {
+      const { closedVacancies } = await changeRole(u.id, target, u.name)
+      setA(u.id + '_role', 'ok',
+        target === 'worker'
+          ? `Теперь работник${closedVacancies ? `, закрыто вакансий: ${closedVacancies}` : ''}`
+          : 'Теперь работодатель')
+      setTimeout(refresh, 800)
+    } catch (e: any) { setA(u.id + '_role', 'err', e.message) }
   }
 
   async function handleDelete(u: any) {
@@ -514,6 +536,25 @@ export default function UsersPage() {
                                     style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-sunken)', color: 'var(--ink-3)', fontSize: 11.5, cursor: 'pointer' }}>
                                     {expanded ? '▲' : '▼'}
                                   </button>
+                                  {(() => {
+                                    const aRole = actions[u.id + '_role']
+                                    if (aRole?.s === 'ok') return <span style={{ fontSize: 11, color: 'var(--positive)', fontWeight: 500 }}>{aRole.msg}</span>
+                                    if (aRole?.s === 'err') return <span style={{ fontSize: 11, color: 'var(--negative)' }} title={aRole.msg}>✗</span>
+                                    const target = u.role === 'worker' ? 'работодателем' : 'работником'
+                                    return (
+                                      <button onClick={() => handleRole(u)} disabled={aRole?.s === 'loading'}
+                                        title={`Сделать ${target}. Открытые вакансии при этом закроются.`}
+                                        style={{
+                                          padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap',
+                                          border: confirmRole[u.id] ? '1px solid rgba(179,60,42,.4)' : '1px solid var(--line)',
+                                          background: confirmRole[u.id] ? 'rgba(179,60,42,.12)' : 'var(--bg-sunken)',
+                                          color: confirmRole[u.id] ? 'var(--negative)' : 'var(--ink-4)',
+                                          fontSize: 11.5, cursor: 'pointer',
+                                        }}>
+                                        {aRole?.s === 'loading' ? '…' : confirmRole[u.id] ? `Сделать ${target}?` : '⇄ роль'}
+                                      </button>
+                                    )
+                                  })()}
                                   {aDel?.s === 'ok'
                                     ? <span style={{ fontSize: 11, color: 'var(--negative)', fontWeight: 500 }}>Удалён</span>
                                     : aDel?.s === 'err'

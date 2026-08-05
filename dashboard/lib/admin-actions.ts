@@ -4,6 +4,56 @@ import { getToken } from './adminApi'
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
+/**
+ * Смена роли: человек зарегистрировался не тем, кем собирался.
+ *
+ * Роль у нас не просто подпись — от неё зависит, что человек видит и что
+ * может. Поэтому мало переписать поле: у бывшего работодателя остаются
+ * вакансии, и если их не закрыть, соискатели продолжат откликаться на
+ * объявления человека, который больше не работодатель.
+ *
+ * Чего намеренно НЕ трогаем — переписки и отклики. Это история: там живые
+ * сообщения и договорённости, и стирать их из-за смены роли нельзя. Они
+ * просто остаются как были.
+ */
+export async function changeRole(
+  userId: string,
+  newRole: 'worker' | 'employer',
+  userName?: string
+): Promise<{ closedVacancies: number }> {
+  let closedVacancies = 0
+
+  if (newRole === 'worker') {
+    // Закрываем открытые вакансии: висеть в ленте они не должны.
+    for (const table of ['jm_vacancies', 'jm_perm_vacancies']) {
+      const { data } = await supabaseAdmin
+        .from(table)
+        .update({ status: 'closed' })
+        .eq('employer_id', userId)
+        .eq('status', 'open')
+        .select('id')
+      closedVacancies += (data ?? []).length
+    }
+  }
+
+  const patch: Record<string, unknown> = { role: newRole }
+  // Компания у соискателя ни к чему, а виды работ — у работодателя.
+  if (newRole === 'worker') patch.company = null
+  else patch.work_types = []
+
+  const { error } = await supabaseAdmin.from('jm_users').update(patch).eq('id', userId)
+  if (error) throw new Error(error.message)
+
+  logActivity(
+    'Смена роли',
+    `${newRole === 'worker' ? 'Работодатель → работник' : 'Работник → работодатель'}` +
+      (closedVacancies ? `, закрыто вакансий: ${closedVacancies}` : ''),
+    userId,
+    userName
+  )
+  return { closedVacancies }
+}
+
 export async function deleteUser(userId: string, role: string, userName?: string) {
   // 1. Find chats involving this user
   const { data: chats } = await supabaseAdmin
