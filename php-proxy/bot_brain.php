@@ -27,16 +27,58 @@
 
 const BOT_APP_URL = 'https://t.me/JobToo_bot/app';
 
-/** Список станций: тот же, что у приложения (см. scripts/gen-metro-php.js). */
-function bot_stations(): array {
+/** Схема метро: та же, что у приложения (см. scripts/gen-metro-php.js). */
+function bot_metro(): array {
     static $cache = null;
     if ($cache === null) {
         $p = __DIR__ . '/metro_stations.php';
         $v = is_readable($p) ? @include $p : null;
-        $cache = is_array($v) ? $v : [];
+        $cache = is_array($v) ? $v : ['lines' => [], 'stations' => []];
     }
     return $cache;
 }
+
+/** Станция → id ветки (первой из тех, на которых она стоит). */
+function bot_stations(): array {
+    static $flat = null;
+    if ($flat === null) {
+        $flat = [];
+        foreach (bot_metro()['stations'] ?? [] as $name => $on) $flat[$name] = $on[0][0] ?? '';
+    }
+    return $flat;
+}
+
+/**
+ * Сколько остановок между станциями, если ехать без пересадок.
+ * null — общей ветки нет, то есть «рядом» это назвать нельзя.
+ *
+ * Пересадки не считаем нарочно: одна ветка — это «сел и доехал», а маршрут
+ * с пересадкой человек и сам найдёт, если захочет.
+ */
+function bot_stops_between(?string $a, ?string $b): ?int {
+    if ($a === null || $b === null) return null;
+    if ($a === $b) return 0;
+    $st = bot_metro()['stations'] ?? [];
+    if (empty($st[$a]) || empty($st[$b])) return null;
+    $best = null;
+    foreach ($st[$a] as [$lineA, $iA]) {
+        foreach ($st[$b] as [$lineB, $iB]) {
+            if ($lineA !== $lineB) continue;
+            $d = abs($iA - $iB);
+            if ($best === null || $d < $best) $best = $d;
+        }
+    }
+    return $best;
+}
+
+function bot_line_name(?string $station): string {
+    $st = bot_metro()['stations'][$station] ?? null;
+    if (!$st) return '';
+    return (string)(bot_metro()['lines'][$st[0][0]] ?? '');
+}
+
+/** Докуда считаем, что «рядом»: одна ветка и не больше часа дороги. */
+const BOT_NEAR_STOPS = 12;
 
 /** Для сравнения: нижний регистр, ё как е, только буквы и цифры. */
 function bot_norm(string $s): string {
@@ -92,11 +134,24 @@ function bot_shifts_near(?string $station, int $limit = 5): array {
         'limit'  => '60',
     ]);
     if (empty($rows)) return [];
-    if ($station !== null) {
-        usort($rows, fn($a, $b) =>
-            (($b['metro_station'] ?? '') === $station ? 1 : 0) - (($a['metro_station'] ?? '') === $station ? 1 : 0));
+
+    // Ближе — выше, а при равной дороге раньше по дате. Расстояние считаем
+    // один раз и кладём в строку: оно же нужно в тексте.
+    foreach ($rows as $k => $v) {
+        $rows[$k]['_stops'] = bot_stops_between($station, $v['metro_station'] ?? null);
     }
+    usort($rows, function ($a, $b) {
+        $sa = $a['_stops'] ?? 999; $sb = $b['_stops'] ?? 999;
+        return $sa === $sb ? strcmp((string)$a['date'], (string)$b['date']) : $sa <=> $sb;
+    });
     return array_slice($rows, 0, $limit);
+}
+
+/** Только то, куда человеку реально ехать: своя станция или своя ветка. */
+function bot_shifts_really_near(?string $station, int $limit = 3): array {
+    if ($station === null) return [];
+    return array_values(array_filter(bot_shifts_near($station, 30),
+        fn($v) => ($v['_stops'] ?? null) !== null && $v['_stops'] <= BOT_NEAR_STOPS));
 }
 
 /** Строка смены. Оплата — главное, поэтому она в строке всегда. */
@@ -106,7 +161,12 @@ function bot_shift_line(array $v): string {
     $pay  = ((float)($v['salary'] ?? 0)) > 0
         ? number_format((float)$v['salary'], 0, ',', ' ') . ' ₽'
         : 'оплата сдельная, нормативы в карточке';
-    return '• ' . ($v['title'] ?? 'Смена') . ' — м. ' . ($v['metro_station'] ?? '?')
+    $far  = '';
+    if (isset($v['_stops'])) {
+        if ($v['_stops'] === 0)              $far = ' (это ваша станция)';
+        elseif ($v['_stops'] <= BOT_NEAR_STOPS) $far = ' (' . $v['_stops'] . ' ост. от вас)';
+    }
+    return '• ' . ($v['title'] ?? 'Смена') . ' — м. ' . ($v['metro_station'] ?? '?') . $far
          . ', ' . $when . $time . ', ' . $pay;
 }
 
@@ -115,12 +175,12 @@ function bot_shifts_text(?string $station): string {
     if (empty($rows)) {
         return 'Сейчас открытых смен нет. Как появятся — сообщу.';
     }
-    $mine = $station !== null
-        ? array_values(array_filter($rows, fn($v) => ($v['metro_station'] ?? '') === $station))
-        : [];
-    $head = $station !== null
-        ? ($mine ? "Смены у метро {$station}:" : "У метро {$station} сейчас смен нет. Ближайшие из открытых:")
-        : 'Открытые смены сейчас:';
+    $near = array_filter($rows, fn($v) => ($v['_stops'] ?? null) !== null && $v['_stops'] <= BOT_NEAR_STOPS);
+    $head = $station === null
+        ? 'Открытые смены сейчас:'
+        : ($near
+            ? "Смены рядом с вами (метро {$station}):"
+            : "Рядом с метро {$station} смен сейчас нет. Вот всё, что открыто — ехать дальше:");
     $lines = array_map('bot_shift_line', $rows);
     return $head . "\n" . implode("\n", $lines) . "\n\nОткликнуться — в приложении, в два тапа.";
 }

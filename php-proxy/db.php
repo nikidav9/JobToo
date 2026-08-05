@@ -777,6 +777,89 @@ function notify_user(string $userId, string $title, string $body, string $type =
 
 
 /**
+ * Раз в два дня — тем, у кого рядом действительно есть смена.
+ *
+ * Прежнее касание работников было слепым: раз в три дня всем «в приложении
+ * появились новые варианты рядом с вашим метро», без единой цифры и без
+ * проверки, есть ли там что-то рядом на самом деле. Кончилось тем, что
+ * 27% людей, сами подключивших телеграм, заблокировали бота.
+ *
+ * Здесь наоборот: если рядом ничего нет — человек не получает ничего. Молчание
+ * дешевле блокировки, а «рядом» считается по остановкам на его ветке, а не по
+ * тому, что обе станции есть в Москве.
+ *
+ * Возвращает, скольким написали и скольких промолчали — второе число тоже
+ * стоит смотреть: если молчим почти всем, значит смен мало, а не рассылка
+ * плохая.
+ */
+function shift_nudge_run(): array {
+    require_once __DIR__ . '/bot_brain.php';
+
+    $today = gmdate('Y-m-d', time() + 3 * 3600);
+    $open = sb_select('jm_vacancies', ['status' => 'eq.open', 'date' => 'gte.' . $today],
+        'id,title,company,metro_station,date,time_start,time_end,salary');
+    if (empty($open)) return ['sent' => 0, 'silent' => 0, 'note' => 'открытых смен нет'];
+
+    // Кому уже писали за последние два дня.
+    $cut = gmdate('Y-m-d\TH:i:s\Z', time() - 2 * 86400);
+    $skip = [];
+    foreach (sb_select('jm_notifications',
+        ['type' => 'eq.shift_nudge', 'created_at' => 'gte.' . $cut], 'user_id') as $r) {
+        $skip[$r['user_id']] = true;
+    }
+
+    $workers = sb_select('jm_users', ['role' => 'eq.worker'],
+        'id,first_name,metro_station,telegram_id,push_token,is_blocked,nudge_off');
+    $sent = 0; $silent = 0; $pushMsgs = [];
+
+    foreach ($workers as $w) {
+        if (!empty($w['is_blocked']) || !empty($w['nudge_off'])) continue;
+        if (empty($w['telegram_id']) && empty($w['push_token'])) continue;
+        if (isset($skip[$w['id']])) continue;
+
+        $st = $w['metro_station'] ?? null;
+        $near = [];
+        foreach ($open as $v) {
+            $d = bot_stops_between($st, $v['metro_station'] ?? null);
+            if ($d === null || $d > BOT_NEAR_STOPS) continue;
+            $v['_stops'] = $d;
+            $near[] = $v;
+        }
+        if (empty($near)) { $silent++; continue; }
+
+        usort($near, fn($a, $b) => $a['_stops'] === $b['_stops']
+            ? strcmp((string)$a['date'], (string)$b['date'])
+            : $a['_stops'] <=> $b['_stops']);
+        $near = array_slice($near, 0, 3);
+
+        $title = count($near) === 1 ? '⚡ Смена рядом с вами' : '⚡ Смены рядом с вами';
+        $list = implode("\n", array_map('bot_shift_line', $near));
+        $body = $list . "\n\nОткликнуться — в приложении, в два тапа.";
+
+        try {
+            sb_insert('jm_notifications',
+                ['user_id' => $w['id'], 'title' => $title, 'body' => $body, 'type' => 'shift_nudge']);
+        } catch (Throwable $e) {
+            sb_insert('jm_notifications', ['user_id' => $w['id'], 'title' => $title, 'body' => $body]);
+        }
+
+        if (!empty($w['telegram_id'])) {
+            tg_send_message((int)$w['telegram_id'], $title . "\n\n" . $body, true);
+        } else {
+            // В пуше видно две строки, поэтому там только ближайшая смена.
+            $pushMsgs[] = ['to' => $w['push_token'], 'title' => $title,
+                'body' => ltrim(bot_shift_line($near[0]), '• '),
+                'sound' => 'default', 'priority' => 'default', 'channelId' => 'vacancies',
+                'data' => ['type' => 'shift_nudge']];
+        }
+        $sent++;
+    }
+    if (!empty($pushMsgs)) expo_push($pushMsgs);
+
+    return ['sent' => $sent, 'silent' => $silent];
+}
+
+/**
  * Понедельничный пост в группу «ПОДРАБОТКИ»: актуальные постоянные вакансии,
  * сгруппированные по роли и отсортированные по убыванию зарплаты. Каждая
  * станция — ссылка, открывающая вакансию в мини-аппе. Возвращает bool.
@@ -1375,35 +1458,24 @@ try {
                 }
             }
 
-            // ── 3. Работникам: посмотрите, что открыто (раз в 3 дня, сдвиг +1) ──
-            if ($dayIdx % 3 === 1) {
-                $today = date('Y-m-d');
-                $openShifts = count(sb_select('jm_vacancies', ['status' => 'eq.open', 'date' => 'gte.' . $today], 'id'));
-                $openPerm = count(sb_select('jm_perm_vacancies', ['status' => 'eq.open'], 'id'));
-                if ($openShifts + $openPerm > 0) {
-                    // Без конкретных цифр — малые числа отпугивают
-                    $title = '⚡ Свежие смены и вакансии';
-                    $body = 'В приложении появились новые варианты рядом с вашим метро. Загляните — отклик в два тапа.';
-                    $workersAll = sb_select('jm_users', ['role' => 'eq.worker'], 'id,telegram_id,push_token');
-                    $bellRows = array_map(fn($w) => ['user_id' => $w['id'], 'title' => $title, 'body' => $body], $workersAll);
-                    if (!empty($bellRows)) { try { sb_insert('jm_notifications', $bellRows); } catch (Throwable $e) {} }
-                    $pushMsgs = [];
-                    foreach ($workersAll as $w) {
-                        if (!empty($w['telegram_id'])) {
-                            tg_send_message((int)$w['telegram_id'], $title . "\n\n" . $body, true);
-                        } elseif (!empty($w['push_token'])) {
-                            $pushMsgs[] = ['to' => $w['push_token'], 'title' => $title, 'body' => $body,
-                                'sound' => 'default', 'priority' => 'default', 'channelId' => 'vacancies', 'data' => ['type' => 'browse_nudge']];
-                        }
-                        $result['workerNudges']++;
-                    }
-                    if (!empty($pushMsgs)) expo_push($pushMsgs);
-                }
-            }
+            // ── 3. Работникам: смены рядом (раз в 2 дня и только тем, у кого рядом есть) ──
+            //
+            // Раньше здесь раз в три дня уходило всем «появились новые варианты
+            // рядом с вашим метро» — без цифр и без проверки, есть ли там
+            // что-то рядом. За этим последовало 27% блокировок бота среди тех,
+            // кто телеграм подключал сам. Теперь адресно, см. shift_nudge_run().
+            $nudge = shift_nudge_run();
+            $result['workerNudges'] = $nudge['sent'];
+            $result['workerSilent'] = $nudge['silent'];
 
             $data = $result;
             break;
         }
+
+        // Отдельный вызов той же рассылки — чтобы прогнать вручную, не дожидаясь крона.
+        case 'cronShiftNudge':
+            @set_time_limit(300);
+            $data = shift_nudge_run(); break;
 
         // args: [title, body, roleFilter 'all'|'worker'|'employer']
         // Рассылка по всем с привязанным Telegram (кнопка приложения в каждом сообщении)
