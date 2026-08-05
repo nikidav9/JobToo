@@ -28,7 +28,7 @@ import { rs, rf } from '@/constants/scale';
 
 const SEEN_KEY = 'jm_complete_profile_prompt_v1';
 const SHOW_DELAY_MS = 2500;
-const MIN_AGE = 16;
+const MIN_AGE = 18;
 const MAX_AGE = 75;
 
 export default function CompleteProfileSheet() {

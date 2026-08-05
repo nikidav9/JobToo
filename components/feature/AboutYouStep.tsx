@@ -37,7 +37,7 @@ const EMPLOYER_PLACEHOLDER =
   'Что за точка и где: адрес, ближайшее метро. Какой коллектив. Сколько заказов '
   + 'в смену. Как устроена разгрузка — подвал, рампа, лифт.';
 
-const MIN_AGE = 16;
+const MIN_AGE = 18;
 const MAX_AGE = 75;
 
 type Props = {
