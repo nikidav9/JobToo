@@ -33,7 +33,7 @@ import {
   dbAddPermSaved,
   dbRemovePermSaved,
 } from '@/services/db';
-import { notifyEmployerNewApplicant, notifyEmployerGotMatch, notifyWorkerGotMatch,
+import { notifyEmployerGotMatch, notifyWorkerGotMatch,
   notifyEmployerNewMessage } from '@/services/notifications';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -970,7 +970,7 @@ function WorkerFeed() {
             notifyEmployerGotMatch(card.employerId, `${user.firstName} ${user.lastName}`, card.title).catch(() => {});
             router.push({ pathname: '/match', params: { vacancyId: card.id, chatId: result.chatId } });
           } else {
-            notifyEmployerNewApplicant(card.employerId, `${user.firstName} ${user.lastName}`, card.title).catch(() => {});
+            // Уведомление директору шлёт сервер при записи отклика — см. dbUpsertLike.
             showToast('Отклик отправлен! Ждём решения работодателя 👍', 'success');
           }
         } catch {

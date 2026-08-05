@@ -648,6 +648,116 @@ function expo_push(array $messages): void {
 }
 
 /**
+ * Уведомить пользователя всем, что есть на сервере: колокольчик, телеграм,
+ * пуш на телефон.
+ *
+ * Появилось после разбирательства с директором, который перестал выкладывать
+ * вакансии: «мне не поступали отклики соискателей, сейчас зашла — сразу 4».
+ * За это время человека нашли через другую компанию, а вакансию удалили.
+ *
+ * Причина была в том, что уведомление директору отправлял телефон соискателя,
+ * уже после того как отклик сохранён. Старая версия приложения, оборвавшаяся
+ * сеть, свёрнутое приложение — и директор не узнавал ничего, а ошибка
+ * глоталась молча. Уведомление о событии должен слать тот, кто это событие
+ * записал, то есть сервер.
+ *
+ * Повтор в течение минуты отбрасываем: пока не все обновились, старые клиенты
+ * продолжают слать своё уведомление, и без этого directоr получал бы по два.
+ */
+/**
+ * Карточка кандидата директору в телеграм, с кнопками «Одобрить/Отклонить».
+ *
+ * Раньше её заказывал телефон соискателя отдельным запросом после отклика.
+ * Теперь зовём и с сервера, сразу при создании отклика: клиент мог не дойти
+ * до этого вызова — старая версия, обрыв связи, свёрнутое приложение, — и
+ * директор оставался без карточки, как и без самого уведомления.
+ */
+function tg_new_application_card(string $employerId, string $workerId, string $vacancyId, string $vTitle): bool {
+            $emp = sb_single('jm_users', ['id' => 'eq.' . $employerId], 'telegram_id');
+            if (!$emp || empty($emp['telegram_id'])) return false;
+
+            $app = sb_single('jm_perm_applications', [
+                'vacancy_id' => 'eq.' . $vacancyId,
+                'worker_id'  => 'eq.' . $workerId,
+                'order'      => 'created_at.desc',
+            ], 'id');
+            if (!$app) return false;
+
+            $w = sb_single('jm_users', ['id' => 'eq.' . $workerId], 'first_name,last_name,age,metro_station,phone,avg_rating,rating_count');
+            $name = trim(($w['first_name'] ?? '') . ' ' . ($w['last_name'] ?? '')) ?: 'Кандидат';
+            $lines = ["📥 <b>Новая заявка на «{$vTitle}»</b>", ''];
+            $lines[] = '👤 ' . $name . (!empty($w['age']) ? ", {$w['age']} лет" : '');
+            if (!empty($w['metro_station'])) $lines[] = '🚇 м. ' . $w['metro_station'];
+            if (!empty($w['avg_rating']) && (float)$w['avg_rating'] > 0) {
+                $lines[] = '⭐ Рейтинг ' . $w['avg_rating'] . (!empty($w['rating_count']) ? " ({$w['rating_count']} оценок)" : '');
+            }
+            if (!empty($w['phone'])) $lines[] = '📞 +' . ltrim($w['phone'], '+');
+            $lines[] = '';
+            $lines[] = 'Решите прямо здесь — работник сразу узнает:';
+
+            $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendMessage');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_POSTFIELDS => json_encode([
+                    'chat_id' => (int)$emp['telegram_id'],
+                    'text' => implode("\n", $lines),
+                    'parse_mode' => 'HTML',
+                    'reply_markup' => ['inline_keyboard' => [
+                        [
+                            ['text' => '✅ Одобрить', 'callback_data' => 'appok_' . $app['id']],
+                            ['text' => '❌ Отклонить', 'callback_data' => 'appno_' . $app['id']],
+                        ],
+                        [['text' => '💬 Написать кандидату', 'callback_data' => 'appmsg_' . $app['id']]],
+                        [['text' => '👤 Открыть в JobToo', 'url' => 'https://t.me/JobToo_bot/app']],
+                    ]],
+                ]),
+            ]);
+            $resp = curl_exec($ch); curl_close($ch);
+            $dec = json_decode($resp ?: 'null', true);
+            return is_array($dec) && ($dec['ok'] ?? false);
+}
+
+
+function notify_user(string $userId, string $title, string $body, string $type = '', array $data = []): void {
+    if ($userId === '') return;
+
+    $since = gmdate('Y-m-d\TH:i:s\Z', time() - 60);
+    $dup = sb_select('jm_notifications', [
+        'user_id'    => 'eq.' . $userId,
+        'title'      => 'eq.' . $title,
+        'created_at' => 'gte.' . $since,
+    ], 'id');
+    if ($dup) return;
+
+    $row = ['user_id' => $userId, 'title' => $title, 'body' => $body];
+    if ($type !== '') $row['type'] = $type;
+    try {
+        sb_insert('jm_notifications', $row);
+    } catch (Throwable $e) {
+        // Колонки type может не быть — пишем без неё, колокольчик важнее.
+        sb_insert('jm_notifications', ['user_id' => $userId, 'title' => $title, 'body' => $body]);
+    }
+
+    $u = sb_single('jm_users', ['id' => 'eq.' . $userId], 'telegram_id,push_token');
+    if (!$u) return;
+    if (!empty($u['telegram_id'])) {
+        tg_send_message((int)$u['telegram_id'],
+            '<b>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . "</b>\n\n"
+            . htmlspecialchars($body, ENT_QUOTES, 'UTF-8'), true, '🚀 Открыть JobToo');
+    }
+    if (!empty($u['push_token'])) {
+        expo_push([[
+            'to' => $u['push_token'], 'title' => $title, 'body' => $body,
+            'sound' => 'default', 'priority' => 'high', 'channelId' => 'matches',
+            'data' => array_merge(['type' => $type], $data),
+        ]]);
+    }
+}
+
+
+/**
  * Понедельничный пост в группу «ПОДРАБОТКИ»: актуальные постоянные вакансии,
  * сгруппированные по роли и отсортированные по убыванию зарплаты. Каждая
  * станция — ссылка, открывающая вакансию в мини-аппе. Возвращает bool.
@@ -1076,54 +1186,10 @@ try {
 
         // args: [employerId, workerId, vacancyId, vacancyTitle]
         // Директору в Telegram: карточка кандидата + кнопки Одобрить/Отклонить
-        case 'tgNotifyNewApplication': {
-            [$employerId, $workerId, $vacancyId, $vTitle] = [$args[0], $args[1], $args[2], (string)($args[3] ?? '')];
-            $emp = sb_single('jm_users', ['id' => 'eq.' . $employerId], 'telegram_id');
-            if (!$emp || empty($emp['telegram_id'])) { $data = false; break; }
-
-            $app = sb_single('jm_perm_applications', [
-                'vacancy_id' => 'eq.' . $vacancyId,
-                'worker_id'  => 'eq.' . $workerId,
-                'order'      => 'created_at.desc',
-            ], 'id');
-            if (!$app) { $data = false; break; }
-
-            $w = sb_single('jm_users', ['id' => 'eq.' . $workerId], 'first_name,last_name,age,metro_station,phone,avg_rating,rating_count');
-            $name = trim(($w['first_name'] ?? '') . ' ' . ($w['last_name'] ?? '')) ?: 'Кандидат';
-            $lines = ["📥 <b>Новая заявка на «{$vTitle}»</b>", ''];
-            $lines[] = '👤 ' . $name . (!empty($w['age']) ? ", {$w['age']} лет" : '');
-            if (!empty($w['metro_station'])) $lines[] = '🚇 м. ' . $w['metro_station'];
-            if (!empty($w['avg_rating']) && (float)$w['avg_rating'] > 0) {
-                $lines[] = '⭐ Рейтинг ' . $w['avg_rating'] . (!empty($w['rating_count']) ? " ({$w['rating_count']} оценок)" : '');
-            }
-            if (!empty($w['phone'])) $lines[] = '📞 +' . ltrim($w['phone'], '+');
-            $lines[] = '';
-            $lines[] = 'Решите прямо здесь — работник сразу узнает:';
-
-            $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendMessage');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                CURLOPT_TIMEOUT => 10,
-                CURLOPT_POSTFIELDS => json_encode([
-                    'chat_id' => (int)$emp['telegram_id'],
-                    'text' => implode("\n", $lines),
-                    'parse_mode' => 'HTML',
-                    'reply_markup' => ['inline_keyboard' => [
-                        [
-                            ['text' => '✅ Одобрить', 'callback_data' => 'appok_' . $app['id']],
-                            ['text' => '❌ Отклонить', 'callback_data' => 'appno_' . $app['id']],
-                        ],
-                        [['text' => '💬 Написать кандидату', 'callback_data' => 'appmsg_' . $app['id']]],
-                        [['text' => '👤 Открыть в JobToo', 'url' => 'https://t.me/JobToo_bot/app']],
-                    ]],
-                ]),
-            ]);
-            $resp = curl_exec($ch); curl_close($ch);
-            $dec = json_decode($resp ?: 'null', true);
-            $data = is_array($dec) && ($dec['ok'] ?? false);
+        // args: [employerId, workerId, vacancyId, vacancyTitle]
+        case 'tgNotifyNewApplication':
+            $data = tg_new_application_card((string)$args[0], (string)$args[1], (string)$args[2], (string)($args[3] ?? ''));
             break;
-        }
 
         // Ежедневные авто-касания (вызывается кроном раз в день):
         // 1) напоминания директорам о необработанных заявках (каждый день)
@@ -1488,6 +1554,19 @@ try {
             ]);
             $written = sb_upsert('jm_likes', $row, 'vacancy_id,worker_id', true);
             if (empty($written)) throw new RuntimeException('Like not saved: permission denied');
+
+            // Директору об отклике на смену — тоже отсюда. Тот же случай, что
+            // и с постоянными вакансиями: раньше сообщение слал телефон
+            // соискателя уже после записи, и терялось оно молча.
+            $justApplied = !empty($row['worker_liked']) && empty($base['worker_liked']);
+            if ($justApplied && !empty($eid)) {
+                $w = sb_single('jm_users', ['id' => 'eq.' . $wid], 'first_name,last_name');
+                $v = sb_single('jm_vacancies', ['id' => 'eq.' . $vid], 'title');
+                $wName = trim(($w['first_name'] ?? '') . ' ' . ($w['last_name'] ?? '')) ?: 'Кандидат';
+                notify_user((string)$eid, '📥 Новый отклик!',
+                    $wName . ' хочет выйти на смену «' . ($v['title'] ?? 'смена') . '». Посмотрите кандидата!',
+                    'new_applicant');
+            }
             $data = $row; break;
         }
 
@@ -1746,12 +1825,25 @@ try {
             // списке и решал вслепую, а сказать о себе человеку было негде —
             // при том что именно на постоянные приходится большая часть
             // откликов. Теперь отклик открывает переписку, как и на сменах.
+            $pv = sb_single('jm_perm_vacancies', ['id' => 'eq.' . $vid], 'title,company');
             if ($sm) {
-                $pv = sb_single('jm_perm_vacancies', ['id' => 'eq.' . $vid], 'title,company');
                 $data = chat_ensure($wid, $eid, (string)$vid,
                     (string)($pv['title'] ?? ''), (string)($pv['company'] ?? ''),
                     $sm, 0, 1, true);
             }
+
+            // Директору — здесь же, а не с телефона соискателя. Раньше отклик
+            // сохранялся, а сообщение слал клиент: старая версия или обрыв
+            // связи — и о кандидате никто не узнавал.
+            $w = sb_single('jm_users', ['id' => 'eq.' . $wid], 'first_name,last_name');
+            $wName = trim(($w['first_name'] ?? '') . ' ' . ($w['last_name'] ?? '')) ?: 'Кандидат';
+            $vTitle = (string)($pv['title'] ?? 'вакансию');
+            notify_user((string)$eid, '📥 Новая заявка!',
+                "{$wName} откликнулся на вакансию «{$vTitle}». Посмотрите кандидата!",
+                'new_perm_applicant');
+            // И карточка с кнопками «Одобрить/Отклонить» — решение в один тап,
+            // не открывая приложение.
+            tg_new_application_card((string)$eid, (string)$wid, (string)$vid, $vTitle);
             break;
         }
 

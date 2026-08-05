@@ -25,7 +25,6 @@ import {
   dbGetPermVacancies,
 } from '@/services/db';
 import { METRO_LINES } from '@/constants/metro';
-import { notifyEmployerNewPermApplicant } from '@/services/notifications';
 
 import { rs, rf } from '@/constants/scale';
 import { ApplySheet } from '@/components/feature/ApplySheet';
@@ -190,13 +189,10 @@ export default function PermVacancyDetailScreen() {
       await dbApplyPermVacancy(vacancy.id, currentUser.id, vacancy.employerId, message);
       setApplyOpen(false);
       await refreshPermApplications();
-      notifyEmployerNewPermApplicant(
-        vacancy.employerId,
-        `${currentUser.firstName} ${currentUser.lastName}`,
-        vacancy.title,
-        currentUser.id,
-        vacancy.id,
-      ).catch(() => {});
+      // Директора уведомляет сервер при создании отклика — и сообщением, и
+      // карточкой с кнопками в телеграме. Раньше это делал телефон соискателя
+      // уже после записи: старая версия или обрыв связи — и директор не
+      // узнавал ничего, а ошибка глоталась молча.
       showToast('Отклик отправлен! 📨', 'success');
     } catch {
       showToast('Не удалось отправить отклик', 'error');
