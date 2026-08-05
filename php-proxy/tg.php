@@ -443,7 +443,7 @@ if ($adminChat !== 0 && $chatId === $adminChat && $text !== '') {
     }
 }
 
-// Всё остальное — сохраняем и пересылаем.
+// Всё остальное: сохраняем, пробуем ответить сами, пересылаем.
 if ($text !== '' && $chatId !== $adminChat) {
     $u = sb_one('jm_users', ['telegram_id' => 'eq.' . $chatId],
         'id,first_name,last_name,phone,role,metro_station');
@@ -457,27 +457,61 @@ if ($text !== '' && $chatId !== $adminChat) {
         'created_at' => now_iso(),
     ]);
 
+    require_once __DIR__ . '/bot_brain.php';
+    $ans = bot_answer($u ?? [], $text);
+
+    // Назвал станцию, а в профиле пусто — запоминаем. Именно этого нам не
+    // хватает, чтобы предлагать смены рядом, а не веером по всей Москве.
+    if ($ans && !empty($ans['station']) && $u && empty($u['metro_station'])) {
+        $stations = bot_stations();
+        sb('PATCH', 'jm_users', ['id' => 'eq.' . $u['id']], [
+            'metro_station' => $ans['station'],
+            'metro_line_id' => $stations[$ans['station']] ?? null,
+        ]);
+    }
+
+    if ($ans) {
+        $payload = ['chat_id' => $chatId, 'text' => $ans['text']];
+        if (!empty($ans['button'])) {
+            $payload['reply_markup'] = ['inline_keyboard' => [[
+                ['text' => '🚀 Открыть JobToo', 'url' => BOT_APP_URL],
+            ]]];
+        }
+        tg('sendMessage', $payload);
+        sb('PATCH', 'jm_bot_messages',
+            ['telegram_id' => 'eq.' . $chatId, 'answered' => 'is.false'], ['answered' => true]);
+    } else {
+        // Не поняли — так и говорим. Придумывать ответ хуже, чем передать
+        // человеку: выдуманному ответу человек поверит.
+        tg('sendMessage', ['chat_id' => $chatId,
+            'text' => 'Спасибо, получил. Передал Никите — он ответит здесь же.']);
+    }
+
     if ($adminChat !== 0) {
+        $mark = $ans === null                     ? '❗ <b>нужен ваш ответ</b>'
+              : ($ans['escalate'] === 'urgent'    ? '🔴 <b>срочно</b>'
+              : ($ans['escalate'] === 'need'      ? '❗ <b>нужен ваш ответ</b>'
+              : '🤖 бот ответил сам'));
         $who = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: $firstName ?: 'Без имени';
         $meta = array_filter([
             $u['role'] ?? null,
             $u['phone'] ?? null,
-            $u['metro_station'] ?? null,
+            $ans['station'] ?? ($u['metro_station'] ?? null),
         ]);
-        tg('sendMessage', [
-            'chat_id' => $adminChat,
-            'text' => "📩 <b>" . htmlspecialchars($who, ENT_QUOTES, 'UTF-8') . "</b>"
-                . ($meta ? "\n" . htmlspecialchars(implode(' · ', $meta), ENT_QUOTES, 'UTF-8') : '')
-                . "\n\n" . htmlspecialchars($text, ENT_QUOTES, 'UTF-8')
-                . "\n\n<i>Ответьте на это сообщение — человек получит ваш текст.</i> #w{$chatId}",
-            'parse_mode' => 'HTML',
-        ]);
+        // Копию шлём всегда, даже когда бот справился: видеть разговор целиком
+        // важнее, чем беречь ленту — вмешаться можно в любой момент.
+        if ($ans === null || $ans['escalate'] !== 'none') {
+            tg('sendMessage', [
+                'chat_id' => $adminChat,
+                'text' => "📩 <b>" . htmlspecialchars($who, ENT_QUOTES, 'UTF-8') . "</b>  " . $mark
+                    . ($meta ? "\n" . htmlspecialchars(implode(' · ', $meta), ENT_QUOTES, 'UTF-8') : '')
+                    . "\n\n" . htmlspecialchars($text, ENT_QUOTES, 'UTF-8')
+                    . "\n\n<i>Ответьте на это сообщение — человек получит ваш текст.</i> #w{$chatId}",
+                'parse_mode' => 'HTML',
+            ]);
+        }
     }
 
-    // Человеку — что его услышали. Обещать ответ можно: сообщение лежит в
-    // ящике и пришло живому человеку, а не в пустоту, как раньше.
-    tg('sendMessage', ['chat_id' => $chatId,
-        'text' => 'Спасибо, получили — ответим здесь же.']);
     echo json_encode(['ok' => true]); exit;
 }
 

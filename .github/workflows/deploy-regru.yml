@@ -39,6 +39,9 @@ jobs:
           cp php-proxy/tg.php dist/api/tg.php
           cp php-proxy/admin.php dist/api/admin.php
           cp php-proxy/tgtool.php dist/api/tgtool.php
+          # База знаний бота и список станций к ней — их подключает tg.php
+          cp php-proxy/bot_brain.php dist/api/bot_brain.php
+          cp php-proxy/metro_stations.php dist/api/metro_stations.php
           cp assets/images/favicon.ico dist/favicon.ico
           cp public/.htaccess dist/.htaccess
 
