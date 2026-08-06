@@ -1512,8 +1512,18 @@ try {
                 if (!$u || empty($u['telegram_id'])) { $skipped[] = $uid; continue; }
                 $name = htmlspecialchars((string)($u['first_name'] ?? ''), ENT_QUOTES, 'UTF-8');
                 $text = str_replace('{name}', $name, $tpl);
-                if (tg_send_message((int)$u['telegram_id'], $text)) $sent[] = $uid;
-                else $skipped[] = $uid;
+                if (tg_send_message((int)$u['telegram_id'], $text)) {
+                    $sent[] = $uid;
+                    // В журнал: без этого ответ человека прилетит без вопроса,
+                    // на который он отвечает, и понять его будет нельзя.
+                    try {
+                        sb_insert('jm_bot_messages', [
+                            'id' => uid(), 'user_id' => $u['id'], 'telegram_id' => (int)$u['telegram_id'],
+                            'direction' => 'out', 'name' => 'Никита', 'topic' => 'outreach',
+                            'text' => $text, 'created_at' => now_iso(),
+                        ]);
+                    } catch (Throwable $e) {}
+                } else $skipped[] = $uid;
             }
             $data = ['sent' => count($sent), 'skipped' => $skipped];
             break;

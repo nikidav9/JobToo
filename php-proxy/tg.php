@@ -106,6 +106,47 @@ function setting_set(string $key, string $value): void {
         'return=minimal,resolution=merge-duplicates');
 }
 
+// ── Ящик переписки с ботом ───────────────────────────────────────────────────
+//
+// Пишем обе стороны. Раньше сохранялись только входящие, и карточка
+// администратору приходила голой строкой: человек отвечал на вопрос, заданный
+// шесть часов назад, а в телеграм прилетало «Да я работаю щас» с пометкой
+// «нужен ваш ответ» — понять, о чём это, было нельзя.
+
+function bot_log(int $chatId, string $direction, string $text, array $extra = []): void {
+    sb('POST', 'jm_bot_messages', [], array_merge([
+        'id' => uid(),
+        'telegram_id' => $chatId,
+        'direction' => $direction,
+        'text' => $text,
+        'created_at' => now_iso(),
+    ], array_filter($extra, fn($v) => $v !== null)));
+}
+
+/** Последние ходы переписки, свежие первыми. */
+function bot_history(int $chatId, int $limit = 4): array {
+    return sb('GET', 'jm_bot_messages', [
+        'select' => 'direction,text,created_at',
+        'telegram_id' => 'eq.' . $chatId,
+        'order' => 'created_at.desc',
+        'limit' => (string)$limit,
+    ]);
+}
+
+/** Блок «до этого» для карточки. Пусто — значит человек пишет впервые. */
+function bot_history_block(array $rows): string {
+    if (empty($rows)) return "\n\n<i>Пишет впервые.</i>";
+    $lines = [];
+    foreach (array_reverse($rows) as $r) {
+        $t = trim(preg_replace('/\s+/u', ' ', (string)($r['text'] ?? '')));
+        if ($t === '') continue;
+        if (mb_strlen($t, 'UTF-8') > 90) $t = mb_substr($t, 0, 90, 'UTF-8') . '…';
+        $lines[] = (($r['direction'] ?? 'in') === 'out' ? '🤖 ' : '👤 ')
+                 . htmlspecialchars($t, ENT_QUOTES, 'UTF-8');
+    }
+    return $lines ? "\n\n<i>До этого:</i>\n" . implode("\n", $lines) : '';
+}
+
 /** Создаёт чат работник↔директор по вакансии (или возвращает существующий) */
 function ensure_chat(string $workerId, string $employerId, string $vacancyId, string $vacTitle, string $company, string $systemMsg): string {
     $ex = sb_one('jm_chats', ['vacancy_id' => 'eq.' . $vacancyId, 'worker_id' => 'eq.' . $workerId], 'id');
@@ -435,6 +476,8 @@ if ($adminChat !== 0 && $chatId === $adminChat && $text !== '') {
     if ($src !== '' && preg_match('/#w(\d+)/', $src, $rm)) {
         $to = (int)$rm[1];
         $ok = tg('sendMessage', ['chat_id' => $to, 'text' => $text]);
+        // Свой ответ тоже в журнал: иначе через день не вспомнить, что уже сказано.
+        bot_log($to, 'out', $text, ['name' => 'Никита', 'topic' => 'admin']);
         tg('sendMessage', ['chat_id' => $chatId,
             'text' => ($ok['ok'] ?? false) ? '✅ Отправлено' : '⚠️ Не доставлено']);
         sb('PATCH', 'jm_bot_messages', ['telegram_id' => 'eq.' . $to, 'answered' => 'is.false'],
@@ -447,14 +490,16 @@ if ($adminChat !== 0 && $chatId === $adminChat && $text !== '') {
 if ($text !== '' && $chatId !== $adminChat) {
     $u = sb_one('jm_users', ['telegram_id' => 'eq.' . $chatId],
         'id,first_name,last_name,phone,role,metro_station');
-    sb('POST', 'jm_bot_messages', [], [
-        'id' => uid(),
+    $who = trim(($u['first_name'] ?? $firstName) . ' ' . ($u['last_name'] ?? ''));
+
+    // Переписку читаем ДО того, как записать новое сообщение: в карточке
+    // нужно «что было раньше», а не «что было раньше вместе с этим».
+    $history = bot_history($chatId, 4);
+
+    bot_log($chatId, 'in', $text, [
         'user_id' => $u['id'] ?? null,
-        'telegram_id' => $chatId,
-        'name' => trim(($u['first_name'] ?? $firstName) . ' ' . ($u['last_name'] ?? '')),
+        'name' => $who,
         'username' => $msg['from']['username'] ?? null,
-        'text' => $text,
-        'created_at' => now_iso(),
     ]);
 
     require_once __DIR__ . '/bot_brain.php';
@@ -485,13 +530,15 @@ if ($text !== '' && $chatId !== $adminChat) {
             ]]];
         }
         tg('sendMessage', $payload);
+        bot_log($chatId, 'out', $ans['text'], ['name' => 'JobToo', 'topic' => $ans['topic'] ?? null]);
         sb('PATCH', 'jm_bot_messages',
             ['telegram_id' => 'eq.' . $chatId, 'answered' => 'is.false'], ['answered' => true]);
     } else {
         // Не поняли — так и говорим. Придумывать ответ хуже, чем передать
         // человеку: выдуманному ответу человек поверит.
-        tg('sendMessage', ['chat_id' => $chatId,
-            'text' => 'Спасибо, получил. Передал Никите — он ответит здесь же.']);
+        $ack = 'Спасибо, получил. Передал Никите — он ответит здесь же.';
+        tg('sendMessage', ['chat_id' => $chatId, 'text' => $ack]);
+        bot_log($chatId, 'out', $ack, ['name' => 'JobToo', 'topic' => 'ack']);
     }
 
     if ($adminChat !== 0) {
@@ -499,7 +546,6 @@ if ($text !== '' && $chatId !== $adminChat) {
               : ($ans['escalate'] === 'urgent'    ? '🔴 <b>срочно</b>'
               : ($ans['escalate'] === 'need'      ? '❗ <b>нужен ваш ответ</b>'
               : '🤖 бот ответил сам'));
-        $who = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: $firstName ?: 'Без имени';
         $meta = array_filter([
             $u['role'] ?? null,
             $u['phone'] ?? null,
@@ -510,9 +556,10 @@ if ($text !== '' && $chatId !== $adminChat) {
         if ($ans === null || $ans['escalate'] !== 'none') {
             tg('sendMessage', [
                 'chat_id' => $adminChat,
-                'text' => "📩 <b>" . htmlspecialchars($who, ENT_QUOTES, 'UTF-8') . "</b>  " . $mark
+                'text' => "📩 <b>" . htmlspecialchars($who ?: 'Без имени', ENT_QUOTES, 'UTF-8') . "</b>  " . $mark
                     . ($meta ? "\n" . htmlspecialchars(implode(' · ', $meta), ENT_QUOTES, 'UTF-8') : '')
                     . "\n\n" . htmlspecialchars($text, ENT_QUOTES, 'UTF-8')
+                    . bot_history_block($history)
                     . "\n\n<i>Ответьте на это сообщение — человек получит ваш текст.</i> #w{$chatId}",
                 'parse_mode' => 'HTML',
             ]);
