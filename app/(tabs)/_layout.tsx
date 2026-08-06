@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Tabs } from 'expo-router';
 import {
   Platform, View, Text, StyleSheet, PanResponder, Dimensions, Animated,
@@ -16,7 +16,7 @@ import NotificationPermissionSheet from '@/components/NotificationPermissionShee
 import CompleteProfileSheet from '@/components/CompleteProfileSheet';
 import EntryTransition from '@/components/EntryTransition';
 import { OnboardingOverlay } from '@/components/OnboardingOverlay';
-import { setOnboardingTarget } from '@/lib/onboardingTargets';
+import { setOnboardingTarget, registerOnboardingMeasurer } from '@/lib/onboardingTargets';
 import { matchBadgeCount } from '@/services/matchCounts';
 
 import { rs, rf } from '@/constants/scale';
@@ -57,6 +57,19 @@ function FloatingTabBar({
 
   // Animated value = floating-point tab index (e.g. 1.5 while sliding)
   const animIndex = useRef(new Animated.Value(0)).current;
+
+  // Вкладка «Мэтчи» — цель подсветки в обучении. Меряем по ссылке, а не по
+  // событию раскладки: e.currentTarget в onLayout не всегда умеет
+  // measureInWindow, и вызов молча пропускался — подсветка оставалась без
+  // координат. И оставляем способ перемерить: первый замер на iOS часто
+  // возвращает нули, а второй попытки раньше не было.
+  const matchesTabRef = useRef<View>(null);
+  const measureMatchesTab = useCallback(() => {
+    matchesTabRef.current?.measureInWindow((x, y, w, h) => {
+      if (w > 0 && h > 0) setOnboardingTarget('matchesTab', { x, y, w, h });
+    });
+  }, []);
+  useEffect(() => registerOnboardingMeasurer('matchesTab', measureMatchesTab), [measureMatchesTab]);
 
   // Which of our tabs is currently focused
   const focusedTabIdx = Math.max(0, tabs.findIndex(t => {
@@ -154,11 +167,8 @@ function FloatingTabBar({
               <View
                 key={tab.route}
                 style={fS.tabItem}
-                onLayout={tab.route === 'matches' ? (e) => {
-                  (e.currentTarget as any)?.measureInWindow?.((x: number, y: number, w: number, h: number) => {
-                    if (w > 0) setOnboardingTarget('matchesTab', { x, y, w, h });
-                  });
-                } : undefined}
+                ref={tab.route === 'matches' ? matchesTabRef : undefined}
+                onLayout={tab.route === 'matches' ? measureMatchesTab : undefined}
               >
                 <View>
                   <Ionicons

@@ -151,7 +151,7 @@ function bot_date_ru(string $iso): string {
 function bot_shifts_near(?string $station, int $limit = 5): array {
     $today = gmdate('Y-m-d', time() + 3 * 3600);
     $rows = sb('GET', 'jm_vacancies', [
-        'select' => 'id,title,company,metro_station,address,date,time_start,time_end,salary',
+        'select' => 'id,title,company,work_type,metro_station,address,date,time_start,time_end,salary',
         'status' => 'eq.open',
         'date'   => 'gte.' . $today,
         'order'  => 'date.asc',
@@ -172,8 +172,12 @@ function bot_shifts_near(?string $station, int $limit = 5): array {
 function bot_shift_line(array $v): string {
     $when = bot_date_ru((string)($v['date'] ?? ''));
     $time = ($v['time_start'] ?? '') !== '' ? ' ' . $v['time_start'] . '–' . $v['time_end'] : '';
-    $pay  = ((float)($v['salary'] ?? 0)) > 0
-        ? number_format((float)$v['salary'], 0, ',', ' ') . ' ₽'
+    // У кладовщика оплата сдельная, и сумма — ориентир. Знак «примерно»
+    // стоит везде, где она показана: человек, пришедший за обещанной суммой
+    // и получивший меньше, прав, считая себя обманутым.
+    $sum = (float)($v['salary'] ?? 0);
+    $pay = $sum > 0
+        ? ((($v['work_type'] ?? '') === 'stocker' ? '≈ ' : '') . number_format($sum, 0, ',', ' ') . ' ₽')
         : 'оплата сдельная, нормативы в карточке';
     $far  = '';
     if (isset($v['_stops'])) {

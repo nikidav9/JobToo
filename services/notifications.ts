@@ -430,14 +430,17 @@ export async function notifyWorkersNearVacancy(params: {
   salary?: number;
   schedule?: string;   // для постоянных
   vacancyId?: string;  // перм. вакансии: кнопка ведёт прямо на неё
+  estimated?: boolean; // сдельная оплата: сумма — ориентир, а не обещание
 }): Promise<void> {
   try {
-    const { metroStation, title, company, type, date, daysCount, timeStart, timeEnd, salary, schedule, vacancyId } = params;
+    const { metroStation, title, company, type, date, daysCount, timeStart, timeEnd, salary, schedule, vacancyId, estimated } = params;
 
     const dateLabel = formatDateRu(date) + (daysCount && daysCount > 1 ? ` (+${daysCount - 1} дн.)` : '');
     const timeLabel = timeStart ? `${timeStart}${timeEnd ? `–${timeEnd}` : ''}` : '';
+    // «≈» у сдельной оплаты: человек, пришедший за обещанной суммой и
+    // получивший меньше, прав, считая себя обманутым.
     const salaryLabel = salary && salary > 0
-      ? `${salary.toLocaleString('ru-RU')} ₽${type === 'permanent' ? '/мес' : ''}`
+      ? `${estimated ? '≈ ' : ''}${salary.toLocaleString('ru-RU')} ₽${type === 'permanent' ? '/мес' : ''}`
       : '';
 
     // Сервер разошлёт тем, кому до этой станции реально ехать: своя ветка,

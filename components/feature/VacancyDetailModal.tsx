@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/hooks/useApp';
 import { ReplyBadge } from '@/components/feature/ReplyBadge';
+import { payShort, isEstimatedPay, PAY_ESTIMATE_HINT } from '@/services/pay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { User, Vacancy } from '@/constants/types';
@@ -89,6 +90,19 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
               />
             </View>
 
+            {/* Оплата. У сдельных ролей это ориентир, и так и написано:
+                человек, пришедший за обещанной суммой и получивший меньше,
+                прав, считая себя обманутым. */}
+            {payShort(vacancy.salary, vacancy.workType) ? (
+              <>
+                <Text style={styles.secLabel}>Оплата за смену</Text>
+                <Text style={styles.payBig}>{payShort(vacancy.salary, vacancy.workType)}</Text>
+                {isEstimatedPay(vacancy.workType) ? (
+                  <Text style={styles.payHint}>{PAY_ESTIMATE_HINT}</Text>
+                ) : null}
+              </>
+            ) : null}
+
             {/* Norms */}
             {vacancy.normsAndPay ? (
               <>
@@ -154,6 +168,8 @@ const styles = StyleSheet.create({
   jobTitle: { fontSize: rf(22), fontWeight: '800', color: Colors.textPrimary, lineHeight: rf(28) },
   secLabel: { fontSize: rf(13), color: Colors.textMuted, fontWeight: '500', marginTop: rs(4) },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: rs(6) },
+  payBig: { fontSize: rf(24), fontWeight: '800', color: Colors.textPrimary, marginTop: rs(2) },
+  payHint: { fontSize: rf(12.5), color: Colors.textMuted, lineHeight: rf(18), marginTop: rs(4) },
   condText: { fontSize: rf(14), color: '#374151', lineHeight: rf(22) },
   progressWrap: { marginTop: rs(8), gap: rs(6) },
   progressTrack: { height: rs(4), backgroundColor: Colors.divider, borderRadius: rs(2), overflow: 'hidden' },

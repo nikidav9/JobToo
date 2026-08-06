@@ -34,3 +34,24 @@ export function setOnboardingFlag(key: string, val: boolean) {
 export function getOnboardingFlag(key: string): boolean | undefined {
   return flags[key];
 }
+
+// ── Перемер по требованию ────────────────────────────────────────────────────
+//
+// Одного onLayout мало. На iOS первый замер нередко возвращает нули, и тогда
+// цель не регистрируется вовсе — а второй попытки не было. Так и вышло с
+// вкладкой «Мэтчи» и с кнопкой «+»: подсветка рисовалась по запасным
+// координатам, то есть мимо, а когда запасные убрали — не рисовалась совсем.
+//
+// Теперь элемент оставляет здесь способ измерить себя, а оверлей просит
+// перемерить в тот момент, когда собирается рисовать.
+
+const measurers: Record<string, () => void> = {};
+
+export function registerOnboardingMeasurer(key: string, fn: () => void): () => void {
+  measurers[key] = fn;
+  return () => { if (measurers[key] === fn) delete measurers[key]; };
+}
+
+export function measureOnboardingTargets(): void {
+  Object.values(measurers).forEach(fn => { try { fn(); } catch {} });
+}

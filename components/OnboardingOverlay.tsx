@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { getOnboardingTarget, getOnboardingFlag, subscribeOnboardingTargets } from '@/lib/onboardingTargets';
+import { getOnboardingTarget, getOnboardingFlag, subscribeOnboardingTargets, measureOnboardingTargets } from '@/lib/onboardingTargets';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
 
 import { rs, rf } from '@/constants/scale';
@@ -119,6 +119,17 @@ export function OnboardingOverlay() {
 
   // Перерисовка, когда элементы сообщают свои измеренные позиции
   useEffect(() => subscribeOnboardingTargets(() => force(n => n + 1)), []);
+
+  // И просим перемерить в тот момент, когда собираемся рисовать. Первый
+  // замер при раскладке нередко приходит с нулями — тогда цели просто нет,
+  // и шаг оставался без подсветки. Второй раз с задержкой: на Android
+  // отступы применяются позже первой раскладки.
+  useEffect(() => {
+    if (!visible) return;
+    measureOnboardingTargets();
+    const t = setTimeout(measureOnboardingTargets, 300);
+    return () => clearTimeout(t);
+  }, [visible, step]);
 
   useEffect(() => {
     if (!user) { setVisible(false); return; }

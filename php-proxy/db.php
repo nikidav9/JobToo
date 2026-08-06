@@ -852,7 +852,7 @@ function shift_nudge_run(): array {
 
     $today = gmdate('Y-m-d', time() + 3 * 3600);
     $open = sb_select('jm_vacancies', ['status' => 'eq.open', 'date' => 'gte.' . $today],
-        'id,title,company,metro_station,date,time_start,time_end,salary');
+        'id,title,company,work_type,metro_station,date,time_start,time_end,salary');
     if (empty($open)) return ['sent' => 0, 'silent' => 0, 'note' => 'открытых смен нет'];
 
     // Кому уже писали за последние два дня.

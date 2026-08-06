@@ -357,6 +357,7 @@ export default function CreateVacancy() {
             metroStation, title: meta.label, company: base.company, type: 'shift',
             date: vacs[0]?.date, daysCount: vacs.length,
             timeStart: base.timeStart, timeEnd: base.timeEnd, salary: base.salary,
+            estimated: isStorcker,
           }).catch(() => {});
         }
         showToast(`Опубликовано ${dates.length} вакансий`, 'success');
@@ -375,6 +376,7 @@ export default function CreateVacancy() {
           notifyWorkersNearVacancy({
             metroStation, title: meta.label, company: base.company, type: 'shift',
             date: vac.date, timeStart: base.timeStart, timeEnd: base.timeEnd, salary: base.salary,
+            estimated: isStorcker,
           }).catch(() => {});
         }
         showToast('Вакансия опубликована', 'success');
@@ -613,8 +615,9 @@ export default function CreateVacancy() {
 
               <Text style={[styles.sectionLabel, { marginTop: rs(16) }]}>Сколько выходит за смену *</Text>
               <Text style={styles.normHint}>
-                Примерная сумма на руки — её видит работник в карточке и в уведомлении.
-                Без неё в объявлении стоит «оплата сдельная», и на такое не откликаются.
+                Сколько обычно выходит на руки за смену. Работник увидит её со знаком
+                «примерно» и с пояснением, что оплата сдельная, — обещанием это не станет.
+                Без суммы в объявлении стоит «оплата сдельная», и на такое не откликаются.
               </Text>
               {errors.pay ? <Text style={styles.errMsg}>{errors.pay}</Text> : null}
               <View style={styles.normRow}>

@@ -45,12 +45,13 @@ import { TabHeader } from '@/components/ui/TabHeader';
 import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import { MetroMap, MapListItem } from '@/components/feature/MetroMap';
 import { PermApplicationsSheet } from '@/components/feature/PermApplicationsSheet';
-import { setOnboardingTarget, setOnboardingFlag } from '@/lib/onboardingTargets';
+import { setOnboardingTarget, setOnboardingFlag, registerOnboardingMeasurer } from '@/lib/onboardingTargets';
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
 
 import { rs, rf } from '@/constants/scale';
 import { ApplySheet } from '@/components/feature/ApplySheet';
 import { getChatSuggestions } from '@/constants/chatSuggestions';
+import { payShort } from '@/services/pay';
 import { vacancyInfoLines, permVacancyInfoLines } from '@/services/vacancyCard';
 
 // ─── Web push permission banner (iOS PWA requires user gesture) ───────────────
@@ -250,11 +251,12 @@ type AppMode = 'shift' | 'perm';
 
 function ModeSwitcher({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode) => void }) {
   const ref = useRef<View>(null);
-  const measure = () => {
+  const measure = useCallback(() => {
     ref.current?.measureInWindow((x, y, w, h) => {
-      if (w > 0) setOnboardingTarget('switcher', { x, y, w, h });
+      if (w > 0 && h > 0) setOnboardingTarget('switcher', { x, y, w, h });
     });
-  };
+  }, []);
+  useEffect(() => registerOnboardingMeasurer('switcher', measure), [measure]);
   return (
     <View ref={ref} onLayout={measure} style={ms.container}>
       <TouchableOpacity
@@ -838,7 +840,7 @@ function WorkerFeed() {
         station: v.metroStation,
         title: v.title,
         company: v.company,
-        pay: v.salary > 0 ? `${v.salary.toLocaleString('ru-RU')} ₽` : undefined,
+        pay: payShort(v.salary, v.workType),
         meta: `${v.timeStart}–${v.timeEnd}`,
         address: v.address,
         lat: v.lat,
@@ -1409,7 +1411,7 @@ function WorkerPermMode() {
         station: (v.metroStation ?? '') as string,
         title: v.title,
         company: v.company,
-        pay: v.salary > 0 ? `${v.salary.toLocaleString('ru-RU')} ₽` : undefined,
+        pay: payShort(v.salary, v.workType),
         meta: v.schedule,
         address: v.address,
         lat: v.lat,
@@ -1847,6 +1849,14 @@ function EmployerHome() {
   const { currentUser, vacancies, likes, permVacancies, permApplications, refreshVacancies, refreshPermVacancies, refreshPermApplications, refreshLikes, refreshAll, showToast, vacancyStatsMap, permVacancyViewsMap } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
   const fabRef = useRef<View>(null);
+  // Способ перемерить кнопку «+» по требованию: одного onLayout мало —
+  // первый замер нередко приходит с нулями, и цель не регистрируется.
+  const measureFab = useCallback(() => {
+    fabRef.current?.measureInWindow((x, y, w, h) => {
+      if (w > 0 && h > 0) setOnboardingTarget('fab', { x, y, w, h });
+    });
+  }, []);
+  useEffect(() => registerOnboardingMeasurer('fab', measureFab), [measureFab]);
   const [mode, setMode] = useState<AppMode>('shift');
   const [tab, setTab] = useState<'active' | 'closed'>('active');
   // Смена раздела — это переход в другое место, а не продолжение прежнего.
@@ -2209,7 +2219,7 @@ function EmployerHome() {
       {/* Плавающая кнопка создания — видна и когда вакансии уже есть */}
       <TouchableOpacity
         ref={fabRef}
-        onLayout={() => fabRef.current?.measureInWindow((x, y, w, h) => { if (w > 0) setOnboardingTarget('fab', { x, y, w, h }); })}
+        onLayout={measureFab}
         style={[
           styles.fab,
           { bottom: tabBarHeight + 14, backgroundColor: mode === 'shift' ? Colors.primary : '#7C3AED' },

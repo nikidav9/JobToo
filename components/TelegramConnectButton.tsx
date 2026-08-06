@@ -11,7 +11,7 @@ import { Colors, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { dbGetUserById, dbUnbindTelegram, dbTgPrepareLink } from '@/services/db';
 import { isTelegramMiniApp } from '@/lib/telegram';
-import { setOnboardingTarget } from '@/lib/onboardingTargets';
+import { setOnboardingTarget, registerOnboardingMeasurer } from '@/lib/onboardingTargets';
 
 import { rs, rf } from '@/constants/scale';
 
@@ -53,6 +53,17 @@ export function TelegramConnectButton({ size = 24, pad = 6, onboardingAnchor = f
   );
   const [busy, setBusy] = useState(false);
   const btnRef = useRef<View>(null);
+  // Способ перемерить по требованию: первый замер при раскладке часто
+  // приходит с нулями, и цель для подсветки не регистрируется вовсе.
+  const measureAnchor = useCallback(() => {
+    btnRef.current?.measureInWindow((x, y, w, h) => {
+      if (w > 0 && h > 0) setOnboardingTarget('telegram', { x, y, w, h });
+    });
+  }, []);
+  useEffect(() => {
+    if (!onboardingAnchor) return;
+    return registerOnboardingMeasurer('telegram', measureAnchor);
+  }, [onboardingAnchor, measureAnchor]);
   const openRef = useRef(false);
   openRef.current = open;
 
@@ -107,7 +118,7 @@ export function TelegramConnectButton({ size = 24, pad = 6, onboardingAnchor = f
     <>
       <TouchableOpacity
         ref={btnRef}
-        onLayout={onboardingAnchor ? () => btnRef.current?.measureInWindow((x, y, w, h) => { if (w > 0) setOnboardingTarget('telegram', { x, y, w, h }); }) : undefined}
+        onLayout={onboardingAnchor ? measureAnchor : undefined}
         style={{ position: 'relative', padding: pad }}
         onPress={() => { setOpen(true); refreshStatus(); }}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
