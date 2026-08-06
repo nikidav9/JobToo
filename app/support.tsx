@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { helpSectionsFor, supportIsOpen, SUPPORT_FROM_HOUR, SUPPORT_TO_HOUR } from '@/constants/help';
@@ -104,7 +105,12 @@ export default function SupportScreen() {
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           {sections.map(sec => (
             <View key={sec.title} style={s.card}>
-              <Text style={s.secTitle}>{sec.icon}  {sec.title}</Text>
+              <View style={s.secHead}>
+                <View style={s.secIcon}>
+                  <Ionicons name={sec.icon as any} size={16} color="#fff" />
+                </View>
+                <Text style={s.secTitle}>{sec.title}</Text>
+              </View>
               {sec.items.map(item => {
                 const key = sec.title + item.q;
                 const isOpen = open === key;
@@ -119,7 +125,11 @@ export default function SupportScreen() {
                       }}
                     >
                       <Text style={s.q}>{item.q}</Text>
-                      <Text style={s.chev}>{isOpen ? '−' : '+'}</Text>
+                      <Ionicons
+                        name={isOpen ? 'chevron-up' : 'chevron-down'}
+                        size={18}
+                        color={Colors.textMuted}
+                      />
                     </TouchableOpacity>
                     {isOpen ? <Text style={s.a}>{item.a}</Text> : null}
                   </View>
@@ -188,7 +198,7 @@ export default function SupportScreen() {
               activeOpacity={0.85}
             >
               {sending ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={s.sendTxt}>›</Text>}
+                : <Ionicons name="arrow-up" size={20} color="#fff" />}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -215,11 +225,15 @@ const s = StyleSheet.create({
 
   scroll: { padding: rs(16), gap: rs(12), paddingBottom: rs(40) },
   card: { backgroundColor: Colors.bg, borderRadius: Radius.lg, padding: rs(14), ...Shadow.card },
-  secTitle: { fontSize: rf(15), fontWeight: '800', color: Colors.textPrimary, marginBottom: rs(4) },
+  secHead: { flexDirection: 'row', alignItems: 'center', gap: rs(10), marginBottom: rs(2) },
+  secIcon: {
+    width: rs(30), height: rs(30), borderRadius: rs(9), backgroundColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  secTitle: { fontSize: rf(15), fontWeight: '800', color: Colors.textPrimary },
   qaWrap: { borderTopWidth: 1, borderTopColor: Colors.divider, paddingTop: rs(10), marginTop: rs(10) },
   qRow: { flexDirection: 'row', alignItems: 'center', gap: rs(10) },
   q: { flex: 1, fontSize: rf(14.5), fontWeight: '600', color: Colors.textPrimary, lineHeight: rf(20) },
-  chev: { fontSize: rf(20), color: Colors.textMuted, width: rs(18), textAlign: 'center' },
   a: { fontSize: rf(14), color: Colors.textSecondary, lineHeight: rf(21), marginTop: rs(8) },
 
   askBtn: {
