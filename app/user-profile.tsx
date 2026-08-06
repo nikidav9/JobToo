@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Platform,
+  TouchableOpacity, ActivityIndicator, Platform, Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -64,7 +64,7 @@ type Tab = 'info' | 'reviews';
 export default function UserProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId: string }>();
-  const { users } = useApp();
+  const { users, currentUser, likes, permApplications, showToast } = useApp();
 
   const [tab, setTab] = useState<Tab>('info');
   const [ratings, setRatings] = useState<UserRating[]>([]);
@@ -151,6 +151,25 @@ export default function UserProfileScreen() {
   const initials = getInitials(`${user.firstName} ${user.lastName}`);
   const line = METRO_LINES.find(l => l.id === user.metroLineId);
 
+  /**
+   * Телефон показываем только тому, кто уже договорился с этим человеком:
+   * взаимный отклик на смену либо одобренная заявка на постоянную работу.
+   * До этого момента номер — лишняя возможность обойти приложение, а после
+   * него — необходимость: перед сменой созваниваются все.
+   */
+  const canCall = !!currentUser && currentUser.role === 'employer' && isWorker && (
+    likes.some((l: any) => l.workerId === user.id && l.employerId === currentUser.id && l.isMatch)
+    || permApplications.some((a: any) => a.workerId === user.id && a.employerId === currentUser.id
+        && (a.status === 'approved' || a.status === 'hired'))
+  );
+
+  const callWorker = () => {
+    const digits = (user.phone ?? '').replace(/\D/g, '');
+    if (!digits) return;
+    Linking.openURL(`tel:+${digits}`).catch(() =>
+      showToast('Не удалось открыть звонок — номер скопируйте вручную', 'error'));
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -220,6 +239,17 @@ export default function UserProfileScreen() {
                   ) : null}
                   {user.age ? <InfoRow label="Возраст" value={<Text style={styles.valText}>{user.age} лет</Text>} /> : null}
                   <InfoRow label="Специализация" value={<Text style={styles.valText}>📦 Кладовщик</Text>} />
+                  {/* Телефон — только после мэтча, и сразу звонком.
+                      До сих пор номер жил единственной строкой в «Мэтчах»:
+                      директор, зашедший в профиль, чтобы посмотреть человека
+                      перед сменой, звонить оттуда не мог и уходил искать. */}
+                  {canCall && user.phone ? (
+                    <InfoRow label="Телефон" value={
+                      <TouchableOpacity onPress={callWorker} activeOpacity={0.7}>
+                        <Text style={styles.phoneLink}>{formatPhoneRu(user.phone)}</Text>
+                      </TouchableOpacity>
+                    } />
+                  ) : null}
                 </>
               ) : (
                 <>
@@ -292,6 +322,17 @@ export default function UserProfileScreen() {
   );
 }
 
+/**
+ * Номер в человеческом виде: +7 916 587-08-77. В базе он лежит цифрами,
+ * и читать его строкой из одиннадцати знаков, чтобы сверить с записью в
+ * телефоне, — занятие на пустом месте.
+ */
+function formatPhoneRu(raw: string): string {
+  const d = (raw ?? '').replace(/\D/g, '');
+  if (d.length !== 11) return raw;
+  return `+${d[0]} ${d.slice(1, 4)} ${d.slice(4, 7)}-${d.slice(7, 9)}-${d.slice(9)}`;
+}
+
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <View style={styles.infoRow}>
@@ -348,6 +389,10 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: rs(12), paddingVertical: rs(8), borderTopWidth: 1, borderTopColor: Colors.divider },
   infoLabel: { fontSize: rf(14), color: Colors.textMuted, flexShrink: 0 },
   infoValue: { flex: 1, alignItems: 'flex-end' },
+  phoneLink: {
+    fontSize: rf(15), fontWeight: '700', color: Colors.primary,
+    textDecorationLine: 'underline',
+  },
   valText: { fontSize: rf(14), fontWeight: '600', color: Colors.textPrimary, textAlign: 'right' },
   metroVal: { flexDirection: 'row', alignItems: 'center', gap: rs(6) },
   lineDot: { width: rs(10), height: rs(10), borderRadius: rs(5) },
