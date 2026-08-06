@@ -1,4 +1,27 @@
 <?php
+// Ответ прокси должен быть только JSON.
+//
+// Хостинг печатает предупреждения PHP прямо в ответ, и они оказываются ПЕРЕД
+// телом: «<br /><b>Warning</b>: Undefined array key 0…{"data":null}». Клиент
+// разбирает такое как JSON, спотыкается о первый символ и показывает
+// «JSON Parse error: Unexpected character» — по этому тексту понять нельзя
+// ничего. У директора так не публиковалась вакансия.
+//
+// Поэтому: предупреждения не печатаем (в лог хостинга они по-прежнему идут),
+// а всё, что кто-то напечатает мимо, ловим буфером и выбрасываем перед
+// выводом. Тихо ломаться хуже, чем громко, — но ломаться в разборе чужого
+// текста хуже всего.
+@ini_set('display_errors', '0');
+@ini_set('html_errors', '0');
+ob_start();
+
+/** Отдать ответ, отбросив всё, что случайно напечаталось до него. */
+function jt_respond(array $payload, int $code = 200): void {
+    if (ob_get_level() > 0) ob_end_clean();
+    http_response_code($code);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+}
+
 define('SB_URL', 'https://bbiqmkeysalwdonlnylb.supabase.co');
 
 // Ключ доступа к базе.
@@ -46,7 +69,7 @@ header('Access-Control-Allow-Headers: Content-Type, X-App-Secret');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405); echo json_encode(['error' => 'Method not allowed']); exit;
+    jt_respond(['error' => 'Method not allowed'], 405); exit;
 }
 
 // Смена секрета не может быть мгновенной: у части людей приложение уже
@@ -62,14 +85,14 @@ $accepted = array_filter([
 $ok = false;
 foreach ($accepted as $s) { if (hash_equals($s, $provided)) $ok = true; }
 if (!$ok) {
-    http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
+    jt_respond(['error' => 'Forbidden'], 403); exit;
 }
 
 $body = json_decode(file_get_contents('php://input'), true);
 $fn   = $body['fn'] ?? null;
 $args = $body['args'] ?? [];
 
-if (!$fn) { http_response_code(400); echo json_encode(['error' => 'Missing fn']); exit; }
+if (!$fn) { jt_respond(['error' => 'Missing fn'], 400); exit; }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -2282,8 +2305,7 @@ try {
             throw new RuntimeException('Unknown function: ' . $fn);
     }
 
-    echo json_encode(['data' => $data]);
+    jt_respond(['data' => $data]);
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    jt_respond(['error' => $e->getMessage()], 500);
 }
