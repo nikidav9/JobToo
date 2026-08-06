@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, Animated, Easing,
+  View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, Modal, Animated, Easing,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -99,37 +99,26 @@ export function OnboardingOverlay() {
   const app = useApp();
   const user = app?.currentUser ?? null;
   const insets = useSafeAreaInsets();
-  const { width: W, height: H } = Dimensions.get('window');
+  // useWindowDimensions, а не Dimensions.get: размер окна меняется — поворот
+  // экрана, разделённый экран на планшете, изменение окна браузера, — и
+  // подсветка должна переехать вместе с кнопкой, а не остаться где была.
+  const { width: W, height: H } = useWindowDimensions();
 
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
   const [, force] = useState(0);
 
-  // Элементы сообщают геометрию через measureInWindow — это координаты ОКНА
-  // (со статус-баром и т.п.), а оверлей живёт внутри контейнера вкладок со
-  // своим нулём. Разница зависит от устройства, поэтому меряем собственное
-  // положение и вычитаем его — так подсветка совпадает на любом экране.
-  const rootRef = useRef<View>(null);
-  const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null);
-  const measureSelf = () => {
-    rootRef.current?.measureInWindow((x, y, w, h) => {
-      if (w > 0 && h > 0) {
-        setOrigin(prev => (prev && prev.x === x && prev.y === y ? prev : { x, y }));
-      }
-    });
-  };
+  // Элементы сообщают геометрию через measureInWindow — это координаты ОКНА.
+  // Оверлей живёт в модальном окне, которое тоже занимает всё окно целиком,
+  // поэтому пересчитывать ничего не нужно: замеры ложатся один в один.
+  //
+  // Раньше оверлей висел внутри контейнера вкладок и вычитал собственное
+  // положение. Стоило этому положению разойтись с ожидаемым — а оно зависит
+  // от устройства и от того, кто рисует отступы, — и подсветка уезжала мимо
+  // кнопки. На скриншотах кольцо стояло выше и левее «плюса».
 
   // Перерисовка, когда элементы сообщают свои измеренные позиции
   useEffect(() => subscribeOnboardingTargets(() => force(n => n + 1)), []);
-
-  // Перемеряем себя на каждом шаге и чуть позже после появления: на Android
-  // первый onLayout иногда приходит до того, как система применит отступы.
-  useEffect(() => {
-    if (!visible) return;
-    measureSelf();
-    const t = setTimeout(measureSelf, 250);
-    return () => clearTimeout(t);
-  }, [visible, step]);
 
   useEffect(() => {
     if (!user) { setVisible(false); return; }
@@ -146,30 +135,31 @@ export function OnboardingOverlay() {
 
   const isWorker = user.role === 'worker';
   const top = insets.top;
-  const tabBarH = (Platform.OS === 'web' ? 76 : insets.bottom + 64 + 12);
-  const seg = (W - 32) / 5;
 
-  // Измеренные позиции элементов (приходят из feed.tsx через реестр),
-  // с запасным вычислением по геометрии экрана, если замер ещё не пришёл
+  // Позиции элементов — только по замеру, без запасных расчётов.
+  //
+  // Запасные значения тут были хуже, чем их отсутствие: они вычислялись по
+  // размеру экрана и предполагали одну конкретную вёрстку. На чужом
+  // устройстве кольцо вставало мимо кнопки, но с уверенным видом. Не
+  // измерено — значит подсветки нет и подсказка просто стоит по центру.
   const pad = (r: Rect, p: number): Rect => ({ x: r.x - p, y: r.y - p, w: r.w + p * 2, h: r.h + p * 2 });
-  // Замер приводим к системе координат оверлея; запасные значения уже в ней
-  const measured = (key: string): Rect | null => {
+  const measured = (key: string, p = 6): Rect | undefined => {
     const t = getOnboardingTarget(key);
-    if (!t) return null;
-    const o = origin ?? { x: 0, y: 0 };
-    return { x: t.x - o.x, y: t.y - o.y, w: t.w, h: t.h };
+    return t && t.w > 0 && t.h > 0 ? pad(t, p) : undefined;
   };
-  const rSwitcher: Rect = pad(measured('switcher') ?? { x: 14, y: top + 52, w: W - 28, h: 48 }, 6);
-  const cardTarget = measured('card') ?? { x: 16, y: top + 150, w: W - 32, h: H * 0.4 };
-  // Есть ли реальная карточка смены. Если нет — покажем демо-карточку компактнее.
+
+  const rSwitcher = measured('switcher');
+  const rFab = measured('fab');
+  const rTelegram = measured('telegram');
+  const rMatchesTab = measured('matchesTab', 4);
+
+  // Есть ли реальная карточка смены. Если нет — рисуем демо-карточку сами,
+  // и вот ей размеры придумать можно: это наша картинка, а не чужая кнопка.
   const hasRealCard = getOnboardingFlag('hasShiftCard') !== false;
-  const rCard: Rect = hasRealCard
-    ? pad(cardTarget, 4)
-    : { x: cardTarget.x + 8, y: cardTarget.y + 8, w: cardTarget.w - 16, h: 208 };
-  const rFab: Rect = pad(measured('fab') ?? { x: W - 16 - 60, y: H - tabBarH - 14 - 60, w: 62, h: 62 }, 6);
-  // Верхняя кнопка Telegram и вкладка «Мэтчи» — тоже по замеру, с запасным расчётом
-  const rTelegram: Rect = pad(measured('telegram') ?? { x: W - 108, y: top + 2, w: 92, h: 46 }, 6);
-  const rMatchesTab: Rect = pad(measured('matchesTab') ?? { x: 16 + seg, y: H - tabBarH - 2, w: seg, h: 62 }, 4);
+  const cardTarget = getOnboardingTarget('card');
+  const rCard: Rect | undefined = hasRealCard
+    ? (cardTarget ? pad(cardTarget, 4) : undefined)
+    : { x: 24, y: top + 158, w: W - 48, h: 208 };
 
   const steps: Step[] = isWorker
     ? [
@@ -207,15 +197,22 @@ export function OnboardingOverlay() {
   };
   const next = () => { if (isLast) finish(); else setStep(step + 1); };
 
-  // Карточка-подсказка: над или под подсветкой, не перекрывая подсвеченный элемент.
-  // Для 'above' прижимаем НИЗ карточки к элементу (высота карточки динамическая — так надёжнее).
+  // Карточка-подсказка: над или под подсветкой, не перекрывая подсвеченный
+  // элемент. Сторону выбираем по свободному месту, а не по тому, что записано
+  // в шаге: на маленьком экране «снизу» может не остаться места вовсе, и
+  // подсказка накрыла бы собой то, на что показывает.
+  //
+  // Для верхнего положения прижимаем НИЗ карточки к элементу: высота её
+  // зависит от длины текста и от размера шрифта на устройстве, а низ известен.
   const cardW = W - 40;
+  const CARD_MIN = 300;
+  const below = s.spot ? H - (s.spot.y + s.spot.h) >= CARD_MIN : false;
   const cardPos: { top?: number; bottom?: number } =
     (!s.spot || s.hint === 'center')
-      ? { top: H / 2 - 150 }
-      : s.hint === 'below'
-      ? { top: Math.min(s.spot.y + s.spot.h + 16, H - 260) }
-      : { bottom: Math.max(H - (s.spot.y - 16), 20) };
+      ? { top: Math.max(insets.top + 24, H / 2 - 170) }
+      : below
+      ? { top: s.spot.y + s.spot.h + 16 }
+      : { bottom: Math.max(H - s.spot.y + 16, insets.bottom + 20) };
 
   // Радиус подсветки: круглым кнопкам — круг, широким блокам — мягкое скругление
   const spotRadius = (r: Rect) =>
@@ -249,12 +246,9 @@ export function OnboardingOverlay() {
   };
 
   return (
-    <View
-      ref={rootRef}
-      style={StyleSheet.absoluteFill}
-      pointerEvents="auto"
-      onLayout={measureSelf}
-    >
+    <Modal visible transparent animationType="fade" statusBarTranslucent
+      navigationBarTranslucent onRequestClose={finish}>
+      <View style={StyleSheet.absoluteFill} pointerEvents="auto">
       <Spot />
 
       {/* Демо-карточка смены — когда на выбранную дату реальных смен нет */}
@@ -314,7 +308,8 @@ export function OnboardingOverlay() {
           <Text style={st.btnTxt}>{isLast ? 'Понятно, начать!' : 'Далее'}</Text>
         </TouchableOpacity>
       </View>
-    </View>
+      </View>
+    </Modal>
   );
 }
 
