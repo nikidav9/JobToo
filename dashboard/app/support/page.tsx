@@ -55,7 +55,10 @@ export default function SupportPage() {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [users, setUsers] = useState<Record<string, User>>({})
   const [loading, setLoading] = useState(true)
-  const [onlyWaiting, setOnlyWaiting] = useState(true)
+  // Показываем всё. Раньше по умолчанию стоял фильтр «только ждущие», и
+  // страница встречала словами «никто не ждёт ответа» — то есть пустотой,
+  // даже когда обращения были. Открывают её, чтобы видеть, что происходит.
+  const [onlyWaiting, setOnlyWaiting] = useState(false)
   const [updated, setUpdated] = useState('')
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [sending, setSending] = useState<string | null>(null)
@@ -137,13 +140,20 @@ export default function SupportPage() {
     return onlyWaiting ? out.filter(t => t.waiting) : out
   }, [msgs, users, onlyWaiting])
 
-  const waitingCount = msgs.length ? threads.filter(t => t.waiting).length : 0
+  // Считаем по всем разговорам, а не по отфильтрованным: иначе включённый
+  // фильтр прятал бы и сам счётчик того, что он прячет.
+  const allThreads = useMemo(() => new Set(msgs.map(m => m.user_id)).size, [msgs])
+  const waitingCount = useMemo(() => {
+    const last = new Map<string, Msg>()
+    for (const m of msgs) if (!last.has(m.user_id)) last.set(m.user_id, m)  // msgs идут свежими первыми
+    return Array.from(last.values()).filter(m => m.direction === 'in').length
+  }, [msgs])
   const mskHour = (new Date().getUTCHours() + 3) % 24
   const openNow = mskHour >= FROM_HOUR && mskHour < TO_HOUR
 
   return (
     <div>
-      <PageHeader title="Поддержка" lastUpdated={updated} onRefresh={load} />
+      <PageHeader title="Поддержка" intervalSec={30} lastUpdated={updated} onRefresh={load} />
 
       <div style={{ padding: '14px 24px', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <button
@@ -158,7 +168,7 @@ export default function SupportPage() {
           {onlyWaiting ? 'Показать все' : 'Только ждущие ответа'}
         </button>
         <span style={{ fontSize: 13, color: 'var(--ink-4)' }}>
-          {loading ? 'Загружаю…' : `Обращений: ${threads.length}${onlyWaiting ? '' : ` · ждут: ${waitingCount}`}`}
+          {loading ? 'Загружаю…' : `Обращений: ${allThreads} · ждут ответа: ${waitingCount}`}
         </span>
         <span style={{
           marginLeft: 'auto', fontSize: 12.5, fontWeight: 600,

@@ -27,8 +27,10 @@ export default function PageHeader({ title, intervalSec, lastUpdated, pulse, onR
             <style>{`@keyframes livepulse{0%,100%{opacity:1}50%{opacity:.35}}`}</style>
             Обновляется
           </span>
-          <span style={{ color: 'var(--line-strong)' }}>·</span>
-          <span>каждые {intervalSec}с</span>
+          {intervalSec ? <>
+            <span style={{ color: 'var(--line-strong)' }}>·</span>
+            <span>каждые {intervalSec}с</span>
+          </> : null}
           {lastUpdated && <>
             <span style={{ color: 'var(--line-strong)' }}>·</span>
             <span className="mono">{lastUpdated}</span>
