@@ -607,6 +607,25 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </SectionCard>
 
+        {/* Поддержка — не в свёрнутой карточке, а отдельной строкой.
+            Сначала я положил её внутрь «Аккаунта»: человек открыл профиль и
+            не увидел ничего, потому что раскрывать надо было угадать. За
+            помощью идут в плохую минуту, и искать её в этот момент незачем. */}
+        <TouchableOpacity
+          style={sS.supportCard}
+          onPress={() => router.push('/support')}
+          activeOpacity={0.7}
+        >
+          <View style={[sS.iconSquare, { backgroundColor: Colors.primary }]}>
+            <Ionicons name="help-buoy" size={18} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={sS.title}>Помощь и поддержка</Text>
+            <Text style={sS.summary} numberOfLines={1}>Ответы на вопросы · написать нам</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+        </TouchableOpacity>
+
         {/* Аккаунт — все действия с учётной записью в одном месте */}
         <SectionCard
           iconName="shield-checkmark"
@@ -616,19 +635,6 @@ export default function ProfileScreen() {
           open={openSection === 'account'}
           onToggle={() => toggleSection('account')}
         >
-          {/* Поддержка — выше выхода и удаления: это то, зачем сюда заходят
-              чаще всего, а не то, чем заканчивают. */}
-          <TouchableOpacity
-            style={sS.actionRow}
-            onPress={() => router.push('/support')}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="help-buoy-outline" size={17} color={Colors.primary} />
-            <Text style={[sS.actionLabel, { flex: 1, color: Colors.primary, fontWeight: '600' }]}>
-              Помощь и поддержка
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-          </TouchableOpacity>
           <TouchableOpacity style={sS.actionRow} onPress={() => setShowSettings(true)} activeOpacity={0.7}>
             <Ionicons name="key-outline" size={17} color={Colors.textSecondary} />
             <Text style={[sS.actionLabel, { flex: 1 }]}>Сменить пароль</Text>
@@ -991,6 +997,13 @@ function SectionCard({
 }
 
 const sS = StyleSheet.create({
+  supportCard: {
+    flexDirection: 'row', alignItems: 'center', gap: rs(12),
+    backgroundColor: Colors.bg, borderRadius: Radius.lg,
+    paddingHorizontal: rs(14), paddingVertical: rs(14),
+    marginHorizontal: rs(16), marginBottom: rs(10), ...Shadow.card,
+  },
+
   card: { backgroundColor: Colors.bg, borderRadius: rs(16), ...Shadow.card, overflow: 'hidden' },
   header: { flexDirection: 'row', alignItems: 'center', gap: rs(10), paddingHorizontal: rs(16), paddingVertical: rs(14) },
   iconSquare: { width: rs(34), height: rs(34), borderRadius: rs(9), alignItems: 'center', justifyContent: 'center' },
