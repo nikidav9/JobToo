@@ -1692,6 +1692,34 @@ try {
             $data = $v; break;
         }
 
+        // Ответить человеку из дашборда — от имени бота.
+        //
+        // Отвечать реплаем в телеграме удобно, пока разговоров пять. Когда их
+        // становится двадцать, нужен список, где видно, кто ждёт, — и отвечать
+        // логично там же, а не перепрыгивая в другое приложение и обратно.
+        // Ответ ложится в тот же журнал: иначе через день не вспомнить, что
+        // уже сказано, и человек получит то же самое дважды.
+        case 'botReply': {
+            $tg = (int)($args[0] ?? 0);
+            $text = trim((string)($args[1] ?? ''));
+            if ($tg <= 0 || $text === '') { $data = ['ok' => false, 'reason' => 'empty']; break; }
+
+            $ok = tg_send_message($tg, $text);
+            if ($ok) {
+                try {
+                    sb_insert('jm_bot_messages', [
+                        'id' => uid(), 'telegram_id' => $tg, 'direction' => 'out',
+                        'name' => 'Никита', 'topic' => 'admin',
+                        'text' => $text, 'created_at' => now_iso(),
+                    ]);
+                } catch (Throwable $e) {}
+                sb_update('jm_bot_messages',
+                    ['telegram_id' => 'eq.' . $tg, 'answered' => 'is.false'], ['answered' => true]);
+            }
+            $data = ['ok' => $ok, 'reason' => $ok ? '' : 'telegram_failed'];
+            break;
+        }
+
         // Ящик входящих боту — для дашборда.
         case 'botInbox':
             $data = sb_select('jm_bot_messages', ['limit' => (string)((int)($args[0] ?? 100))],
