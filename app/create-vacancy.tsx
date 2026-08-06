@@ -59,6 +59,11 @@ type NormKey = typeof NORM_FIELDS[number]['key'];
 type Norms = Record<NormKey, string>;
 const DEFAULT_NORMS: Norms = { sborka: '', razmTovara: '', razmMaketa: '', razmMoroza: '', razmMulti: '', npo: '' };
 
+// Разумные границы для «сколько выходит за смену»: ниже — похоже на опечатку
+// в рублях за час, выше — на месячный оклад, вписанный не в то поле.
+const PAY_MIN = 500;
+const PAY_MAX = 15000;
+
 function buildNormsText(address: string, norms: Norms): string {
   const lines = NORM_FIELDS.map(f => `— ${f.label}: ${norms[f.key] || '0'} ₽`).join('\n');
   return `📍 Адрес: ${address}\nНормативы:\n${lines}`;
@@ -115,6 +120,12 @@ export default function CreateVacancy() {
   const [iosPickerVisible, setIosPickerVisible] = useState(false);
   const [tempDate, setTempDate] = useState<Date>(new Date());
   const [norms, setNorms] = useState<Norms>(DEFAULT_NORMS);
+  // Сколько выходит за смену. У кладовщика оплата сдельная, и в карточке до
+  // сих пор стояло «оплата сдельная, нормативы в карточке» — человек должен
+  // был сам сложить расценки и угадать выработку. Девять смен из одиннадцати
+  // висели без единой цифры; двое из десяти опрошенных назвали причиной
+  // именно оплату. Директор эту цифру знает, работник — нет.
+  const [shiftPay, setShiftPay] = useState(existing?.salary ? String(existing.salary) : '');
   const [workersNeeded, setWorkersNeeded] = useState(1);
   const [isUrgent, setIsUrgent] = useState(false);
   const [noExp, setNoExp] = useState(true);
@@ -165,7 +176,7 @@ export default function CreateVacancy() {
     setWorkersNeeded(source.workersNeeded);
     setIsUrgent(source.isUrgent);
     setNoExp(source.noExperienceNeeded);
-    if (source.salary) setFixedSalary(String(source.salary));
+    if (source.salary) { setFixedSalary(String(source.salary)); setShiftPay(String(source.salary)); }
     if (source.normsAndPay) {
       const next: Norms = { ...DEFAULT_NORMS };
       let found = false;
@@ -246,6 +257,10 @@ export default function CreateVacancy() {
     if (!metroStation) e.metro = 'Выберите станцию метро';
     if (isStorcker) {
       if (!normsValid) e.norms = 'Проверьте нормативы (0–20 ₽, НПО: 1–999)';
+      const pay = parseFloat(shiftPay);
+      if (isNaN(pay) || pay < PAY_MIN || pay > PAY_MAX) {
+        e.pay = `Укажите, сколько примерно выходит за смену: от ${PAY_MIN} до ${PAY_MAX} ₽`;
+      }
     } else {
       const val = parseFloat(fixedSalary);
       if (isNaN(val) || val < roleNorm.min || val > roleNorm.max) {
@@ -294,7 +309,7 @@ export default function CreateVacancy() {
       lng: lng ?? undefined,
       timeStart: formatTime(selectedTimeStart),
       timeEnd: formatTime(selectedTimeEnd),
-      salary: isStorcker ? 0 : parseFloat(fixedSalary),
+      salary: isStorcker ? parseFloat(shiftPay) : parseFloat(fixedSalary),
       normsAndPay,
       workersNeeded,
       isUrgent,
@@ -595,6 +610,25 @@ export default function CreateVacancy() {
                   </View>
                 );
               })}
+
+              <Text style={[styles.sectionLabel, { marginTop: rs(16) }]}>Сколько выходит за смену *</Text>
+              <Text style={styles.normHint}>
+                Примерная сумма на руки — её видит работник в карточке и в уведомлении.
+                Без неё в объявлении стоит «оплата сдельная», и на такое не откликаются.
+              </Text>
+              {errors.pay ? <Text style={styles.errMsg}>{errors.pay}</Text> : null}
+              <View style={styles.normRow}>
+                <Text style={styles.normLabel}>Примерно за смену</Text>
+                <TextInput
+                  style={[styles.normInput, errors.pay ? styles.inputError : null]}
+                  value={shiftPay}
+                  onChangeText={setShiftPay}
+                  placeholder="3000"
+                  keyboardType="number-pad"
+                  placeholderTextColor={Colors.textMuted}
+                />
+                <Text style={styles.normUnit}>₽</Text>
+              </View>
             </View>
           ) : (
             <View style={styles.fieldGroup}>

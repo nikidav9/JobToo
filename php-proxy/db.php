@@ -995,6 +995,75 @@ function plural_vac(int $n): string {
  * Expo push to everyone with a push token + Telegram message (with app button)
  * to everyone with a linked telegram_id.
  */
+/**
+ * Объявить о новой смене тем, кому до неё реально ехать.
+ *
+ * Раньше публикация уходила всем работникам разом, независимо от географии.
+ * За один день так ушло семь сообщений подряд — человеку с Новогиреево
+ * четырежды про Ховрино, — и 27% из тех, кто сам подключил телеграм, бота
+ * заблокировали. Напоминание раз в два дня мы уже сделали адресным, а момент
+ * публикации оставался слепым.
+ *
+ * «Рядом» — та же мерка, что и в напоминании: своя ветка, не дальше часа
+ * дороги. И не больше двух объявлений в день на человека: директор может
+ * выложить смены на неделю одну за другой, и это не повод писать семь раз.
+ *
+ * Колокольчик в приложении по-прежнему получают все: он ничего не требует
+ * от человека и никого не будит.
+ */
+const NEARBY_MAX_PER_DAY = 2;
+
+function notify_workers_near(string $station, string $title, string $body,
+                             string $tgHtml, string $dataType, bool|string $btnUrl = true): array {
+    require_once __DIR__ . '/bot_brain.php';
+
+    $all = sb_select('jm_users', ['role' => 'eq.worker'],
+        'id,metro_station,telegram_id,push_token,is_blocked,nudge_off');
+
+    // Колокольчик — всем, как и раньше.
+    $bell = array_map(fn($w) => ['user_id' => $w['id'], 'title' => $title,
+                                 'body' => $body, 'type' => $dataType], $all);
+    if (!empty($bell)) {
+        try { sb_insert('jm_notifications', $bell); }
+        catch (Throwable $e) {
+            $plain = array_map(fn($r) => ['user_id' => $r['user_id'], 'title' => $r['title'],
+                                          'body' => $r['body']], $bell);
+            try { sb_insert('jm_notifications', $plain); } catch (Throwable $e2) {}
+        }
+    }
+
+    // Сколько объявлений человек уже получил сегодня.
+    $since = gmdate('Y-m-d\T00:00:00\Z', time() + 3 * 3600);
+    $seen = [];
+    foreach (sb_select('jm_notifications',
+        ['type' => 'in.(nearby_shift,nearby_perm)', 'created_at' => 'gte.' . $since],
+        'user_id') as $r) {
+        $seen[$r['user_id']] = ($seen[$r['user_id']] ?? 0) + 1;
+    }
+
+    $pushMsgs = []; $tgOk = 0; $far = 0; $capped = 0;
+    foreach ($all as $w) {
+        if (!empty($w['is_blocked']) || !empty($w['nudge_off'])) continue;
+        if (empty($w['telegram_id']) && empty($w['push_token'])) continue;
+
+        $d = bot_stops_between($w['metro_station'] ?? null, $station);
+        if ($d === null || $d > BOT_NEAR_STOPS) { $far++; continue; }
+        if (($seen[$w['id']] ?? 0) >= NEARBY_MAX_PER_DAY) { $capped++; continue; }
+
+        if (!empty($w['telegram_id'])) {
+            if (tg_send_message((int)$w['telegram_id'], $tgHtml, $btnUrl)) $tgOk++;
+        } else {
+            $pushMsgs[] = ['to' => $w['push_token'], 'title' => $title, 'body' => $body,
+                'sound' => 'default', 'priority' => 'high',
+                'channelId' => 'vacancies', 'data' => ['type' => $dataType]];
+        }
+    }
+    if (!empty($pushMsgs)) expo_push($pushMsgs);
+
+    return ['telegram' => $tgOk, 'push' => count($pushMsgs),
+            'far' => $far, 'capped' => $capped, 'bell' => count($bell)];
+}
+
 function broadcast_workers(string $title, string $body, string $tgHtml, string $dataType, bool|string $btnUrl = true): array {
     $withPush = sb_select('jm_users', ['role' => 'eq.worker', 'push_token' => 'not.is.null'], 'push_token');
     $msgs = array_map(fn($w) => [
@@ -2281,7 +2350,15 @@ try {
                 $groupOk = tg_send_message(TG_GROUP_CHAT_ID, $groupHtml, $btnUrl);
             }
 
-            $data = broadcast_workers((string)$args[0], (string)$args[1], (string)$args[2], (string)($args[3] ?? 'nearby_shift'), $btnUrl);
+            // Станцию присылают новые версии приложения. Старые не присылают —
+            // им остаётся прежняя рассылка всем: молчать в ответ на публикацию
+            // хуже, чем написать лишнему человеку.
+            $station = trim((string)($args[6] ?? ''));
+            $data = $station !== ''
+                ? notify_workers_near($station, (string)$args[0], (string)$args[1], (string)$args[2],
+                                      (string)($args[3] ?? 'nearby_shift'), $btnUrl)
+                : broadcast_workers((string)$args[0], (string)$args[1], (string)$args[2],
+                                    (string)($args[3] ?? 'nearby_shift'), $btnUrl);
             $data['group'] = $groupOk;
             break;
         }

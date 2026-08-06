@@ -440,8 +440,10 @@ export async function notifyWorkersNearVacancy(params: {
       ? `${salary.toLocaleString('ru-RU')} ₽${type === 'permanent' ? '/мес' : ''}`
       : '';
 
-    // Broadcast to ALL workers (small user base — reach beats geo-precision).
-    // Server sends Expo push + Telegram bot messages + bell + web push.
+    // Сервер разошлёт тем, кому до этой станции реально ехать: своя ветка,
+    // не дальше часа. Раньше слали всем — «охват важнее точности», — и за это
+    // 27% подключивших телеграм заблокировали бота. Колокольчик в приложении
+    // по-прежнему получают все: он никого не будит.
     const notifTitle = type === 'permanent'
       ? '💼 Новая постоянная вакансия!'
       : '⚡ Новая подработка!';
@@ -469,7 +471,10 @@ export async function notifyWorkersNearVacancy(params: {
       headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
       body: JSON.stringify({
         fn: 'dbNotifyAllWorkersNewVacancy',
-        args: [notifTitle, body, tgHtml, type === 'permanent' ? 'nearby_perm' : 'nearby_shift', groupHtml, vacancyId ?? ''],
+        // Станция — седьмым аргументом: по ней сервер выбирает, кому это
+        // объявление вообще имеет смысл слать. Раньше оно уходило всем.
+        args: [notifTitle, body, tgHtml, type === 'permanent' ? 'nearby_perm' : 'nearby_shift',
+               groupHtml, vacancyId ?? '', metroStation ?? ''],
       }),
     });
   } catch {
