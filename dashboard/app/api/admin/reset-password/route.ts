@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server'
-import { serverSupabase } from '@/lib/serverSupabase'
 import { isAdmin } from '@/lib/requireAdmin'
-import bcrypt from 'bcryptjs'
+
+/**
+ * Сброс чужого пароля.
+ *
+ * Раньше этот маршрут ходил в Supabase напрямую, своим ключом. Ключ отозвали,
+ * и кнопка стала отвечать «Unregistered API key» — причём тому, кто её нажал,
+ * а не тому, кто мог бы починить. Ключей должно быть меньше, а не больше:
+ * рабочий лежит на хостинге, за ним и ходим, как ходят остальные страницы
+ * дашборда. Заодно отсюда ушёл bcrypt — хеширует тот, кто хранит.
+ */
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -20,35 +28,38 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS })
   }
 
+  const appSecret = process.env.EXPO_PUBLIC_APP_SECRET
+  if (!appSecret) {
+    return NextResponse.json(
+      { error: 'EXPO_PUBLIC_APP_SECRET не задан на сервере' },
+      { status: 500, headers: CORS }
+    )
+  }
+
   const { userId } = await req.json()
   if (!userId) {
     return NextResponse.json({ error: 'userId required' }, { status: 400, headers: CORS })
   }
 
-  let supabase
-  try {
-    supabase = serverSupabase()
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500, headers: CORS })
+  const res = await fetch('https://jobtoo.ru/api/db.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-App-Secret': appSecret },
+    body: JSON.stringify({ fn: 'adminResetPassword', args: [userId] }),
+  })
+
+  const body = await res.json().catch(() => null)
+  if (!res.ok || body?.error) {
+    return NextResponse.json(
+      { error: body?.error ?? `Прокси ответил ${res.status}` },
+      { status: 502, headers: CORS }
+    )
+  }
+  if (!body?.data?.ok) {
+    return NextResponse.json(
+      { error: body?.data?.reason === 'not_found' ? 'Пользователь не найден' : 'Не удалось сбросить' },
+      { status: 404, headers: CORS }
+    )
   }
 
-  const newPassword = Math.random().toString(36).slice(2, 8).toUpperCase()
-  const hashed = await bcrypt.hash(newPassword, 10)
-
-  const { data, error } = await supabase
-    .from('jm_users')
-    .update({ password: hashed })
-    .eq('id', userId)
-    .select('id')
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500, headers: CORS })
-  }
-  // Без .select() запрос по несуществующему id проходил без ошибки, и дашборд
-  // показывал пароль, которого ни у кого нет.
-  if (!data || data.length === 0) {
-    return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404, headers: CORS })
-  }
-
-  return NextResponse.json({ ok: true, password: newPassword }, { headers: CORS })
+  return NextResponse.json({ ok: true, password: body.data.password }, { headers: CORS })
 }

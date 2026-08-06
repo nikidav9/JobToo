@@ -1176,6 +1176,34 @@ try {
             $data = ['ok' => true]; break;
         }
 
+        // Сброс чужого пароля — для дашборда.
+        //
+        // Раньше дашборд ходил за этим прямо в Supabase собственным ключом.
+        // Ключ отозвали, и кнопка стала отвечать «Unregistered API key» —
+        // причём тем, кто её нажимал, а не тем, кто мог бы починить. Рабочий
+        // ключ лежит на хостинге, и правильнее ходить сюда, как ходят
+        // остальные страницы дашборда: меньше мест, где живут ключи.
+        case 'adminResetPassword': {
+            $uid = (string)($args[0] ?? '');
+            if ($uid === '') { $data = ['ok' => false, 'reason' => 'no_user']; break; }
+
+            // Шесть знаков без похожих друг на друга: пароль диктуют голосом,
+            // и «0 или O» на том конце провода стоит отдельного звонка.
+            $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            $pass = '';
+            for ($i = 0; $i < 6; $i++) $pass .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+
+            // return=representation: без него запрос по несуществующему id
+            // проходил молча, и дашборд показывал пароль, которого ни у кого нет.
+            $rows = sb('PATCH', 'jm_users', ['id' => 'eq.' . $uid],
+                ['password' => password_hash($pass, PASSWORD_BCRYPT)],
+                ['Prefer: return=representation']);
+            if (empty($rows)) { $data = ['ok' => false, 'reason' => 'not_found']; break; }
+
+            $data = ['ok' => true, 'password' => $pass];
+            break;
+        }
+
         case 'dbWarmup':
             // Раньше просто возвращалось true — прогревался только PHP, а сама
             // база оставалась холодной. Теперь делаем самое дешёвое чтение:
