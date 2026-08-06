@@ -27,3 +27,7 @@ create index if not exists jm_support_created_idx
 -- сервисным ключом (см. 013_lock_down_rls.sql).
 alter table jm_support_messages enable row level security;
 revoke all on jm_support_messages from anon, authenticated;
+
+-- Повторная выкладка: первый прогон миграций не состоялся из-за аварии
+-- GitHub Actions. Файл идемпотентен (create table if not exists), поэтому
+-- повтор безопасен.
