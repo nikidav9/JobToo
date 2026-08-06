@@ -14,15 +14,48 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://jobtoo.ru';
 
 const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET ?? '';
 
+/**
+ * Запрос к прокси.
+ *
+ * Ответ читаем текстом, а не res.json(). Когда хостинг вместо ответа отдаёт
+ * свою страницу — «слишком много запросов», технические работы, — разбор
+ * падал с «JSON Parse error: Unexpected character: Т», и это всё, что видел
+ * человек. У директора так не опубликовалась вакансия, и по такому тексту
+ * понять было нечего: он описывает первую букву чужой страницы, а не беду.
+ *
+ * Поэтому: одна повторная попытка (страница хостинга — обычно секундная
+ * икота), а если и она не JSON — говорим, что именно ответил сервер.
+ */
 async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
-  const res = await fetch(`${API_BASE}/api/db.php`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
-    body: JSON.stringify({ fn, args }),
-  });
-  const body = await res.json() as { data?: T; error?: string };
-  if (body.error) throw new Error(body.error);
-  return body.data as T;
+  let status = 0;
+  let text = '';
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(`${API_BASE}/api/db.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
+      body: JSON.stringify({ fn, args }),
+    });
+    status = res.status;
+    text = await res.text();
+
+    let parsed: { data?: T; error?: string } | null = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      // Не JSON — ответила не наша программа. Пробуем ещё раз, один.
+      if (attempt === 0) { await new Promise(r => setTimeout(r, 600)); continue; }
+      break;
+    }
+    if (parsed?.error) throw new Error(parsed.error);
+    return parsed?.data as T;
+  }
+
+  const head = text.trim().replace(/\s+/g, ' ').slice(0, 120);
+  console.error(`[db] ${fn}: ответ не JSON (HTTP ${status}):`, text.slice(0, 500));
+  throw new Error(head
+    ? `Сервер ответил не по делу (${status}): ${head}`
+    : `Сервер не ответил (${status}). Попробуйте ещё раз.`);
 }
 
 function withTimeout<T>(promise: PromiseLike<T>, ms = DB_TIMEOUT): Promise<T> {
