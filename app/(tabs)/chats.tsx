@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { Chat } from '@/constants/types';
-import { nameColorFromString, getInitials } from '@/services/storage';
+import { nameColorFromString, getInitials, formatChatTime } from '@/services/storage';
 import { dbDeleteChat } from '@/services/db';
 import { TabHeader } from '@/components/ui/TabHeader';
 
@@ -79,11 +79,6 @@ function ChatRow({ item, currentUser, users, onPress, onDelete }: {
   const unread = currentUser.role === 'worker' ? item.unreadWorker : item.unreadEmployer;
   const last = item.messages[item.messages.length - 1];
 
-  const formatTime = (iso: string) => {
-    const d = new Date(iso);
-    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-  };
-
   const handleDelete = () => {
     Alert.alert(
       'Удалить переписку?',
@@ -118,7 +113,7 @@ function ChatRow({ item, currentUser, users, onPress, onDelete }: {
           <View style={styles.chatInfo}>
             <View style={styles.chatTop}>
               <Text style={styles.chatName} numberOfLines={1}>{name}</Text>
-              {last ? <Text style={styles.chatTime}>{formatTime(last.timestamp)}</Text> : null}
+              {last ? <Text style={styles.chatTime}>{formatChatTime(last.timestamp)}</Text> : null}
             </View>
             <Text style={styles.chatVac} numberOfLines={1}>{item.vacTitle}</Text>
             <Text style={styles.chatLast} numberOfLines={1}>

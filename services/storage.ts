@@ -53,6 +53,36 @@ export function formatDate(isoDate: string): string {
   return `${days[d.getDay()]} ${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}`;
 }
 
+const MONTHS_GEN = [
+  'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+];
+
+/**
+ * Отметка времени в списке переписок.
+ *
+ * Раньше у каждой строки стояли часы и минуты — и у сегодняшней, и у
+ * прошлогодней. «12:29» ничего не говорит, когда разговор был неделю назад:
+ * список выглядел так, будто все написали сегодня.
+ *
+ * Считаем по календарным дням, а не по суткам: сообщение вчера в 23:00,
+ * прочитанное сегодня в час ночи, — это «1д», а не «2 часа назад».
+ */
+export function formatChatTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  const midnight = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((midnight(now) - midnight(d)) / 86_400_000);
+  const p2 = (n: number) => n.toString().padStart(2, '0');
+
+  if (days <= 0) return `${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  if (days < 7) return `${days}д`;
+  if (days < 35) return `${Math.floor(days / 7)}н`;
+  if (d.getFullYear() === now.getFullYear()) return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
+  return `${p2(d.getDate())}.${p2(d.getMonth() + 1)}.${d.getFullYear()}`;
+}
+
 /**
  * Returns the "virtual start date" for the date strip.
  * After 21:00, today is considered closed — the strip starts from tomorrow.
