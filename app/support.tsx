@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { HELP_SECTIONS, supportIsOpen, SUPPORT_FROM_HOUR, SUPPORT_TO_HOUR } from '@/constants/help';
+import { helpSectionsFor, supportIsOpen, SUPPORT_FROM_HOUR, SUPPORT_TO_HOUR } from '@/constants/help';
 import { dbSupportHistory, dbSupportSend, SupportMessage } from '@/services/db';
 import { rs, rf } from '@/constants/scale';
 
@@ -29,6 +29,10 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 export default function SupportScreen() {
   const router = useRouter();
   const { currentUser, showToast } = useApp();
+
+  // Вопросы у директора и у работника разные, и общий список означал бы,
+  // что каждый читает половину чужого.
+  const sections = helpSectionsFor(currentUser?.role);
 
   const [tab, setTab] = useState<'help' | 'chat'>('help');
   const [open, setOpen] = useState<string | null>(null);
@@ -98,7 +102,7 @@ export default function SupportScreen() {
 
       {tab === 'help' ? (
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-          {HELP_SECTIONS.map(sec => (
+          {sections.map(sec => (
             <View key={sec.title} style={s.card}>
               <Text style={s.secTitle}>{sec.icon}  {sec.title}</Text>
               {sec.items.map(item => {
