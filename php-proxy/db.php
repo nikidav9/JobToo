@@ -649,6 +649,11 @@ function fill_coords(array $row): array {
 // работа на ключе, который знает чужой.
 define('TG_BOT_TOKEN', jt_secret('TG_BOT_TOKEN'));
 define('DASHBOARD_URL', getenv('DASHBOARD_URL') ?: 'https://dashboard-nujus-projects.vercel.app');
+// Часы работы поддержки, по Москве. Обещать круглосуточный ответ и молчать
+// до утра хуже, чем сразу сказать, когда ответят.
+define('SUPPORT_FROM_HOUR', 10);
+define('SUPPORT_TO_HOUR', 21);
+
 define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025)); // группа «ПОДРАБОТКИ»
 
 /**
@@ -1691,6 +1696,80 @@ try {
             sb_upsert('jm_settings', ['key' => 'admin_chat_id', 'value' => $v, 'updated_at' => now_iso()], 'key');
             $data = $v; break;
         }
+
+        // ── Поддержка ──────────────────────────────────────────────────────
+        //
+        // Тред один на человека: заводить тикеты с номерами значит заставлять
+        // объяснять всё заново каждый раз.
+        //
+        // Часы работы честные. Обещать круглосуточный ответ и молчать до утра
+        // хуже, чем сразу сказать, когда ответят: человек не сидит и не ждёт.
+
+        case 'supportHistory':
+            $data = sb_select('jm_support_messages', ['user_id' => 'eq.' . (string)($args[0] ?? '')],
+                'id,direction,text,created_at', 'created_at.asc'); break;
+
+        case 'supportSend': {
+            $uid = (string)($args[0] ?? '');
+            $text = trim((string)($args[1] ?? ''));
+            if ($uid === '' || $text === '') { $data = ['ok' => false]; break; }
+
+            sb_insert('jm_support_messages', [
+                'id' => uid(), 'user_id' => $uid, 'direction' => 'in',
+                'text' => $text, 'created_at' => now_iso(),
+            ]);
+
+            // Никите — в телеграм, сразу и с контекстом. Без этого обращение
+            // лежало бы в базе, пока кто-нибудь не откроет дашборд.
+            $adm = sb_single('jm_settings', ['key' => 'eq.admin_chat_id'], 'value');
+            if ($adm && !empty($adm['value'])) {
+                $u = sb_single('jm_users', ['id' => 'eq.' . $uid],
+                    'first_name,last_name,phone,role,metro_station');
+                $who = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: 'Без имени';
+                $meta = array_filter([$u['role'] ?? null, $u['phone'] ?? null, $u['metro_station'] ?? null]);
+                $prev = sb_select('jm_support_messages', ['user_id' => 'eq.' . $uid],
+                    'direction,text,created_at', 'created_at.desc');
+                $first = count($prev) <= 1;
+                tg_send_message((int)$adm['value'],
+                    "🆘 <b>Поддержка</b> — " . htmlspecialchars($who, ENT_QUOTES, 'UTF-8')
+                    . ($meta ? "\n" . htmlspecialchars(implode(' · ', $meta), ENT_QUOTES, 'UTF-8') : '')
+                    . ($first ? "\n<i>Пишет впервые.</i>" : '')
+                    . "\n\n" . htmlspecialchars($text, ENT_QUOTES, 'UTF-8')
+                    . "\n\n<i>Ответить — в дашборде, раздел «Поддержка».</i>",
+                    DASHBOARD_URL . '/support', '🖥 Открыть дашборд');
+            }
+
+            // Вне часов работы — сразу говорим, когда ответим.
+            $hour = (int)gmdate('G', time() + 3 * 3600);
+            if ($hour < SUPPORT_FROM_HOUR || $hour >= SUPPORT_TO_HOUR) {
+                sb_insert('jm_support_messages', [
+                    'id' => uid(), 'user_id' => $uid, 'direction' => 'out',
+                    'text' => 'Спасибо, получили! Поддержка отвечает с '
+                        . SUPPORT_FROM_HOUR . ':00 до ' . SUPPORT_TO_HOUR . ':00 по Москве — '
+                        . 'ответим, как начнём. Если вопрос срочный, напишите об этом здесь же.',
+                    'created_at' => now_iso(),
+                ]);
+            }
+            $data = ['ok' => true]; break;
+        }
+
+        // Ответ поддержки. Человеку — всеми каналами: он ждёт именно его.
+        case 'supportReply': {
+            $uid = (string)($args[0] ?? '');
+            $text = trim((string)($args[1] ?? ''));
+            if ($uid === '' || $text === '') { $data = ['ok' => false]; break; }
+            sb_insert('jm_support_messages', [
+                'id' => uid(), 'user_id' => $uid, 'direction' => 'out',
+                'text' => $text, 'created_at' => now_iso(),
+            ]);
+            notify_user($uid, '🆘 Ответ поддержки', $text, 'support');
+            $data = ['ok' => true]; break;
+        }
+
+        // Все обращения для дашборда — свежие сверху.
+        case 'supportThreads':
+            $data = sb_select('jm_support_messages', [], 'id,user_id,direction,text,created_at',
+                'created_at.desc'); break;
 
         // Ответить человеку из дашборда — от имени бота.
         //

@@ -616,6 +616,19 @@ export default function ProfileScreen() {
           open={openSection === 'account'}
           onToggle={() => toggleSection('account')}
         >
+          {/* Поддержка — выше выхода и удаления: это то, зачем сюда заходят
+              чаще всего, а не то, чем заканчивают. */}
+          <TouchableOpacity
+            style={sS.actionRow}
+            onPress={() => router.push('/support')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="help-buoy-outline" size={17} color={Colors.primary} />
+            <Text style={[sS.actionLabel, { flex: 1, color: Colors.primary, fontWeight: '600' }]}>
+              Помощь и поддержка
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+          </TouchableOpacity>
           <TouchableOpacity style={sS.actionRow} onPress={() => setShowSettings(true)} activeOpacity={0.7}>
             <Ionicons name="key-outline" size={17} color={Colors.textSecondary} />
             <Text style={[sS.actionLabel, { flex: 1 }]}>Сменить пароль</Text>

@@ -17,6 +17,7 @@ const NAV = [
   { href: '/moderation',  icon: IconShield,   label: 'Модерация' },
   { href: '/tickets',     icon: IconTicket,   label: 'Тикеты' },
   { href: '/outreach',    icon: IconPhone,    label: 'Обзвон' },
+  { href: '/support',     icon: IconTicket,   label: 'Поддержка' },
   { href: '/bot-inbox',   icon: IconChat,     label: 'Бот' },
   { href: '/broadcast',      icon: IconBell,     label: 'Рассылка' },
 ]

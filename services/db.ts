@@ -1271,3 +1271,27 @@ export async function dbAutoClosePastVacancies(): Promise<void> {
 export async function dbUnbindTelegram(userId: string): Promise<void> {
   await proxy('tgUnbindTelegram', [userId]);
 }
+
+// ─── Поддержка ────────────────────────────────────────────────────────────────
+
+export type SupportMessage = {
+  id: string;
+  direction: 'in' | 'out';
+  text: string;
+  createdAt: string;
+};
+
+/** Переписка человека с поддержкой. Тред один на человека. */
+export async function dbSupportHistory(userId: string): Promise<SupportMessage[]> {
+  const rows = await proxy<any[]>('supportHistory', [userId]);
+  return (rows ?? []).map(r => ({
+    id: r.id,
+    direction: r.direction === 'out' ? 'out' : 'in',
+    text: r.text,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function dbSupportSend(userId: string, text: string): Promise<void> {
+  await proxy('supportSend', [userId, text]);
+}
