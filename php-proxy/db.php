@@ -535,13 +535,18 @@ function address_variants(string $address): array {
 // Координаты по адресу. Возвращает [lat, lng] или null.
 // Города за пределами Москвы (Красногорск, Химки и прочие) не трогаем: если
 // дописать им «, Москва», геокодер уводит метку в другой конец области.
-function geocode_address(string $address, int $timeout = 6): ?array {
+function geocode_address(string $address, int $timeout = 4, float $budget = 6.0): ?array {
+    $deadline = microtime(true) + $budget;
     $outsideMoscow = (bool)preg_match(
         '/\b(красногорск|химки|люберцы|балашиха|мытищи|реутов|котельники|видное|одинцово|подольск|домодедово|щербинка|долгопрудный|лобня|дзержинский)\b/ui',
         $address
     );
 
     foreach (address_variants($address) as $q) {
+        // Вариантов бывает четыре, и каждый — запрос наружу. Когда Nominatim
+        // молчит, это десятки секунд, и PHP успевает упереться в лимит
+        // времени раньше, чем дойдёт до записи. Дороже координат.
+        if (microtime(true) >= $deadline) break;
         $full = $outsideMoscow ? $q . ', Московская область' : $q . ', Москва';
         foreach (nominatim_search($full, $timeout) as $hit) {
             if ($hit['lat'] !== null && $hit['lng'] !== null) {
@@ -592,6 +597,33 @@ function vacancy_dates_guard(array $rows): void {
 // на карте не появляется вовсе: раньше телефон геокодировал адреса сам при
 // каждом открытии карты, и пока все тридцать запросов не пройдут, на карте
 // висела одна-единственная вакансия.
+/**
+ * Сохранить, а потом искать координаты.
+ *
+ * Раньше порядок был обратный: сначала геокодер, потом запись. Адрес идёт
+ * во внешнюю службу до четырёх раз, и если та молчит, PHP упирается в лимит
+ * времени и умирает — до того, как что-либо сохранит. Вакансия пропадала
+ * целиком, а человек получал обрывок вместо ответа и не понимал, почему
+ * «не публикуется».
+ *
+ * Теперь запись первая. Не нашлись координаты — метка встанет у метро, это
+ * мелочь по сравнению с потерянной вакансией.
+ */
+function save_then_geocode(string $table, array $row): void {
+    sb_upsert($table, $row, 'id');
+
+    $hasCoords = isset($row['lat']) && $row['lat'] !== null
+              && isset($row['lng']) && $row['lng'] !== null;
+    $address = trim((string)($row['address'] ?? ''));
+    $id = (string)($row['id'] ?? '');
+    if ($hasCoords || $address === '' || $id === '') return;
+
+    try {
+        $c = geocode_address($address);
+        if ($c) sb_update($table, ['id' => 'eq.' . $id], ['lat' => $c[0], 'lng' => $c[1]]);
+    } catch (\Throwable $e) {}
+}
+
 function fill_coords(array $row): array {
     $hasCoords = isset($row['lat']) && $row['lat'] !== null
               && isset($row['lng']) && $row['lng'] !== null;
@@ -1591,7 +1623,7 @@ try {
 
         case 'dbUpsertVacancy':
             vacancy_dates_guard([$args[0]]);
-            sb_upsert('jm_vacancies', fill_coords($args[0]), 'id'); break;
+            save_then_geocode('jm_vacancies', $args[0]); break;
 
         case 'dbUpsertVacancyBatch': {
             // $args[0] — массив строк вакансий, пишется одним запросом.
@@ -1960,7 +1992,7 @@ try {
             $data = sb_select('jm_perm_vacancies', ['employer_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;
 
         case 'dbUpsertPermVacancy':
-            sb_upsert('jm_perm_vacancies', fill_coords($args[0]), 'id'); break;
+            save_then_geocode('jm_perm_vacancies', $args[0]); break;
 
         case 'dbClosePermVacancy':
             sb_update('jm_perm_vacancies', ['id' => 'eq.' . $args[0]], ['status' => 'closed']); break;
