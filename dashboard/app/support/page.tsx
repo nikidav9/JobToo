@@ -159,7 +159,12 @@ export default function SupportPage() {
       if (!res.ok || body.error) throw new Error(body.error ?? 'Не закрылось')
       setClosingFor(null)
       setCloseDrafts(d => ({ ...d, [userId]: '' }))
-      setNotice(n => ({ ...n, [userId]: 'Обращение закрыто' }))
+      setNotice(n => ({
+        ...n,
+        [userId]: body.marked === false
+          ? 'Письмо ушло, но отметка «закрыто» не сохранилась — обращение вернётся в список'
+          : 'Обращение закрыто',
+      }))
       await load()
     } catch (e: any) {
       setNotice(n => ({ ...n, [userId]: e.message ?? 'Не закрылось' }))

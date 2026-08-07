@@ -659,15 +659,18 @@ define('SUPPORT_TO_HOUR', 21);
  *
  * Таблицы может ещё не быть: миграции выкладываются отдельным ходом, и один
  * раз этот ход уже не состоялся. Ради служебной отметки нельзя ронять ни
- * обращение человека, ни ответ из дашборда — поэтому молча переживаем.
+ * обращение человека, ни ответ из дашборда — поэтому переживаем. Но не молча:
+ * возвращаем, получилось ли, иначе дашборд напишет «закрыто», а обращение при
+ * следующем обновлении вернётся в список, и будет непонятно почему.
  */
-function support_thread_set(string $userId, ?string $closedAt): void {
-    if ($userId === '') return;
+function support_thread_set(string $userId, ?string $closedAt): bool {
+    if ($userId === '') return false;
     try {
         sb_upsert('jm_support_threads', [
             'user_id' => $userId, 'closed_at' => $closedAt, 'updated_at' => now_iso(),
         ], 'user_id');
-    } catch (Throwable $e) { /* таблицы нет — работаем как раньше */ }
+        return true;
+    } catch (Throwable $e) { return false; }
 }
 
 define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025)); // группа «ПОДРАБОТКИ»
@@ -1727,16 +1730,16 @@ try {
                 ]);
                 notify_user($uid, '🆘 Ответ поддержки', $text, 'support');
             }
-            support_thread_set($uid, now_iso());
-            $data = ['ok' => true]; break;
+            $marked = support_thread_set($uid, now_iso());
+            $data = ['ok' => true, 'marked' => $marked]; break;
         }
 
         // Снова открыть — если закрыли по ошибке.
         case 'supportReopen': {
             $uid = (string)($args[0] ?? '');
             if ($uid === '') { $data = ['ok' => false]; break; }
-            support_thread_set($uid, null);
-            $data = ['ok' => true]; break;
+            $marked = support_thread_set($uid, null);
+            $data = ['ok' => true, 'marked' => $marked]; break;
         }
 
         case 'supportSend': {

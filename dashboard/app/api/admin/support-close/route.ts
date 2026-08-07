@@ -49,5 +49,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: body?.error ?? 'Не удалось закрыть' },
       { status: 502, headers: CORS })
   }
-  return NextResponse.json({ ok: true }, { headers: CORS })
+  // marked=false — письмо ушло, а отметка не сохранилась (таблицы ещё нет).
+  // Об этом надо сказать: иначе обращение вернётся в список само по себе.
+  return NextResponse.json({ ok: true, marked: body?.data?.marked !== false }, { headers: CORS })
 }
