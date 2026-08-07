@@ -77,7 +77,7 @@ function WebPushBanner({ userId }: { userId: string }) {
   if (state === 'denied') {
     return (
       <TouchableOpacity style={[wpStyles.banner, wpStyles.bannerDenied]} activeOpacity={1}>
-        <Text style={wpStyles.icon}>⚙️</Text>
+        <Ionicons name="settings-outline" size={rf(18)} color="#92400E" />
         <Text style={[wpStyles.text, wpStyles.textDenied]}>Разрешите уведомления: Настройки → Safari → Уведомления</Text>
       </TouchableOpacity>
     );
@@ -101,7 +101,9 @@ function WebPushBanner({ userId }: { userId: string }) {
 
   return (
     <TouchableOpacity style={wpStyles.banner} onPress={handlePress} activeOpacity={0.85} disabled={loading}>
-      <Text style={wpStyles.icon}>{loading ? '⏳' : '🔔'}</Text>
+      {loading
+        ? <ActivityIndicator size="small" color="#4338CA" />
+        : <Ionicons name="notifications-outline" size={rf(18)} color="#4338CA" />}
       <View style={{ flex: 1 }}>
         <Text style={wpStyles.text}>
           {state === 'retry' ? 'Завершить настройку уведомлений' : 'Включить push-уведомления'}
@@ -121,7 +123,6 @@ const wpStyles = StyleSheet.create({
     paddingHorizontal: rs(14), paddingVertical: rs(10),
   },
   bannerDenied: { backgroundColor: '#FEF3C7' },
-  icon: { fontSize: rf(18) },
   text: { fontSize: rf(14), fontWeight: '600', color: '#4338CA' },
   textDenied: { color: '#92400E', fontWeight: '500', fontSize: rf(12) },
   debugText: { fontSize: rf(11), color: '#6B7280', marginTop: rs(2) },
@@ -169,7 +170,7 @@ function MetroStationPicker({
         </View>
 
         <View style={metroPickerSt.searchRow}>
-          <Text style={metroPickerSt.searchIcon}>🔍</Text>
+          <Ionicons name="search" size={rf(16)} color={Colors.textMuted} />
           <TextInput
             style={metroPickerSt.searchInput}
             placeholder="Введите название станции..."
@@ -236,7 +237,6 @@ const metroPickerSt = StyleSheet.create({
     paddingHorizontal: rs(12), paddingVertical: rs(10),
     borderWidth: 1, borderColor: Colors.inputBorder,
   },
-  searchIcon: { fontSize: rf(15) },
   searchInput: { flex: 1, fontSize: rf(15), color: Colors.textPrimary },
   searchClear: { fontSize: rf(14), color: Colors.textMuted, paddingLeft: rs(4) },
   lineSubtitle: { fontSize: rf(11), color: Colors.textMuted, marginTop: rs(1) },
@@ -368,6 +368,7 @@ function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId
           <View {...viewersSwipe.panHandlers}>
             <SheetHandle />
             <View style={wS.sheetHeader}>
+              <SheetTitleIcon name="eye-outline" color={Colors.textSecondary} bg={Colors.divider} />
               <Text style={wS.sheetTitle}>Просмотрели вакансию</Text>
             </View>
           </View>
@@ -379,7 +380,7 @@ function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId
           </View>
         ) : viewers.length === 0 ? (
           <View style={wS.empty}>
-            <Text style={{ fontSize: rf(36) }}>👀</Text>
+            <EmptyIcon name="eye-off-outline" />
             <Text style={wS.emptyTxt}>Ещё никто не просмотрел</Text>
           </View>
         ) : (
@@ -397,7 +398,7 @@ function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId
                   </View>
                   <View style={wS.cardInfo}>
                     <Text style={wS.cardName}>{w.firstName} {w.lastName}</Text>
-                    {w.metroStation ? <Text style={wS.cardMeta}>м. {w.metroStation}</Text> : null}
+                    {w.metroStation ? <MetaBit name="subway-outline" text={w.metroStation} /> : null}
                   </View>
                   <TouchableOpacity
                     style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' }}
@@ -472,11 +473,12 @@ function WorkerListModal({
     init();
   }, [vacancyId]);
 
-  const titleMap = {
-    applicants: '👥 Отклики',
-    hired: '✅ Набрано',
-    rejected: '👎 Отклонённые',
+  const titleMap: Record<typeof type, { title: string; icon: IconName; color: string; bg: string; empty: IconName; emptyTxt: string }> = {
+    applicants: { title: 'Отклики',     icon: 'people-outline',           color: Colors.primary, bg: Colors.primaryLight, empty: 'people-outline',      emptyTxt: 'Нет новых откликов' },
+    hired:      { title: 'Набрано',     icon: 'checkmark-circle-outline', color: Colors.green,   bg: Colors.greenLight,   empty: 'person-add-outline',  emptyTxt: 'Никого не набрано' },
+    rejected:   { title: 'Отклонённые', icon: 'close-circle-outline',     color: Colors.red,     bg: Colors.redLight,     empty: 'close-circle-outline', emptyTxt: 'Нет отклонённых' },
   };
+  const head = titleMap[type];
 
   // Use fresh localLikes (from DB) for display — not stale context likes
   let filteredLikes: Like[] = [];
@@ -547,7 +549,7 @@ function WorkerListModal({
       }
       refreshLikes().catch(() => {});
       notifyWorkerGotMatch(like.workerId, vacancy?.company ?? '', vacTitle).catch(() => {});
-      showToast('🎉 Мэтч! Чат открыт', 'success');
+      showToast('Мэтч! Чат открыт', 'success');
       onClose();
       if (result.chatId) {
         router.push({ pathname: '/chat-room', params: { chatId: result.chatId } });
@@ -650,11 +652,15 @@ function WorkerListModal({
           <View {...listSwipe.panHandlers}>
             <SheetHandle />
             <View style={wS.sheetHeader}>
-              <Text style={wS.sheetTitle}>{titleMap[type]}</Text>
+              <SheetTitleIcon name={head.icon} color={head.color} bg={head.bg} />
+              <Text style={wS.sheetTitle}>{head.title}</Text>
             </View>
           </View>
           {vacancy ? (
-            <Text style={wS.vacSubtitle} numberOfLines={1}>📋 {vacancy.title} · 📅 {formatDate(vacancy.date)}</Text>
+            <View style={wS.vacSubtitleRow}>
+              <MetaBit name="briefcase-outline" text={vacancy.title} />
+              <MetaBit name="calendar-outline" text={formatDate(vacancy.date)} />
+            </View>
           ) : null}
 
           {dataLoading ? (
@@ -664,10 +670,8 @@ function WorkerListModal({
             </View>
           ) : filteredLikes.length === 0 ? (
             <View style={wS.empty}>
-              <Text style={{ fontSize: rf(36) }}>{type === 'applicants' ? '👀' : type === 'hired' ? '🤝' : '🙅'}</Text>
-              <Text style={wS.emptyTxt}>
-                {type === 'applicants' ? 'Нет новых откликов' : type === 'hired' ? 'Никого не набрано' : 'Нет отклонённых'}
-              </Text>
+              <EmptyIcon name={head.empty} />
+              <Text style={wS.emptyTxt}>{head.emptyTxt}</Text>
             </View>
           ) : (
             <FlatList
@@ -703,20 +707,32 @@ function WorkerListModal({
                       <View style={{ flex: 1 }}>
                         <Text style={wS.name}>{workerDisplayName}</Text>
                         {worker ? (
-                          <Text style={wS.meta}>
-                            {like.isMatch ? `📞 ${worker.phone}` : `🚇 ${worker.metroStation ?? '—'}`}
-                            {(worker.avgRating ?? 0) > 0 ? `  ·  ⭐ ${(worker.avgRating ?? 0).toFixed(1)}` : ''}
-                          </Text>
+                          <View style={wS.metaRow}>
+                            {like.isMatch
+                              ? <MetaBit name="call-outline" text={worker.phone} />
+                              : <MetaBit name="subway-outline" text={worker.metroStation ?? '—'} />}
+                            {(worker.avgRating ?? 0) > 0
+                              ? <MetaBit name="star" text={(worker.avgRating ?? 0).toFixed(1)} color={Colors.amber} />
+                              : null}
+                          </View>
                         ) : (
                           <Text style={wS.meta}>Загрузка...</Text>
                         )}
                         {type === 'rejected' ? (
-                          <Text style={wS.rejectionReason}>
-                            {rejectedByWorker ? '← Сам отказался' : '← Вы отклонили'}
-                          </Text>
+                          <View style={wS.reasonRow}>
+                            <Ionicons name="arrow-undo-outline" size={rf(11)} color={Colors.red} />
+                            <Text style={wS.rejectionReason}>
+                              {rejectedByWorker ? 'Сам отказался' : 'Вы отклонили'}
+                            </Text>
+                          </View>
                         ) : null}
                       </View>
-                      {worker ? <Text style={wS.profileArrow}>Профиль ›</Text> : null}
+                      {worker ? (
+                        <View style={wS.profileLink}>
+                          <Text style={wS.profileArrow}>Профиль</Text>
+                          <Ionicons name="chevron-forward" size={rf(13)} color={Colors.primary} />
+                        </View>
+                      ) : null}
                     </TouchableOpacity>
 
                     <View style={wS.btnRow}>
@@ -750,7 +766,8 @@ function WorkerListModal({
                             disabled={isLoading}
                             onPress={() => onAccept(like)}
                           >
-                            <Text style={wS.acceptBtnTxt}>✅ Подходит</Text>
+                            <Ionicons name="checkmark" size={rf(14)} color="#fff" />
+                            <Text style={wS.acceptBtnTxt}>Подходит</Text>
                           </TouchableOpacity>
                         </>
                       )}
@@ -766,13 +783,56 @@ function WorkerListModal({
   );
 }
 
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+// Шторки откликов раньше подписывались смайликами: 👥 в заголовке, 👀 и 🙅
+// в пустом состоянии, 📞 и 🚇 в строке под именем. Смайлик рисует не наш
+// шрифт, а система: на каждом телефоне он свой, у половины — жёлтая рожица
+// вместо смысла. Одинаковые иконки читаются одинаково везде.
+function SheetTitleIcon({ name, color, bg }: { name: IconName; color: string; bg: string }) {
+  return (
+    <View style={[wS.titleIcon, { backgroundColor: bg }]}>
+      <Ionicons name={name} size={rf(16)} color={color} />
+    </View>
+  );
+}
+
+function EmptyIcon({ name }: { name: IconName }) {
+  return (
+    <View style={wS.emptyIcon}>
+      <Ionicons name={name} size={rf(26)} color={Colors.textMuted} />
+    </View>
+  );
+}
+
+// Строка «иконка + текст» для мелких подписей: метро, телефон, рейтинг, дата.
+function MetaBit({ name, text, color }: { name: IconName; text: string; color?: string }) {
+  return (
+    <View style={wS.metaBit}>
+      <Ionicons name={name} size={rf(12)} color={color ?? Colors.textMuted} />
+      <Text style={[wS.metaTxt, color ? { color } : null]} numberOfLines={1}>{text}</Text>
+    </View>
+  );
+}
+
 const wS = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: Colors.bg, borderTopLeftRadius: rs(24), borderTopRightRadius: rs(24), maxHeight: '85%' },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: rs(20), paddingTop: rs(16), paddingBottom: rs(8) },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: rs(10), paddingHorizontal: rs(20), paddingTop: rs(16), paddingBottom: rs(8) },
   sheetTitle: { fontSize: rf(18), fontWeight: '700', color: Colors.textPrimary },
-  vacSubtitle: { fontSize: rf(12), color: Colors.textMuted, paddingHorizontal: rs(20), paddingBottom: rs(12), borderBottomWidth: 1, borderBottomColor: Colors.divider },
+  titleIcon: { width: rs(30), height: rs(30), borderRadius: rs(15), alignItems: 'center', justifyContent: 'center' },
+  vacSubtitleRow: {
+    flexDirection: 'row', alignItems: 'center', gap: rs(10), flexWrap: 'wrap',
+    paddingHorizontal: rs(20), paddingBottom: rs(12),
+    borderBottomWidth: 1, borderBottomColor: Colors.divider,
+  },
+  metaBit: { flexDirection: 'row', alignItems: 'center', gap: rs(4), flexShrink: 1 },
+  metaTxt: { fontSize: rf(12), color: Colors.textMuted, flexShrink: 1 },
   empty: { alignItems: 'center', padding: rs(48), gap: rs(10) },
+  emptyIcon: {
+    width: rs(56), height: rs(56), borderRadius: rs(28),
+    backgroundColor: Colors.divider, alignItems: 'center', justifyContent: 'center',
+  },
   // Крутилка чуть выше середины: строго по центру пустой шторки она выглядит
   // потерянной, а взгляд при открытии идёт по верхней трети.
   loaderWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: rs(90) },
@@ -783,16 +843,18 @@ const wS = StyleSheet.create({
   avatarTxt: { color: '#fff', fontSize: rf(15), fontWeight: '700' },
   name: { fontSize: rf(14), fontWeight: '700', color: Colors.textPrimary },
   meta: { fontSize: rf(12), color: Colors.textMuted, marginTop: rs(2) },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: rs(10), marginTop: rs(3) },
+  profileLink: { flexDirection: 'row', alignItems: 'center', gap: rs(1) },
   profileArrow: { fontSize: rf(12), color: Colors.primary, fontWeight: '600' },
   btnRow: { flexDirection: 'row', gap: rs(8) },
-  rejectionReason: { fontSize: rf(11), color: Colors.red, marginTop: rs(3), fontStyle: 'italic' },
-  acceptBtn: { backgroundColor: Colors.primary, borderRadius: rs(100), paddingVertical: rs(9), paddingHorizontal: rs(14), alignItems: 'center' },
+  reasonRow: { flexDirection: 'row', alignItems: 'center', gap: rs(4), marginTop: rs(3) },
+  rejectionReason: { fontSize: rf(11), color: Colors.red, fontStyle: 'italic' },
+  acceptBtn: { flexDirection: 'row', alignItems: 'center', gap: rs(5), backgroundColor: Colors.primary, borderRadius: rs(100), paddingVertical: rs(9), paddingHorizontal: rs(14), justifyContent: 'center' },
   acceptBtnTxt: { fontSize: rf(13), color: '#fff', fontWeight: '700' },
   chatBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: rs(10), paddingVertical: rs(9), alignItems: 'center' },
   chatBtnTxt: { fontSize: rf(13), color: '#fff', fontWeight: '600' },
   cardInfo: { flex: 1 },
   cardName: { fontSize: rf(14), fontWeight: '700', color: Colors.textPrimary },
-  cardMeta: { fontSize: rf(12), color: Colors.textMuted, marginTop: rs(2) },
 });
 
 // ─────────────────────────────────────────────────
@@ -973,7 +1035,7 @@ function WorkerFeed() {
             router.push({ pathname: '/match', params: { vacancyId: card.id, chatId: result.chatId } });
           } else {
             // Уведомление директору шлёт сервер при записи отклика — см. dbUpsertLike.
-            showToast('Отклик отправлен! Ждём решения работодателя 👍', 'success');
+            showToast('Отклик отправлен. Ждём решения работодателя', 'success');
           }
         } catch {
           // Restore card to front of deck on failure
@@ -1485,7 +1547,7 @@ function WorkerPermMode() {
     setApplying(v.id);
     try {
       await dbApplyPermVacancy(v.id, currentUser.id, v.employerId, message);
-      showToast('Отклик отправлен! 📨', 'success');
+      showToast('Отклик отправлен', 'success');
       setPermApplyFor(null);
       await Promise.all([
         refreshPermApplications().catch(() => {}),
@@ -1530,10 +1592,12 @@ function WorkerPermMode() {
     }
   };
 
-  const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
-    pending:  { label: '⏳ На рассмотрении', color: '#92400E', bg: '#FFF7ED' },
-    approved: { label: '✅ Приглашён',        color: Colors.green, bg: '#D1FAE5' },
-    rejected: { label: '✕ Отказ',            color: Colors.red,   bg: '#FEE2E2' },
+  // Тот же набор, что видит директор в своей шторке, — и так же иконками,
+  // а не смайликами: их рисует система, и на каждом телефоне по-своему.
+  const STATUS_MAP: Record<string, { label: string; icon: IconName; color: string; bg: string }> = {
+    pending:  { label: 'На рассмотрении', icon: 'hourglass-outline', color: '#92400E',    bg: '#FFF7ED' },
+    approved: { label: 'Приглашён',       icon: 'checkmark-circle',  color: Colors.green, bg: '#D1FAE5' },
+    rejected: { label: 'Отказ',           icon: 'close-circle',      color: Colors.red,   bg: '#FEE2E2' },
   };
 
   const activeStationLine = filterStation
@@ -1555,7 +1619,7 @@ function WorkerPermMode() {
     } else {
       optimisticAddPermSaved(v.id);
       dbAddPermSaved(currentUser.id, v.id).catch(() => {});
-      showToast('Сохранено ❤️', 'success');
+      showToast('Сохранено в избранное', 'success');
     }
   };
 
@@ -1590,6 +1654,7 @@ function WorkerPermMode() {
       >
         {statusInfo ? (
           <View style={[pS.statusBadge, { backgroundColor: statusInfo.bg }]}>
+            <Ionicons name={statusInfo.icon} size={rf(12)} color={statusInfo.color} />
             <Text style={[pS.statusTxt, { color: statusInfo.color }]}>{statusInfo.label}</Text>
           </View>
         ) : null}
@@ -2130,7 +2195,8 @@ function EmployerHome() {
                     <Text style={pS.permSalaryTxt}>{v.salary.toLocaleString('ru-RU')} ₽/мес</Text>
                   </View>
                   <View style={pS.permScheduleTag}>
-                    <Text style={pS.permScheduleTxt}>🗓 {v.schedule}</Text>
+                    <Ionicons name="calendar-outline" size={rf(13)} color={Colors.textSecondary} />
+                    <Text style={pS.permScheduleTxt}>{v.schedule}</Text>
                   </View>
                 </View>
                 <TouchableOpacity
@@ -2322,7 +2388,7 @@ const pS = StyleSheet.create({
     backgroundColor: Colors.bg, borderRadius: rs(18),
     padding: rs(16), gap: rs(10), ...Shadow.card,
   },
-  statusBadge: { borderRadius: rs(8), paddingHorizontal: rs(10), paddingVertical: rs(6), alignSelf: 'flex-start' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: rs(5), borderRadius: rs(8), paddingHorizontal: rs(10), paddingVertical: rs(6), alignSelf: 'flex-start' },
   statusTxt: { fontSize: rf(12), fontWeight: '700' },
 
   // company row
@@ -2397,7 +2463,7 @@ const pS = StyleSheet.create({
   permTagsRow: { flexDirection: 'row', gap: rs(10), flexWrap: 'wrap' },
   permSalaryTag: { backgroundColor: '#D1FAE5', borderRadius: rs(100), paddingHorizontal: rs(12), paddingVertical: rs(5) },
   permSalaryTxt: { fontSize: rf(13), fontWeight: '800', color: Colors.green },
-  permScheduleTag: { backgroundColor: Colors.surface, borderRadius: rs(100), paddingHorizontal: rs(12), paddingVertical: rs(5) },
+  permScheduleTag: { flexDirection: 'row', alignItems: 'center', gap: rs(5), backgroundColor: Colors.surface, borderRadius: rs(100), paddingHorizontal: rs(12), paddingVertical: rs(5) },
   permScheduleTxt: { fontSize: rf(13), color: Colors.textSecondary, fontWeight: '500' },
   appStatBtn: {
     flexDirection: 'row', alignItems: 'center', gap: rs(6),

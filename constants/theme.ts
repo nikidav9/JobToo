@@ -21,6 +21,10 @@ export const Colors = {
   blueLight: '#EFF6FF',
   purple: '#7C3AED',
   purpleLight: '#F5F3FF',
+  // Звёзды рейтинга: жёлтый смайлик ⭐ рисовала система и на каждом телефоне
+  // по-своему, поэтому теперь иконка, а цвет — отсюда.
+  amber: '#F59E0B',
+  amberLight: '#FFFBEB',
 
   surface: '#F9FAFB',
 };

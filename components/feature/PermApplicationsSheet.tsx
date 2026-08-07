@@ -12,6 +12,7 @@ import {
   View, Text, StyleSheet, FlatList, Modal, Animated,
   TouchableOpacity, ActivityIndicator, RefreshControl,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -32,12 +33,27 @@ import {
 import { ApplySheet } from '@/components/feature/ApplySheet';
 import { PERM_APPROVE_SUGGESTIONS } from '@/constants/chatSuggestions';
 
-const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  pending:  { label: '⏳ На рассмотрении', color: '#92400E', bg: '#FFF7ED' },
-  approved: { label: '✅ Одобрено',        color: Colors.green, bg: '#D1FAE5' },
-  rejected: { label: '✕ Отказ',           color: Colors.red,   bg: '#FEE2E2' },
-  hired:    { label: '✅ Кандидат закрыт', color: '#4F46E5',    bg: '#EEF2FF' },
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+// Статус подписывался смайликом. Смайлик рисует система, а не наш шрифт:
+// на разных телефонах он разного вида и размера, и строка «⏳ На
+// рассмотрении» прыгала. Иконка — одна и та же везде.
+const STATUS_LABELS: Record<string, { label: string; icon: IconName; color: string; bg: string }> = {
+  pending:  { label: 'На рассмотрении', icon: 'hourglass-outline',        color: '#92400E',    bg: '#FFF7ED' },
+  approved: { label: 'Одобрено',        icon: 'checkmark-circle',         color: Colors.green, bg: '#D1FAE5' },
+  rejected: { label: 'Отказ',           icon: 'close-circle',             color: Colors.red,   bg: '#FEE2E2' },
+  hired:    { label: 'Кандидат закрыт', icon: 'person-circle-outline',    color: '#4F46E5',    bg: '#EEF2FF' },
 };
+
+/** Мелкая подпись «иконка + текст»: метро, телефон, рейтинг. */
+function MetaBit({ name, text, color }: { name: IconName; text: string; color?: string }) {
+  return (
+    <View style={styles.metaBit}>
+      <Ionicons name={name} size={rf(12)} color={color ?? Colors.textMuted} />
+      <Text style={[styles.metaTxt, color ? { color } : null]} numberOfLines={1}>{text}</Text>
+    </View>
+  );
+}
 
 export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: string; onClose: () => void }) {
   const router = useRouter();
@@ -81,7 +97,7 @@ export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: strin
       setApproving(null);
       await refreshPermApplications();
       await refreshChats(currentUser);
-      showToast('Одобрено! Чат открыт 🎉', 'match');
+      showToast('Одобрено! Чат открыт', 'match');
       // Окно письма лежит внутри этой шторки, и убирать оба разом нельзя:
       // на iOS второе закрытие приходит, пока первое ещё идёт, и экран
       // остаётся под затемнением. Поэтому закрываем по очереди.
@@ -122,7 +138,7 @@ export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: strin
     ? [
         approvingWorker ? `${approvingWorker.firstName} ${approvingWorker.lastName}` : 'Кандидат',
         `Вакансия: ${vacancy.title}`,
-        vacancy.metroStation ? `Где: 🚇 ${vacancy.metroStation}` : `Компания: ${vacancy.company}`,
+        vacancy.metroStation ? `Где: м. ${vacancy.metroStation}` : `Компания: ${vacancy.company}`,
       ]
     : [];
 
@@ -153,16 +169,22 @@ export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: strin
           )}
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{name}</Text>
-            <Text style={styles.meta}>
-              {worker.phone}
-              {worker.metroStation ? `  ·  🚇 ${worker.metroStation}` : ''}
-              {(worker.avgRating ?? 0) > 0 ? `  ·  ⭐ ${(worker.avgRating ?? 0).toFixed(1)}` : ''}
-            </Text>
+            <View style={styles.metaRow}>
+              <MetaBit name="call-outline" text={worker.phone} />
+              {worker.metroStation ? <MetaBit name="subway-outline" text={worker.metroStation} /> : null}
+              {(worker.avgRating ?? 0) > 0
+                ? <MetaBit name="star" text={(worker.avgRating ?? 0).toFixed(1)} color={Colors.amber} />
+                : null}
+            </View>
           </View>
-          <Text style={styles.arrow}>Профиль ›</Text>
+          <View style={styles.arrowRow}>
+            <Text style={styles.arrow}>Профиль</Text>
+            <Ionicons name="chevron-forward" size={rf(13)} color={Colors.primary} />
+          </View>
         </TouchableOpacity>
 
         <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+          <Ionicons name={status.icon} size={rf(13)} color={status.color} />
           <Text style={[styles.statusTxt, { color: status.color }]}>{status.label}</Text>
         </View>
 
@@ -174,7 +196,12 @@ export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: strin
               onPress={() => reject(app)}
               activeOpacity={0.8}
             >
-              {isRLoading ? <ActivityIndicator size="small" color={Colors.red} /> : <Text style={styles.rejectBtnTxt}>✕ Отказать</Text>}
+              {isRLoading ? <ActivityIndicator size="small" color={Colors.red} /> : (
+                <>
+                  <Ionicons name="close" size={rf(15)} color={Colors.red} />
+                  <Text style={styles.rejectBtnTxt}>Отказать</Text>
+                </>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.approveBtn, isLoading && { opacity: 0.5 }]}
@@ -182,7 +209,12 @@ export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: strin
               onPress={() => setApproving(app)}
               activeOpacity={0.8}
             >
-              {isLoading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.approveBtnTxt}>✅ Одобрить + Чат</Text>}
+              {isLoading ? <ActivityIndicator size="small" color="#fff" /> : (
+                <>
+                  <Ionicons name="checkmark" size={rf(16)} color="#fff" />
+                  <Text style={styles.approveBtnTxt}>Одобрить + Чат</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         ) : null}
@@ -207,7 +239,9 @@ export function PermApplicationsSheet({ vacancyId, onClose }: { vacancyId: strin
 
       {apps.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={{ fontSize: rf(48) }}>📥</Text>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="file-tray-outline" size={rf(30)} color={Colors.textMuted} />
+          </View>
           <Text style={styles.emptyTitle}>Нет откликов</Text>
           <Text style={styles.emptySub}>Когда кандидаты откликнутся — они появятся здесь</Text>
         </View>
@@ -256,13 +290,22 @@ const styles = StyleSheet.create({
   avatarTxt: { color: '#fff', fontSize: rf(15), fontWeight: '700' },
   name: { fontSize: rf(15), fontWeight: '700', color: Colors.textPrimary },
   meta: { fontSize: rf(12), color: Colors.textMuted, marginTop: rs(2) },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: rs(10), marginTop: rs(3), flexWrap: 'wrap' },
+  metaBit: { flexDirection: 'row', alignItems: 'center', gap: rs(4), flexShrink: 1 },
+  metaTxt: { fontSize: rf(12), color: Colors.textMuted, flexShrink: 1 },
+  arrowRow: { flexDirection: 'row', alignItems: 'center', gap: rs(1) },
   arrow: { fontSize: rf(12), color: Colors.primary, fontWeight: '600' },
-  statusBadge: { borderRadius: rs(8), paddingHorizontal: rs(10), paddingVertical: rs(6), alignSelf: 'flex-start' },
+  emptyIcon: {
+    width: rs(64), height: rs(64), borderRadius: rs(32),
+    backgroundColor: Colors.divider, alignItems: 'center', justifyContent: 'center',
+    marginBottom: rs(4),
+  },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: rs(6), borderRadius: rs(8), paddingHorizontal: rs(10), paddingVertical: rs(6), alignSelf: 'flex-start' },
   statusTxt: { fontSize: rf(13), fontWeight: '700' },
   btnRow: { flexDirection: 'row', gap: rs(10) },
-  rejectBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.red, borderRadius: rs(100), paddingVertical: rs(11), alignItems: 'center' },
+  rejectBtn: { flex: 1, flexDirection: 'row', gap: rs(5), justifyContent: 'center', borderWidth: 1.5, borderColor: Colors.red, borderRadius: rs(100), paddingVertical: rs(11), alignItems: 'center' },
   rejectBtnTxt: { color: Colors.red, fontSize: rf(14), fontWeight: '600' },
-  approveBtn: { flex: 2, backgroundColor: Colors.green, borderRadius: rs(100), paddingVertical: rs(11), alignItems: 'center' },
+  approveBtn: { flex: 2, flexDirection: 'row', gap: rs(6), justifyContent: 'center', backgroundColor: Colors.green, borderRadius: rs(100), paddingVertical: rs(11), alignItems: 'center' },
   approveBtnTxt: { color: '#fff', fontSize: rf(14), fontWeight: '700' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: rs(32), paddingBottom: rs(80) },
   emptyTitle: { fontSize: rf(18), fontWeight: '700', color: Colors.textPrimary, marginTop: rs(12) },
