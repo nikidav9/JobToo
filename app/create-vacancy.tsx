@@ -69,6 +69,25 @@ function buildNormsText(address: string, norms: Norms): string {
   return `📍 Адрес: ${address}\nНормативы:\n${lines}`;
 }
 
+/**
+ * Обратный разбор: нормативы лежат в базе одной строкой, а форме нужны поля.
+ *
+ * Раньше это умело только «повторить смену», а правка — нет. Из-за этого
+ * директор, который хотел сдвинуть смену на час, открывал форму с шестью
+ * пустыми нормативами, и сохранить она не давала: «Проверьте нормативы».
+ * Приходилось вбивать всё заново ради одной цифры времени.
+ */
+function parseNorms(text?: string | null): Norms | null {
+  if (!text) return null;
+  const next: Norms = { ...DEFAULT_NORMS };
+  let found = false;
+  for (const f of NORM_FIELDS) {
+    const m = text.match(new RegExp(`— ${f.label}: ([0-9.]+)`));
+    if (m) { next[f.key] = m[1]; found = true; }
+  }
+  return found ? next : null;
+}
+
 // Role-specific single norm configs
 const ROLE_NORM: Record<string, { label: string; unit: string; hint: string; min: number; max: number; placeholder: string }> = {
   cook:             { label: 'Почасовая ставка',  unit: '₽/час',   hint: 'Диапазон: 1–999 ₽/час',              min: 1, max: 999,   placeholder: '250'  },
@@ -132,7 +151,6 @@ export default function CreateVacancy() {
   const [metroPicker, setMetroPicker] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [fixedSalary, setFixedSalary] = useState(existing?.salary ? String(existing.salary) : '');
-  const [fixedConditions, setFixedConditions] = useState('');
   const [saving, setSaving] = useState(false);
   // Multi-day toggle (disabled in edit mode)
   const [multiDay, setMultiDay] = useState(false);
@@ -153,6 +171,16 @@ export default function CreateVacancy() {
     setWorkersNeeded(existing.workersNeeded);
     setIsUrgent(existing.isUrgent);
     setNoExp(existing.noExperienceNeeded);
+    // Нормативы и оплата. Их восстановление тут и пропустили.
+    const parsed = parseNorms(existing.normsAndPay);
+    if (parsed) setNorms(parsed);
+    // Ставим и здесь, а не только в начальном значении поля: список смен
+    // может подъехать из сети уже после того, как экран отрисовался, и тогда
+    // начальное значение успело посчитаться от пустоты.
+    if (existing.salary) {
+      setShiftPay(String(existing.salary));
+      setFixedSalary(String(existing.salary));
+    }
     setLoadingInit(false);
   }, [existing?.id]);
 
@@ -177,15 +205,8 @@ export default function CreateVacancy() {
     setIsUrgent(source.isUrgent);
     setNoExp(source.noExperienceNeeded);
     if (source.salary) { setFixedSalary(String(source.salary)); setShiftPay(String(source.salary)); }
-    if (source.normsAndPay) {
-      const next: Norms = { ...DEFAULT_NORMS };
-      let found = false;
-      for (const f of NORM_FIELDS) {
-        const m = source.normsAndPay.match(new RegExp(`— ${f.label}: ([0-9.]+)`));
-        if (m) { next[f.key] = m[1]; found = true; }
-      }
-      if (found) setNorms(next);
-    }
+    const parsed = parseNorms(source.normsAndPay);
+    if (parsed) setNorms(parsed);
   }, [source?.id]);
 
   const line = METRO_LINES.find(l => l.id === metroLineId);
