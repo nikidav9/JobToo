@@ -418,7 +418,7 @@ function formatDateRu(iso?: string): string {
   return `${d} ${MONTHS_RU[m - 1]}`;
 }
 
-export async function notifyWorkersNearVacancy(params: {
+export async function notifyWorkersNewVacancy(params: {
   metroStation: string;
   title: string;
   company: string;
@@ -443,10 +443,12 @@ export async function notifyWorkersNearVacancy(params: {
       ? `${estimated ? '≈ ' : ''}${salary.toLocaleString('ru-RU')} ₽${type === 'permanent' ? '/мес' : ''}`
       : '';
 
-    // Сервер разошлёт тем, кому до этой станции реально ехать: своя ветка,
-    // не дальше часа. Раньше слали всем — «охват важнее точности», — и за это
-    // 27% подключивших телеграм заблокировали бота. Колокольчик в приложении
-    // по-прежнему получают все: он никого не будит.
+    // Сервер разошлёт всем работникам, у кого есть куда написать. Какое-то
+    // время слали только тем, кому недалеко по своей ветке, но география
+    // отрезала тех, кто готов ехать, а таких среди складских много: на смене
+    // в Строгино объявление ушло 19 людям вместо 149. От заваливания теперь
+    // защищает не расстояние, а счёт — не больше четырёх объявлений в сутки
+    // на человека. Станция стоит в тексте, человек решает сам.
     const notifTitle = type === 'permanent'
       ? '💼 Новая постоянная вакансия!'
       : '⚡ Новая подработка!';
@@ -474,8 +476,9 @@ export async function notifyWorkersNearVacancy(params: {
       headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
       body: JSON.stringify({
         fn: 'dbNotifyAllWorkersNewVacancy',
-        // Станция — седьмым аргументом: по ней сервер выбирает, кому это
-        // объявление вообще имеет смысл слать. Раньше оно уходило всем.
+        // Станция всё ещё уходит седьмым аргументом, но сервер её больше не
+        // использует для отбора получателей. Оставлена, чтобы не ломать
+        // старые версии приложения, которые её присылают.
         args: [notifTitle, body, tgHtml, type === 'permanent' ? 'nearby_perm' : 'nearby_shift',
                groupHtml, vacancyId ?? '', metroStation ?? ''],
       }),

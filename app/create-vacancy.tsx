@@ -14,7 +14,7 @@ import { AddressSuggestField } from '@/components/feature/AddressSuggestField';
 import { useApp } from '@/hooks/useApp';
 import { uid, nowISO } from '@/services/storage';
 import { dbUpsertVacancy, dbUpsertVacancyBatch } from '@/services/db';
-import { notifyWorkersNearVacancy } from '@/services/notifications';
+import { notifyWorkersNewVacancy } from '@/services/notifications';
 import { Vacancy, WorkType } from '@/constants/types';
 import { METRO_LINES } from '@/constants/metro';
 import { WorkTypeSelector, WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
@@ -374,7 +374,7 @@ export default function CreateVacancy() {
         await upsertWithTimeout(dbUpsertVacancyBatch(vacs));
         vacs.forEach(v => optimisticAddVacancy(v));
         if (metroStation) {
-          notifyWorkersNearVacancy({
+          notifyWorkersNewVacancy({
             metroStation, title: meta.label, company: base.company, type: 'shift',
             date: vacs[0]?.date, daysCount: vacs.length,
             timeStart: base.timeStart, timeEnd: base.timeEnd, salary: base.salary,
@@ -394,7 +394,7 @@ export default function CreateVacancy() {
         await upsertWithTimeout(dbUpsertVacancy(vac));
         optimisticAddVacancy(vac);
         if (metroStation) {
-          notifyWorkersNearVacancy({
+          notifyWorkersNewVacancy({
             metroStation, title: meta.label, company: base.company, type: 'shift',
             date: vac.date, timeStart: base.timeStart, timeEnd: base.timeEnd, salary: base.salary,
             estimated: isStorcker,

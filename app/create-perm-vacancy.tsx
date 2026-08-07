@@ -12,7 +12,7 @@ import { AddressSuggestField } from '@/components/feature/AddressSuggestField';
 import { useApp } from '@/hooks/useApp';
 import { uid, nowISO } from '@/services/storage';
 import { dbUpsertPermVacancy, dbGetPermVacanciesByEmployer } from '@/services/db';
-import { notifyWorkersNearVacancy } from '@/services/notifications';
+import { notifyWorkersNewVacancy } from '@/services/notifications';
 import { PermVacancy, WorkType } from '@/constants/types';
 import { METRO_LINES } from '@/constants/metro';
 import { WorkTypeSelector, WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
@@ -88,7 +88,7 @@ export default function CreatePermVacancy() {
       await dbUpsertPermVacancy(vac);
       if (isEdit) optimisticUpdatePermVacancy(vac); else optimisticAddPermVacancy(vac);
       if (!isEdit && metroStation) {
-        notifyWorkersNearVacancy({
+        notifyWorkersNewVacancy({
           metroStation, title: title.trim(), company: vac.company, type: 'permanent',
           salary: vac.salary, schedule: vac.schedule, vacancyId: vac.id,
         }).catch(() => {});
