@@ -52,6 +52,9 @@ export function TelegramConnectButton({ size = 24, pad = 6, onboardingAnchor = f
     app?.currentUser?.telegramId ? true : null,
   );
   const [busy, setBusy] = useState(false);
+  // Телеграм может не открыться — не установлен, запрещены переходы.
+  // Молчать нельзя: человек жмёт кнопку и не понимает, живая она вообще или нет.
+  const [failed, setFailed] = useState(false);
   const btnRef = useRef<View>(null);
   // Способ перемерить по требованию: первый замер при раскладке часто
   // приходит с нулями, и цель для подсветки не регистрируется вовсе.
@@ -91,12 +94,19 @@ export function TelegramConnectButton({ size = 24, pad = 6, onboardingAnchor = f
   // Внутри Telegram Mini App уведомления и так идут в Телеграм — кнопка не нужна
   if (!userId || isTelegramMiniApp()) return null;
 
-  const connect = async () => {
-    // Оставляем серверу заявку до перехода: если чат с ботом уже был,
-    // Telegram не донесёт метку из ссылки и пришлёт голый «/start» —
-    // бот привяжет по заявке.
-    await dbTgPrepareLink(userId);
-    Linking.openURL(`${BOT_URL}?start=link_${userId}`).catch(() => {});
+  const connect = () => {
+    setFailed(false);
+    // Заявку серверу шлём параллельно, а НЕ перед переходом. Она нужна на
+    // случай, когда чат с ботом уже был: Telegram тогда не доносит метку из
+    // ссылки и присылает голый «/start», и бот привязывает по заявке.
+    // Но ждать её ответа нельзя:
+    //  • в браузере открыть Телеграм разрешено только внутри самого нажатия —
+    //    после await это уже «всплывающее окно», и его молча блокируют;
+    //  • если сеть подвисла, запрос висел без ограничения по времени, и
+    //    кнопка просто ничего не делала — ни перехода, ни слова о причине.
+    // Пока человек переключается в Телеграм, заявка успевает дойти.
+    dbTgPrepareLink(userId);
+    Linking.openURL(`${BOT_URL}?start=link_${userId}`).catch(() => setFailed(true));
   };
 
   const disconnect = async () => {
@@ -188,9 +198,16 @@ export function TelegramConnectButton({ size = 24, pad = 6, onboardingAnchor = f
                   <Ionicons name="paper-plane" size={17} color="#fff" style={{ marginRight: 8 }} />
                   <Text style={st.connectText}>Подключить Telegram</Text>
                 </TouchableOpacity>
-                <Text style={st.hint}>
-                  Откроется Телеграм — нажмите «Start». Вернитесь сюда, статус обновится сам.
-                </Text>
+                {failed ? (
+                  <Text style={st.failHint}>
+                    Телеграм не открылся. Проверьте, что он установлен, и откройте бота
+                    вручную: t.me/JobToo_bot — там нажмите «Start».
+                  </Text>
+                ) : (
+                  <Text style={st.hint}>
+                    Откроется Телеграм — нажмите «Start». Вернитесь сюда, статус обновится сам.
+                  </Text>
+                )}
               </>
             )}
           </View>
@@ -246,6 +263,7 @@ const st = StyleSheet.create({
   },
   connectText: { color: '#fff', fontSize: rf(16), fontWeight: '700' },
   hint: { fontSize: rf(12.5), lineHeight: rf(17), color: Colors.textMuted, textAlign: 'center', marginTop: rs(10) },
+  failHint: { fontSize: rf(12.5), lineHeight: rf(17), color: Colors.red, textAlign: 'center', marginTop: rs(10) },
   connectedBox: {
     flexDirection: 'row', alignItems: 'center', gap: rs(10),
     backgroundColor: Colors.greenLight, borderRadius: Radius.md,

@@ -25,19 +25,42 @@ const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET ?? '';
  *
  * Поэтому: одна повторная попытка (страница хостинга — обычно секундная
  * икота), а если и она не JSON — говорим, что именно ответил сервер.
+ *
+ * И обязательно свой срок ожидания. У fetch его нет вовсе: при подвисшей
+ * сети запрос висит бесконечно, а вместе с ним — всё, что его ждёт. Снаружи
+ * это выглядит как «нажимаю, и ничего не происходит», без единого слова о
+ * причине. Лучше честно сказать, что сервер не ответил.
  */
+const PROXY_TIMEOUT = 25_000;
+
 async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
   let status = 0;
   let text = '';
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await fetch(`${API_BASE}/api/db.php`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
-      body: JSON.stringify({ fn, args }),
-    });
-    status = res.status;
-    text = await res.text();
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), PROXY_TIMEOUT);
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/api/db.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
+        body: JSON.stringify({ fn, args }),
+        signal: ctl.signal,
+      });
+      status = res.status;
+      text = await res.text();
+    } catch (e: any) {
+      clearTimeout(timer);
+      const timedOut = e?.name === 'AbortError';
+      // Обрыв связи повторяем один раз — как и невнятный ответ хостинга.
+      if (attempt === 0 && !timedOut) { await new Promise(r => setTimeout(r, 600)); continue; }
+      console.error(`[db] ${fn}:`, e?.message ?? String(e));
+      throw new Error(timedOut
+        ? 'Сервер не ответил вовремя. Проверьте соединение и попробуйте ещё раз.'
+        : 'Нет связи с сервером. Проверьте соединение.');
+    }
+    clearTimeout(timer);
 
     let parsed: { data?: T; error?: string } | null = null;
     try {

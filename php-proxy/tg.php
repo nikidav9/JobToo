@@ -423,8 +423,15 @@ if (preg_match('/^\/start\s*$/', $text)) {
     $pending = tg_pending_read();
     if (!empty($pending)) {
         arsort($pending);                       // самая свежая — первая
-        $userId = (string)array_key_first($pending);
-        $u = sb_one('jm_users', ['id' => 'eq.' . $userId], 'id,first_name');
+        // Идём по заявкам, пока не найдём живой аккаунт. Раньше смотрели
+        // только на первую: если она осталась от удалённого аккаунта, привязка
+        // не срабатывала ни у кого следующие 15 минут, и заявка так и висела.
+        $userId = null; $u = null;
+        foreach (array_keys($pending) as $cand) {
+            $row = sb_one('jm_users', ['id' => 'eq.' . $cand], 'id,first_name');
+            if ($row) { $userId = (string)$cand; $u = $row; break; }
+            unset($pending[$cand]);             // такого аккаунта нет — выбрасываем
+        }
         if ($u) {
             unset($pending[$userId]);
             tg_pending_write($pending);
@@ -440,6 +447,7 @@ if (preg_match('/^\/start\s*$/', $text)) {
             ]);
             echo json_encode(['ok' => true]); exit;
         }
+        tg_pending_write($pending);             // мусор из мёртвых заявок не копим
     }
 }
 
