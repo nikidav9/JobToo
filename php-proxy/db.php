@@ -654,6 +654,22 @@ define('DASHBOARD_URL', getenv('DASHBOARD_URL') ?: 'https://dashboard-nujus-proj
 define('SUPPORT_FROM_HOUR', 10);
 define('SUPPORT_TO_HOUR', 21);
 
+/**
+ * Отметка «обращение закрыто» (null — открыто).
+ *
+ * Таблицы может ещё не быть: миграции выкладываются отдельным ходом, и один
+ * раз этот ход уже не состоялся. Ради служебной отметки нельзя ронять ни
+ * обращение человека, ни ответ из дашборда — поэтому молча переживаем.
+ */
+function support_thread_set(string $userId, ?string $closedAt): void {
+    if ($userId === '') return;
+    try {
+        sb_upsert('jm_support_threads', [
+            'user_id' => $userId, 'closed_at' => $closedAt, 'updated_at' => now_iso(),
+        ], 'user_id');
+    } catch (Throwable $e) { /* таблицы нет — работаем как раньше */ }
+}
+
 define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025)); // группа «ПОДРАБОТКИ»
 
 /**
@@ -1695,10 +1711,43 @@ try {
             $data = sb_select('jm_support_messages', ['user_id' => 'eq.' . (string)($args[0] ?? '')],
                 'id,direction,text,created_at', 'created_at.asc'); break;
 
+        // Закрыть обращение: прощальное слово человеку + отметка «закрыто».
+        //
+        // Текст обязателен и приходит из дашборда: закрывать молча — значит
+        // оборвать разговор на полуслове, а человек не знает, ждать ему ещё
+        // или нет. Отметка отдельно от переписки (см. 023_support_close.sql).
+        case 'supportClose': {
+            $uid = (string)($args[0] ?? '');
+            $text = trim((string)($args[1] ?? ''));
+            if ($uid === '') { $data = ['ok' => false, 'reason' => 'no_user']; break; }
+            if ($text !== '') {
+                sb_insert('jm_support_messages', [
+                    'id' => uid(), 'user_id' => $uid, 'direction' => 'out',
+                    'text' => $text, 'created_at' => now_iso(),
+                ]);
+                notify_user($uid, '🆘 Ответ поддержки', $text, 'support');
+            }
+            support_thread_set($uid, now_iso());
+            $data = ['ok' => true]; break;
+        }
+
+        // Снова открыть — если закрыли по ошибке.
+        case 'supportReopen': {
+            $uid = (string)($args[0] ?? '');
+            if ($uid === '') { $data = ['ok' => false]; break; }
+            support_thread_set($uid, null);
+            $data = ['ok' => true]; break;
+        }
+
         case 'supportSend': {
             $uid = (string)($args[0] ?? '');
             $text = trim((string)($args[1] ?? ''));
             if ($uid === '' || $text === '') { $data = ['ok' => false]; break; }
+
+            // Написал снова — обращение снова открыто, даже если мы его
+            // закрывали. Иначе человек пишет в пустоту: у нас в списке
+            // «закрыто», а он ждёт ответа.
+            support_thread_set($uid, null);
 
             sb_insert('jm_support_messages', [
                 'id' => uid(), 'user_id' => $uid, 'direction' => 'in',
