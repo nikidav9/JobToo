@@ -112,6 +112,7 @@ ln -sf /etc/nginx/sites-available/jobtoo /etc/nginx/sites-enabled/jobtoo
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
+set +e
 # ── Роли ──────────────────────────────────────────────────────────────────
 # Не через docker-entrypoint-initdb.d: те скрипты выполняются только при
 # создании пустого каталога данных, а образ Supabase приходит с уже готовым.
@@ -124,8 +125,12 @@ for i in $(seq 1 40); do
   sleep 5
 done
 
-if docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db psql -U postgres -d postgres -c 'select 1' >/dev/null 2>&1; then
-  docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db psql -v ON_ERROR_STOP=1 -U postgres -d postgres <<SQL >/tmp/jt-roles.log 2>&1 && say "роли" "заданы" || say "роли" "ОШИБКА: $(tail -3 /tmp/jt-roles.log | tr '\n' ' ' | cut -c1-200)"
+# Проверку «а можно ли войти» убрал: она глотала причину отказа, и блок
+# молча пропускался. Пусть команда выполняется всегда и всегда докладывает —
+# ошибка полезнее тишины.
+docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+  psql -v ON_ERROR_STOP=1 -U postgres -d postgres >/tmp/jt-roles.log 2>&1 <<SQL
+
     alter role authenticator          with login password '${POSTGRES_PASSWORD}';
     alter role supabase_storage_admin with login password '${POSTGRES_PASSWORD}';
     alter role supabase_admin         with login password '${POSTGRES_PASSWORD}';
@@ -139,9 +144,15 @@ if docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db psql -U postgres
     alter default privileges in schema public grant all on tables    to service_role;
     alter default privileges in schema public grant all on sequences to service_role;
 SQL
+rc=$?
+set -e
+if [ $rc -eq 0 ]; then
+  say "роли" "заданы"
   # Службы, которые уже успели упасть на неверном пароле, сами не оживут:
   # они перезапускаются с тем же кэшем неудачи. Подталкиваем.
   docker compose restart rest realtime storage >/dev/null 2>&1 || true
+else
+  say "роли" "ОШИБКА($rc): $(tail -4 /tmp/jt-roles.log | tr '\n' ' ' | cut -c1-300)"
 fi
 
 # ── Миграции ──────────────────────────────────────────────────────────────
