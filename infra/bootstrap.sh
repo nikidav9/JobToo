@@ -207,6 +207,14 @@ fi
 chmod +x "$REPO/infra/migrate.sh" 2>/dev/null || true
 bash "$REPO/infra/migrate.sh" || say "миграции" "не прошли, см. следующий заход"
 
+# ── Перенос данных из облака ──────────────────────────────────────────────
+# Только если мы вообще знаем, откуда переносить: ключ доступа к облаку
+# приезжает отдельно и в репозитории его нет.
+if [ -f /opt/jobtoo-secrets/cloud ]; then
+  chmod +x "$REPO/infra/import.sh" 2>/dev/null || true
+  bash "$REPO/infra/import.sh" || say "перенос" "не удался, см. следующий заход"
+fi
+
 state=$(docker compose ps --format '{{.Service}}={{.State}}' 2>/dev/null | tr '\n' ' ')
 say "развёрнуто" "$state"
 
