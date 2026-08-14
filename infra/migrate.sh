@@ -15,7 +15,11 @@ NTFY=${NTFY:-https://ntfy.sh/jt-v4-m7q2z8}
 say() { curl -s -m 20 -H "Title: $1" -d "$2" "$NTFY" >/dev/null || true; }
 
 cd "$REPO/infra"
-q() { docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d postgres "$@"; }
+# Пароль нужен даже локально: образ supabase/postgres не пускает по доверию,
+# и без него psql молча не соединяется, а выглядит это как «база не отвечает».
+set -a; . /opt/jobtoo-secrets/env; set +a
+q() { docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+        psql -v ON_ERROR_STOP=1 -U postgres -d postgres "$@"; }
 
 # ── Ждём базу ─────────────────────────────────────────────────────────────
 for i in $(seq 1 30); do
