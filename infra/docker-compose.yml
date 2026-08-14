@@ -1,0 +1,134 @@
+# Supabase на своём сервере — то, что раньше было облачным.
+#
+# Из тринадцати служб официальной сборки здесь семь. Выброшены:
+#   auth (gotrue)  — у нас свой вход, bcrypt в php-proxy/db.php
+#   studio, meta   — панель не нужна, у нас свой дашборд
+#   edge-runtime   — единственную функцию push-notify перепишем на PHP
+#   supavisor      — пул соединений при нашей нагрузке лишний
+# Меньше служб — меньше памяти и меньше того, что может сломаться.
+#
+# Шлюзом вместо Envoy работает nginx на самой машине: он и так нужен для
+# сертификата, а его конфигурацию я могу прочитать и починить, в отличие от
+# сгенерированной Envoy. Наружу контейнеры не смотрят — только на 127.0.0.1.
+
+name: jobtoo
+
+services:
+  db:
+    image: supabase/postgres:17.6.1.136
+    restart: unless-stopped
+    ports: ["127.0.0.1:5432:5432"]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: 3600
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      # Realtime читает журнал репликации — без logical он не работает вовсе.
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+      # 4 ГБ памяти на всех: Postgres берёт четверть, остальное службам и кэшу.
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - effective_cache_size=1GB
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # Главное: весь доступ к данным идёт через него. Это тот самый /rest/v1,
+  # который дёргают php-proxy и дашборд.
+  rest:
+    image: postgrest/postgrest:v14.12
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: 3600
+
+  # Живые обновления чатов, лайков и уведомлений — двенадцать подписок
+  # в contexts/AppContext.tsx. Самая капризная часть: держит слот репликации,
+  # и если тот отвалится, всё остальное продолжит работать как ни в чём не
+  # бывало, а чаты тихо перестанут обновляться. Поэтому за ним отдельный присмотр.
+  realtime:
+    image: supabase/realtime:v2.102.3
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["127.0.0.1:4000:4000"]
+    environment:
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
+      DB_ENC_KEY: ${REALTIME_ENC_KEY}
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+
+  # Аватары, фотографии и голосовые из чатов. Файлы кладём на диск сервера;
+  # если разрастутся — переедут в объектное хранилище Timeweb.
+  storage:
+    image: supabase/storage-api:v1.60.4
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["127.0.0.1:5000:5000"]
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: jobtoo
+      REGION: msk
+      GLOBAL_S3_BUCKET: jobtoo
+      ENABLE_IMAGE_TRANSFORMATION: "true"
+      IMGPROXY_URL: http://imgproxy:5001
+    volumes:
+      - storage-data:/var/lib/storage
+
+  imgproxy:
+    image: darthsim/imgproxy:v3.30.1
+    restart: unless-stopped
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+      IMGPROXY_ENABLE_WEBP_DETECTION: "true"
+    volumes:
+      - storage-data:/var/lib/storage
+
+volumes:
+  db-data:
+  storage-data:
