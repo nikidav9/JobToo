@@ -8,7 +8,7 @@
 # Порядок не случаен. Миграция 015 правит storage.buckets, а эту таблицу
 # создаёт служба Storage при первом запуске — не раньше. Поэтому сначала
 # ждём Storage, потом заводим бакет avatars, и только потом катим по списку.
-set -eu
+set -u
 
 REPO=${REPO:-/opt/jobtoo}
 NTFY=${NTFY:-https://ntfy.sh/jt-v4-m7q2z8}
@@ -41,9 +41,14 @@ if ! q -c "select 1 from storage.buckets limit 1" >/dev/null 2>&1; then
   exit 0
 fi
 
-q -c "insert into storage.buckets (id, name, public)
-      values ('avatars', 'avatars', true)
-      on conflict (id) do nothing" >/dev/null
+# Бакет заводим сами: Storage создаёт таблицы, но не наши бакеты.
+# Ошибку показываем, а не глотаем — молчащий сбой здесь стоил получаса.
+if ! q -c "insert into storage.buckets (id, name, public)
+           values ('avatars', 'avatars', true)
+           on conflict (id) do nothing" >/tmp/jt-bucket.log 2>&1; then
+  say "миграции" "бакет: $(tail -3 /tmp/jt-bucket.log | tr '\n' ' ' | cut -c1-250)"
+  exit 1
+fi
 
 # ── Сами миграции, строго по порядку имён ─────────────────────────────────
 applied=0
@@ -52,11 +57,11 @@ for f in $(ls "$REPO"/supabase/migrations/*.sql | sort); do
   if q -tAc "select 1 from jm_migrations where name = '$name'" 2>/dev/null | grep -q 1; then
     continue
   fi
-  if q < "$f" >/dev/null 2>&1; then
-    q -c "insert into jm_migrations (name) values ('$name')" >/dev/null
+  if q < "$f" >/tmp/jt-mig.log 2>&1; then
+    q -c "insert into jm_migrations (name) values ('$name')" >/dev/null 2>&1
     applied=$((applied+1))
   else
-    say "миграции" "СПОТКНУЛАСЬ на $name — дальше не иду"
+    say "миграции" "СПОТКНУЛАСЬ на $name: $(grep -a -m2 ERROR /tmp/jt-mig.log | tr '\n' ' ' | cut -c1-250)"
     exit 1
   fi
 done
