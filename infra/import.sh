@@ -15,7 +15,12 @@ set -eu
 REPO=${REPO:-/opt/jobtoo}
 DATA=${DATA:-/opt/jobtoo-import}
 NTFY=${NTFY:-https://ntfy.sh/jt-v4-m7q2z8}
-say() { curl -s -m 20 -H "Title: $1" -d "$2" "$NTFY" >/dev/null || true; }
+say() {
+  # В свой журнал, а не только наружу: сторонний канал перестал принимать
+  # с адреса сервера, и все объяснения этого скрипта уходили в пустоту.
+  echo "$(date -Is) [$1] $2" >> /var/log/jt-apply.log
+  curl -s -m 10 -H "Title: $1" -d "$2" "$NTFY" >/dev/null 2>&1 || true
+}
 
 cd "$REPO/infra"
 set -a; . /opt/jobtoo-secrets/env; set +a
