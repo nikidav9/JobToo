@@ -247,13 +247,28 @@ fi
 # на db.jobtoo.ru, когда до записи дойдут руки.
 # Строго IPv4: ifconfig.me отдавал IPv6, и имя получалось несуществующим —
 # certbot честно не мог выпустить сертификат на 2a03:...sslip.io.
+# Строго IPv4: ifconfig.me отдавал IPv6, и имя получалось несуществующим —
+# certbot честно не мог выпустить сертификат на 2a03:...sslip.io.
 IP=$(ip -4 addr show scope global 2>/dev/null | grep -oE 'inet [0-9.]+' | awk '{print $2}' | head -1)
 HOST="${IP}.sslip.io"
+
+# certonly, а не --nginx: правки certbot в конфигурации не выживали. Этот
+# скрипт переписывает её каждую минуту и стирал всё, что тот вносил —
+# сертификат был выпущен, а отдавать его было некому.
 if [ ! -d "/etc/letsencrypt/live/$HOST" ] && command -v certbot >/dev/null 2>&1; then
-  certbot --nginx -n --agree-tos -m nikidav9@gmail.com -d "$HOST" \
-    --redirect >>/var/log/jt-apply.log 2>&1 \
+  certbot certonly --webroot -w /var/www/html -n --agree-tos \
+    -m nikidav9@gmail.com -d "$HOST" >>/var/log/jt-apply.log 2>&1 \
     && say "сертификат" "выпущен на $HOST" \
     || say "сертификат" "не вышло, работаем по http"
+fi
+
+# TLS-часть подставляем сами, из своего файла.
+if [ -d "/etc/letsencrypt/live/$HOST" ] && [ -f "$REPO/infra/nginx-tls.conf" ]; then
+  sed "s/__HOST__/$HOST/g" "$REPO/infra/nginx-tls.conf" \
+    >> /etc/nginx/sites-available/jobtoo
+  nginx -t >/dev/null 2>&1 && systemctl reload nginx \
+    && say "tls" "включён на https://$HOST и панель на :8443" \
+    || say "tls" "конфигурация не прошла проверку"
 fi
 
 # ── Перенос данных из облака ──────────────────────────────────────────────
