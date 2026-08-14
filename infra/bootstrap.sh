@@ -17,6 +17,41 @@ NTFY=${NTFY:-https://ntfy.sh/jt-v4-m7q2z8}
 
 say() { curl -s -m 20 -H "Title: $1" -d "$2" "$NTFY" >/dev/null || true; }
 
+# ── Подготовка машины ─────────────────────────────────────────────────────
+# Всё тяжёлое живёт здесь, а не в cloud-init, по горькому опыту: там это
+# была служба типа oneshot, а systemd убивает такие через 90 секунд. Установка
+# Docker в полторы минуты не укладывается, и она обрывалась на полуслове.
+# Здесь же таймаут снят, а любая поломка чинится коммитом, а не пересозданием.
+
+if [ ! -f /swapfile ]; then
+  # На 4 ГБ памяти Postgres, Realtime и Storage без подкачки будут толкаться.
+  fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile \
+    && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  sysctl -w vm.swappiness=10
+  echo 'vm.swappiness=10' > /etc/sysctl.d/99-swappiness.conf
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  say "установка" "ставлю docker"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y
+  apt-get install -y jq openssl python3 certbot python3-certbot-nginx
+  curl -fsSL https://get.docker.com -o /tmp/get-docker.sh && sh /tmp/get-docker.sh
+  systemctl enable --now docker
+  say "установка" "docker=$(docker --version 2>/dev/null || echo не встал)"
+fi
+
+# Файрвол после докера: ufw и docker спорят за iptables, и порядок важен.
+# 5432 наружу не открываем никогда — база доступна только изнутри машины.
+if ! ufw status 2>/dev/null | grep -q "Status: active"; then
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw allow 22/tcp
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw --force enable
+fi
+
 # ── Секреты ───────────────────────────────────────────────────────────────
 if [ ! -f "$SECRETS" ]; then
   mkdir -p "$(dirname "$SECRETS")"
