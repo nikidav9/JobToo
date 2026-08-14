@@ -112,12 +112,6 @@ ln -sf /etc/nginx/sites-available/jobtoo /etc/nginx/sites-enabled/jobtoo
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
-# ── Миграции ──────────────────────────────────────────────────────────────
-# После контейнеров: накатыватель сам подождёт базу и Storage, а если те
-# ещё не готовы — тихо отложит до следующего запуска таймера.
-chmod +x "$REPO/infra/migrate.sh" 2>/dev/null || true
-bash "$REPO/infra/migrate.sh" || say "миграции" "не прошли, см. следующий заход"
-
 # ── Роли ──────────────────────────────────────────────────────────────────
 # Не через docker-entrypoint-initdb.d: те скрипты выполняются только при
 # создании пустого каталога данных, а образ Supabase приходит с уже готовым.
@@ -149,6 +143,12 @@ SQL
   # они перезапускаются с тем же кэшем неудачи. Подталкиваем.
   docker compose restart rest realtime storage >/dev/null 2>&1 || true
 fi
+
+# ── Миграции ──────────────────────────────────────────────────────────────
+# После контейнеров: накатыватель сам подождёт базу и Storage, а если те
+# ещё не готовы — тихо отложит до следующего запуска таймера.
+chmod +x "$REPO/infra/migrate.sh" 2>/dev/null || true
+bash "$REPO/infra/migrate.sh" || say "миграции" "не прошли, см. следующий заход"
 
 state=$(docker compose ps --format '{{.Service}}={{.State}}' 2>/dev/null | tr '\n' ' ')
 say "развёрнуто" "$state"
