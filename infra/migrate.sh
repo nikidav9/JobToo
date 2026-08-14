@@ -19,7 +19,7 @@ cd "$REPO/infra"
 # и без него psql молча не соединяется, а выглядит это как «база не отвечает».
 set -a; . /opt/jobtoo-secrets/env; set +a
 q() { docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
-        psql -v ON_ERROR_STOP=1 -U postgres -d postgres "$@"; }
+        psql -v ON_ERROR_STOP=1 -U supabase_admin -d postgres "$@"; }
 
 # ── Ждём базу ─────────────────────────────────────────────────────────────
 for i in $(seq 1 30); do

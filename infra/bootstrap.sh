@@ -121,7 +121,7 @@ set +e
 #
 # Здесь же — после запуска, и при каждом заходе: alter role идемпотентен.
 for i in $(seq 1 40); do
-  docker compose exec -T db pg_isready -U postgres -h localhost >/dev/null 2>&1 && break
+  docker compose exec -T db pg_isready -U supabase_admin -h localhost >/dev/null 2>&1 && break
   sleep 5
 done
 
@@ -129,11 +129,12 @@ done
 # молча пропускался. Пусть команда выполняется всегда и всегда докладывает —
 # ошибка полезнее тишины.
 docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
-  psql -v ON_ERROR_STOP=1 -U postgres -d postgres >/tmp/jt-roles.log 2>&1 <<SQL
+  psql -v ON_ERROR_STOP=1 -U supabase_admin -d postgres >/tmp/jt-roles.log 2>&1 <<SQL
 
     alter role authenticator          with login password '${POSTGRES_PASSWORD}';
     alter role supabase_storage_admin with login password '${POSTGRES_PASSWORD}';
-    alter role supabase_admin         with login password '${POSTGRES_PASSWORD}';
+    -- supabase_admin — тот, под кем мы и подключились, пароль ему уже задан
+    -- образом из POSTGRES_PASSWORD; трогать не нужно.
     create schema if not exists _realtime;
     alter schema _realtime owner to supabase_admin;
     create schema if not exists storage;
