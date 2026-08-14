@@ -72,7 +72,9 @@ if [ ! -f "$SECRETS" ]; then
   PGPASS=$(openssl rand -hex 24)
   JWTSEC=$(openssl rand -hex 32)
   SKB=$(openssl rand -hex 32)
-  ENCKEY=$(openssl rand -hex 16)
+  # Realtime требует ровно 16 байт: с 32 он падает на «Bad key size» и
+  # молча не обслуживает подписки, хотя контейнер выглядит здоровым.
+  ENCKEY=$(openssl rand -hex 8)
 
   # Ключи anon и service_role — это JWT, подписанные тем же секретом.
   # Ровно так же, как в облачном Supabase, иначе PostgREST их не примет.
@@ -208,6 +210,23 @@ fi
 chmod +x "$REPO/infra/migrate.sh" 2>/dev/null || true
 bash "$REPO/infra/migrate.sh" || say "миграции" "не прошли, см. следующий заход"
 
+# Ключ шифрования Realtime: если он неверной длины, служба поднимается, но
+# подписки не работают — то есть чаты перестают обновляться живьём, а внешне
+# всё в порядке. Худший вид поломки, поэтому чиним отдельно.
+if [ "${#REALTIME_ENC_KEY}" -ne 16 ]; then
+  NEWKEY=$(openssl rand -hex 8)
+  sed -i "s/^REALTIME_ENC_KEY=.*/REALTIME_ENC_KEY=$NEWKEY/" "$SECRETS"
+  # Старые записи зашифрованы прежним ключом и уже не расшифруются;
+  # своё хозяйство Realtime заведёт заново при следующем запуске.
+  docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+    psql -q -U supabase_admin -d postgres \
+    -c "drop schema if exists _realtime cascade; create schema _realtime;
+        alter schema _realtime owner to supabase_admin;" >/dev/null 2>&1
+  set -a; . "$SECRETS"; set +a
+  docker compose up -d --force-recreate realtime >/dev/null 2>&1
+  say "realtime" "ключ шифрования заменён на верную длину"
+fi
+
 # ── Панель и сертификат ───────────────────────────────────────────────────
 # Пароль к панели создаётся один раз и лежит рядом с остальными секретами.
 if [ ! -f /opt/jobtoo-secrets/studio ]; then
@@ -226,7 +245,9 @@ fi
 # Сертификат на имя вида <адрес>.sslip.io: своего домена пока нет, а без
 # TLS пароль к панели ходил бы открытым текстом. Имя временное, поменяем
 # на db.jobtoo.ru, когда до записи дойдут руки.
-IP=$(curl -s -m 10 https://ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+# Строго IPv4: ifconfig.me отдавал IPv6, и имя получалось несуществующим —
+# certbot честно не мог выпустить сертификат на 2a03:...sslip.io.
+IP=$(ip -4 addr show scope global 2>/dev/null | grep -oE 'inet [0-9.]+' | awk '{print $2}' | head -1)
 HOST="${IP}.sslip.io"
 if [ ! -d "/etc/letsencrypt/live/$HOST" ] && command -v certbot >/dev/null 2>&1; then
   certbot --nginx -n --agree-tos -m nikidav9@gmail.com -d "$HOST" \
