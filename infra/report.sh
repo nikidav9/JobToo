@@ -1,40 +1,55 @@
 #!/bin/bash
 # Отчёт о состоянии сервера.
 #
-# Единственный способ увидеть, что происходит внутри: ssh из моей среды
-# недоступен, а до контейнеров снаружи не достучаться, пока шлюз не работает.
+# Кладём файлом, который отдаёт свой же nginx. Никаких сторонних сервисов:
+# предыдущая версия слала в ntfy.sh, и тот перестал принимать с адреса
+# сервера после сотен сообщений за день — наблюдение отвалилось молча и
+# в самый неподходящий момент.
 #
-# Главное правило здесь — отчёт не должен зависеть от того, о чём он
-# докладывает. Прошлая версия звала docker compose ps, и когда Docker увяз в
-# бесконечном перезапуске контейнеров, отчёт увяз вместе с ним: восемь минут
-# полной тишины ровно тогда, когда сведения были нужнее всего.
-#
-# Поэтому: сначала то, что не требует Docker, отправляем сразу. Docker
-# спрашиваем последним и с жёстким тайм-аутом — не ответил, так и напишем.
+# Второе правило, тоже выученное на себе: отчёт не должен зависеть от того,
+# о чём докладывает. Сначала пишем всё, что не требует Docker. Docker
+# спрашиваем последним и с тайм-аутом — не ответил, так и запишем.
 
-T=${NTFY:-https://ntfy.sh/jt-v4-m7q2z8}
-say() { curl -s -m 15 -H "Title: $1" -d "$2" "$T" >/dev/null 2>&1 || true; }
+OUT=/var/www/html/status.json
+TMP=/tmp/jt-status.$$
 
-# ── Без Docker ────────────────────────────────────────────────────────────
-say "машина" "память $(free -m | awk '/^Mem/{print $3"/"$2}') МБ, подкачка $(free -m | awk '/^Swap/{print $3"/"$2}') МБ, диск $(df -h / | awk 'NR==2{print $4}') свободно, нагрузка $(cut -d' ' -f1-3 /proc/loadavg)"
+{
+  echo '{'
+  echo "  \"время\": \"$(date -Is)\","
+  echo "  \"запущен\": \"$(uptime -s)\","
+  echo "  \"нагрузка\": \"$(cut -d' ' -f1-3 /proc/loadavg)\","
+  echo "  \"память_МБ\": \"$(free -m | awk '/^Mem/{print $3"/"$2}')\","
+  echo "  \"подкачка_МБ\": \"$(free -m | awk '/^Swap/{print $3"/"$2}')\","
+  echo "  \"диск\": \"$(df -h / | awk 'NR==2{print $4}') свободно\","
+  echo "  \"nginx\": \"$(systemctl is-active nginx)\","
+  echo "  \"docker\": \"$(systemctl is-active docker)\","
+  echo "  \"таймер\": \"$(systemctl is-active jt-apply.timer)\","
+  echo "  \"последний_заход\": \"$(systemctl show jt-apply.service -p ExecMainStatus --value 2>/dev/null)\","
+  # Слушающие порты — самое полезное: по ним видно, поднялись ли службы,
+  # даже когда Docker не отвечает вовсе.
+  echo "  \"порты\": \"$(ss -ltn 2>/dev/null | awk 'NR>1{print $4}' | grep -oE '[0-9]+$' | sort -un | tr '\n' ' ')\","
+  echo "  \"версия\": \"$(cd /opt/jobtoo 2>/dev/null && git rev-parse --short HEAD 2>/dev/null || echo нет)\","
 
-say "службы" "nginx=$(systemctl is-active nginx) docker=$(systemctl is-active docker) apply=$(systemctl is-active jt-apply.timer) последний-заход=$(systemctl show jt-apply.service -p ExecMainStatus --value 2>/dev/null)"
+  st=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 20 docker compose ps --format '{{.Service}}={{.State}}' 2>&1 | tr '\n' ' ' | tr -d '"')
+  echo "  \"контейнеры\": \"${st:-docker не ответил за 20 секунд}\","
 
-# Слушающие порты видно и без Docker — по ним понятно, поднялись ли службы.
-say "порты" "$(ss -ltn 2>/dev/null | awk 'NR>1{print $4}' | grep -oE ':[0-9]+$' | sort -u | tr '\n' ' ')"
+  echo "  \"журналы\": {"
+  first=1
+  for svc in db rest realtime storage; do
+    s=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 10 docker compose ps "$svc" --format '{{.State}}' 2>/dev/null)
+    [ "$s" = "running" ] && continue
+    [ -n "$s" ] || continue
+    [ $first -eq 0 ] && echo ","
+    first=0
+    log=$(cd /opt/jobtoo/infra && timeout 15 docker compose logs --tail=8 --no-log-prefix "$svc" 2>&1 \
+          | tr -d '"\r' | tr '\n' ' ' | cut -c1-500)
+    printf '    "%s": "%s"' "$svc" "$log"
+  done
+  echo
+  echo "  },"
+  echo "  \"заход\": \"$(tail -6 /var/log/jt-apply.log 2>/dev/null | tr -d '"' | tr '\n' ' ' | cut -c1-600)\""
+  echo '}'
+} > "$TMP" 2>/dev/null
 
-say "заход" "$(tail -4 /var/log/jt-apply.log 2>/dev/null | tr -d '"' | tr '\n' ' ' | cut -c1-280)"
-
-# ── С Docker, но с поводком ───────────────────────────────────────────────
-# timeout обязателен: без него команда висит, пока Docker разбирается с
-# перезапусками, и утаскивает за собой весь отчёт.
-st=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 20 docker compose ps --format '{{.Service}}={{.State}}' 2>&1 | tr '\n' ' ')
-say "контейнеры" "${st:-docker не ответил за 20 секунд}"
-
-for svc in db rest realtime storage; do
-  s=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 10 docker compose ps "$svc" --format '{{.State}}' 2>/dev/null)
-  case "$s" in
-    running|"") ;;
-    *) say "журнал:$svc" "$(cd /opt/jobtoo/infra && timeout 15 docker compose logs --tail=10 --no-log-prefix "$svc" 2>&1 | tr -d '\r' | tail -10 | cut -c1-180)" ;;
-  esac
-done
+mv -f "$TMP" "$OUT" 2>/dev/null || true
+chmod 644 "$OUT" 2>/dev/null || true

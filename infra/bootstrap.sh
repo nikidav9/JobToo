@@ -15,7 +15,12 @@ REPO=/opt/jobtoo
 SECRETS=/opt/jobtoo-secrets/env
 NTFY=${NTFY:-https://ntfy.sh/jt-v4-m7q2z8}
 
-say() { curl -s -m 20 -H "Title: $1" -d "$2" "$NTFY" >/dev/null || true; }
+say() {
+  # Пишем в свой же журнал, а не только наружу: сторонний канал сегодня
+  # молча перестал принимать, и наблюдение отвалилось вместе с ним.
+  echo "$(date -Is) [$1] $2" >> /var/log/jt-apply.log
+  curl -s -m 10 -H "Title: $1" -d "$2" "$NTFY" >/dev/null 2>&1 || true
+}
 
 # ── Подготовка машины ─────────────────────────────────────────────────────
 # Всё тяжёлое живёт здесь, а не в cloud-init, по горькому опыту: там это
@@ -182,3 +187,6 @@ for svc in db rest realtime storage; do
     *) say "журнал:$svc" "$(docker compose logs --tail=12 --no-log-prefix "$svc" 2>&1 | tr -d '\r' | cut -c1-200 | tail -12)" ;;
   esac
 done
+
+# Обновляем страницу состояния — по ней я вижу происходящее снаружи.
+[ -x /usr/local/bin/jt-report ] && /usr/local/bin/jt-report || true
