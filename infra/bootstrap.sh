@@ -96,6 +96,9 @@ fi
 
 ln -sf "$SECRETS" "$REPO/infra/.env"
 
+# Секреты нужны не только docker compose, но и самому скрипту — для psql.
+set -a; . "$SECRETS"; set +a
+
 # ── Контейнеры ────────────────────────────────────────────────────────────
 cd "$REPO/infra"
 chmod +x init/*.sh 2>/dev/null || true
@@ -114,6 +117,38 @@ nginx -t && systemctl reload nginx
 # ещё не готовы — тихо отложит до следующего запуска таймера.
 chmod +x "$REPO/infra/migrate.sh" 2>/dev/null || true
 bash "$REPO/infra/migrate.sh" || say "миграции" "не прошли, см. следующий заход"
+
+# ── Роли ──────────────────────────────────────────────────────────────────
+# Не через docker-entrypoint-initdb.d: те скрипты выполняются только при
+# создании пустого каталога данных, а образ Supabase приходит с уже готовым.
+# Наш файл там молча не отрабатывал, пароли служебным ролям не задавались,
+# и rest, realtime и storage бесконечно перезапускались, не сумев войти.
+#
+# Здесь же — после запуска, и при каждом заходе: alter role идемпотентен.
+for i in $(seq 1 40); do
+  docker compose exec -T db pg_isready -U postgres -h localhost >/dev/null 2>&1 && break
+  sleep 5
+done
+
+if docker compose exec -T db psql -U postgres -d postgres -c 'select 1' >/dev/null 2>&1; then
+  docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null 2>&1 <<SQL || say "роли" "не удалось задать"
+    alter role authenticator          with login password '${POSTGRES_PASSWORD}';
+    alter role supabase_storage_admin with login password '${POSTGRES_PASSWORD}';
+    alter role supabase_admin         with login password '${POSTGRES_PASSWORD}';
+    create schema if not exists _realtime;
+    alter schema _realtime owner to supabase_admin;
+    create schema if not exists storage;
+    alter schema storage owner to supabase_storage_admin;
+    grant usage on schema public to anon, authenticated, service_role;
+    grant all on all tables    in schema public to service_role;
+    grant all on all sequences in schema public to service_role;
+    alter default privileges in schema public grant all on tables    to service_role;
+    alter default privileges in schema public grant all on sequences to service_role;
+SQL
+  # Службы, которые уже успели упасть на неверном пароле, сами не оживут:
+  # они перезапускаются с тем же кэшем неудачи. Подталкиваем.
+  docker compose restart rest realtime storage >/dev/null 2>&1 || true
+fi
 
 state=$(docker compose ps --format '{{.Service}}={{.State}}' 2>/dev/null | tr '\n' ' ')
 say "развёрнуто" "$state"
