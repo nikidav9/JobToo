@@ -85,7 +85,11 @@ services:
       DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
       DB_ENC_KEY: ${REALTIME_ENC_KEY}
       API_JWT_SECRET: ${JWT_SECRET}
+      # Без него Realtime падает при старте на System.fetch_env! — переменная
+      # обязательная, хотя метрики нам и не нужны.
+      METRICS_JWT_SECRET: ${JWT_SECRET}
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      DISABLE_HEALTHCHECK_LOGGING: "true"
       ERL_AFLAGS: -proto_dist inet_tcp
       DNS_NODES: "''"
       RLIMIT_NOFILE: "10000"
@@ -105,7 +109,8 @@ services:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       POSTGREST_URL: http://rest:3000
-      PGRST_JWT_SECRET: ${JWT_SECRET}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      REQUEST_ALLOW_X_FORWARDED_PATH: "true"
       DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
       FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: file
@@ -115,6 +120,8 @@ services:
       GLOBAL_S3_BUCKET: jobtoo
       ENABLE_IMAGE_TRANSFORMATION: "true"
       IMGPROXY_URL: http://imgproxy:5001
+      S3_PROTOCOL_ACCESS_KEY_ID: ${SERVICE_ROLE_KEY}
+      S3_PROTOCOL_ACCESS_KEY_SECRET: ${JWT_SECRET}
     volumes:
       - storage-data:/var/lib/storage
 

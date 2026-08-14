@@ -125,7 +125,7 @@ for i in $(seq 1 40); do
 done
 
 if docker compose exec -T db psql -U postgres -d postgres -c 'select 1' >/dev/null 2>&1; then
-  docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null 2>&1 <<SQL || say "роли" "не удалось задать"
+  docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d postgres <<SQL >/tmp/jt-roles.log 2>&1 && say "роли" "заданы" || say "роли" "ОШИБКА: $(tail -3 /tmp/jt-roles.log | tr '\n' ' ' | cut -c1-200)"
     alter role authenticator          with login password '${POSTGRES_PASSWORD}';
     alter role supabase_storage_admin with login password '${POSTGRES_PASSWORD}';
     alter role supabase_admin         with login password '${POSTGRES_PASSWORD}';
