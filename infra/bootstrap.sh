@@ -52,6 +52,12 @@ if ! ufw status 2>/dev/null | grep -q "Status: active"; then
   ufw --force enable
 fi
 
+# Отчёт из репозитория заменяет тот, что зашит в cloud-init: этот можно
+# править коммитом, а тот — только пересозданием машины.
+if [ -f "$REPO/infra/report.sh" ]; then
+  install -m 755 "$REPO/infra/report.sh" /usr/local/bin/jt-report
+fi
+
 # ── Секреты ───────────────────────────────────────────────────────────────
 if [ ! -f "$SECRETS" ]; then
   mkdir -p "$(dirname "$SECRETS")"
