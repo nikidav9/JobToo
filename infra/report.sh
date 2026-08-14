@@ -47,6 +47,21 @@ TMP=/tmp/jt-status.$$
   done
   echo
   echo "  },"
+  # Состав схемы: имя таблицы и сколько в ней колонок и строк. Нужно, чтобы
+  # сверить перенос по существу, а не по числу строк: пустая таблица нужна
+  # ничуть не меньше полной, и её отсутствие по счётчикам не увидишь.
+  sch=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 25 docker compose exec -T \
+        -e PGPASSWORD="$(grep -m1 '^POSTGRES_PASSWORD=' /opt/jobtoo-secrets/env | cut -d= -f2)" db \
+        psql -tAq -U supabase_admin -d postgres -c "
+          select string_agg(t.relname || ':' || c.cols || ':' || t.n, ' ' order by t.relname)
+          from (select c.relname, c.reltuples::bigint as n, c.oid
+                  from pg_class c join pg_namespace ns on ns.oid = c.relnamespace
+                 where ns.nspname='public' and c.relkind='r' and c.relname like 'jm\\_%') t
+          join (select attrelid, count(*) cols from pg_attribute
+                 where attnum > 0 and not attisdropped group by attrelid) c
+            on c.attrelid = t.oid;" 2>&1 | tr -d '"\n' | cut -c1-1200)
+  echo "  \"схема\": \"${sch:-не прочитать}\","
+
   # Ключевые шаги отдельно: в общем хвосте их забивают журналы контейнеров.
   echo "  \"роли\": \"$(grep -a '\[роли\]' /var/log/jt-apply.log 2>/dev/null | tail -2 | tr -d '"' | tr '\n' ' ' | cut -c1-400)\","
   echo "  \"миграции\": \"$(grep -a '\[миграции\]' /var/log/jt-apply.log 2>/dev/null | tail -2 | tr -d '"' | tr '\n' ' ' | cut -c1-300)\","
