@@ -52,16 +52,27 @@ for t in $ORDER; do
     n=$(printf '%s' "$page" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))" 2>/dev/null || echo 0)
     [ "$n" -eq 0 ] && break
 
-    # Через jsonb_populate_recordset: он сам разложит поля по колонкам, и мне
-    # не нужно знать ни их порядок, ни типы. Чужие ключи не помеха.
-    printf '%s' "$page" | docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
-      psql -q -U supabase_admin -d postgres \
-      -c "create temp table _in (d jsonb);
-          copy _in (d) from stdin csv quote e'\\x01' delimiter e'\\x02';
-          insert into public.$t
-            select * from jsonb_populate_recordset(null::public.$t, (select d from _in))
-            on conflict do nothing;" >/dev/null 2>&1 \
-      || { say "перенос" "СПОТКНУЛСЯ на $t (сдвиг $off)"; exit 1; }
+    # JSON едет в base64. Прямо его через COPY не протащить: в данных есть
+    # кавычки, запятые и переносы строк, и любой формат — что CSV, что
+    # текстовый — истолкует их по-своему и порвёт строку пополам. В base64
+    # таких символов нет вовсе, поэтому разбор однозначен.
+    #
+    # jsonb_populate_recordset сам разложит поля по колонкам: знать их
+    # порядок и типы не нужно, а лишние ключи он молча пропустит.
+    err=$(printf '%s' "$page" | base64 -w0 \
+      | docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+          psql -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+          -c "create temp table _in (b text);
+              copy _in (b) from stdin;
+              insert into public.$t
+                select * from jsonb_populate_recordset(
+                  null::public.$t,
+                  convert_from(decode((select b from _in), 'base64'), 'UTF8')::jsonb)
+                on conflict do nothing;" 2>&1)
+    if [ -n "$err" ]; then
+      say "перенос" "СПОТКНУЛСЯ на $t (сдвиг $off): $(printf '%s' "$err" | grep -a -m1 -iE 'error|ошибка' | cut -c1-220)"
+      exit 1
+    fi
 
     got=$((got+n)); off=$((off+1000))
     [ "$n" -lt 1000 ] && break
