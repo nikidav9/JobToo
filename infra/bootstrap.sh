@@ -115,4 +115,16 @@ nginx -t && systemctl reload nginx
 chmod +x "$REPO/infra/migrate.sh" 2>/dev/null || true
 bash "$REPO/infra/migrate.sh" || say "миграции" "не прошли, см. следующий заход"
 
-say "развёрнуто" "$(docker compose ps --format '{{.Service}}={{.State}}' 2>/dev/null | tr '\n' ' ')"
+state=$(docker compose ps --format '{{.Service}}={{.State}}' 2>/dev/null | tr '\n' ' ')
+say "развёрнуто" "$state"
+
+# Если служба не поднялась — присылаем её журнал. Без этого «restarting»
+# означает только «что-то не так», а причина остаётся на машине, куда мне
+# не попасть.
+for svc in db rest realtime storage; do
+  st=$(docker compose ps "$svc" --format '{{.State}}' 2>/dev/null)
+  case "$st" in
+    running) ;;
+    *) say "журнал:$svc" "$(docker compose logs --tail=12 --no-log-prefix "$svc" 2>&1 | tr -d '\r' | cut -c1-200 | tail -12)" ;;
+  esac
+done
