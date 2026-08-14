@@ -47,7 +47,10 @@ TMP=/tmp/jt-status.$$
   done
   echo
   echo "  },"
-  echo "  \"заход\": \"$(tail -6 /var/log/jt-apply.log 2>/dev/null | tr -d '"' | tr '\n' ' ' | cut -c1-600)\""
+  # Ключевые шаги отдельно: в общем хвосте их забивают журналы контейнеров.
+  echo "  \"роли\": \"$(grep -a '\[роли\]' /var/log/jt-apply.log 2>/dev/null | tail -2 | tr -d '"' | tr '\n' ' ' | cut -c1-400)\","
+  echo "  \"миграции\": \"$(grep -a '\[миграции\]' /var/log/jt-apply.log 2>/dev/null | tail -2 | tr -d '"' | tr '\n' ' ' | cut -c1-300)\","
+  echo "  \"заход\": \"$(tail -6 /var/log/jt-apply.log 2>/dev/null | tr -d '"' | tr '\n' ' ' | cut -c1-500)\""
   echo '}'
 } > "$TMP" 2>/dev/null
 
