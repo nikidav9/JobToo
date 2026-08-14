@@ -136,6 +136,38 @@ services:
     volumes:
       - storage-data:/var/lib/storage
 
+  # Панель для просмотра базы — та же, что в облачном Supabase.
+  # Наружу сама не смотрит: доступ через nginx, за паролем и сертификатом.
+  meta:
+    image: supabase/postgres-meta:v0.96.6
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+  studio:
+    image: supabase/studio:2026.08.03-sha-022b374
+    restart: unless-stopped
+    depends_on: [meta]
+    ports: ["127.0.0.1:3001:3000"]
+    environment:
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DEFAULT_ORGANIZATION_NAME: JobToo
+      DEFAULT_PROJECT_NAME: JobToo
+      SUPABASE_URL: http://rest:3000
+      SUPABASE_PUBLIC_URL: ${PUBLIC_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      NEXT_PUBLIC_ENABLE_LOGS: "false"
+
 volumes:
   db-data:
   storage-data:

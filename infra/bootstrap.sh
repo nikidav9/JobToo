@@ -107,6 +107,7 @@ EOF
 fi
 
 ln -sf "$SECRETS" "$REPO/infra/.env"
+grep -q "^PUBLIC_URL=" "$SECRETS" || echo "PUBLIC_URL=http://$(hostname -I | awk '{print $1}')" >> "$SECRETS"
 
 # Секреты нужны не только docker compose, но и самому скрипту — для psql.
 set -a; . "$SECRETS"; set +a
@@ -206,6 +207,33 @@ fi
 # ещё не готовы — тихо отложит до следующего запуска таймера.
 chmod +x "$REPO/infra/migrate.sh" 2>/dev/null || true
 bash "$REPO/infra/migrate.sh" || say "миграции" "не прошли, см. следующий заход"
+
+# ── Панель и сертификат ───────────────────────────────────────────────────
+# Пароль к панели создаётся один раз и лежит рядом с остальными секретами.
+if [ ! -f /opt/jobtoo-secrets/studio ]; then
+  SPASS=$(openssl rand -base64 12 | tr -d '/+=' | cut -c1-12)
+  echo "STUDIO_USER=admin"      >  /opt/jobtoo-secrets/studio
+  echo "STUDIO_PASS=$SPASS"     >> /opt/jobtoo-secrets/studio
+  chmod 600 /opt/jobtoo-secrets/studio
+fi
+. /opt/jobtoo-secrets/studio
+if [ ! -f /etc/nginx/.htpasswd ]; then
+  printf '%s:%s\n' "$STUDIO_USER" "$(openssl passwd -apr1 "$STUDIO_PASS")" > /etc/nginx/.htpasswd
+  chmod 640 /etc/nginx/.htpasswd
+  chown root:www-data /etc/nginx/.htpasswd 2>/dev/null || true
+fi
+
+# Сертификат на имя вида <адрес>.sslip.io: своего домена пока нет, а без
+# TLS пароль к панели ходил бы открытым текстом. Имя временное, поменяем
+# на db.jobtoo.ru, когда до записи дойдут руки.
+IP=$(curl -s -m 10 https://ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+HOST="${IP}.sslip.io"
+if [ ! -d "/etc/letsencrypt/live/$HOST" ] && command -v certbot >/dev/null 2>&1; then
+  certbot --nginx -n --agree-tos -m nikidav9@gmail.com -d "$HOST" \
+    --redirect >>/var/log/jt-apply.log 2>&1 \
+    && say "сертификат" "выпущен на $HOST" \
+    || say "сертификат" "не вышло, работаем по http"
+fi
 
 # ── Перенос данных из облака ──────────────────────────────────────────────
 # Только если мы вообще знаем, откуда переносить: ключ доступа к облаку
