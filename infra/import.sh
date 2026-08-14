@@ -64,11 +64,33 @@ for t in $ORDER; do
           psql -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
           -c "create temp table _in (b text);
               copy _in (b) from stdin;
-              insert into public.$t
-                select * from jsonb_populate_recordset(
-                  null::public.$t,
-                  convert_from(decode((select b from _in), 'base64'), 'UTF8')::jsonb)
-                on conflict do nothing;" 2>&1)
+              do \$do\$
+              declare
+                j    jsonb := convert_from(decode((select b from _in), 'base64'), 'UTF8')::jsonb;
+                cols text;
+              begin
+                -- Вставляем только те колонки, что есть в данных.
+                --
+                -- Через select * не выйдет: отсутствующее поле он подставит
+                -- явным NULL, и умолчание колонки перестанет действовать.
+                -- Так споткнулись на jm_bulletins.views — её добавляет
+                -- миграция 008 как NOT NULL DEFAULT 0, в выгрузке её нет,
+                -- и явный NULL нарушал ограничение вместо того, чтобы
+                -- уступить нулю по умолчанию.
+                select string_agg(quote_ident(k), ', ')
+                  into cols
+                  from (select distinct jsonb_object_keys(e) as k
+                          from jsonb_array_elements(j) e) x
+                 where k in (select column_name from information_schema.columns
+                              where table_schema = 'public' and table_name = '$t');
+                if cols is null then return; end if;
+                execute format(
+                  'insert into public.%I (%s) select %s
+                     from jsonb_populate_recordset(null::public.%I, \$1)
+                     on conflict do nothing',
+                  '$t', cols, cols, '$t') using j;
+              end
+              \$do\$;" 2>&1)
     if [ -n "$err" ]; then
       say "перенос" "СПОТКНУЛСЯ на $t (сдвиг $off): $(printf '%s' "$err" | grep -a -m1 -iE 'error|ошибка' | cut -c1-220)"
       exit 1
