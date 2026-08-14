@@ -143,15 +143,48 @@ done
 docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
   psql -v ON_ERROR_STOP=1 -U supabase_admin -d postgres >/tmp/jt-roles.log 2>&1 <<SQL
 
+    -- Роли создаём, а не только настраиваем: образ supabase/postgres их не
+    -- приносит, вопреки моему первоначальному допущению. psql отвечал
+    -- «role authenticator does not exist», а службы бесконечно
+    -- перезапускались, не сумев войти.
+    --
+    -- Имена и права повторяют облачные: разведи их по-своему — и миграции
+    -- из supabase/migrations начнут падать на GRANT-ах.
+    do \$\$ begin
+      -- anon: тот, кем PostgREST представляется без токена. Прав почти нет,
+      -- всё закрыто через RLS (см. 013_lock_down_rls.sql).
+      if not exists (select from pg_roles where rolname = 'anon') then
+        create role anon nologin noinherit;
+      end if;
+      if not exists (select from pg_roles where rolname = 'authenticated') then
+        create role authenticated nologin noinherit;
+      end if;
+      -- service_role ходит мимо RLS: под ним работает php-proxy.
+      if not exists (select from pg_roles where rolname = 'service_role') then
+        create role service_role nologin noinherit bypassrls;
+      end if;
+      -- authenticator — тот, кто подключается и переключается в нужную роль
+      -- по токену. Единственный из троих, кто умеет входить.
+      if not exists (select from pg_roles where rolname = 'authenticator') then
+        create role authenticator login noinherit;
+      end if;
+      if not exists (select from pg_roles where rolname = 'supabase_storage_admin') then
+        create role supabase_storage_admin login createrole;
+      end if;
+    end \$\$;
+
     alter role authenticator          with login password '${POSTGRES_PASSWORD}';
     alter role supabase_storage_admin with login password '${POSTGRES_PASSWORD}';
-    -- supabase_admin — тот, под кем мы и подключились, пароль ему уже задан
-    -- образом из POSTGRES_PASSWORD; трогать не нужно.
+
+    grant anon, authenticated, service_role to authenticator;
+
     create schema if not exists _realtime;
     alter schema _realtime owner to supabase_admin;
     create schema if not exists storage;
     alter schema storage owner to supabase_storage_admin;
-    grant usage on schema public to anon, authenticated, service_role;
+
+    grant usage on schema public  to anon, authenticated, service_role;
+    grant usage on schema storage to anon, authenticated, service_role;
     grant all on all tables    in schema public to service_role;
     grant all on all sequences in schema public to service_role;
     alter default privileges in schema public grant all on tables    to service_role;
