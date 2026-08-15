@@ -17,12 +17,16 @@ jobs:
         env:
           APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
         run: |
-          if [ -n "$APP_SECRET" ]; then
-            SECRET="$APP_SECRET"; echo "Пропуск: из GitHub Secrets"
-          else
-            SECRET="ebb565bbbe600d111d88ad03b4d2e1731ebf9055d1dfd9bb147af91a6597d5f6"
-            echo "Пропуск: запасной из кода — секрет EXPO_PUBLIC_APP_SECRET не задан"
+          # Запасного пропуска в коде больше нет. Он тут был «чтобы не легло»,
+          # но репозиторий открыт, и любой мог им обратиться к db.php — то есть
+          # ко всем данным. Проверено: пропуск был действующим.
+          #
+          # Нет секрета — ход честно падает. Это видно сразу, в отличие от
+          # тихой работы на ключе, который знает посторонний.
+          if [ -z "$APP_SECRET" ]; then
+            echo "Секрет EXPO_PUBLIC_APP_SECRET не задан"; exit 1
           fi
+          SECRET="$APP_SECRET"
           RESP=$(curl -s -X POST "https://jobtoo.ru/api/db.php" \
             -H "Content-Type: application/json" \
             -H "X-App-Secret: $SECRET" \
