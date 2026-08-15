@@ -595,6 +595,49 @@ export async function dbInsertMessage(chatId: string, senderId: string, text: st
   return rowToMessage(msg);
 }
 
+// ─── Файлы ────────────────────────────────────────────────────────────────────
+
+/**
+ * Кладёт файл в хранилище и возвращает ссылку на него.
+ *
+ * Через прокси, а не напрямую: ключ, которым приложение обращалось к
+ * хранилищу, лежит в каждой установленной сборке. Чтобы загрузка работала,
+ * ему нужно право записи — то есть любой, кто достанет ключ, мог бы залить
+ * в наше хранилище что угодно. Здесь же вместо этого проверяется пропуск
+ * приложения, а служебный ключ не покидает сервер.
+ */
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function bytesToBase64(bytes: Uint8Array): string {
+  // Своими руками, а не через btoa: на телефоне такой глобальной функции
+  // может не оказаться вовсе, а отдельную библиотеку ради двенадцати строк
+  // тащить незачем. Ошибка здесь проявилась бы только у людей на устройствах
+  // и выглядела бы как «фото не отправляется», без всякой подсказки.
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i];
+    const b = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const c = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    out += B64[a >> 2];
+    out += B64[((a & 3) << 4) | (b >> 4)];
+    out += i + 1 < bytes.length ? B64[((b & 15) << 2) | (c >> 6)] : '=';
+    out += i + 2 < bytes.length ? B64[c & 63] : '=';
+  }
+  return out;
+}
+
+export async function dbUploadFile(
+  fileName: string,
+  bytes: Uint8Array,
+  contentType: string,
+): Promise<string> {
+  const res = await proxy<{ url?: string; error?: string }>(
+    'dbUploadFile', [fileName, bytesToBase64(bytes), contentType],
+  );
+  if (!res?.url) throw new Error(res?.error || 'Файл не загрузился');
+  return res.url;
+}
+
 // ─── Chats ────────────────────────────────────────────────────────────────────
 
 function rowToChat(r: any, messages: Message[] = []): Chat {

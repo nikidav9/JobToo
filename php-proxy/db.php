@@ -2156,6 +2156,64 @@ try {
             $data = $msg; break;
         }
 
+        // ── Файлы ──────────────────────────────────────────────────────────────
+        // Аватары, фотографии и голосовые из чатов.
+        //
+        // Раньше приложение клало их в хранилище само, ключом, который лежит
+        // в каждой установленной сборке. Чтобы это работало, тому ключу нужно
+        // право записи — то есть любой, кто достанет его из сборки, мог бы
+        // залить в наше хранилище что угодно и сколько угодно.
+        //
+        // Теперь файл идёт сюда, а отсюда в хранилище служебным ключом,
+        // который не покидает сервер. Заодно здесь же проверяется пропуск
+        // приложения — там его не было вовсе.
+        //
+        // args: [имя файла, содержимое в base64, тип]
+        case 'dbUploadFile': {
+            $name = (string)($args[0] ?? '');
+            $b64  = (string)($args[1] ?? '');
+            $type = (string)($args[2] ?? 'application/octet-stream');
+
+            // Имя приходит от приложения, а уходит в путь. Пускаем только то,
+            // из чего нельзя составить выход за пределы каталога.
+            if (!preg_match('#^[A-Za-z0-9._/-]{1,180}$#', $name) || str_contains($name, '..')) {
+                $data = ['error' => 'плохое имя файла']; break;
+            }
+            $bytes = base64_decode($b64, true);
+            if ($bytes === false || $bytes === '') { $data = ['error' => 'пустой файл']; break; }
+            if (strlen($bytes) > 25 * 1024 * 1024) { $data = ['error' => 'файл больше 25 МБ']; break; }
+
+            $ch = curl_init(SB_URL . '/storage/v1/object/avatars/' . $name);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CUSTOMREQUEST => 'POST',
+                CURLOPT_POSTFIELDS => $bytes,
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_HTTPHEADER => [
+                    'apikey: ' . SB_KEY,
+                    'Authorization: Bearer ' . SB_KEY,
+                    'Content-Type: ' . $type,
+                    'Cache-Control: max-age=3600',
+                    // Перезапись: аватар кладётся под одним и тем же именем,
+                    // и без этого вторая смена фотографии молча не проходила бы.
+                    'x-upsert: true',
+                ],
+            ]);
+            $resp = curl_exec($ch);
+            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err  = curl_error($ch);
+            curl_close($ch);
+
+            if ($code < 200 || $code >= 300) {
+                // Возвращаем причину, а не просто «не вышло»: без неё
+                // разбираться придётся по чужим экранам.
+                $data = ['error' => $err ?: ('хранилище ответило ' . $code . ': ' . substr((string)$resp, 0, 200))];
+                break;
+            }
+            $data = ['url' => SB_URL . '/storage/v1/object/public/avatars/' . $name];
+            break;
+        }
+
         // ── Chats ──────────────────────────────────────────────────────────────
         case 'dbGetChats': {
             $field = $args[1] === 'worker' ? 'worker_id' : 'employer_id';

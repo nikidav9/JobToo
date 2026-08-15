@@ -21,7 +21,7 @@ import { ReadTicks, isSeenByOther } from '@/components/ReadTicks';
 import { useApp } from '@/hooks/useApp';
 import { Message, Chat } from '@/constants/types';
 import { nameColorFromString, getInitials, formatDate, uid, nowISO } from '@/services/storage';
-import { dbGetMessages, dbInsertMessage, dbMarkRead, dbIncrementUnread, dbGetLikeByVacancyWorker, dbUpsertLike, dbCheckAndCreateMatch, dbGetLikes, dbGetChatById, dbGetUserById, dbSetPermApplicationStatus } from '@/services/db';
+import { dbGetMessages, dbInsertMessage, dbMarkRead, dbIncrementUnread, dbGetLikeByVacancyWorker, dbUpsertLike, dbCheckAndCreateMatch, dbGetLikes, dbGetChatById, dbGetUserById, dbSetPermApplicationStatus, dbUploadFile } from '@/services/db';
 import { notifyWorkerGotMatch, notifyWorkerNewMessage, notifyEmployerNewMessage,
   notifyWorkerPermApplicationApproved, notifyWorkerPermApplicationRejected,
   setActiveChat } from '@/services/notifications';
@@ -605,18 +605,13 @@ export default function ChatRoom() {
         { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
       );
       const bytes = await uriToBytes(processed.uri);
-      const sb = getSupabaseClient();
       const fileName = `chat/${chat.id}_${Date.now()}.jpg`;
-      const { error: upErr } = await sb.storage.from('avatars').upload(
-        fileName, bytes,
-        { contentType: 'image/jpeg', upsert: true, cacheControl: '3600' },
-      );
-      // Не залилось — не отправляем: иначе собеседник получит сообщение со
-      // ссылкой в никуда, и оба будут думать, что фото ушло.
-      if (upErr) throw upErr;
-      const { data: urlData } = sb.storage.from('avatars').getPublicUrl(fileName);
+      // Через прокси, а не ключом из сборки: см. dbUploadFile в services/db.ts.
+      // Не залилось — бросает, и сообщение не уходит: иначе собеседник получит
+      // ссылку в никуда, и оба будут думать, что фото отправлено.
+      const publicUrl = await dbUploadFile(fileName, bytes, 'image/jpeg');
 
-      const msg = await dbInsertMessage(chat.id, currentUser.id, IMG_PREFIX + urlData.publicUrl);
+      const msg = await dbInsertMessage(chat.id, currentUser.id, IMG_PREFIX + publicUrl);
       setMessages(prev => {
         const next = [...prev, msg];
         msgCache.set(chat.id, next);
@@ -732,20 +727,17 @@ export default function ChatRoom() {
 
     setUploadingVoice(true);
     try {
-      const sb = getSupabaseClient();
       const fileName = `chat/voice_${chat.id}_${Date.now()}.${clip.ext}`;
-      const { error: upErr } = await sb.storage.from('avatars').upload(
-        fileName, clip.bytes,
-        { contentType: clip.contentType, upsert: true, cacheControl: '3600' },
-      );
-      // Раньше здесь стоял console.warn и отправка шла дальше. Ссылку на
-      // несуществующий файл собеседник увидит обычным голосовым — нажмёт, а
-      // там тишина, и ни он, ни отправитель не поймут, что запись не дошла.
-      if (upErr) throw upErr;
-      const { data: urlData } = sb.storage.from('avatars').getPublicUrl(fileName);
+      // Через прокси, а не ключом из сборки: см. dbUploadFile в services/db.ts.
+      //
+      // Раньше при неудаче здесь стоял console.warn и отправка шла дальше.
+      // Ссылку на несуществующий файл собеседник увидит обычным голосовым —
+      // нажмёт, а там тишина, и ни он, ни отправитель не поймут, что запись
+      // не дошла. Теперь неудача бросает, и сообщение не уходит.
+      const publicUrl = await dbUploadFile(fileName, clip.bytes, clip.contentType);
 
       const msg = await dbInsertMessage(
-        chat.id, currentUser.id, `${VOICE_PREFIX}${urlData.publicUrl}|${seconds}`,
+        chat.id, currentUser.id, `${VOICE_PREFIX}${publicUrl}|${seconds}`,
       );
       setMessages(prev => {
         const next = [...prev, msg];

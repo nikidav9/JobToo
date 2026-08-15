@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { getSupabaseClient } from '@/template';
+import { dbUploadFile } from '@/services/db';
 
 /**
  * Обрезка, сжатие и загрузка фото профиля.
@@ -79,16 +79,9 @@ export async function uploadAvatar(sourceUri: string, userId: string): Promise<s
   }
 
   const fileName = `avatar_${userId}.jpg`;
-  const sb = getSupabaseClient();
-  const { error } = await sb.storage.from('avatars').upload(fileName, bytes, {
-    contentType: 'image/jpeg',
-    upsert: true,
-    cacheControl: '3600',
-  });
-  if (error) throw error;
-
-  const { data } = sb.storage.from('avatars').getPublicUrl(fileName);
+  // Через прокси, а не ключом из сборки: см. dbUploadFile в services/db.ts.
+  const publicUrl = await dbUploadFile(fileName, bytes, 'image/jpeg');
   // Метка времени — иначе после смены фото и телефон, и браузер показывают
   // старую картинку из кэша.
-  return `${data.publicUrl}?t=${Date.now()}`;
+  return `${publicUrl}?t=${Date.now()}`;
 }
