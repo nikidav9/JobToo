@@ -1,6 +1,5 @@
 import React from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import type { Chat } from '@/constants/types';
 
@@ -14,6 +13,11 @@ import type { Chat } from '@/constants/types';
  *
  * Показываем только у своих сообщений. У чужих галочка сообщала бы человеку
  * то, что он и так знает: он их читает прямо сейчас.
+ *
+ * Значки взяты из набора Material: там двойная галочка — один цельный знак.
+ * Первая версия складывала две одиночных с наездом друг на друга, и они
+ * получались тонкими и разъезжались. Заодно этот набор рисует линию заметно
+ * плотнее — прежние было почти не разглядеть на оранжевом пузыре.
  */
 
 /** Прочитал ли собеседник сообщение, отправленное в это время. */
@@ -31,25 +35,17 @@ export function isSeenByOther(
 }
 
 export function ReadTicks({ seen, onDark = false }: { seen: boolean; onDark?: boolean }) {
-    // На синем пузыре свои цвета: серая галочка там сливается с фоном,
-    // и «доставлено» выглядело бы как «ничего не показано».
+    // На оранжевом пузыре свои цвета. Полупрозрачный белый там сливался с
+    // фоном, и «доставлено» выглядело как «ничего не показано».
     const color = seen
         ? (onDark ? '#fff' : Colors.primary)
-        : (onDark ? 'rgba(255,255,255,0.6)' : Colors.textMuted);
+        : (onDark ? 'rgba(255,255,255,0.9)' : Colors.textSecondary);
 
     return (
-        <View style={styles.row}>
-            <Ionicons name="checkmark" size={13} color={color} />
-            {/* Вторая галочка с наездом на первую — так их читают как одну
-                отметку, а не как две разные иконки подряд. */}
-            {seen ? (
-                <Ionicons name="checkmark" size={13} color={color} style={styles.second} />
-            ) : null}
-        </View>
+        <MaterialCommunityIcons
+            name={seen ? 'check-all' : 'check'}
+            size={15}
+            color={color}
+        />
     );
 }
-
-const styles = StyleSheet.create({
-    row: { flexDirection: 'row', alignItems: 'center' },
-    second: { marginLeft: -7 },
-});
