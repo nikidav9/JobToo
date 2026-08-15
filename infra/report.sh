@@ -194,7 +194,10 @@ TMP=/tmp/jt-status.$$
         done
         printf 'ipv%s=%s/4 ' "$v" "$ok"
       done
-      printf 'адреса=%s' "$(getent ahosts api.telegram.org 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ',')"
+      printf 'адреса=%s ' "$(getent ahosts api.telegram.org 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ',')"
+      # Свой IPv6: он тут есть, и это меняет советы по записям в DNS —
+      # AAAA не обязана исчезать, у неё может быть куда указывать.
+      printf 'свой_ipv6=%s' "$(ip -6 addr show scope global 2>/dev/null | grep -oE 'inet6 [0-9a-f:]+' | awk '{print $2}' | head -1)"
     } > /var/lib/jt-net-check 2>/dev/null
   fi
   echo "  \"телеграм\": \"$(cat /var/lib/jt-tg-check 2>/dev/null | cut -c1-400)\","
