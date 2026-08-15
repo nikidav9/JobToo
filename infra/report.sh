@@ -37,8 +37,9 @@ TMP=/tmp/jt-status.$$
   first=1
   for svc in db rest realtime storage; do
     s=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 10 docker compose ps "$svc" --format '{{.State}}' 2>/dev/null)
-    # storage показываем всегда: он «running», а шлюз получает от него 502.
-    [ "$s" = "running" ] && [ "$svc" != "storage" ] && continue
+    # storage и realtime показываем всегда: оба бывают «running» и при этом
+    # не работают — первый отвечал 502, второй отвергает подписки.
+    [ "$s" = "running" ] && [ "$svc" != "storage" ] && [ "$svc" != "realtime" ] && continue
     [ -n "$s" ] || continue
     [ $first -eq 0 ] && echo ","
     first=0
@@ -60,6 +61,16 @@ TMP=/tmp/jt-status.$$
 
   # Realtime отвергает подключения: надо знать, какого арендатора он завёл.
   echo "  \"realtime_арендаторы\": \"$(cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose exec -T -e PGPASSWORD="$(grep -m1 '^POSTGRES_PASSWORD=' /opt/jobtoo-secrets/env | cut -d= -f2)" db psql -tAq -U supabase_admin -d postgres -c \"select external_id || ':' || name from _realtime.tenants\" 2>&1 | tr -d '\"' | tr '\n' ' ' | cut -c1-200)\","
+
+
+  rt=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose exec -T \
+       -e PGPASSWORD="$(grep -m1 '^POSTGRES_PASSWORD=' /opt/jobtoo-secrets/env | cut -d= -f2)" db \
+       psql -tAq -U supabase_admin -d postgres -c "
+         select (select count(*) from information_schema.tables where table_schema='_realtime')
+                || ' таблиц, арендаторов ' ||
+                coalesce((select count(*)::text from _realtime.tenants), 'нет таблицы');
+       " 2>&1 | tr -d '"\n' | cut -c1-160)
+  echo "  \"realtime_состояние\": \"${rt:-не прочитать}\","
 
   # Состав схемы: имя таблицы и сколько в ней колонок и строк. Нужно, чтобы
   # сверить перенос по существу, а не по числу строк: пустая таблица нужна
