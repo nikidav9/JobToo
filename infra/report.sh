@@ -104,6 +104,17 @@ TMP=/tmp/jt-status.$$
         else { echo $f . "=" . (strlen((string)$v) ? "есть" : "пусто") . " "; }
       }' 2>&1 | tr -d '"' | tr '\n' ' ' | cut -c1-300)\","
 
+  # Чем закончилась последняя публикация вакансии в группу. Записывает
+  # db.php при каждой рассылке. Без этого причина отказа Telegram остаётся
+  # внутри одного запроса и пропадает вместе с ним: снаружи видно только
+  # «в личку пришло, в группу нет».
+  gp=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose exec -T \
+       -e PGPASSWORD="$(grep -m1 '^POSTGRES_PASSWORD=' /opt/jobtoo-secrets/env | cut -d= -f2)" db \
+       psql -tAq -U supabase_admin -d postgres -c \
+       "select value from jm_settings where key = 'last_group_post';" 2>&1 \
+       | tr -d '"\\\n\r' | cut -c1-400)
+  echo "  \"публикация_в_группу\": \"${gp:-нет записи}\","
+
   # Ключевые шаги отдельно: в общем хвосте их забивают журналы контейнеров.
   echo "  \"роли\": \"$(grep -a '\[роли\]' /var/log/jt-apply.log 2>/dev/null | tail -2 | tr -d '"' | tr '\n' ' ' | cut -c1-400)\","
   echo "  \"миграции\": \"$(grep -a '\[миграции\]' /var/log/jt-apply.log 2>/dev/null | tail -2 | tr -d '"' | tr '\n' ' ' | cut -c1-300)\","
