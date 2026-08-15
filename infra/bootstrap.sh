@@ -292,12 +292,20 @@ docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
     alter default privileges in schema public grant all on sequences to service_role;
 SQL
 rc=$?
-set -e
+# set -e намеренно НЕ возвращаем: дальше идут проверки, которые законно
+# отвечают ненулевым кодом (служба ещё поднимается, файла ещё нет), и
+# каждая такая мелочь убивала весь заход молча — миграции переставали
+# доезжать, а в журнале не оставалось ни строчки.
 if [ $rc -eq 0 ]; then
   say "роли" "заданы"
-  # Службы, которые уже успели упасть на неверном пароле, сами не оживут:
-  # они перезапускаются с тем же кэшем неудачи. Подталкиваем.
-  docker compose restart rest realtime storage >/dev/null 2>&1 || true
+  # Перезапуск служб здесь был ошибкой: он выполнялся каждую минуту, а не
+  # однажды. Службы мигали, приложение отвечало через раз, и следующая же
+  # проверка Storage приходилась на момент, когда тот ещё не поднялся.
+  # Толкаем только один раз, при первой настройке ролей.
+  if [ ! -f /opt/jobtoo-secrets/.roles-done ]; then
+    docker compose restart rest realtime storage >/dev/null 2>&1 || true
+    touch /opt/jobtoo-secrets/.roles-done
+  fi
 else
   say "роли" "ОШИБКА($rc): $(tail -4 /tmp/jt-roles.log | tr '\n' ' ' | cut -c1-300)"
 fi
