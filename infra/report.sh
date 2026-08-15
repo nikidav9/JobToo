@@ -180,12 +180,20 @@ TMP=/tmp/jt-status.$$
     # И то же самое с самой машины, вне контейнера: если наружу не пускает
     # докерная сеть, а не провайдер, лечится это совсем иначе.
     {
+      # Решающий замер: тот же запрос с машины, но отдельно по IPv6 и по IPv4.
+      # Если IPv6 берёт всегда, а IPv4 не берёт никогда — закрыт не Telegram
+      # вообще, а его IPv4-адрес. Контейнеру же достаётся только IPv4:
+      # у докерной сети IPv6 нет. Отсюда и «с машины работает, из контейнера
+      # нет» при одном и том же исходящем адресе.
       printf 'машина: '
-      ok=0; for i in 1 2 3 4; do
-        c=$(curl -sS -o /dev/null -m 8 -w '%{http_code}' "https://api.telegram.org/" 2>/dev/null)
-        [ "$c" = "302" ] && ok=$((ok + 1))
+      for v in 6 4; do
+        ok=0
+        for i in 1 2 3 4; do
+          c=$(curl -sS -"$v" -o /dev/null -m 8 -w '%{http_code}' "https://api.telegram.org/" 2>/dev/null)
+          [ "$c" = "302" ] && ok=$((ok + 1))
+        done
+        printf 'ipv%s=%s/4 ' "$v" "$ok"
       done
-      printf 'telegram=%s/4 ' "$ok"
       printf 'адреса=%s' "$(getent ahosts api.telegram.org 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ',')"
     } > /var/lib/jt-net-check 2>/dev/null
   fi
