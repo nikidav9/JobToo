@@ -353,6 +353,26 @@ if [ -n "${GH_TOKEN:-}" ]; then
   git config --global credential.helper store 2>/dev/null || true
   printf 'https://x-access-token:%s@github.com\n' "$GH_TOKEN" > /root/.git-credentials
   chmod 600 /root/.git-credentials
+
+  # И то же самое в адрес самого хранилища.
+  #
+  # Красивее было бы обойтись файлом, но он читается относительно HOME, а
+  # обновления тянет служба по таймеру — с окружением, которое мы не писали.
+  # Когда репозиторий закрыли, оказалось, что до файла она не дотягивается:
+  # «could not read Username», то есть учётных данных не нашлось вовсе.
+  # Сервер отстал на девять коммитов, и починить это изнутри было нечем —
+  # канал доставки правок обрывался тем же самым отказом.
+  #
+  # Адрес от HOME не зависит: он лежит в .git/config самого хранилища. Токен
+  # в нём — плата за то, чтобы обновления доезжали при любом окружении.
+  # Права на каталог и так только у root, а всплыть в чужом логе он может
+  # разве что при ошибке git — это меньшее из двух зол.
+  CUR=$(git -C /opt/jobtoo config --get remote.origin.url 2>/dev/null || true)
+  WANT="https://x-access-token:$GH_TOKEN@github.com/nikidav9/JobToo.git"
+  if [ "$CUR" != "$WANT" ]; then
+    git -C /opt/jobtoo remote set-url origin "$WANT" 2>/dev/null \
+      && say "обновления" "адрес хранилища переписан с токеном"
+  fi
 fi
 
 # Пропуск приложения — в переменные compose.
