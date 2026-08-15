@@ -302,23 +302,33 @@ else
   say "роли" "ОШИБКА($rc): $(tail -4 /tmp/jt-roles.log | tr '\n' ' ' | cut -c1-300)"
 fi
 
-# ── Сброс схемы Storage, если он не встал ─────────────────────────────────
-# Storage ведёт в базе собственный набор миграций. Я создал схему storage
-# заранее, своими руками, и она разошлась с тем, что служба ожидает увидеть:
-# контейнер значится работающим, но на каждый запрос отвечает отказом, и
-# шлюз отдаёт 502.
+# ── Схема Storage ─────────────────────────────────────────────────────────
+# Storage ведёт в базе собственный набор миграций и сам же проверяет, что
+# схема им соответствует. Моя ранняя попытка создать её вручную, а потом
+# несколько сбросов подряд оставили её на полпути: служба отвечает
+# DatabaseSchemaMismatch и отказывается работать.
 #
-# Чиним один раз: отдаём схему службе и даём завести всё заново. Файлы при
-# этом не теряются — они лежат на диске, в томе, а не в базе.
-if [ ! -f /opt/jobtoo-secrets/.storage-reset3 ]; then
-  if [ "$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:5000/status 2>/dev/null)" != "200" ]; then
+# Сбрасываем один раз и отдаём целиком службе. Файлы при этом не теряются —
+# они лежат в томе на диске, а не в базе.
+if [ ! -f /opt/jobtoo-secrets/.storage-clean ]; then
+  code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:5000/bucket \
+         -H "Authorization: Bearer $SERVICE_ROLE_KEY" 2>/dev/null)
+  if [ "$code" != "200" ]; then
     docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
       psql -q -U supabase_admin -d postgres \
       -c "drop schema if exists storage cascade;" >/dev/null 2>&1
-    docker compose up -d --force-recreate storage >/dev/null 2>&1
-    touch /opt/jobtoo-secrets/.storage-reset3
-    say "storage" "схема сброшена, служба пересоздана"
-    sleep 20
+    docker compose restart storage >/dev/null 2>&1
+    sleep 25
+    code2=$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:5000/bucket \
+            -H "Authorization: Bearer $SERVICE_ROLE_KEY" 2>/dev/null)
+    if [ "$code2" = "200" ]; then
+      touch /opt/jobtoo-secrets/.storage-clean
+      say "storage" "схема пересоздана службой, отвечает"
+    else
+      say "storage" "после сброса отвечает $code2"
+    fi
+  else
+    touch /opt/jobtoo-secrets/.storage-clean
   fi
 fi
 
