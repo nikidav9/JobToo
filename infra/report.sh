@@ -20,7 +20,15 @@ TMP=/tmp/jt-status.$$
   echo "  \"нагрузка\": \"$(cut -d' ' -f1-3 /proc/loadavg)\","
   echo "  \"память_МБ\": \"$(free -m | awk '/^Mem/{print $3"/"$2}')\","
   echo "  \"подкачка_МБ\": \"$(free -m | awk '/^Swap/{print $3"/"$2}')\","
-  echo "  \"диск\": \"$(df -h / | awk 'NR==2{print $4}') свободно\","
+  echo "  \"диск\": \"$(df -h / | awk 'NR==2{print $3" из "$2", свободно "$4}')\","
+  # Из чего сложилось занятое место. Диск здесь не резиновый, а растёт он
+  # молча: база от переписки, хранилище от фотографий и голосовых, копии от
+  # самих себя. Когда место кончится, Postgres встанет — и разбираться,
+  # что именно его съело, будет уже некогда.
+  echo "  \"занимает\": \"$(
+    for p in /var/lib/docker/volumes /opt/jobtoo-backups /var/www/jobtoo /opt/jobtoo; do
+      [ -e "$p" ] && printf '%s=%s ' "$(basename "$p")" "$(du -sh "$p" 2>/dev/null | cut -f1)"
+    done)\","
   echo "  \"nginx\": \"$(systemctl is-active nginx)\","
   echo "  \"docker\": \"$(systemctl is-active docker)\","
   echo "  \"таймер\": \"$(systemctl is-active jt-apply.timer)\","
@@ -88,6 +96,23 @@ TMP=/tmp/jt-status.$$
                  where attnum > 0 and not attisdropped group by attrelid) c
             on c.attrelid = t.oid;" 2>&1 | tr -d '"\n' | cut -c1-1200)
   echo "  \"схема\": \"${sch:-не прочитать}\","
+
+  # Сколько весит сама база и её самые тяжёлые таблицы. Растёт она от
+  # переписки и уведомлений, а не от людей: четыреста человек занимают
+  # меньше, чем их разговоры за месяц.
+  wt=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 20 docker compose exec -T \
+       -e PGPASSWORD="$(grep -m1 '^POSTGRES_PASSWORD=' /opt/jobtoo-secrets/env | cut -d= -f2)" db \
+       psql -tAq -U supabase_admin -d postgres -c "
+         select pg_size_pretty(pg_database_size('postgres')) || ' всего: ' ||
+                string_agg(x.n || ' ' || x.s, ', ' order by x.b desc)
+           from (select c.relname as n,
+                        pg_size_pretty(pg_total_relation_size(c.oid)) as s,
+                        pg_total_relation_size(c.oid) as b
+                   from pg_class c join pg_namespace ns on ns.oid = c.relnamespace
+                  where ns.nspname = 'public' and c.relkind = 'r'
+                    and c.relname like 'jm\\_%'
+                  order by b desc limit 5) x;" 2>&1 | tr -d '"\n' | cut -c1-300)
+  echo "  \"вес_базы\": \"${wt:-не прочитать}\","
 
   # Переезд домена: три вещи, каждая из которых по отдельности выглядит
   # исправно, а вместе должны сойтись до смены записи в DNS.
