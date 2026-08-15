@@ -813,18 +813,40 @@ function tg_send_message(int $chatId, string $text, bool|string $withAppButton =
             ['text' => $btnText, 'url' => $url],
         ]]];
     }
-    $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendMessage');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-        CURLOPT_TIMEOUT => 10,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_POSTFIELDS => json_encode($payload),
-    ]);
-    $resp = curl_exec($ch); $err = curl_error($ch); curl_close($ch);
-    $dec = json_decode($resp ?: 'null', true);
-    $ok = is_array($dec) && ($dec['ok'] ?? false) === true;
+    // Три попытки, а не одна.
+    //
+    // Связь с api.telegram.org рваная: замер с сервера дал четыре ответа из
+    // четырёх на одной настройке и один из двух на другой, в разное время
+    // по-разному. При одной попытке этого достаточно, чтобы объявление
+    // молча не ушло в группу — ровно то, на что и жаловались.
+    //
+    // Повторяем только когда виновата связь. На отказ по существу — «бот
+    // исключён», «чат не найден» — повтор бессмыслен: ответ будет тот же,
+    // а человек будет ждать втрое дольше.
+    $resp = false; $err = ''; $dec = null; $ok = false;
+    for ($try = 1; $try <= 3; $try++) {
+        $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendMessage');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+        ]);
+        $resp = curl_exec($ch);
+        $err  = curl_error($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $dec = json_decode($resp ?: 'null', true);
+        $ok  = is_array($dec) && ($dec['ok'] ?? false) === true;
+        if ($ok) break;
+
+        // Телеграм ответил и отказал — это его слово, а не обрыв связи.
+        if ($resp !== false && $code < 500 && is_array($dec)) break;
+        if ($try < 3) usleep($try * 400000);   // 0,4 с, потом 0,8 с
+    }
 
     // Последний отказ запоминаем: молчаливый провал отправки в группу стоил
     // нам того, что объявления перестали доходить до «ПОДРАБОТОК», а понять
@@ -833,6 +855,7 @@ function tg_send_message(int $chatId, string $text, bool|string $withAppButton =
         $GLOBALS['jt_last_tg_error'] = [
             'chat' => $chatId,
             'ошибка' => $err ?: (($dec['description'] ?? null) ?: substr((string)$resp, 0, 200)),
+            'попыток' => $try ?? 1,
             'когда' => now_iso(),
         ];
     }
