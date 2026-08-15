@@ -137,9 +137,25 @@ fi
 # Разовый опыт: дозванивается ли Телеграм до этой машины напрямую.
 # Подробности и сетка безопасности — в самом скрипте. Отметкой, а не
 # каждую минуту: переключать вебхук по кругу нельзя.
-if [ -f "$REPO/infra/switch-webhook.sh" ] && [ ! -f /var/lib/jt-webhook.done ]; then
-  touch /var/lib/jt-webhook.done
+#
+# Первый заход (отметка jt-webhook.done) целил в jobtoo.ru и не вышел:
+# «Connection timed out». Второй целит в tg.jobtoo.ru — имя без A-записи,
+# и потому только по IPv6. Отметка новая, иначе опыт не повторился бы.
+# Ждём сертификат: без него Телеграм откажется от вебхука на TLS-ошибке,
+# и одна попытка сгорела бы впустую.
+if [ -f "$REPO/infra/switch-webhook.sh" ] && [ ! -f /var/lib/jt-webhook-tg.done ] \
+   && [ -d /etc/letsencrypt/live/tg.jobtoo.ru ]; then
+  touch /var/lib/jt-webhook-tg.done
   bash "$REPO/infra/switch-webhook.sh" >/dev/null 2>&1 || true
+fi
+
+# Сторож прямого вебхука: сам вернёт его на Vercel, если Телеграм перестанет
+# доходить. Раз в пять минут — дольше молчащего бота терпеть не хочется.
+if [ -f "$REPO/infra/webhook-watch.sh" ] && [ -f /var/lib/jt-webhook.prev ]; then
+  if [ ! -f /var/lib/jt-webhook-check ] \
+     || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-webhook-check 2>/dev/null || echo 0) )) -gt 300 ]; then
+    bash "$REPO/infra/webhook-watch.sh" >/dev/null 2>&1 || true
+  fi
 fi
 
 # Проверка анонимного пути — того, чем приложение грузит файлы и держит
@@ -505,9 +521,8 @@ fi
 # на db.jobtoo.ru, когда до записи дойдут руки.
 # Строго IPv4: ifconfig.me отдавал IPv6, и имя получалось несуществующим —
 # certbot честно не мог выпустить сертификат на 2a03:...sslip.io.
-# Строго IPv4: ifconfig.me отдавал IPv6, и имя получалось несуществующим —
-# certbot честно не мог выпустить сертификат на 2a03:...sslip.io.
 IP=$(ip -4 addr show scope global 2>/dev/null | grep -oE 'inet [0-9.]+' | awk '{print $2}' | head -1)
+IP6=$(ip -6 addr show scope global 2>/dev/null | grep -oE 'inet6 [0-9a-f:]+' | awk '{print $2}' | head -1)
 HOST="${IP}.sslip.io"
 
 # certonly, а не --nginx: правки certbot в конфигурации не выживали. Этот
@@ -607,6 +622,27 @@ if [ ! -d "/etc/letsencrypt/live/$ADMIN_HOST" ] && command -v certbot >/dev/null
   fi
 fi
 
+# tg.jobtoo.ru — имя только под вебхук, и намеренно без A-записи. Проверяем
+# соответственно AAAA, а не A: A там не появится никогда, это и есть смысл
+# записи. Ждём, пока имя укажет на наш же IPv6.
+TG_HOST=tg.jobtoo.ru
+if [ ! -d "/etc/letsencrypt/live/$TG_HOST" ] && command -v certbot >/dev/null 2>&1 \
+   && command -v dig >/dev/null 2>&1 && [ -n "${IP6:-}" ]; then
+  TNS=$(dig +short +time=5 +tries=1 NS jobtoo.ru 2>/dev/null | head -1)
+  TOK=0
+  [ -n "$TNS" ] && TOK=$(dig +short +time=5 +tries=1 AAAA "$TG_HOST" "@$TNS" 2>/dev/null | grep -c "^${IP6}$" || true)
+  if [ "${TOK:-0}" -ge 1 ]; then
+    TLAST=$(cat /var/lib/jt-tg-cert-last 2>/dev/null || echo 0)
+    if [ "$(( $(date +%s) - ${TLAST:-0} ))" -gt 900 ]; then
+      date +%s > /var/lib/jt-tg-cert-last
+      certbot certonly --webroot -w /var/www/html -n --agree-tos \
+        -m nikidav9@gmail.com -d "$TG_HOST" >>/var/log/jt-apply.log 2>&1 \
+        && say "сертификат" "выпущен на $TG_HOST" \
+        || say "сертификат" "на $TG_HOST не вышел, повтор через 15 мин"
+    fi
+  fi
+fi
+
 # Собираем во временный файл и сравниваем с действующим: перезапускать
 # nginx каждую минуту незачем. Он это переживает, но не бесследно — часть
 # запросов в момент перезагрузки обрывается, и снаружи это выглядит как
@@ -625,6 +661,10 @@ fi
 # Дашборд — так же: только вместе со своим сертификатом.
 if [ -d "/etc/letsencrypt/live/$ADMIN_HOST" ] && [ -f "$REPO/infra/nginx-admin.conf" ]; then
   cat "$REPO/infra/nginx-admin.conf" >> "$NEW"
+fi
+# Вебхук Телеграма — так же.
+if [ -d "/etc/letsencrypt/live/$TG_HOST" ] && [ -f "$REPO/infra/nginx-tg.conf" ]; then
+  cat "$REPO/infra/nginx-tg.conf" >> "$NEW"
 fi
 
 if cmp -s "$NEW" /etc/nginx/sites-available/jobtoo; then
