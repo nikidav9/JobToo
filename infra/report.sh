@@ -66,9 +66,7 @@ TMP=/tmp/jt-status.$$
   rt=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose exec -T \
        -e PGPASSWORD="$(grep -m1 '^POSTGRES_PASSWORD=' /opt/jobtoo-secrets/env | cut -d= -f2)" db \
        psql -tAq -U supabase_admin -d postgres -c "
-         select (select count(*) from information_schema.tables where table_schema='_realtime')
-                || ' таблиц, арендаторов ' ||
-                coalesce((select count(*)::text from _realtime.tenants), 'нет таблицы');
+         select coalesce(string_agg(external_id || ' / ' || name, ', '), 'нет') from _realtime.tenants;
        " 2>&1 | tr -d '"\n' | cut -c1-160)
   echo "  \"realtime_состояние\": \"${rt:-не прочитать}\","
 
