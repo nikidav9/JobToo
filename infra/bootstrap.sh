@@ -125,6 +125,20 @@ grep -q "^PUBLIC_URL=" "$SECRETS" || echo "PUBLIC_URL=http://$(hostname -I | awk
 # Секреты нужны не только docker compose, но и самому скрипту — для psql.
 set -a; . "$SECRETS"; set +a
 
+# ── Секреты прокси ────────────────────────────────────────────────────────
+# Прокси хранит свои секреты отдельными файлами рядом с кодом — так заведено
+# на Reg.ru, и менять это при переносе незачем: меньше отличий, меньше
+# сюрпризов.
+#
+# Сервисный ключ берём свой, локальный: прокси теперь ходит в свою же базу,
+# и старый облачный ему не нужен. Остальное — пропуск приложения и токен
+# бота — приезжает извне, в репозитории им не место.
+mkdir -p /opt/jobtoo-secrets/proxy
+chmod 700 /opt/jobtoo-secrets/proxy
+printf "<?php return '%s';\n" "$SERVICE_ROLE_KEY" > /opt/jobtoo-secrets/proxy/sb_service_key.php
+printf "<?php return '%s';\n" "https://147.45.184.99.sslip.io" > /opt/jobtoo-secrets/proxy/sb_url.php
+chmod 600 /opt/jobtoo-secrets/proxy/*.php
+
 # ── Контейнеры ────────────────────────────────────────────────────────────
 cd "$REPO/infra"
 chmod +x init/*.sh 2>/dev/null || true
