@@ -157,6 +157,8 @@ jobs:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           DASHBOARD_LOGIN: ${{ secrets.DASHBOARD_LOGIN }}
           DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+          STUDIO_LOGIN: ${{ secrets.STUDIO_LOGIN }}
+          STUDIO_PASSWORD: ${{ secrets.STUDIO_PASSWORD }}
         run: |
           if [ -z "$JT_DEPLOY_TOKEN" ]; then
             echo "JT_DEPLOY_TOKEN не задан — пропускаю доставку"
@@ -174,6 +176,11 @@ jobs:
               "admin": {
                   "login":    e("DASHBOARD_LOGIN", ""),
                   "password": e("DASHBOARD_PASSWORD", ""),
+              },
+              # Вход в панель базы. Пустое — сервер оставит прежний пароль.
+              "studio": {
+                  "login":    e("STUDIO_LOGIN", ""),
+                  "password": e("STUDIO_PASSWORD", ""),
               },
           }))
           PY

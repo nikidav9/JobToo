@@ -381,18 +381,49 @@ EOF
 chmod 644 /etc/nginx/conf.d/jt-authswap.conf
 
 # ── Панель и сертификат ───────────────────────────────────────────────────
-# Пароль к панели создаётся один раз и лежит рядом с остальными секретами.
-if [ ! -f /opt/jobtoo-secrets/studio ]; then
-  SPASS=$(openssl rand -base64 12 | tr -d '/+=' | cut -c1-12)
-  echo "STUDIO_USER=admin"      >  /opt/jobtoo-secrets/studio
-  echo "STUDIO_PASS=$SPASS"     >> /opt/jobtoo-secrets/studio
-  chmod 600 /opt/jobtoo-secrets/studio
+# Пароль к панели задаёт владелец, а не сервер.
+#
+# Сначала было наоборот: сервер придумывал пароль сам. Звучит надёжнее, а на
+# деле хуже — такой пароль надо как-то передать владельцу, то есть провести
+# через переписку, страницу или журнал. И он перестаёт быть паролем. А если
+# не передать, к панели не попадёшь вовсе: она же за ним и закрыта.
+#
+# Заданный владельцем не передаётся никуда: он его и так знает. Приезжает
+# тем же путём, что остальные секреты, — из настроек репозитория.
+#
+# Сгенерированный остаётся запасным вариантом на случай, если своего ещё не
+# задали: без пароля панель открылась бы всем, а она показывает переписку.
+if [ -r "$PROXY/studio_credentials.php" ]; then
+  SC=$(docker compose exec -T php php -r '
+    $v = @include "/var/www/api/studio_credentials.php";
+    if (is_array($v)) echo ($v["login"] ?? "") . "\n" . ($v["password"] ?? "");
+  ' 2>/dev/null | tr -d '\r')
+  STUDIO_USER=$(echo "$SC" | sed -n 1p)
+  STUDIO_PASS=$(echo "$SC" | sed -n 2p)
 fi
-. /opt/jobtoo-secrets/studio
-if [ ! -f /etc/nginx/.htpasswd ]; then
+
+if [ -z "${STUDIO_PASS:-}" ]; then
+  if [ ! -f /opt/jobtoo-secrets/studio ]; then
+    SPASS=$(openssl rand -base64 12 | tr -d '/+=' | cut -c1-12)
+    echo "STUDIO_USER=admin"  >  /opt/jobtoo-secrets/studio
+    echo "STUDIO_PASS=$SPASS" >> /opt/jobtoo-secrets/studio
+    chmod 600 /opt/jobtoo-secrets/studio
+  fi
+  . /opt/jobtoo-secrets/studio
+fi
+
+# Пересобираем при смене пароля, а не только при первом запуске. Прежняя
+# проверка «файла нет — создать» означала, что сменить пароль нельзя вовсе:
+# положили новый, а вход остался по старому, и понять это можно только
+# попробовав.
+WANT=$(printf '%s' "${STUDIO_USER}:${STUDIO_PASS}" | sha256sum | cut -d' ' -f1)
+if [ "$WANT" != "$(cat /etc/nginx/.htpasswd.mark 2>/dev/null || true)" ]; then
   printf '%s:%s\n' "$STUDIO_USER" "$(openssl passwd -apr1 "$STUDIO_PASS")" > /etc/nginx/.htpasswd
   chmod 640 /etc/nginx/.htpasswd
   chown root:www-data /etc/nginx/.htpasswd 2>/dev/null || true
+  echo "$WANT" > /etc/nginx/.htpasswd.mark
+  chmod 600 /etc/nginx/.htpasswd.mark
+  say "панель" "пароль обновлён"
 fi
 
 # Сертификат на имя вида <адрес>.sslip.io: своего домена пока нет, а без

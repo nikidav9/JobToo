@@ -96,6 +96,21 @@ if (is_array($app)) {
     }
 }
 
+// Вход в панель базы.
+//
+// Пароль задаёт владелец у себя в настройках репозитория, а не сервер у
+// себя. Разница принципиальная: сгенерированный сервером пароль пришлось бы
+// как-то передать — через переписку, страницу или журнал, — и он перестал бы
+// быть паролем. Заданный владельцем не передаётся вообще: он его и так знает.
+$std = $in['studio'] ?? null;
+if (is_array($std) && !empty($std['login']) && !empty($std['password'])) {
+    $php = "<?php return ['login' => " . literal((string) $std['login'])
+         . ", 'password' => " . literal((string) $std['password']) . "];\n";
+    if (put(__DIR__ . '/studio_credentials.php', $php)) {
+        $done[] = 'studio_credentials.php';
+    }
+}
+
 // Вход в дашборд.
 $adm = $in['admin'] ?? null;
 if (is_array($adm) && !empty($adm['login']) && !empty($adm['password'])) {
