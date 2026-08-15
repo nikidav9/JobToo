@@ -69,7 +69,7 @@ TMP=/tmp/jt-status.$$
   echo "  },"
   # Проверка служб изнутри машины: снаружи шлюз может отвечать 502, и не
   # видно, кто виноват — он или сама служба.
-  echo "  \"изнутри\": \"rest=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3000/ 2>/dev/null) storage=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:5000/status 2>/dev/null) realtime=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:4000/api/tenants 2>/dev/null) studio=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3001/ 2>/dev/null)\","
+  echo "  \"изнутри\": \"rest=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3000/ 2>/dev/null) storage=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:5000/status 2>/dev/null) realtime=$(curl -s -o /dev/null -w %{http_code} -m 5 -H 'Host: realtime-dev.localhost' http://127.0.0.1:4000/api/tenants 2>/dev/null) studio=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3001/ 2>/dev/null)\","
 
   # Ошибки Postgres: storage падает на своих миграциях, а сам показывает
   # только «DatabaseError» без текста. Причина видна лишь здесь.
