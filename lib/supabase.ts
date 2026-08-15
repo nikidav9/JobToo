@@ -28,8 +28,13 @@ const storage =
 // Ключ берём только из окружения. Запасного значения в коде нет намеренно:
 // прежнее пережило смену ключей и продолжало бы работать втихую, а забытый
 // в коде ключ — ровно то, из-за чего пришлось всё это переделывать.
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+// trim не для красоты. Значения приходят из настроек репозитория, куда их
+// вставляют руками, и при переезде на свой сервер в адрес попал перевод
+// строки: получалось «https://jobtoo.ru\n», а из него — «…\n/rest/v1/…».
+// Где-то такой адрес починится сам, где-то молча не сработает, и искать
+// причину придётся по невидимому символу. Дешевле отрезать здесь.
+const SUPABASE_URL = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
+const SUPABASE_KEY = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error(

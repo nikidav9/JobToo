@@ -10,9 +10,13 @@ const DB_TIMEOUT = 12_000;
 // All DB calls go through the web API endpoint instead.
 
 const IS_NATIVE = true; // always proxy through jobtoo.ru — Supabase is blocked in Russia from browsers
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://jobtoo.ru';
+// trim и снятие косой черты на конце — по той же причине, что в
+// lib/supabase.ts: значения вставляют руками, и в один из адресов уже
+// попадал перевод строки. Пропуск тоже подрезаем: лишний пробел в нём
+// превратился бы в «неверный пропуск» на каждом запросе.
+const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'https://jobtoo.ru').trim().replace(/\/+$/, '');
 
-const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET ?? '';
+const APP_SECRET = (process.env.EXPO_PUBLIC_APP_SECRET ?? '').trim();
 
 /**
  * Запрос к прокси.
