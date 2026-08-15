@@ -33,7 +33,17 @@ TOKEN=$(docker compose exec -T php php -r '
 SECRET=$(docker compose exec -T php php -r '
   $s = @include "/var/www/api/app_secrets.php";
   echo is_array($s) ? ($s["APP_SECRET"] ?? "") : "";' 2>/dev/null | tr -d '\r\n')
+# Прежний ключ нужен не для истории. Пересылка на Vercel проверяет заголовок
+# своим значением, а оно там осталось старым: после смены ключа она отвечает
+# Телеграму 401, и бот замолкает именно тогда, когда мы на неё откатились.
+# Свой обработчик принимает оба, так что откат ходит под прежним ключом.
+SECRET_PREV=$(docker compose exec -T php php -r '
+  $s = @include "/var/www/api/app_secrets.php";
+  echo is_array($s) ? ($s["APP_SECRET_PREV"] ?? "") : "";' 2>/dev/null | tr -d '\r\n')
 [ -z "$TOKEN" ] && exit 0
+
+# Каким ключом подписывать вебхук на этот адрес.
+sec_for() { if [ "$1" = "$MINE" ] || [ -z "${SECRET_PREV:-}" ]; then printf '%s' "$SECRET"; else printf '%s' "$SECRET_PREV"; fi; }
 
 api() { curl -s -m 20 "https://api.telegram.org/bot$TOKEN/$1" "${@:2}"; }
 field() { python3 -c 'import sys,json;print(json.load(sys.stdin).get("result",{}).get(sys.argv[1],""))' "$1" 2>/dev/null; }
@@ -67,14 +77,18 @@ URL=$(echo "$INFO" | field url)
 if [ -z "$URL" ]; then
   for cand in "$MINE" "${PREV:-}" "https://jobtoo.ru/api/tg.php"; do
     [ -z "$cand" ] && continue
-    RESP=$(api setWebhook -d "url=$cand" -d "secret_token=$SECRET")
+    RESP=$(api setWebhook -d "url=$cand" -d "secret_token=$(sec_for "$cand")")
     case "$RESP" in
       *'"ok":true'*)
         [ "$cand" = "$MINE" ] || touch /opt/jobtoo-proxy/tg_relay_mode 2>/dev/null || true
-        echo "$(date +%H:%M) вебхука не было — поставил $cand" > /var/lib/jt-webhook-check
+        # Отказ своего имени записываем даже при удачном запасном: без этого
+        # причина, по которой прямой путь не берут, теряется — а она и есть
+        # то единственное, ради чего вся эта возня.
+        echo "$(date +%H:%M) поставил $cand${MINEWHY:+ (своё имя отклонено: $MINEWHY)}" > /var/lib/jt-webhook-check
         exit 0;;
     esac
-    WHY=$(echo "$RESP" | tr -d '\r\n' | cut -c1-120)
+    WHY=$(echo "$RESP" | tr -d '\r\n"' | cut -c1-120)
+    [ "$cand" = "$MINE" ] && MINEWHY="$WHY"
   done
   echo "$(date +%H:%M) вебхук поставить не удалось: ${WHY:-нет ответа}" > /var/lib/jt-webhook-check
   exit 0
@@ -83,6 +97,16 @@ fi
 # Не наш адрес — значит откат уже случился. Отмечаемся всё равно: без записи
 # сторож считал бы отметку просроченной и ходил в Телеграм каждую минуту.
 if [ "$URL" != "$MINE" ]; then
+  # Откат уже случился — но и на пересылке бот может молчать. Она сверяет
+  # заголовок своим значением ключа, а оно осталось прежним: после смены
+  # APP_SECRET Телеграм получает от неё 401 и не доставляет ничего. Ровно
+  # это и произошло, и снаружи выглядело как «вебхук стоит, всё хорошо».
+  case "$(echo "$INFO" | field last_error_message)" in
+    *401*|*403*)
+      api setWebhook -d "url=$URL" -d "secret_token=$(sec_for "$URL")" >/dev/null
+      echo "$(date +%H:%M) пересылка отвечала 401 — переподписал прежним ключом" > /var/lib/jt-webhook-check
+      exit 0;;
+  esac
   echo "$(date +%H:%M) вебхук на $URL — прямой путь не используется" > /var/lib/jt-webhook-check
   exit 0
 fi
