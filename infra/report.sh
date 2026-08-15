@@ -42,8 +42,10 @@ TMP=/tmp/jt-status.$$
     [ -n "$s" ] || continue
     [ $first -eq 0 ] && echo ","
     first=0
-    log=$(cd /opt/jobtoo/infra && timeout 15 docker compose logs --tail=8 --no-log-prefix "$svc" 2>&1 \
-          | tr -d '"\r' | tr '\n' ' ' | cut -c1-500)
+    # Берём хвост строки, а не начало: причина обычно в конце сообщения,
+    # а начало занято перечислением уже применённых миграций.
+    log=$(cd /opt/jobtoo/infra && timeout 15 docker compose logs --tail=6 --no-log-prefix "$svc" 2>&1 \
+          | tr -d '"\r' | tr '\n' ' ' | tail -c 600)
     printf '    "%s": "%s"' "$svc" "$log"
   done
   echo
