@@ -756,9 +756,21 @@ function tg_send_message(int $chatId, string $text, bool|string $withAppButton =
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_POSTFIELDS => json_encode($payload),
     ]);
-    $resp = curl_exec($ch); curl_close($ch);
+    $resp = curl_exec($ch); $err = curl_error($ch); curl_close($ch);
     $dec = json_decode($resp ?: 'null', true);
-    return is_array($dec) && ($dec['ok'] ?? false) === true;
+    $ok = is_array($dec) && ($dec['ok'] ?? false) === true;
+
+    // Последний отказ запоминаем: молчаливый провал отправки в группу стоил
+    // нам того, что объявления перестали доходить до «ПОДРАБОТОК», а понять
+    // причину было нечем — код на месте, права есть, сообщений нет.
+    if (!$ok) {
+        $GLOBALS['jt_last_tg_error'] = [
+            'chat' => $chatId,
+            'ошибка' => $err ?: (($dec['description'] ?? null) ?: substr((string)$resp, 0, 200)),
+            'когда' => now_iso(),
+        ];
+    }
+    return $ok;
 }
 
 /** Sends Expo push messages in batches of 100. Never throws. */
@@ -2567,6 +2579,21 @@ try {
             if ($groupHtml !== '' && TG_GROUP_CHAT_ID !== 0) {
                 $groupOk = tg_send_message(TG_GROUP_CHAT_ID, $groupHtml, $btnUrl);
             }
+            // Итог публикации сохраняем: иначе он теряется, а следующий раз
+            // выяснять причину снова будет нечем.
+            try {
+                sb_upsert('jm_settings', [
+                    'key' => 'last_group_post',
+                    'value' => json_encode([
+                        'ok' => $groupOk,
+                        'когда' => now_iso(),
+                        'длина_текста' => strlen($groupHtml),
+                        'кнопка' => is_string($btnUrl) ? $btnUrl : 'по умолчанию',
+                        'отказ' => $GLOBALS['jt_last_tg_error'] ?? null,
+                    ], JSON_UNESCAPED_UNICODE),
+                    'updated_at' => now_iso(),
+                ], 'key');
+            } catch (Throwable $e) { /* запись отчёта не должна ломать рассылку */ }
 
             // Станция приходит в $args[6] и больше ни на что не влияет: делить
             // рассылку по географии мы перестали, и от старых версий
