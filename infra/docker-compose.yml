@@ -191,7 +191,6 @@ services:
     volumes:
       # Код и секреты вместе: прокси ищет их рядом с собой.
       - /opt/jobtoo-proxy:/var/www/api
-      - /opt/jobtoo/infra/intake:/var/www/intake:ro
     environment:
       # Через свой же шлюз, а не напрямую в PostgREST: прокси добавляет к
       # адресу /rest/v1/ сам, и путь должен совпадать с боевым. Петля внутри
