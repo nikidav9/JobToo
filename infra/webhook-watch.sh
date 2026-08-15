@@ -36,8 +36,23 @@ URL=$(echo "$INFO" | field url)
 [ "$URL" = "$MINE" ] || exit 0
 
 ERR=$(echo "$INFO" | field last_error_message)
+
+# 401 — это не сеть, а рассинхрон ключей: secret_token у Телеграма остался от
+# прошлого APP_SECRET. Откатываться тут нечего, надо просто переставить его
+# заново. Отдельно от общего отката: иначе смена ключа выглядела бы как
+# недоступность сервера и уводила вебхук обратно на пересылку.
+case "$ERR" in
+  *401*)
+    api setWebhook -d "url=$MINE" -d "secret_token=$SECRET" >/dev/null
+    echo "$(date +%H:%M) переставил secret_token после смены ключа" > /var/lib/jt-webhook-check
+    exit 0;;
+esac
+
 if [ -n "$ERR" ]; then
   api setWebhook -d "url=$PREV" -d "secret_token=$SECRET" >/dev/null
+  # Пересылка на Vercel заголовок дальше не передаёт — на время отката
+  # обработчик должен принимать обновления и без него.
+  touch /opt/jobtoo-proxy/tg_relay_mode 2>/dev/null || true
   echo "$(date +%H:%M) прямой путь отвалился ($ERR) — вернул на $PREV" > /var/lib/jt-webhook-check
   exit 0
 fi
@@ -47,8 +62,11 @@ fi
 PEND=$(echo "$INFO" | field pending_update_count)
 if [ "${PEND:-0}" -gt 20 ] 2>/dev/null; then
   api setWebhook -d "url=$PREV" -d "secret_token=$SECRET" >/dev/null
+  touch /opt/jobtoo-proxy/tg_relay_mode 2>/dev/null || true
   echo "$(date +%H:%M) очередь выросла до $PEND без ошибки — вернул на $PREV" > /var/lib/jt-webhook-check
   exit 0
 fi
 
+# Путь прямой и живой — послабление ни к чему.
+rm -f /opt/jobtoo-proxy/tg_relay_mode 2>/dev/null || true
 echo "$(date +%H:%M) прямой путь держится, в очереди $PEND" > /var/lib/jt-webhook-check

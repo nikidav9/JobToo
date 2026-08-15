@@ -63,9 +63,13 @@ PEND=$(echo "$INFO" | field pending_update_count)
 if [ -n "$ERR" ] && [ "${EDATE:-0}" -ge "$T0" ] 2>/dev/null; then
   # Не дозвонился — возвращаем как было немедленно.
   api setWebhook -d "url=$WAS" -d "secret_token=$SECRET" >/dev/null
+  # Пересылка проверяет заголовок у себя и дальше не передаёт — значит на
+  # время отката обработчик должен принимать обновления и без него.
+  touch /opt/jobtoo-proxy/tg_relay_mode 2>/dev/null || true
   echo "$(date +%H:%M) прямой путь НЕ вышел ($ERR) — вернул на $WAS" > /var/lib/jt-webhook-check
 elif [ "${PEND0:-0}" -gt 0 ] && [ "${PEND:-0}" -lt "${PEND0:-0}" ] 2>/dev/null; then
   # Очередь была и рассосалась — доставка точно состоялась.
+  rm -f /opt/jobtoo-proxy/tg_relay_mode 2>/dev/null || true
   echo "$(date +%H:%M) прямой путь работает: очередь $PEND0 -> $PEND" > /var/lib/jt-webhook-check
 else
   # Ошибки нет, но и доставлять было нечего. Оставляем прямой путь — первое
