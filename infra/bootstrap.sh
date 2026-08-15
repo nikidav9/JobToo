@@ -341,6 +341,35 @@ if curl -fsSL -m 300 -o /tmp/jt-web.tgz "$WEBSRC" 2>/dev/null; then
   rm -f /tmp/jt-web.tgz
 fi
 
+# ── Дашборд ───────────────────────────────────────────────────────────────
+# Тем же способом, что и веб-версия: сборка приезжает выпуском, потому что
+# собирать Next.js здесь нельзя — он съедает под два гигабайта и уронит базу.
+#
+# Забираем всегда, а запускаем только когда есть что запускать: пока файла
+# server.js нет, служба не поднимается и место не занимает.
+DASHSRC=https://github.com/nikidav9/JobToo/releases/download/dashboard/dashboard.tar.gz
+if curl -fsSL -m 300 -o /tmp/jt-dash.tgz "$DASHSRC" 2>/dev/null; then
+  DSUM=$(sha256sum /tmp/jt-dash.tgz | cut -d' ' -f1)
+  if [ "$DSUM" != "$(cat /var/lib/jt-dash.sha 2>/dev/null || true)" ]; then
+    rm -rf /tmp/jt-dash && mkdir -p /tmp/jt-dash
+    if tar -xzf /tmp/jt-dash.tgz -C /tmp/jt-dash 2>/dev/null && [ -s /tmp/jt-dash/server.js ]; then
+      rm -rf /opt/jobtoo-dashboard.old
+      if [ -d /opt/jobtoo-dashboard ]; then mv /opt/jobtoo-dashboard /opt/jobtoo-dashboard.old; fi
+      mv /tmp/jt-dash /opt/jobtoo-dashboard
+      chmod -R a+rX /opt/jobtoo-dashboard
+      rm -rf /opt/jobtoo-dashboard.old
+      echo "$DSUM" > /var/lib/jt-dash.sha
+      say "дашборд" "сборка обновлена"
+      # Новая сборка — служба должна подняться с ней, а не со старой.
+      rm -f /var/lib/jt-dash.up
+    else
+      say "дашборд" "архив не распаковался — оставляю прежний"
+      rm -rf /tmp/jt-dash
+    fi
+  fi
+  rm -f /tmp/jt-dash.tgz
+fi
+
 # ── Контейнеры ────────────────────────────────────────────────────────────
 cd "$REPO/infra"
 chmod +x init/*.sh 2>/dev/null || true
@@ -351,6 +380,15 @@ timeout 600 docker compose --env-file "$SECRETS" up -d --remove-orphans >/tmp/jt
   || say "контейнеры" "up не уложился в 10 минут"
 grep -qE "Started|Recreated|Created" /tmp/jt-compose.log 2>/dev/null \
   && say "контейнеры" "$(grep -aE "Started|Recreated|Created" /tmp/jt-compose.log | tr -d "\r" | tr "\n" " " | cut -c1-200)"
+
+# Дашборд — отдельным ходом и только когда сборка приехала. Он в профиле,
+# то есть общий up его не касается: это и позволяет держать его готовым, но
+# выключенным, пока не решат переносить.
+if [ -s /opt/jobtoo-dashboard/server.js ] && [ ! -f /var/lib/jt-dash.up ]; then
+  timeout 300 docker compose --env-file "$SECRETS" --profile dashboard up -d dashboard \
+    >/tmp/jt-dash-up.log 2>&1 && touch /var/lib/jt-dash.up
+  say "дашборд" "$(tail -2 /tmp/jt-dash-up.log | tr -d '\r' | tr '\n' ' ' | cut -c1-160)"
+fi
 
 # ── Шлюз ──────────────────────────────────────────────────────────────────
 # Свою конфигурацию кладём вместо стандартной: две одновременно спорят
@@ -508,6 +546,31 @@ if [ ! -d "/etc/letsencrypt/live/$DOMAIN" ] && command -v certbot >/dev/null 2>&
   fi
 fi
 
+# ── Сертификат для дашборда ───────────────────────────────────────────────
+# Пробуем, только когда запись уже указывает сюда: спрашиваем ответственные
+# за домен серверы напрямую. Иначе каждая минута была бы неудачной попыткой,
+# а пять неудач в час закрывают выпуск на всё имя.
+#
+# Пока записи нет — этот кусок молчит и ничего не делает. Появится — и
+# сертификат, и блок шлюза, и сама служба поднимутся сами, без правок.
+ADMIN_HOST=admin.jobtoo.ru
+if [ ! -d "/etc/letsencrypt/live/$ADMIN_HOST" ] && command -v certbot >/dev/null 2>&1 \
+   && command -v dig >/dev/null 2>&1 && [ -s /opt/jobtoo-dashboard/server.js ]; then
+  ANS=$(dig +short +time=5 +tries=1 NS jobtoo.ru 2>/dev/null | head -1)
+  AOK=0
+  [ -n "$ANS" ] && AOK=$(dig +short +time=5 +tries=1 A "$ADMIN_HOST" "@$ANS" 2>/dev/null | grep -c "^$IP$" || true)
+  if [ "${AOK:-0}" -ge 1 ]; then
+    ALAST=$(cat /var/lib/jt-admin-cert-last 2>/dev/null || echo 0)
+    if [ "$(( $(date +%s) - ${ALAST:-0} ))" -gt 900 ]; then
+      date +%s > /var/lib/jt-admin-cert-last
+      certbot certonly --webroot -w /var/www/html -n --agree-tos \
+        -m nikidav9@gmail.com -d "$ADMIN_HOST" >>/var/log/jt-apply.log 2>&1 \
+        && say "сертификат" "выпущен на $ADMIN_HOST" \
+        || say "сертификат" "на $ADMIN_HOST не вышел, повтор через 15 мин"
+    fi
+  fi
+fi
+
 # Собираем во временный файл и сравниваем с действующим: перезапускать
 # nginx каждую минуту незачем. Он это переживает, но не бесследно — часть
 # запросов в момент перезагрузки обрывается, и снаружи это выглядит как
@@ -522,6 +585,10 @@ fi
 # nginx не поднимется вовсе, и вместе с сайтом ляжет всё остальное.
 if [ -d "/etc/letsencrypt/live/$DOMAIN" ] && [ -f "$REPO/infra/nginx-site.conf" ]; then
   cat "$REPO/infra/nginx-site.conf" >> "$NEW"
+fi
+# Дашборд — так же: только вместе со своим сертификатом.
+if [ -d "/etc/letsencrypt/live/$ADMIN_HOST" ] && [ -f "$REPO/infra/nginx-admin.conf" ]; then
+  cat "$REPO/infra/nginx-admin.conf" >> "$NEW"
 fi
 
 if cmp -s "$NEW" /etc/nginx/sites-available/jobtoo; then
@@ -551,7 +618,7 @@ else
   cp "$ALT" /etc/nginx/sites-available/jobtoo
   if nginx -t >/dev/null 2>&1; then
     systemctl reload nginx
-    say "шлюз" "поднят без блока сайта — виноват nginx-site.conf"
+    say "шлюз" "поднят без блоков домена — виноват nginx-site.conf или nginx-admin.conf"
   else
     # Лучше без шифрования, чем без шлюза вовсе.
     cp "$REPO/infra/nginx.conf" /etc/nginx/sites-available/jobtoo
