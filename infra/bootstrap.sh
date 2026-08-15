@@ -134,10 +134,14 @@ set -a; . "$SECRETS"; set +a
 # и старый облачный ему не нужен. Остальное — пропуск приложения и токен
 # бота — приезжает извне, в репозитории им не место.
 mkdir -p /opt/jobtoo-secrets/proxy
-chmod 700 /opt/jobtoo-secrets/proxy
+# 82 — это www-data в alpine-образе PHP. Каталог должен быть доступен ему на
+# запись: приёмная секретов работает от его имени. Наружу каталог не смотрит.
+chown -R 82:82 /opt/jobtoo-secrets/proxy 2>/dev/null || true
+chmod 750 /opt/jobtoo-secrets/proxy
 printf "<?php return '%s';\n" "$SERVICE_ROLE_KEY" > /opt/jobtoo-secrets/proxy/sb_service_key.php
 printf "<?php return '%s';\n" "https://147.45.184.99.sslip.io" > /opt/jobtoo-secrets/proxy/sb_url.php
-chmod 600 /opt/jobtoo-secrets/proxy/*.php
+chmod 640 /opt/jobtoo-secrets/proxy/*.php
+chown 82:82 /opt/jobtoo-secrets/proxy/*.php 2>/dev/null || true
 
 # ── Контейнеры ────────────────────────────────────────────────────────────
 cd "$REPO/infra"
