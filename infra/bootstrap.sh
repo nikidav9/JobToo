@@ -186,8 +186,10 @@ mkdir -p /var/www/private
 chmod 640 /var/www/private/token.txt
 chown root:www-data /var/www/private/token.txt 2>/dev/null || true
 
-# 82 — www-data в alpine-образе PHP: от его имени работает приёмная секретов.
-chown -R 82:82 "$PROXY" 2>/dev/null || true
+# 33 — www-data в обычном образе PHP; в alpine это был 82. Номер важен:
+# каталог закрыт для посторонних, и с чужим владельцем прокси не прочитает
+# собственные секреты, а доставка из GitHub не сможет их обновить.
+chown -R 33:33 "$PROXY" 2>/dev/null || true
 chmod 750 "$PROXY"
 
 # ── Сайт ──────────────────────────────────────────────────────────────────
