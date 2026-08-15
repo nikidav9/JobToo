@@ -329,6 +329,25 @@ else
   say "роли" "ОШИБКА($rc): $(tail -4 /tmp/jt-roles.log | tr '\n' ' ' | cut -c1-300)"
 fi
 
+# ── Арендатор Realtime ────────────────────────────────────────────────────
+# Realtime в самостоятельной установке адресует подключения «арендатору» и
+# заводит его сам при первом запуске (SEED_SELF_HOST). У нас список оказался
+# пуст: засев не прошёл, потому что я сбрасывал схему _realtime, когда менял
+# ключ шифрования.
+#
+# Без арендатора служба отвечает 403 на всякое подключение — то есть чаты и
+# уведомления перестают обновляться живьём, при том что контейнер здоров.
+if [ -z "$(docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+      psql -tAq -U supabase_admin -d postgres \
+      -c 'select 1 from _realtime.tenants limit 1' 2>/dev/null | tr -d '[:space:]')" ]; then
+  docker compose restart realtime >/dev/null 2>&1
+  sleep 20
+  n=$(docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+        psql -tAq -U supabase_admin -d postgres \
+        -c 'select count(*) from _realtime.tenants' 2>/dev/null | tr -d '[:space:]')
+  say "realtime" "арендаторов после перезапуска: ${n:-не прочитать}"
+fi
+
 # ── Схема Storage ─────────────────────────────────────────────────────────
 # Storage ведёт в базе собственный набор миграций и сам же проверяет, что
 # схема им соответствует. Моя ранняя попытка создать её вручную, а потом
