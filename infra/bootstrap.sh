@@ -341,9 +341,20 @@ chmod 750 "$PROXY"
 # Поэтому заранее: если токен доставлен (см. php-proxy/deploy.php), git
 # начинает ходить с ним, а curl добавляет заголовок. Нет токена — всё
 # работает как раньше, ни одна строка ниже не меняется.
-GH_TOKEN=$(docker compose exec -T php php -r '
+# Со своим cd, и это не мелочь.
+#
+# Каталог со сборкой контейнеров скрипт выбирает ниже по тексту, а сюда
+# приходит с тем, что дала служба по таймеру, — то есть, скорее всего, с
+# корнем. docker compose там файла не находит, команда тихо возвращает
+# пустоту, и токен получается пустым. Ошибки при этом нет нигде.
+#
+# Пока репозиторий был открытым, это не значило ничего: git и так ходил без
+# пароля. После закрытия сервер перестал получать обновления вовсе, и
+# причина выглядела как «токен не работает», хотя токен был исправен и его
+# просто ни разу не прочитали.
+GH_TOKEN=$( (cd "$REPO/infra" && docker compose exec -T php php -r '
   $v = @include "/var/www/api/gh_token.php";
-  echo is_string($v) ? $v : "";' 2>/dev/null | tr -d '\r\n' || true)
+  echo is_string($v) ? $v : "";') 2>/dev/null | tr -d '\r\n' || true)
 
 GH_HDR=()
 if [ -n "${GH_TOKEN:-}" ]; then
@@ -385,9 +396,9 @@ fi
 # Поэтому переносим значение в файл переменных. Читаем через сам PHP: файл
 # написан через base64_decode, и разобрать его текстом нельзя.
 if [ -n "${GH_TOKEN+x}" ]; then
-  APP_SECRET_VAL=$(docker compose exec -T php php -r '
+  APP_SECRET_VAL=$( (cd "$REPO/infra" && docker compose exec -T php php -r '
     $s = @include "/var/www/api/app_secrets.php";
-    echo is_array($s) ? ($s["APP_SECRET"] ?? "") : "";' 2>/dev/null | tr -d '\r\n' || true)
+    echo is_array($s) ? ($s["APP_SECRET"] ?? "") : "";') 2>/dev/null | tr -d '\r\n' || true)
   if [ -n "${APP_SECRET_VAL:-}" ] \
      && ! grep -qx "EXPO_PUBLIC_APP_SECRET=$APP_SECRET_VAL" "$SECRETS" 2>/dev/null; then
     sed -i '/^EXPO_PUBLIC_APP_SECRET=/d' "$SECRETS"
