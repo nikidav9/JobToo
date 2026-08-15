@@ -54,6 +54,10 @@ TMP=/tmp/jt-status.$$
   # видно, кто виноват — он или сама служба.
   echo "  \"изнутри\": \"rest=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3000/ 2>/dev/null) storage=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:5000/status 2>/dev/null) realtime=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:4000/api/tenants 2>/dev/null) studio=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3001/ 2>/dev/null)\","
 
+  # Ошибки Postgres: storage падает на своих миграциях, а сам показывает
+  # только «DatabaseError» без текста. Причина видна лишь здесь.
+  echo "  \"ошибки_базы\": \"$(cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose logs --tail=120 --no-log-prefix db 2>&1 | grep -aiE 'error|fatal' | tail -4 | tr -d '"\r' | tr '\n' ' ' | tail -c 500)\","
+
   # Состав схемы: имя таблицы и сколько в ней колонок и строк. Нужно, чтобы
   # сверить перенос по существу, а не по числу строк: пустая таблица нужна
   # ничуть не меньше полной, и её отсутствие по счётчикам не увидишь.
