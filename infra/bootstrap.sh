@@ -355,6 +355,42 @@ if [ -n "${GH_TOKEN:-}" ]; then
   chmod 600 /root/.git-credentials
 fi
 
+# Скачать файл из выпуска.
+#
+# Тонкость, из-за которой дашборд когда-то и перестал обновляться, когда
+# репозиторий закрыли. Обычный адрес /releases/download/… у закрытого
+# репозитория заголовком Authorization не открывается: github.com уводит на
+# страницу входа, и вместо архива приезжает HTML. Токен при этом исправен —
+# просто не тому адресу предъявлен.
+#
+# Правильный путь — через API: сперва узнать номер файла в выпуске, потом
+# забрать его по номеру с Accept: application/octet-stream. Оттуда идёт
+# переадресация на хранилище с подписанной ссылкой; curl при переходе на
+# чужой узел заголовок Authorization не тащит, и это как раз то, что нужно —
+# иначе хранилище отвечает «две проверки сразу».
+#
+# Без токена остаётся прежний прямой адрес: для открытого репозитория он
+# работает и не требует ничего.
+gh_asset() {
+  local tag="$1" name="$2" out="$3" id
+  if [ -n "${GH_TOKEN:-}" ]; then
+    id=$(curl -fsSL -m 60 "${GH_HDR[@]}" -H 'Accept: application/vnd.github+json' \
+      "https://api.github.com/repos/nikidav9/JobToo/releases/tags/$tag" 2>/dev/null \
+      | python3 -c 'import sys,json
+d = json.load(sys.stdin)
+print(next((str(a["id"]) for a in d.get("assets", []) if a.get("name") == sys.argv[1]), ""))' \
+        "$name" 2>/dev/null) || id=""
+    if [ -z "$id" ]; then
+      return 1
+    fi
+    curl -fsSL -m 300 "${GH_HDR[@]}" -H 'Accept: application/octet-stream' \
+      -o "$out" "https://api.github.com/repos/nikidav9/JobToo/releases/assets/$id" 2>/dev/null
+    return $?
+  fi
+  curl -fsSL -m 300 -o "$out" \
+    "https://github.com/nikidav9/JobToo/releases/download/$tag/$name" 2>/dev/null
+}
+
 # ── Сайт ──────────────────────────────────────────────────────────────────
 # Собранная веб-версия приезжает не так, как на Reg.ru. Туда её кладёт
 # GitHub по FTP; сюда положить нечем — ни FTP, ни ssh, и заводить их значит
@@ -366,8 +402,7 @@ fi
 # Разворачиваем во временный каталог и подменяем готовым: если архив побит
 # или скачался наполовину, на месте останется прежний рабочий сайт, а не
 # половина нового.
-WEBSRC=https://github.com/nikidav9/JobToo/releases/download/web/dist.tar.gz
-if curl -fsSL -m 300 "${GH_HDR[@]}" -o /tmp/jt-web.tgz "$WEBSRC" 2>/dev/null; then
+if gh_asset web dist.tar.gz /tmp/jt-web.tgz; then
   SUM=$(sha256sum /tmp/jt-web.tgz | cut -d' ' -f1)
   if [ "$SUM" != "$(cat /var/lib/jt-web.sha 2>/dev/null || true)" ]; then
     rm -rf /tmp/jt-web && mkdir -p /tmp/jt-web
@@ -399,8 +434,7 @@ fi
 #
 # Забираем всегда, а запускаем только когда есть что запускать: пока файла
 # server.js нет, служба не поднимается и место не занимает.
-DASHSRC=https://github.com/nikidav9/JobToo/releases/download/dashboard/dashboard.tar.gz
-if curl -fsSL -m 300 "${GH_HDR[@]}" -o /tmp/jt-dash.tgz "$DASHSRC" 2>/dev/null; then
+if gh_asset dashboard dashboard.tar.gz /tmp/jt-dash.tgz; then
   DSUM=$(sha256sum /tmp/jt-dash.tgz | cut -d' ' -f1)
   if [ "$DSUM" != "$(cat /var/lib/jt-dash.sha 2>/dev/null || true)" ]; then
     rm -rf /tmp/jt-dash && mkdir -p /tmp/jt-dash
