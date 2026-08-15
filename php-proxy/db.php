@@ -799,7 +799,7 @@ function tg_validate_init_data(string $initData): ?array {
  * Sends a message to a Telegram user via Bot API. Never throws.
  * $withAppButton: true — кнопка на главную мини-аппа; string — свой URL кнопки.
  */
-function tg_send_message(int $chatId, string $text, bool|string $withAppButton = false, string $btnText = '🚀 Откликнуться в JobToo'): bool {
+function tg_send_message(int $chatId, string $text, bool|string $withAppButton = false, string $btnText = '🚀 Откликнуться в JobToo', ?array $keyboard = null): bool {
     if (TG_BOT_TOKEN === '') return false;
     $payload = [
         'chat_id' => $chatId,
@@ -807,7 +807,14 @@ function tg_send_message(int $chatId, string $text, bool|string $withAppButton =
         'parse_mode' => 'HTML',
         'disable_web_page_preview' => true,
     ];
-    if ($withAppButton !== false) {
+    // Готовая клавиатура — для сообщений с кнопками ответа, вроде «одобрить
+    // или отклонить». Раньше такие отправлялись мимо этой функции, своим
+    // curl, — и мимо повтора при обрыве связи вместе с ним. То есть
+    // работодатель мог не узнать об отклике ровно по той же причине, по
+    // которой не уходили объявления в группу.
+    if ($keyboard !== null) {
+        $payload['reply_markup'] = ['inline_keyboard' => $keyboard];
+    } elseif ($withAppButton !== false) {
         $url = is_string($withAppButton) ? $withAppButton : 'https://t.me/JobToo_bot/app';
         $payload['reply_markup'] = ['inline_keyboard' => [[
             ['text' => $btnText, 'url' => $url],
@@ -925,28 +932,19 @@ function tg_new_application_card(string $employerId, string $workerId, string $v
             $lines[] = '';
             $lines[] = 'Решите прямо здесь — работник сразу узнает:';
 
-            $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendMessage');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                CURLOPT_TIMEOUT => 10,
-                CURLOPT_POSTFIELDS => json_encode([
-                    'chat_id' => (int)$emp['telegram_id'],
-                    'text' => implode("\n", $lines),
-                    'parse_mode' => 'HTML',
-                    'reply_markup' => ['inline_keyboard' => [
-                        [
-                            ['text' => '✅ Одобрить', 'callback_data' => 'appok_' . $app['id']],
-                            ['text' => '❌ Отклонить', 'callback_data' => 'appno_' . $app['id']],
-                        ],
-                        [['text' => '💬 Написать кандидату', 'callback_data' => 'appmsg_' . $app['id']]],
-                        [['text' => '👤 Открыть в JobToo', 'url' => 'https://t.me/JobToo_bot/app']],
-                    ]],
-                ]),
+            // Через общую отправку, а не своим curl: раньше это сообщение
+            // шло мимо неё, а вместе с ней — мимо повтора при обрыве связи.
+            // Связь с Telegram отсюда рваная, и работодатель мог не узнать
+            // об отклике по той же причине, по которой не уходили
+            // объявления в группу. Одна неудачная попытка — и тишина.
+            return tg_send_message((int)$emp['telegram_id'], implode("\n", $lines), false, '', [
+                [
+                    ['text' => '✅ Одобрить', 'callback_data' => 'appok_' . $app['id']],
+                    ['text' => '❌ Отклонить', 'callback_data' => 'appno_' . $app['id']],
+                ],
+                [['text' => '💬 Написать кандидату', 'callback_data' => 'appmsg_' . $app['id']]],
+                [['text' => '👤 Открыть в JobToo', 'url' => 'https://t.me/JobToo_bot/app']],
             ]);
-            $resp = curl_exec($ch); curl_close($ch);
-            $dec = json_decode($resp ?: 'null', true);
-            return is_array($dec) && ($dec['ok'] ?? false);
 }
 
 
