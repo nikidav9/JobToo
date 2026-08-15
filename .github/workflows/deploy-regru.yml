@@ -51,6 +51,10 @@ jobs:
           # проверка владения доменом не доходит до московского сервера.
           mkdir -p dist/.well-known/acme-challenge
           cp public/.well-known/acme-challenge/.htaccess dist/.well-known/acme-challenge/.htaccess
+          # Маячок: по нему видно, отдаёт ли хостинг этот каталог из папки
+          # сайта или подменяет его своим — от этого зависит, можно ли
+          # выпустить сертификат заранее.
+          cp public/.well-known/acme-challenge/probe.txt dist/.well-known/acme-challenge/probe.txt
 
       # Секреты в репозитории не лежат, поэтому файлы для них собираем здесь
       # из GitHub Secrets. Значения кладём в base64: пароль может содержать

@@ -313,23 +313,40 @@ chmod +x /etc/letsencrypt/renewal-hooks/deploy/nginx.sh
 # Сначала проверяем сами, своим файлом, что цепочка сложилась. Пустая
 # попытка стоит дорого: пять неудачных проверок в час — и Let's Encrypt
 # закрывает выпуск на этот домен, а таймер здесь ходит каждую минуту.
+#
+# Второй путь — на случай, если перенаправление на хостинге не сложится:
+# имя уже указывает сюда. Тогда выпускать надо как можно быстрее, потому
+# что это и есть тот самый провал. Кэш преобразователя перед проверкой
+# сбрасываем: иначе сервер до конца старого TTL будет видеть прежний адрес
+# и ждать неизвестно чего, пока люди упираются в чужой сертификат.
 DOMAIN=jobtoo.ru
 if [ ! -d "/etc/letsencrypt/live/$DOMAIN" ] && command -v certbot >/dev/null 2>&1; then
   mkdir -p /var/www/html/.well-known/acme-challenge
   echo "jt-ok" > /var/www/html/.well-known/acme-challenge/jt-probe
+  resolvectl flush-caches >/dev/null 2>&1 || true
   P1=$(curl -fsSL -m 20 "http://$DOMAIN/.well-known/acme-challenge/jt-probe" 2>/dev/null || true)
   P2=$(curl -fsSL -m 20 "http://www.$DOMAIN/.well-known/acme-challenge/jt-probe" 2>/dev/null || true)
+  # Пауза между попытками: обычно час, но если имя уже указывает сюда —
+  # десять минут. В этом случае каждая минута ожидания это минута, когда
+  # приложение упирается в чужой сертификат.
+  PAUSE=3600
+  if [ "$P1" != "jt-ok" ] || [ "$P2" != "jt-ok" ]; then
+    if getent hosts "$DOMAIN" 2>/dev/null | grep -q "^$IP " \
+       && getent hosts "www.$DOMAIN" 2>/dev/null | grep -q "^$IP "; then
+      P1=jt-ok; P2=jt-ok; PAUSE=600
+      say "сертификат" "$DOMAIN уже указывает сюда — выпускаю"
+    fi
+  fi
   if [ "$P1" = "jt-ok" ] && [ "$P2" = "jt-ok" ]; then
-    # Не чаще раза в час: если что-то всё же не сложится, попытки не должны
-    # выесть недельный лимит за первые десять минут.
+    # Впустую пробовать нельзя: пять неудач в час закрывают выпуск на домен.
     LAST=$(cat /var/lib/jt-cert-last 2>/dev/null || echo 0)
     NOW=$(date +%s)
-    if [ $((NOW - LAST)) -gt 3600 ]; then
+    if [ $((NOW - LAST)) -gt "$PAUSE" ]; then
       date +%s > /var/lib/jt-cert-last
       certbot certonly --webroot -w /var/www/html -n --agree-tos \
         -m nikidav9@gmail.com -d "$DOMAIN" -d "www.$DOMAIN" >>/var/log/jt-apply.log 2>&1 \
         && say "сертификат" "выпущен на $DOMAIN и www" \
-        || say "сертификат" "на $DOMAIN не вышел, повтор через час"
+        || say "сертификат" "на $DOMAIN не вышел, повтор через $((PAUSE / 60)) мин"
     fi
   fi
 fi
