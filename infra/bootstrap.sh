@@ -355,6 +355,26 @@ if [ -n "${GH_TOKEN:-}" ]; then
   chmod 600 /root/.git-credentials
 fi
 
+# Пропуск приложения — в переменные compose.
+#
+# Дашборд принимает рассылки от сервера по заголовку x-app-secret, но живёт
+# этот пропуск не здесь, а в app_secrets.php: его кладёт выкладка, а не этот
+# скрипт. Контейнер о нём не знал бы и отвечал 401 на каждую попытку послать
+# уведомление в браузер — молча, потому что зовущая сторона ответ не читает.
+#
+# Поэтому переносим значение в файл переменных. Читаем через сам PHP: файл
+# написан через base64_decode, и разобрать его текстом нельзя.
+if [ -n "${GH_TOKEN+x}" ]; then
+  APP_SECRET_VAL=$(docker compose exec -T php php -r '
+    $s = @include "/var/www/api/app_secrets.php";
+    echo is_array($s) ? ($s["APP_SECRET"] ?? "") : "";' 2>/dev/null | tr -d '\r\n' || true)
+  if [ -n "${APP_SECRET_VAL:-}" ] \
+     && ! grep -qx "EXPO_PUBLIC_APP_SECRET=$APP_SECRET_VAL" "$SECRETS" 2>/dev/null; then
+    sed -i '/^EXPO_PUBLIC_APP_SECRET=/d' "$SECRETS"
+    echo "EXPO_PUBLIC_APP_SECRET=$APP_SECRET_VAL" >> "$SECRETS"
+  fi
+fi
+
 # Скачать файл из выпуска.
 #
 # Тонкость, из-за которой дашборд когда-то и перестал обновляться, когда

@@ -258,6 +258,9 @@ services:
       ADMIN_API_URL: https://jobtoo.ru/api/admin.php
       # Секреты подставляются из того же файла, что и всё остальное.
       # Ключей VAPID там пока нет — их надо забрать из Vercel до включения.
+      # Пропуск приложения: по нему дашборд отличает рассылку от сервера от
+      # запроса с улицы. Кладётся в файл переменных из app_secrets.php.
+      EXPO_PUBLIC_APP_SECRET: ${EXPO_PUBLIC_APP_SECRET:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:nikidav9@gmail.com}

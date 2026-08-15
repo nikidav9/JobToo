@@ -745,7 +745,7 @@ function fill_coords(array $row): array {
 // собирает app_secrets.php. Если он не задан — лучше явная тишина, чем
 // работа на ключе, который знает чужой.
 define('TG_BOT_TOKEN', jt_secret('TG_BOT_TOKEN'));
-define('DASHBOARD_URL', getenv('DASHBOARD_URL') ?: 'https://dashboard-nujus-projects.vercel.app');
+define('DASHBOARD_URL', getenv('DASHBOARD_URL') ?: 'https://admin.jobtoo.ru');
 // Часы работы поддержки, по Москве. Обещать круглосуточный ответ и молчать
 // до утра хуже, чем сразу сказать, когда ответят.
 define('SUPPORT_FROM_HOUR', 10);
@@ -2599,7 +2599,10 @@ try {
         case 'tgSetWebhook': {
             $token = TG_BOT_TOKEN;
             if ($token === '') { $data = ['ok' => false, 'error' => 'TG_BOT_TOKEN не задан на сервере']; break; }
-            $url = rtrim(DASHBOARD_URL, '/') . '/api/tg';
+            // Не через дашборд: вебхук идёт прямо в обработчик, на имя без
+            // A-записи. Пересылка была крюком вокруг сломанного IPv4, и
+            // возвращать её этой кнопкой было бы шагом назад.
+            $url = 'https://tg.jobtoo.ru/api/tg.php';
             $ch = curl_init('https://api.telegram.org/bot' . $token . '/setWebhook');
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,

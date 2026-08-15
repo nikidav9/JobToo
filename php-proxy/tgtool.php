@@ -51,7 +51,7 @@ if ($TOKEN === '') {
 // этому файлу тот же, что у db.php, а он лежит в открытом коде: с адресом
 // из параметра ботом можно было бы писать в любой чат и увести вебхук.
 $GROUP = (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025);
-$HOOK  = rtrim(getenv('DASHBOARD_URL') ?: 'https://dashboard-nujus-projects.vercel.app', '/') . '/api/tg';
+$HOOK  = getenv('TG_HOOK_URL') ?: 'https://tg.jobtoo.ru/api/tg.php';
 
 function tg(string $method, array $payload = [], string $verb = 'POST'): array {
     global $TOKEN;
