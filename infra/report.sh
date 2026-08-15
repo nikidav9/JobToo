@@ -118,6 +118,22 @@ TMP=/tmp/jt-status.$$
                   order by b desc limit 5) x;" 2>&1 | tr -d '"\n' | cut -c1-300)
   echo "  \"вес_базы\": \"${wt:-не прочитать}\","
 
+  # Точные счётчики там, где приблизительные вводят в заблуждение.
+  #
+  # В строке «схема» числа берутся из статистики планировщика: у таблиц, по
+  # которым она не собиралась, стоит -1, и это читается как «пусто». Здесь
+  # важно знать наверняка: от числа подписок на уведомления в браузере
+  # зависит, можно ли просто выпустить новые ключи VAPID или это лишит
+  # людей уведомлений.
+  cnt=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 20 docker compose exec -T \
+        -e PGPASSWORD="$(grep -m1 '^POSTGRES_PASSWORD=' /opt/jobtoo-secrets/env | cut -d= -f2)" db \
+        psql -tAq -U supabase_admin -d postgres -c "
+          select 'подписки_браузер=' || (select count(*) from jm_web_push_subscriptions)
+              || ' с_телеграмом=' || (select count(*) from jm_users where telegram_id is not null)
+              || ' с_пушем=' || (select count(*) from jm_users where push_token is not null);
+        " 2>&1 | tr -d '"\n' | cut -c1-200)
+  echo "  \"охват\": \"${cnt:-не прочитать}\","
+
   # Переезд домена: три вещи, каждая из которых по отдельности выглядит
   # исправно, а вместе должны сойтись до смены записи в DNS.
   echo "  \"сертификаты\": \"$(ls /etc/letsencrypt/live 2>/dev/null | grep -v README | tr '\n' ' ')\","
