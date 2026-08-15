@@ -298,13 +298,13 @@ fi
 #
 # Чиним один раз: отдаём схему службе и даём завести всё заново. Файлы при
 # этом не теряются — они лежат на диске, в томе, а не в базе.
-if [ ! -f /opt/jobtoo-secrets/.storage-reset ]; then
+if [ ! -f /opt/jobtoo-secrets/.storage-reset2 ]; then
   if [ "$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:5000/status 2>/dev/null)" != "200" ]; then
     docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
       psql -q -U supabase_admin -d postgres \
       -c "drop schema if exists storage cascade;" >/dev/null 2>&1
     docker compose up -d --force-recreate storage >/dev/null 2>&1
-    touch /opt/jobtoo-secrets/.storage-reset
+    touch /opt/jobtoo-secrets/.storage-reset2
     say "storage" "схема сброшена, служба пересоздана"
     sleep 20
   fi
