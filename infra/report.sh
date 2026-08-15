@@ -209,7 +209,9 @@ TMP=/tmp/jt-status.$$
       printf 'свой_ipv6=%s' "$(ip -6 addr show scope global 2>/dev/null | grep -oE 'inet6 [0-9a-f:]+' | awk '{print $2}' | head -1)"
     } > /var/lib/jt-net-check2 2>/dev/null
   fi
-  echo "  \"телеграм\": \"$(cat /var/lib/jt-tg-check2 2>/dev/null | cut -c1-400)\","
+  # Со временем съёмки: замер живёт до десяти минут, и без отметки не
+  # отличить «стало хорошо» от «показываю то, что было до починки».
+  echo "  \"телеграм\": \"$(date -d "@$(stat -c %Y /var/lib/jt-tg-check2 2>/dev/null || echo 0)" +%H:%M 2>/dev/null) $(cat /var/lib/jt-tg-check2 2>/dev/null | cut -c1-400)\","
   echo "  \"сеть\": \"$(cat /var/lib/jt-net-check2 2>/dev/null | tr -d '"\\\n\r' | cut -c1-200)\","
 
   # Чем закончилась последняя публикация вакансии в группу. Записывает
