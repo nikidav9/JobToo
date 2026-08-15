@@ -2402,7 +2402,20 @@ try {
                 curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15]);
                 $member = json_decode((string)curl_exec($ch), true); curl_close($ch);
             }
-            $data = ['chat_id' => TG_GROUP_CHAT_ID, 'chat' => $chat, 'бот_в_группе' => $member];
+            // Проверка возможности писать — без единого видимого сообщения.
+            // sendChatAction требует тех же прав, что и отправка, но в чате
+            // после него ничего не остаётся. Точный текст отказа от телеграма
+            // ценнее любых догадок о правах.
+            $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendChatAction');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_TIMEOUT => 15,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_POSTFIELDS => json_encode(['chat_id' => TG_GROUP_CHAT_ID, 'action' => 'typing']),
+            ]);
+            $can = json_decode((string)curl_exec($ch), true); curl_close($ch);
+
+            $data = ['chat_id' => TG_GROUP_CHAT_ID, 'chat' => $chat,
+                     'бот_в_группе' => $member, 'может_писать' => $can];
             break;
         }
 
