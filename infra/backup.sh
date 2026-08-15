@@ -50,3 +50,27 @@ else
   say "копия" "битая, удаляю"
   rm -f "$f"
 fi
+
+# ── Проверка восстановлением ──────────────────────────────────────────────
+# Копия, которую ни разу не разворачивали, — не копия: на неё рассчитывают,
+# а выясняется всё в худший момент. Раз в неделю берём свежую и поднимаем во
+# временную базу рядом. Данные при этом не трогаются: восстановление идёт в
+# отдельную базу, которая тут же удаляется.
+if [ "$(date +%u)" = "7" ] || [ ! -f /opt/jobtoo-backups/.checked ]; then
+  T=jt_restore_check
+  docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+    psql -q -U supabase_admin -d postgres -c "drop database if exists $T;" >/dev/null 2>&1
+  docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+    psql -q -U supabase_admin -d postgres -c "create database $T;" >/dev/null 2>&1
+  if gzip -dc "$f" | docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+       psql -q -U supabase_admin -d "$T" >/dev/null 2>&1; then
+    cnt=$(docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+            psql -tAq -U supabase_admin -d "$T" -c "select count(*) from jm_users" 2>/dev/null | tr -d '[:space:]')
+    say "копия" "проверка восстановлением: людей в развёрнутой копии $cnt"
+    touch /opt/jobtoo-backups/.checked
+  else
+    say "копия" "ВОССТАНОВЛЕНИЕ НЕ УДАЛОСЬ — копии негодны"
+  fi
+  docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+    psql -q -U supabase_admin -d postgres -c "drop database if exists $T;" >/dev/null 2>&1
+fi
