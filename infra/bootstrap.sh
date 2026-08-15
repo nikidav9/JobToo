@@ -544,6 +544,13 @@ docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
 
     grant anon, authenticated, service_role to authenticator;
 
+    -- То же самое нужно и Storage. На каждый запрос он переключается в роль
+    -- обратившегося — set_config('role', …), — а переключиться можно только
+    -- в ту роль, в которой состоишь. Под суперпользователем это проходило
+    -- само собой; стоило сузить права, как все картинки стали отдаваться
+    -- ошибкой 403, причём в теле ответа лежал сам запрос, а не объяснение.
+    grant anon, authenticated, service_role to supabase_storage_admin;
+
     create schema if not exists _realtime;
     alter schema _realtime owner to supabase_admin;
     create schema if not exists storage;
@@ -583,6 +590,15 @@ if [ $rc -eq 0 ]; then
   if [ ! -f /opt/jobtoo-secrets/.roles-done ]; then
     docker compose restart rest realtime storage >/dev/null 2>&1 || true
     touch /opt/jobtoo-secrets/.roles-done
+  fi
+  # Отдельная разовая отметка под смену роли Storage: новые права роли
+  # действуют с новых соединений, а служба держит пул уже открытых. Без
+  # этого толчка картинки продолжали бы отдаваться ошибкой, хотя права
+  # уже выданы, — и выглядело бы это как «не помогло».
+  if [ ! -f /opt/jobtoo-secrets/.storage-role-2 ]; then
+    docker compose restart storage >/dev/null 2>&1 || true
+    touch /opt/jobtoo-secrets/.storage-role-2
+    say "storage" "перезапущен после выдачи ролей"
   fi
 else
   say "роли" "ОШИБКА($rc): $(tail -4 /tmp/jt-roles.log | tr '\n' ' ' | cut -c1-300)"
