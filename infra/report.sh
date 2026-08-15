@@ -26,8 +26,12 @@ TMP=/tmp/jt-status.$$
   # самих себя. Когда место кончится, Postgres встанет — и разбираться,
   # что именно его съело, будет уже некогда.
   echo "  \"занимает\": \"$(
-    for p in /var/lib/docker/volumes /opt/jobtoo-backups /var/www/jobtoo /opt/jobtoo; do
-      [ -e "$p" ] && printf '%s=%s ' "$(basename "$p")" "$(du -sh "$p" 2>/dev/null | cut -f1)"
+    for e in "тома:/var/lib/docker/volumes" "копии:/opt/jobtoo-backups" \
+             "сайт:/var/www/jobtoo" "репозиторий:/opt/jobtoo" "образы:/var/lib/docker/overlay2"; do
+      p=${e#*:}
+      # Имена свои, а не из пути: у /var/www/jobtoo и /opt/jobtoo он один и
+      # тот же, и в отчёте выходили две одинаковые строки с разными числами.
+      [ -e "$p" ] && printf '%s=%s ' "${e%%:*}" "$(du -sh "$p" 2>/dev/null | cut -f1)"
     done)\","
   echo "  \"nginx\": \"$(systemctl is-active nginx)\","
   echo "  \"docker\": \"$(systemctl is-active docker)\","
@@ -113,12 +117,6 @@ TMP=/tmp/jt-status.$$
                     and c.relname like 'jm\\_%'
                   order by b desc limit 5) x;" 2>&1 | tr -d '"\n' | cut -c1-300)
   echo "  \"вес_базы\": \"${wt:-не прочитать}\","
-  # ВРЕМЕННО: ключ anon, чтобы передать его владельцу для настроек сборки.
-  # Он публичен по устройству — попадает в каждую собранную версию, — и прав
-  # у него нет никаких: ни чтения данных, ни записи файлов. Всё же уберу
-  # сразу после передачи: страница открыта всем, и держать здесь что-то
-  # похожее на ключ — плохая привычка, даже когда конкретно этот безвреден.
-  echo "  \"ключ_anon_временно\": \"$(grep -m1 '^ANON_KEY=' /opt/jobtoo-secrets/env | cut -d= -f2-)\","
 
   # Переезд домена: три вещи, каждая из которых по отдельности выглядит
   # исправно, а вместе должны сойтись до смены записи в DNS.
