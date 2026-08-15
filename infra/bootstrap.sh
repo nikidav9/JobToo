@@ -182,6 +182,48 @@ EOF
   say "секреты" "созданы заново"
 fi
 
+# ── Ключи для уведомлений в браузере ──────────────────────────────────────
+# Создаём здесь, а не приносим извне. Прежняя пара жила в настройках Vercel,
+# и чтобы переехать, её пришлось бы оттуда доставать и куда-то передавать —
+# то есть провести секрет через переписку. Один раз так и вышло.
+#
+# Сервер делает пару сам: приватная часть остаётся в этом файле и никуда не
+# уходит, публичную можно называть вслух, её и так получает каждый браузер
+# при подписке.
+#
+# Менять ключи стало безопасно: приложение сверяет, под каким ключом выдана
+# подписка, и при несовпадении переподписывается (lib/webPush.ts). До этой
+# правки смена ключей молча лишала уведомлений всех, кто уже подписан.
+if ! grep -q '^VAPID_PRIVATE_KEY=' "$SECRETS" 2>/dev/null; then
+  if openssl ecparam -name prime256v1 -genkey -noout -out /tmp/jt-vapid.pem 2>/dev/null; then
+    vapid=$(openssl pkey -in /tmp/jt-vapid.pem -text -noout 2>/dev/null | python3 -c '
+import sys, base64, re
+t = sys.stdin.read()
+def block(label, nxt):
+    m = re.search(label + r":(.*?)" + nxt, t, re.S)
+    return bytes.fromhex(re.sub(r"[^0-9a-f]", "", m.group(1))) if m else b""
+# priv — 32 байта скаляра, pub — несжатая точка на 65 байт. Ровно в таком
+# виде их ждёт веб-push: не PEM, не DER, а сырые байты в base64url.
+priv = block("priv", "pub:")[-32:]
+pub  = block("pub", "ASN1 OID|NIST CURVE|$")
+pub  = pub[pub.find(b"\x04"):][:65] if b"\x04" in pub else pub[:65]
+b64 = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+if len(priv) == 32 and len(pub) == 65:
+    print(b64(priv)); print(b64(pub))
+')
+    VP=$(echo "$vapid" | sed -n 1p)
+    VB=$(echo "$vapid" | sed -n 2p)
+    if [ -n "$VP" ] && [ -n "$VB" ]; then
+      echo "VAPID_PRIVATE_KEY=$VP" >> "$SECRETS"
+      echo "VAPID_PUBLIC_KEY=$VB"  >> "$SECRETS"
+      say "vapid" "пара создана, публичный: $VB"
+    else
+      say "vapid" "разобрать ключ не вышло — уведомления в браузере пока на прежней паре"
+    fi
+    rm -f /tmp/jt-vapid.pem
+  fi
+fi
+
 ln -sf "$SECRETS" "$REPO/infra/.env"
 grep -q "^PUBLIC_URL=" "$SECRETS" || echo "PUBLIC_URL=http://$(hostname -I | awk '{print $1}')" >> "$SECRETS"
 
