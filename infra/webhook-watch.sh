@@ -17,8 +17,15 @@ set -u
 cd /opt/jobtoo/infra 2>/dev/null || exit 0
 
 MINE="https://tg.jobtoo.ru/api/tg.php"
+
+# Куда откатываться, если прямой путь не выдержит. Пустое значение сюда
+# попадать не должно: setWebhook с пустым адресом — это удалить вебхук, то
+# есть выключить бота вместо того, чтобы его спасти.
 PREV=$(cat /var/lib/jt-webhook.prev 2>/dev/null | tr -d '\r\n')
-[ -z "$PREV" ] && exit 0
+case "$PREV" in
+  https://*) ;;
+  *) PREV="";;
+esac
 
 TOKEN=$(docker compose exec -T php php -r '
   $s = @include "/var/www/api/app_secrets.php";
@@ -75,6 +82,13 @@ case "$ERR" in
 esac
 
 if [ -n "$ERR" ]; then
+  if [ -z "$PREV" ]; then
+    # Откатываться некуда. Оставляем как есть и говорим об этом: молчащий
+    # бот с вебхуком лучше молчащего бота без вебхука — очередь хотя бы
+    # копится и уйдёт, когда путь починится.
+    echo "$(date +%H:%M) прямой путь с ошибкой ($ERR), откатываться некуда" > /var/lib/jt-webhook-check
+    exit 0
+  fi
   api setWebhook -d "url=$PREV" -d "secret_token=$SECRET" >/dev/null
   # Пересылка на Vercel заголовок дальше не передаёт — на время отката
   # обработчик должен принимать обновления и без него.
@@ -86,7 +100,7 @@ fi
 # Ошибок нет. Считаем успехом только подтверждённую доставку: у Телеграма
 # это last_synchronization_error_date пусто и очередь не растёт.
 PEND=$(echo "$INFO" | field pending_update_count)
-if [ "${PEND:-0}" -gt 20 ] 2>/dev/null; then
+if [ "${PEND:-0}" -gt 20 ] && [ -n "$PREV" ] 2>/dev/null; then
   api setWebhook -d "url=$PREV" -d "secret_token=$SECRET" >/dev/null
   touch /opt/jobtoo-proxy/tg_relay_mode 2>/dev/null || true
   echo "$(date +%H:%M) очередь выросла до $PEND без ошибки — вернул на $PREV" > /var/lib/jt-webhook-check

@@ -151,7 +151,7 @@ fi
 
 # Сторож прямого вебхука: сам вернёт его на Vercel, если Телеграм перестанет
 # доходить. Раз в пять минут — дольше молчащего бота терпеть не хочется.
-if [ -f "$REPO/infra/webhook-watch.sh" ] && [ -f /var/lib/jt-webhook.prev ]; then
+if [ -f "$REPO/infra/webhook-watch.sh" ]; then
   if [ ! -f /var/lib/jt-webhook-check ] \
      || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-webhook-check 2>/dev/null || echo 0) )) -gt 300 ]; then
     bash "$REPO/infra/webhook-watch.sh" >/dev/null 2>&1 || true

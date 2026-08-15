@@ -40,12 +40,28 @@ api() { curl -s -m 20 "https://api.telegram.org/bot$TOKEN/$1" "${@:2}"; }
 field() { python3 -c 'import sys,json;print(json.load(sys.stdin).get("result",{}).get(sys.argv[1],""))' "$1" 2>/dev/null; }
 
 BEFORE=$(api getWebhookInfo)
-WAS=$(echo "$BEFORE" | field url)
-PEND0=$(echo "$BEFORE" | field pending_update_count)
 NEW="https://tg.jobtoo.ru/api/tg.php"
 
+# Ничего не делаем, пока не знаем, что было. Связь с Телеграмом рвётся, и на
+# неудачном запросе прежний адрес читается как пустая строка. Дальше она
+# попадала бы и в файл отката, и — при неудаче — в setWebhook, а setWebhook с
+# пустым адресом означает «удалить вебхук». Так бот и остался без вебхука
+# вовсе: не из-за отказа, а из-за оборванного запроса.
+case "$BEFORE" in
+  *'"ok":true'*) ;;
+  *)
+    echo "$(date +%H:%M) Телеграм не ответил — опыт отложен" > /var/lib/jt-webhook-check
+    rm -f /var/lib/jt-webhook-tg.done
+    exit 0;;
+esac
+
+WAS=$(echo "$BEFORE" | field url)
+PEND0=$(echo "$BEFORE" | field pending_update_count)
+
 [ "$WAS" = "$NEW" ] && { echo "$(date +%H:%M) уже прямой" > /var/lib/jt-webhook-check; exit 0; }
-echo "$WAS" > /var/lib/jt-webhook.prev
+# Пустой прежний адрес в файл отката не пишем: откатываться на «никуда» —
+# это и есть выключить бота.
+[ -n "$WAS" ] && echo "$WAS" > /var/lib/jt-webhook.prev
 
 T0=$(date +%s)
 api setWebhook -d "url=$NEW" -d "secret_token=$SECRET" -d "drop_pending_updates=false" >/dev/null
@@ -60,7 +76,7 @@ ERR=$(echo "$INFO" | field last_error_message)
 EDATE=$(echo "$INFO" | field last_error_date)
 PEND=$(echo "$INFO" | field pending_update_count)
 
-if [ -n "$ERR" ] && [ "${EDATE:-0}" -ge "$T0" ] 2>/dev/null; then
+if [ -n "$ERR" ] && [ -n "$WAS" ] && [ "${EDATE:-0}" -ge "$T0" ] 2>/dev/null; then
   # Не дозвонился — возвращаем как было немедленно.
   api setWebhook -d "url=$WAS" -d "secret_token=$SECRET" >/dev/null
   # Пересылка проверяет заголовок у себя и дальше не передаёт — значит на

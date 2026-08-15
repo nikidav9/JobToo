@@ -146,6 +146,32 @@ TMP=/tmp/jt-status.$$
   # обе строки пустые — это и значит «готово, но не включено».
   echo "  \"дашборд\": \"сборка $([ -s /opt/jobtoo-dashboard/server.js ] && echo есть || echo нет), отвечает $(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3002/ 2>/dev/null || echo нет)\","
   echo "  \"сайт\": \"файлов $(find /var/www/jobtoo -type f 2>/dev/null | wc -l), оболочка $([ -s /var/www/jobtoo/index.html ] && echo есть || echo нет), страница ключей $([ -s /var/www/private/token.txt ] && echo есть || echo нет)\","
+  # Что будет, когда репозиторий закроют.
+  #
+  # Оттуда сервер берёт три вещи: сами обновления (git pull), сборку сайта и
+  # сборку дашборда. Закрытый репозиторий обрывает все три, причём молча:
+  # сайт останется прежним, ошибки не будет нигде, а «почему не обновляется»
+  # выясняется днями. Проверять это после закрытия поздно — чинить придётся
+  # тем же закрытым репозиторием.
+  #
+  # Поэтому проверяем заранее и тем же токеном, которым будет ходить сервер:
+  # видно ли репозиторий через API, отвечает ли git и находится ли файл в
+  # выпуске. Три ответа «да» — закрывать можно хоть сейчас.
+  echo "  \"github\": \"$(
+    t=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose exec -T php php -r '
+      $v = @include "/var/www/api/gh_token.php"; echo is_string($v) ? $v : "";' 2>/dev/null | tr -d '\r\n')
+    if [ -z "$t" ]; then printf 'токена нет'; else
+      printf 'api=%s ' "$(curl -s -o /dev/null -m 15 -w '%{http_code}' \
+        -H "Authorization: Bearer $t" https://api.github.com/repos/nikidav9/JobToo 2>/dev/null)"
+      printf 'git=%s ' "$(GIT_TERMINAL_PROMPT=0 timeout 20 git ls-remote \
+        https://x-access-token:$t@github.com/nikidav9/JobToo HEAD >/dev/null 2>&1 && echo да || echo нет)"
+      printf 'сборка_сайта=%s ' "$(curl -s -m 15 -H "Authorization: Bearer $t" \
+        https://api.github.com/repos/nikidav9/JobToo/releases/tags/web 2>/dev/null \
+        | grep -c '"name": *"dist.tar.gz"' || echo 0)"
+      printf 'закрыт=%s' "$(curl -s -m 15 -H "Authorization: Bearer $t" \
+        https://api.github.com/repos/nikidav9/JobToo 2>/dev/null \
+        | grep -o '\"private\": *[a-z]*' | head -1 | awk '{print $2}')"
+    fi)\","
   # Куда указывает домен по мнению ответственных за него серверов. Обычный
   # преобразователь здесь бесполезен: TTL записи час, и он ещё час будет
   # показывать прежнее — то есть в самый нужный момент соврёт.
