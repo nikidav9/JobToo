@@ -25,37 +25,44 @@ q -c "select 1 from jm_migrations where name='__files__'" 2>/dev/null | grep -q 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-# Список бакета. Папки приходят как имена без размера — в них надо заглянуть
-# отдельно, иначе перенесётся только то, что лежит в корне.
-list() {
+# Список бакета. Папки приходят как записи без размера — в них надо
+# заглянуть отдельно, иначе перенесётся только то, что лежит в корне, а
+# вложения чатов останутся в облаке.
+ls_bucket() {
   curl -s -m 60 -X POST "$SB_URL/storage/v1/object/list/avatars" \
     -H "apikey: $SB_KEY" -H "Authorization: Bearer $SB_KEY" \
     -H "Content-Type: application/json" \
     -d "{\"prefix\":\"$1\",\"limit\":1000,\"sortBy\":{\"column\":\"name\",\"order\":\"asc\"}}"
 }
 
-names=$(python3 - <<PY
-import json, subprocess, sys
-def ls(prefix=""):
-    out = subprocess.run(["bash","-c",'''curl -s -m 60 -X POST "$SB_URL/storage/v1/object/list/avatars" \
-      -H "apikey: $SB_KEY" -H "Authorization: Bearer $SB_KEY" -H "Content-Type: application/json" \
-      -d "{\\"prefix\\":\\"'''+prefix+'''\\",\\"limit\\":1000,\\"sortBy\\":{\\"column\\":\\"name\\",\\"order\\":\\"asc\\"}}"'''],
-      capture_output=True, text=True).stdout
-    try: return json.loads(out)
-    except Exception: return []
-res=[]
-for e in ls():
-    n=e.get("name")
+# Разбираем ответ построчно: имя и признак «это папка» (нет размера).
+parse() {
+  python3 -c "
+import json,sys
+try: d=json.load(sys.stdin)
+except Exception: sys.exit(0)
+if not isinstance(d,list): sys.exit(0)
+for e in d:
+    n=e.get('name')
     if not n: continue
-    # У папки нет размера — в неё заходим отдельно.
-    if (e.get("metadata") or {}).get("size") is None:
-        for s in ls(n):
-            if s.get("name"): res.append(f"{n}/{s['name']}")
-    else:
-        res.append(n)
-print("\n".join(res))
-PY
-)
+    size=(e.get('metadata') or {}).get('size')
+    print(('DIR' if size is None else 'FILE'), n)
+"
+}
+
+names=""
+while read -r kind name; do
+  [ -z "$kind" ] && continue
+  if [ "$kind" = "DIR" ]; then
+    while read -r k2 n2; do
+      [ "$k2" = "FILE" ] && names="$names $name/$n2"
+    done <<< "$(ls_bucket "$name" | parse)"
+  else
+    names="$names $name"
+  fi
+done <<< "$(ls_bucket "" | parse)"
+
+say "файлы" "нашёл в облаке: $(echo $names | wc -w)"
 
 ok=0; bad=0
 for n in $names; do

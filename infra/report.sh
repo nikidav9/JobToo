@@ -62,7 +62,6 @@ TMP=/tmp/jt-status.$$
             on c.attrelid = t.oid;" 2>&1 | tr -d '"\n' | cut -c1-1200)
   echo "  \"схема\": \"${sch:-не прочитать}\","
 
-  echo "  \"ключи\": \"$(grep -E '^(ANON_KEY|SERVICE_ROLE_KEY)=' /opt/jobtoo-secrets/env 2>/dev/null | tr '\n' ' ')\","
   # Ключевые шаги отдельно: в общем хвосте их забивают журналы контейнеров.
   echo "  \"роли\": \"$(grep -a '\[роли\]' /var/log/jt-apply.log 2>/dev/null | tail -2 | tr -d '"' | tr '\n' ' ' | cut -c1-400)\","
   echo "  \"миграции\": \"$(grep -a '\[миграции\]' /var/log/jt-apply.log 2>/dev/null | tail -2 | tr -d '"' | tr '\n' ' ' | cut -c1-300)\","
