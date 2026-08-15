@@ -88,7 +88,11 @@ TMP=/tmp/jt-status.$$
   # Переезд домена: три вещи, каждая из которых по отдельности выглядит
   # исправно, а вместе должны сойтись до смены записи в DNS.
   echo "  \"сертификаты\": \"$(ls /etc/letsencrypt/live 2>/dev/null | grep -v README | tr '\n' ' ')\","
-  echo "  \"сайт\": \"файлов $(find /var/www/jobtoo -type f 2>/dev/null | wc -l), оболочка $([ -s /var/www/jobtoo/index.html ] && echo есть || echo нет)\","
+  echo "  \"сайт\": \"файлов $(find /var/www/jobtoo -type f 2>/dev/null | wc -l), оболочка $([ -s /var/www/jobtoo/index.html ] && echo есть || echo нет), страница ключей $([ -s /var/www/private/token.txt ] && echo есть || echo нет)\","
+  # Куда указывает домен по мнению ответственных за него серверов. Обычный
+  # преобразователь здесь бесполезен: TTL записи час, и он ещё час будет
+  # показывать прежнее — то есть в самый нужный момент соврёт.
+  echo "  \"домен\": \"$(ns=$(dig +short +time=5 +tries=1 NS jobtoo.ru 2>/dev/null | head -1); [ -n "$ns" ] && dig +short +time=5 +tries=1 A jobtoo.ru "@$ns" 2>/dev/null | tr '\n' ' ' || echo 'не спросить')\","
   # Только наличие, без значений: страница открыта всем. Без токена бота
   # после переезда молча умрёт вебхук, без пароля — вход в дашборд.
   echo "  \"секреты_прокси\": \"$(cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose exec -T php php -r '
