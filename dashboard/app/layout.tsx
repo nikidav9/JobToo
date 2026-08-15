@@ -1,4 +1,18 @@
 import type { Metadata, Viewport } from 'next'
+// Шрифты — из пакета, а не из Google.
+//
+// В globals.css стоял @import с fonts.googleapis.com: браузер шёл за
+// шрифтом при каждом открытии страницы. Из России этот адрес отвечает
+// через раз, и дашборд то грузился долго, то показывался без оформления —
+// а понять причину по внешнему виду невозможно.
+//
+// Плюс это была лишняя зарубежная зависимость: при каждом заходе адрес
+// того, кто открыл дашборд, уходил в Google.
+//
+// Пакет geist кладёт те же самые шрифты рядом со сборкой, и они
+// отдаются с нашего сервера. Вид не меняется.
+import { GeistSans } from 'geist/font/sans'
+import { GeistMono } from 'geist/font/mono'
 import './globals.css'
 import Shell from '@/components/Shell'
 import SwRegister from '@/components/SwRegister'
@@ -28,7 +42,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru">
+    <html lang="ru" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body>
         <Shell>{children}</Shell>
         <SwRegister />
