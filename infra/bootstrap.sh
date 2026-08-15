@@ -227,6 +227,35 @@ if [ "${#REALTIME_ENC_KEY}" -ne 16 ]; then
   say "realtime" "ключ шифрования заменён на верную длину"
 fi
 
+# ── Резервные копии ───────────────────────────────────────────────────────
+# Ставим таймер один раз. Копия делается раньше переключения намеренно:
+# после него данные 420 человек будут жить в единственном экземпляре.
+install -m 755 "$REPO/infra/backup.sh" /usr/local/bin/jt-backup 2>/dev/null || true
+if [ ! -f /etc/systemd/system/jt-backup.timer ]; then
+  cat > /etc/systemd/system/jt-backup.service <<'EOF'
+[Unit]
+Description=Резервная копия базы и файлов
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/jt-backup
+TimeoutStartSec=3600
+EOF
+  cat > /etc/systemd/system/jt-backup.timer <<'EOF'
+[Unit]
+Description=Резервная копия базы и файлов
+[Timer]
+OnCalendar=*-*-* 04:30:00
+Persistent=true
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now jt-backup.timer
+  # Первую копию делаем сразу, не дожидаясь ночи: без неё данные существуют
+  # в одном экземпляре прямо сейчас.
+  /usr/local/bin/jt-backup || true
+fi
+
 # ── Панель и сертификат ───────────────────────────────────────────────────
 # Пароль к панели создаётся один раз и лежит рядом с остальными секретами.
 if [ ! -f /opt/jobtoo-secrets/studio ]; then
