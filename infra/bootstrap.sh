@@ -150,10 +150,23 @@ fi
 . /opt/jobtoo-secrets/deploy
 printf "<?php return '%s';\n" "$DEPLOY_TOKEN" > "$PROXY/deploy_token.php"
 
-# Тот же токен — за паролем панели, чтобы его можно было прочитать и внести
-# в настройки репозитория. Наружу без пароля не отдаётся: см. nginx-tls.conf.
+# Всё, что нужно вписать в настройки репозитория, — одной страницей за
+# паролем панели. Иначе эти значения приходится диктовать в переписке, а
+# оттуда они уже не убираются.
+#
+# Ключи anon и service_role сюда попадают намеренно: без них приложение не
+# сможет уйти с облака на этот сервер. Страница закрыта тем же паролем, что
+# и панель, — а панель показывает переписку и телефоны, то есть куда больше.
 mkdir -p /var/www/private
-printf 'JT_DEPLOY_TOKEN=%s\n' "$DEPLOY_TOKEN" > /var/www/private/token.txt
+{
+  echo "# Вписать в Settings → Secrets and variables → Actions"
+  echo
+  echo "JT_DEPLOY_TOKEN=$DEPLOY_TOKEN"
+  echo "SB_SERVICE_KEY=$SERVICE_ROLE_KEY"
+  echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+  echo "EXPO_PUBLIC_SUPABASE_URL=https://jobtoo.ru"
+  echo "SB_URL=https://jobtoo.ru"
+} > /var/www/private/token.txt
 chmod 640 /var/www/private/token.txt
 chown root:www-data /var/www/private/token.txt 2>/dev/null || true
 
