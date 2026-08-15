@@ -505,6 +505,19 @@ docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
     create schema if not exists storage;
     alter schema storage owner to supabase_storage_admin;
 
+    -- Storage работает под владельцем своей схемы. Чтобы это было
+    -- достаточно, он должен видеть и то, что заводил прежде под
+    -- суперпользователем: таблицы, созданные до смены роли, остались за
+    -- прежним владельцем, и без этой строки служба поднялась бы, но не
+    -- смогла прочитать собственный список файлов.
+    do \$\$
+    declare r record;
+    begin
+      for r in select tablename from pg_tables where schemaname = 'storage' loop
+        execute format('alter table storage.%I owner to supabase_storage_admin', r.tablename);
+      end loop;
+    end \$\$;
+
     grant usage on schema public  to anon, authenticated, service_role;
     grant usage on schema storage to anon, authenticated, service_role;
     grant all on all tables    in schema public to service_role;
