@@ -134,6 +134,14 @@ if [ -f "$REPO/infra/report.sh" ]; then
   install -m 755 "$REPO/infra/report.sh" /usr/local/bin/jt-report
 fi
 
+# Разовый опыт: дозванивается ли Телеграм до этой машины напрямую.
+# Подробности и сетка безопасности — в самом скрипте. Отметкой, а не
+# каждую минуту: переключать вебхук по кругу нельзя.
+if [ -f "$REPO/infra/switch-webhook.sh" ] && [ ! -f /var/lib/jt-webhook.done ]; then
+  touch /var/lib/jt-webhook.done
+  bash "$REPO/infra/switch-webhook.sh" >/dev/null 2>&1 || true
+fi
+
 # Проверка анонимного пути — того, чем приложение грузит файлы и держит
 # живые подписки. Раз в десять минут: она лазает в базу и в три службы,
 # а ответ меняется только когда мы сами что-то поменяли.
