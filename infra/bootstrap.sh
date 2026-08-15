@@ -260,7 +260,19 @@ docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
       if not exists (select from pg_roles where rolname = 'supabase_storage_admin') then
         create role supabase_storage_admin login createrole;
       end if;
+      -- postgres: в этом образе суперпользователь зовётся supabase_admin, а
+      -- роли postgres нет вовсе. При этом миграции Storage раздают ей права
+      -- и падают с «role postgres does not exist» — служба не стартует, и
+      -- снаружи это выглядит как 502 на всех запросах к файлам.
+      if not exists (select from pg_roles where rolname = 'postgres') then
+        create role postgres superuser login createrole createdb replication bypassrls;
+      end if;
     end \$\$;
+
+    -- Схема realtime (без подчёркивания): её ждут миграции Realtime, а
+    -- рабочее хозяйство он держит в _realtime. Имена разные, нужны обе.
+    create schema if not exists realtime;
+    alter schema realtime owner to supabase_admin;
 
     alter role authenticator          with login password '${POSTGRES_PASSWORD}';
     alter role supabase_storage_admin with login password '${POSTGRES_PASSWORD}';
@@ -298,13 +310,13 @@ fi
 #
 # Чиним один раз: отдаём схему службе и даём завести всё заново. Файлы при
 # этом не теряются — они лежат на диске, в томе, а не в базе.
-if [ ! -f /opt/jobtoo-secrets/.storage-reset2 ]; then
+if [ ! -f /opt/jobtoo-secrets/.storage-reset3 ]; then
   if [ "$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:5000/status 2>/dev/null)" != "200" ]; then
     docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
       psql -q -U supabase_admin -d postgres \
       -c "drop schema if exists storage cascade;" >/dev/null 2>&1
     docker compose up -d --force-recreate storage >/dev/null 2>&1
-    touch /opt/jobtoo-secrets/.storage-reset2
+    touch /opt/jobtoo-secrets/.storage-reset3
     say "storage" "схема сброшена, служба пересоздана"
     sleep 20
   fi
