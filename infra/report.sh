@@ -37,7 +37,8 @@ TMP=/tmp/jt-status.$$
   first=1
   for svc in db rest realtime storage; do
     s=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 10 docker compose ps "$svc" --format '{{.State}}' 2>/dev/null)
-    [ "$s" = "running" ] && continue
+    # storage показываем всегда: он «running», а шлюз получает от него 502.
+    [ "$s" = "running" ] && [ "$svc" != "storage" ] && continue
     [ -n "$s" ] || continue
     [ $first -eq 0 ] && echo ","
     first=0
@@ -47,6 +48,10 @@ TMP=/tmp/jt-status.$$
   done
   echo
   echo "  },"
+  # Проверка служб изнутри машины: снаружи шлюз может отвечать 502, и не
+  # видно, кто виноват — он или сама служба.
+  echo "  \"изнутри\": \"rest=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3000/ 2>/dev/null) storage=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:5000/status 2>/dev/null) realtime=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:4000/api/tenants 2>/dev/null) studio=$(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3001/ 2>/dev/null)\","
+
   # Состав схемы: имя таблицы и сколько в ней колонок и строк. Нужно, чтобы
   # сверить перенос по существу, а не по числу строк: пустая таблица нужна
   # ничуть не меньше полной, и её отсутствие по счётчикам не увидишь.
