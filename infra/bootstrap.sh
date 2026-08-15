@@ -266,9 +266,16 @@ fi
 if [ -d "/etc/letsencrypt/live/$HOST" ] && [ -f "$REPO/infra/nginx-tls.conf" ]; then
   sed "s/__HOST__/$HOST/g" "$REPO/infra/nginx-tls.conf" \
     >> /etc/nginx/sites-available/jobtoo
-  nginx -t >/dev/null 2>&1 && systemctl reload nginx \
-    && say "tls" "включён на https://$HOST и панель на :8443" \
-    || say "tls" "конфигурация не прошла проверку"
+  if nginx -t >/tmp/jt-nginx.log 2>&1; then
+    systemctl reload nginx
+    say "tls" "включён: https://$HOST и панель https://$HOST:8443"
+  else
+    say "tls" "конфигурация не прошла: $(grep -a -m1 -iE 'emerg|error' /tmp/jt-nginx.log | cut -c1-220)"
+    # Возвращаем рабочую конфигурацию без TLS, иначе перезапуск nginx
+    # оставит сервер без шлюза вообще.
+    cp "$REPO/infra/nginx.conf" /etc/nginx/sites-available/jobtoo
+    nginx -t >/dev/null 2>&1 && systemctl reload nginx
+  fi
 fi
 
 # ── Перенос данных из облака ──────────────────────────────────────────────
