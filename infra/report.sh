@@ -158,7 +158,8 @@ TMP=/tmp/jt-status.$$
   # Только наличие, без значений: страница открыта всем. Без токена бота
   # после переезда молча умрёт вебхук, без пароля — вход в дашборд.
   echo "  \"секреты_прокси\": \"$(cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose exec -T php php -r '
-      foreach (["app_secrets.php","admin_credentials.php","sb_service_key.php","sb_url.php"] as $f) {
+      foreach (["app_secrets.php","admin_credentials.php","sb_service_key.php","sb_url.php",
+                "studio_credentials.php","gh_token.php","deploy_token.php"] as $f) {
         $p = "/var/www/api/" . $f;
         if (!is_readable($p)) { echo "$f=нет "; continue; }
         $v = include $p;
