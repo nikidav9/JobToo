@@ -25,6 +25,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Что из настроек репозитория реально доехало до сборки.
+      #
+      # Значения не печатаем — только длину. Сегодня выяснилось, что ключ
+      # считался заданным, а в собранной версии его не было вовсе: живые
+      # обновления и загрузка файлов молча не работали месяцами. Отличить
+      # «вписал» от «доехало» по самим настройкам невозможно, а по этой
+      # строке — за две секунды.
+      - name: Which build secrets arrived
+        env:
+          U: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          K: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          A: ${{ secrets.EXPO_PUBLIC_API_URL }}
+          S: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+        run: |
+          say() { [ -n "$2" ] && echo "$1: задан, ${#2} символов" || echo "$1: ПУСТО"; }
+          say EXPO_PUBLIC_SUPABASE_URL      "$U"
+          say EXPO_PUBLIC_SUPABASE_ANON_KEY "$K"
+          say EXPO_PUBLIC_API_URL           "$A"
+          say EXPO_PUBLIC_APP_SECRET        "$S"
+          # Адрес не секрет — его показываем целиком: по нему сразу видно,
+          # смотрит сборка на облако или на свой сервер.
+          echo "адрес бэкенда: ${U:-нет}"
+
       - name: Build Expo web
         run: npx expo export --platform web
         env:
