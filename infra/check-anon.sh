@@ -1,71 +1,27 @@
 #!/bin/bash
-# Работает ли на этом сервере то, что приложение делает анонимным ключом.
+# Работает ли то, чем приложение живёт: сигналы об обновлениях и загрузка файлов.
 #
-# Через анонимный ключ идут ровно две вещи: загрузка фотографий и голосовых
-# в бакет avatars и двенадцать живых подписок из contexts/AppContext.tsx.
-# Всё остальное ходит через php-proxy сервисным ключом и здесь ни при чём.
+# Проверка переписана вслед за переустройством. Раньше приложение подписывалось
+# на изменения таблиц и клало файлы в хранилище само — обоим нужен был ключ с
+# правами, а он лежит в каждой установленной сборке. Теперь наружу уходит
+# только сигнал «раздел изменился», а файлы идут через прокси. Значит и
+# проверять надо другое: публикация и права анонимной роли больше ни на что
+# не влияют.
 #
-# Проверять это надо ДО переключения приложения с облака. Обе вещи ломаются
-# тихо: подписки просто перестают приносить обновления, а загрузка падает
-# уже у человека в руках. Ни то, ни другое не видно по состоянию служб —
-# контейнеры при этом совершенно здоровы.
-#
-# Отдельным файлом, а не строкой в отчёте: проверок пять, каждая со своей
-# причиной, и разбираться в них придётся по отдельности.
+# Каждая из трёх проверок ломается тихо. Сигнал не дошёл — экраны просто
+# обновляются с задержкой, и виноватым выглядит интернет. Загрузка не прошла —
+# человек видит «фото не отправляется» и никто не знает почему.
 
 set -u
 cd /opt/jobtoo/infra 2>/dev/null || exit 0
 set -a; . /opt/jobtoo-secrets/env; set +a
 
-q() {
-  docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
-    psql -tAq -U supabase_admin -d postgres -c "$1" 2>&1 | tr -d '"\n\r'
-}
-
+IP=$(ip -4 addr show scope global 2>/dev/null | grep -oE 'inet [0-9.]+' | awk '{print $2}' | head -1)
+BASE="https://${IP}.sslip.io"
 out=""
 
-# 1. Публикация. Realtime раздаёт изменения только тех таблиц, что в неё
-# включены. Нет публикации — нет ни одной живой подписки, при полностью
-# исправном на вид Realtime.
-pub=$(q "select count(*) from pg_publication_tables
-          where pubname = 'supabase_realtime' and tablename like 'jm\\_%';")
-out="$out публикация=${pub:-?}"
-
-# 2. Права анонимной роли на чтение. Без них подписка подключится и не
-# принесёт ничего: Realtime отдаёт строку только тому, кто имел бы право
-# её прочитать.
-gr=$(q "select count(distinct table_name) from information_schema.role_table_grants
-         where grantee = 'anon' and table_schema = 'public'
-           and privilege_type = 'SELECT' and table_name like 'jm\\_%';")
-out="$out чтение_anon=${gr:-?}"
-
-# 3. Сколько таблиц под построчной защитой. Если она включена, а политик
-# для anon нет, получится то же самое молчание — но по другой причине,
-# и лечится оно иначе.
-rls=$(q "select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
-          where n.nspname = 'public' and c.relname like 'jm\\_%' and c.relrowsecurity;")
-out="$out под_защитой=${rls:-?}"
-
-# 4. Чтение через PostgREST анонимным ключом — тем же путём, каким пойдёт
-# приложение.
-rc=$(curl -s -o /dev/null -m 10 -w '%{http_code}' \
-     -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" \
-     "http://127.0.0.1:3000/jm_vacancies?select=id&limit=1" 2>/dev/null)
-out="$out чтение=${rc:-нет}"
-
-# 5. Загрузка файла анонимным ключом и уборка за собой. Именно так
-# приложение кладёт аватар и вложения чата.
-up=$(curl -s -o /dev/null -m 20 -w '%{http_code}' -X POST \
-     -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" \
-     -H "Content-Type: text/plain" --data-binary 'jt' \
-     "http://127.0.0.1:5000/object/avatars/jt-anon-probe.txt" 2>/dev/null)
-out="$out загрузка=${up:-нет}"
-curl -s -o /dev/null -m 10 -X DELETE \
-  -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" \
-  "http://127.0.0.1:5000/object/avatars/jt-anon-probe.txt" >/dev/null 2>&1
-
-# 6. Само подключение подписки. Ответ 101 значит, что Realtime принял
-# анонимный ключ и согласился говорить дальше; 403 — не принял.
+# 1. Пускает ли Realtime приложение с его ключом. Ответ 101 значит, что
+# подключение согласовано; ничего больше этому ключу и не нужно.
 ws=$(curl -s -o /dev/null -m 10 -w '%{http_code}' \
      -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
      -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
@@ -73,4 +29,42 @@ ws=$(curl -s -o /dev/null -m 10 -w '%{http_code}' \
      "http://127.0.0.1:4000/socket/websocket?apikey=$ANON_KEY&vsn=1.0.0" 2>/dev/null)
 out="$out подписка=${ws:-нет}"
 
-echo "$(date +%H:%M)$out" > /var/lib/jt-anon-check
+# 2. Доходит ли до Realtime сам сигнал. Этот путь уже был сломан однажды:
+# шлюз уводил служебные вызовы туда же, куда подписки, и они отвечали 404 —
+# а отправка сообщения намеренно не падает из-за несостоявшегося сигнала.
+sig=$(curl -s -o /dev/null -m 10 -w '%{http_code}' -X POST \
+      -H "apikey: $SERVICE_ROLE_KEY" -H 'Content-Type: application/json' \
+      -d '{"messages":[{"topic":"jt","event":"changed","payload":{"что":"проверка"}}]}' \
+      "$BASE/realtime/v1/api/broadcast" 2>/dev/null)
+out="$out сигнал=${sig:-нет}"
+
+# 3. Настоящая загрузка файла — тем же путём, каким её делает приложение:
+# через прокси, с пропуском приложения. Проверяем и то, что файл потом
+# открывается по ссылке: залитый, но недоступный файл выглядит для человека
+# точно так же, как незалитый.
+SEC=$(docker compose exec -T php php -r '
+  $s = @include "/var/www/api/app_secrets.php";
+  echo is_array($s) ? ($s["APP_SECRET"] ?? "") : "";' 2>/dev/null | tr -d '\r\n')
+
+if [ -n "$SEC" ]; then
+  body='{"fn":"dbUploadFile","args":["probe/jt-check.txt","anQtcHJvdmVya2E=","text/plain"]}'
+  up=$(curl -s -m 30 -X POST -H "X-App-Secret: $SEC" -H 'Content-Type: application/json' \
+       -d "$body" "$BASE/api/db.php" 2>/dev/null | tr -d '\n' | cut -c1-160)
+  case "$up" in
+    *'"url"'*) out="$out загрузка=есть" ;;
+    *)         out="$out загрузка=нет($(echo "$up" | cut -c1-80))" ;;
+  esac
+
+  got=$(curl -s -o /dev/null -m 10 -w '%{http_code}' \
+        "$BASE/storage/v1/object/public/avatars/probe/jt-check.txt" 2>/dev/null)
+  out="$out открывается=${got:-нет}"
+
+  # Убираем за собой: проверка не должна оставлять мусор в хранилище людей.
+  curl -s -o /dev/null -m 10 -X DELETE \
+    -H "apikey: $SERVICE_ROLE_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+    "$BASE/storage/v1/object/avatars/probe/jt-check.txt" >/dev/null 2>&1
+else
+  out="$out загрузка=пропуска нет"
+fi
+
+echo "$(date +%H:%M)$out" > /var/lib/jt-anon-check2

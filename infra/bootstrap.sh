@@ -88,8 +88,8 @@ fi
 # живые подписки. Раз в десять минут: она лазает в базу и в три службы,
 # а ответ меняется только когда мы сами что-то поменяли.
 if [ -f "$REPO/infra/check-anon.sh" ]; then
-  if [ ! -f /var/lib/jt-anon-check ] \
-     || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-anon-check 2>/dev/null || echo 0) )) -gt 600 ]; then
+  if [ ! -f /var/lib/jt-anon-check2 ] \
+     || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-anon-check2 2>/dev/null || echo 0) )) -gt 600 ]; then
     bash "$REPO/infra/check-anon.sh" >/dev/null 2>&1 || true
   fi
 fi
