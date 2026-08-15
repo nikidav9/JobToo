@@ -114,12 +114,17 @@ TMP=/tmp/jt-status.$$
   # поздно. Раз в десять минут, а не каждую минуту: Telegram незачем дёргать
   # по кругу, но и час ждать нельзя — в момент переключения ответ нужен
   # свежий, а не позавчерашний.
-  if [ ! -f /var/lib/jt-tg-check ] \
-     || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-tg-check 2>/dev/null || echo 0) )) -gt 600 ]; then
+  if [ ! -f /var/lib/jt-tg-check2 ] \
+     || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-tg-check2 2>/dev/null || echo 0) )) -gt 600 ]; then
     (cd /opt/jobtoo/infra 2>/dev/null && timeout 90 docker compose exec -T php php -r '
       $s = @include "/var/www/api/app_secrets.php";
       $t = is_array($s) ? ($s["TG_BOT_TOKEN"] ?? "") : "";
       if (!strlen($t)) { echo "токена нет"; exit; }
+
+      // Достался ли контейнеру IPv6. Без него до Telegram отсюда не дойти
+      // вовсе: его IPv4-адрес закрыт, и это единственная работающая дорога.
+      echo "свой_ipv6=" . (trim((string) @shell_exec(
+        "ip -6 addr show scope global 2>/dev/null | grep -c inet6")) > 0 ? "есть" : "нет") . " ";
 
       // Отказы непостоянные: один и тот же getMe то проходит, то умирает по
       // тайм-ауту. Одиночная проверка тут врёт в обе стороны, поэтому меряем
@@ -180,7 +185,7 @@ TMP=/tmp/jt-status.$$
       // Отдельно — умеет ли контейнер вообще выходить наружу по https.
       // Без этого «бот не отвечает» ничего не значит: виноват может быть
       // и токен, и сеть, и отсутствие корневых сертификатов в образе.
-      ' 2>&1 | tr -d '"\\\n\r' | cut -c1-400) > /var/lib/jt-tg-check 2>/dev/null
+      ' 2>&1 | tr -d '"\\\n\r' | cut -c1-400) > /var/lib/jt-tg-check2 2>/dev/null
     # И то же самое с самой машины, вне контейнера: если наружу не пускает
     # докерная сеть, а не провайдер, лечится это совсем иначе.
     {
@@ -202,10 +207,10 @@ TMP=/tmp/jt-status.$$
       # Свой IPv6: он тут есть, и это меняет советы по записям в DNS —
       # AAAA не обязана исчезать, у неё может быть куда указывать.
       printf 'свой_ipv6=%s' "$(ip -6 addr show scope global 2>/dev/null | grep -oE 'inet6 [0-9a-f:]+' | awk '{print $2}' | head -1)"
-    } > /var/lib/jt-net-check 2>/dev/null
+    } > /var/lib/jt-net-check2 2>/dev/null
   fi
-  echo "  \"телеграм\": \"$(cat /var/lib/jt-tg-check 2>/dev/null | cut -c1-400)\","
-  echo "  \"сеть\": \"$(cat /var/lib/jt-net-check 2>/dev/null | tr -d '"\\\n\r' | cut -c1-200)\","
+  echo "  \"телеграм\": \"$(cat /var/lib/jt-tg-check2 2>/dev/null | cut -c1-400)\","
+  echo "  \"сеть\": \"$(cat /var/lib/jt-net-check2 2>/dev/null | tr -d '"\\\n\r' | cut -c1-200)\","
 
   # Чем закончилась последняя публикация вакансии в группу. Записывает
   # db.php при каждой рассылке. Без этого причина отказа Telegram остаётся
