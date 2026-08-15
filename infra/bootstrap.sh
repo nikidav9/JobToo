@@ -241,6 +241,11 @@ if [ -f /opt/jobtoo-secrets/cloud ]; then
   OLDKEY=$(grep -m1 '^SB_KEY=' /opt/jobtoo-secrets/cloud | cut -d= -f2-)
   if [ -n "$OLDKEY" ] && [ -n "${SERVICE_ROLE_KEY:-}" ]; then
     cat > /etc/nginx/conf.d/jt-authswap.conf <<EOF
+# Ключи — длинные строки, в стандартный буфер сопоставления не помещаются:
+# nginx отвечает «could not build map_hash».
+map_hash_bucket_size 512;
+map_hash_max_size 2048;
+
 map \$http_authorization \$jt_auth {
     default   \$http_authorization;
     "Bearer $OLDKEY" "Bearer $SERVICE_ROLE_KEY";
