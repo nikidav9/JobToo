@@ -208,7 +208,12 @@ cp -f "$REPO"/php-proxy/*.php "$PROXY"/ 2>/dev/null || true
 rm -f "$PROXY"/*.example.php
 
 printf "<?php return '%s';\n" "$SERVICE_ROLE_KEY" > "$PROXY/sb_service_key.php"
-printf "<?php return '%s';\n" "https://147.45.184.99.sslip.io" > "$PROXY/sb_url.php"
+# Через собственный домен, а не через имя, собранное из IP сторонним
+# сервисом. Прежнее держалось на двух чужих вещах сразу: что sslip.io
+# продолжит работать и что адрес машины не поменяется. Домен теперь наш и
+# указывает сюда — петля через него стоит доли миллисекунды, зато адрес из
+# цифр исчезает из системы совсем.
+printf "<?php return '%s';\n" "https://jobtoo.ru" > "$PROXY/sb_url.php"
 
 # Токен для доставки секретов из GitHub — см. php-proxy/deploy.php.
 # Создаётся один раз: сменится он — и выкладка перестанет доходить, а

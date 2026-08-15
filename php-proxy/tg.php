@@ -53,7 +53,7 @@ function sb_resolve_url(): string {
     //
     // Секрет SB_URL по-прежнему перекрывает это значение — им же делается
     // и откат, если понадобится вернуться в облако.
-    return 'https://147.45.184.99.sslip.io';
+    return 'https://jobtoo.ru';
 }
 
 define('SB_URL', sb_resolve_url());
