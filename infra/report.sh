@@ -112,7 +112,20 @@ TMP=/tmp/jt-status.$$
   # свежий, а не позавчерашний.
   if [ ! -f /var/lib/jt-tg-check ] \
      || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-tg-check 2>/dev/null || echo 0) )) -gt 600 ]; then
-    (cd /opt/jobtoo/infra 2>/dev/null && timeout 30 docker compose exec -T php php -r '
+    (cd /opt/jobtoo/infra 2>/dev/null && timeout 90 docker compose exec -T php php -r '
+      // Сначала контрольный выход наружу, потом уже Telegram. В прошлый раз
+      // было наоборот, и проверка сети не выполнилась вовсе: пять запросов
+      // по десять секунд не уложились в отведённое время, а обрезано было
+      // ровно то, ради чего всё и затевалось.
+      foreach (["https://ya.ru/" => "ya", "https://api.github.com/" => "github",
+                "https://api.telegram.org/" => "telegram"] as $u => $n) {
+        $c = curl_init($u);
+        curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8,
+                               CURLOPT_NOBODY => true, CURLOPT_CONNECTTIMEOUT => 6]);
+        $ok = curl_exec($c) !== false;
+        echo $n . "=" . ($ok ? "есть" : ("нет/" . curl_errno($c))) . " ";
+        curl_close($c);
+      }
       $s = @include "/var/www/api/app_secrets.php";
       $t = is_array($s) ? ($s["TG_BOT_TOKEN"] ?? "") : "";
       if (!strlen($t)) { echo "токена нет"; exit; }
@@ -149,13 +162,20 @@ TMP=/tmp/jt-status.$$
       // Отдельно — умеет ли контейнер вообще выходить наружу по https.
       // Без этого «бот не отвечает» ничего не значит: виноват может быть
       // и токен, и сеть, и отсутствие корневых сертификатов в образе.
-      $c = curl_init("https://ya.ru/");
-      curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_NOBODY => true]);
-      $ok = curl_exec($c) !== false;
-      echo " сеть_наружу=" . ($ok ? "есть" : ("нет [curl " . curl_errno($c) . "]"));
-      curl_close($c);' 2>&1 | tr -d '"\\\n\r' | cut -c1-400) > /var/lib/jt-tg-check 2>/dev/null
+      ' 2>&1 | tr -d '"\\\n\r' | cut -c1-400) > /var/lib/jt-tg-check 2>/dev/null
+    # И то же самое с самой машины, вне контейнера: если наружу не пускает
+    # докерная сеть, а не провайдер, лечится это совсем иначе.
+    {
+      printf 'машина: '
+      for u in https://ya.ru/ https://api.telegram.org/; do
+        printf '%s=%s ' "$(echo "$u" | cut -d/ -f3)" \
+          "$(curl -sS -o /dev/null -m 8 -w '%{http_code}' "$u" 2>&1 | tr -d '"' | cut -c1-40)"
+      done
+      printf 'адрес=%s' "$(getent hosts api.telegram.org 2>/dev/null | awk '{print $1}' | tr '\n' ',')"
+    } > /var/lib/jt-net-check 2>/dev/null
   fi
   echo "  \"телеграм\": \"$(cat /var/lib/jt-tg-check 2>/dev/null | cut -c1-400)\","
+  echo "  \"сеть\": \"$(cat /var/lib/jt-net-check 2>/dev/null | tr -d '"\\\n\r' | cut -c1-200)\","
 
   # Чем закончилась последняя публикация вакансии в группу. Записывает
   # db.php при каждой рассылке. Без этого причина отказа Telegram остаётся
