@@ -47,6 +47,10 @@ jobs:
           cp php-proxy/metro_stations.php dist/api/metro_stations.php
           cp assets/images/favicon.ico dist/favicon.ico
           cp public/.htaccess dist/.htaccess
+          # Явно, не полагаясь на копирование public/: без этого файла
+          # проверка владения доменом не доходит до московского сервера.
+          mkdir -p dist/.well-known/acme-challenge
+          cp public/.well-known/acme-challenge/.htaccess dist/.well-known/acme-challenge/.htaccess
 
       # Секреты в репозитории не лежат, поэтому файлы для них собираем здесь
       # из GitHub Secrets. Значения кладём в base64: пароль может содержать
