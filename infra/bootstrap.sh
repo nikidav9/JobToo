@@ -284,6 +284,8 @@ fi
 if [ -f /opt/jobtoo-secrets/cloud ]; then
   chmod +x "$REPO/infra/import.sh" 2>/dev/null || true
   bash "$REPO/infra/import.sh" || say "перенос" "не удался, см. следующий заход"
+  chmod +x "$REPO/infra/import-files.sh" 2>/dev/null || true
+  bash "$REPO/infra/import-files.sh" || say "файлы" "не удались, см. следующий заход"
 fi
 
 state=$(docker compose ps --format '{{.Service}}={{.State}}' 2>/dev/null | tr '\n' ' ')
