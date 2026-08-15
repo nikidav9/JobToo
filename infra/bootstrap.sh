@@ -140,6 +140,23 @@ rm -f "$PROXY"/*.example.php
 printf "<?php return '%s';\n" "$SERVICE_ROLE_KEY" > "$PROXY/sb_service_key.php"
 printf "<?php return '%s';\n" "https://147.45.184.99.sslip.io" > "$PROXY/sb_url.php"
 
+# Токен для доставки секретов из GitHub — см. php-proxy/deploy.php.
+# Создаётся один раз: сменится он — и выкладка перестанет доходить, а
+# заметно это станет только когда понадобится поменять пароль.
+if [ ! -f /opt/jobtoo-secrets/deploy ]; then
+  echo "DEPLOY_TOKEN=$(openssl rand -hex 24)" > /opt/jobtoo-secrets/deploy
+  chmod 600 /opt/jobtoo-secrets/deploy
+fi
+. /opt/jobtoo-secrets/deploy
+printf "<?php return '%s';\n" "$DEPLOY_TOKEN" > "$PROXY/deploy_token.php"
+
+# Тот же токен — за паролем панели, чтобы его можно было прочитать и внести
+# в настройки репозитория. Наружу без пароля не отдаётся: см. nginx-tls.conf.
+mkdir -p /var/www/private
+printf 'JT_DEPLOY_TOKEN=%s\n' "$DEPLOY_TOKEN" > /var/www/private/token.txt
+chmod 640 /var/www/private/token.txt
+chown root:www-data /var/www/private/token.txt 2>/dev/null || true
+
 # 82 — www-data в alpine-образе PHP: от его имени работает приёмная секретов.
 chown -R 82:82 "$PROXY" 2>/dev/null || true
 chmod 750 "$PROXY"

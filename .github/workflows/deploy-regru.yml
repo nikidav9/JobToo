@@ -118,6 +118,51 @@ jobs:
           print("Metrika injected OK")
           PYEOF
 
+      # Те же секреты — на московский сервер.
+      #
+      # На Reg.ru они уезжают файлами по FTP. Туда FTP нет, и первый раз
+      # пропуск приложения пришлось нести руками, разовой формой. Повторять
+      # это при каждой смене пароля — верный способ однажды забыть.
+      #
+      # Токен не задан — шаг пропускается: значит канал ещё не заведён, и
+      # выкладка не должна из-за этого падать.
+      - name: Deliver secrets to the Moscow server
+        env:
+          JT_DEPLOY_TOKEN: ${{ secrets.JT_DEPLOY_TOKEN }}
+          APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+          APP_SECRET_PREV: ${{ secrets.APP_SECRET_PREV }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          DASHBOARD_LOGIN: ${{ secrets.DASHBOARD_LOGIN }}
+          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+        run: |
+          if [ -z "$JT_DEPLOY_TOKEN" ]; then
+            echo "JT_DEPLOY_TOKEN не задан — пропускаю доставку"
+            exit 0
+          fi
+          python3 - > payload.json <<'PY'
+          import json, os
+          e = os.environ.get
+          print(json.dumps({
+              "app": {
+                  "APP_SECRET":      e("APP_SECRET", ""),
+                  "APP_SECRET_PREV": e("APP_SECRET_PREV", ""),
+                  "TG_BOT_TOKEN":    e("TG_BOT_TOKEN", ""),
+              },
+              "admin": {
+                  "login":    e("DASHBOARD_LOGIN", ""),
+                  "password": e("DASHBOARD_PASSWORD", ""),
+              },
+          }))
+          PY
+          code=$(curl -sS -o resp.json -w '%{http_code}' -m 60 \
+            -H "X-Deploy-Token: $JT_DEPLOY_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary @payload.json \
+            https://147.45.184.99.sslip.io/api/deploy.php)
+          echo "ответ $code: $(cat resp.json)"
+          rm -f payload.json resp.json
+          [ "$code" = "200" ]
+
       # Тот же сайт — для московского сервера.
       #
       # Туда нет ни FTP, ни ssh, и заводить их значит класть ключ в настройки
