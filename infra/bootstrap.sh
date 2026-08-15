@@ -397,9 +397,28 @@ if nginx -t >/tmp/jt-nginx.log 2>&1; then
   say "шлюз" "пересобран${HOST:+, tls на $HOST}"
 else
   say "шлюз" "не прошёл проверку: $(grep -a -m1 -iE 'emerg|error' /tmp/jt-nginx.log | cut -c1-200)"
-  # Лучше без шифрования, чем без шлюза вовсе.
-  cp "$REPO/infra/nginx.conf" /etc/nginx/sites-available/jobtoo
-  nginx -t >/dev/null 2>&1 && systemctl reload nginx
+  # Отступаем по одной ступени, а не сразу до голого http.
+  #
+  # Блок сайта появляется ровно в момент переезда домена — и если бы в нём
+  # оказалась ошибка, прежний откат снёс бы вместе с ним и шифрование для
+  # приложения. То есть мелкая опечатка в новом куске гасила бы всё разом,
+  # именно тогда, когда всё и переключается.
+  ALT=/tmp/jt-nginx-alt.conf
+  cp "$REPO/infra/nginx.conf" "$ALT"
+  if [ -d "/etc/letsencrypt/live/$HOST" ] && [ -f "$REPO/infra/nginx-tls.conf" ]; then
+    sed "s/__HOST__/$HOST/g" "$REPO/infra/nginx-tls.conf" >> "$ALT"
+  fi
+  cp "$ALT" /etc/nginx/sites-available/jobtoo
+  if nginx -t >/dev/null 2>&1; then
+    systemctl reload nginx
+    say "шлюз" "поднят без блока сайта — виноват nginx-site.conf"
+  else
+    # Лучше без шифрования, чем без шлюза вовсе.
+    cp "$REPO/infra/nginx.conf" /etc/nginx/sites-available/jobtoo
+    nginx -t >/dev/null 2>&1 && systemctl reload nginx
+    say "шлюз" "поднят без шифрования — виноват nginx-tls.conf"
+  fi
+  rm -f "$ALT"
 fi
 fi
 
