@@ -117,7 +117,13 @@ set -a; . "$SECRETS"; set +a
 # ── Контейнеры ────────────────────────────────────────────────────────────
 cd "$REPO/infra"
 chmod +x init/*.sh 2>/dev/null || true
-timeout 600 docker compose --env-file "$SECRETS" up -d --remove-orphans || say "контейнеры" "up не уложился в 10 минут"
+# up -d сам по себе безвреден: контейнеры, у которых ничего не изменилось,
+# он не трогает. Но вывод в журнал каждую минуту засоряет его так, что
+# полезное тонет, поэтому пишем только при изменениях.
+timeout 600 docker compose --env-file "$SECRETS" up -d --remove-orphans >/tmp/jt-compose.log 2>&1 \
+  || say "контейнеры" "up не уложился в 10 минут"
+grep -qE "Started|Recreated|Created" /tmp/jt-compose.log 2>/dev/null \
+  && say "контейнеры" "$(grep -aE "Started|Recreated|Created" /tmp/jt-compose.log | tr -d "\r" | tr "\n" " " | cut -c1-200)"
 
 # ── Шлюз ──────────────────────────────────────────────────────────────────
 # Свою конфигурацию кладём вместо стандартной: две одновременно спорят
@@ -196,21 +202,34 @@ if [ ! -d "/etc/letsencrypt/live/$HOST" ] && command -v certbot >/dev/null 2>&1;
     || say "сертификат" "не вышло, работаем по http"
 fi
 
-cp "$REPO/infra/nginx.conf" /etc/nginx/sites-available/jobtoo
+# Собираем во временный файл и сравниваем с действующим: перезапускать
+# nginx каждую минуту незачем. Он это переживает, но не бесследно — часть
+# запросов в момент перезагрузки обрывается, и снаружи это выглядит как
+# «картинка иногда не грузится». Проверка с восьми точек мира показала
+# таймаут на половине из них.
+NEW=/tmp/jt-nginx-new.conf
+cp "$REPO/infra/nginx.conf" "$NEW"
 if [ -d "/etc/letsencrypt/live/$HOST" ] && [ -f "$REPO/infra/nginx-tls.conf" ]; then
-  sed "s/__HOST__/$HOST/g" "$REPO/infra/nginx-tls.conf" >> /etc/nginx/sites-available/jobtoo
+  sed "s/__HOST__/$HOST/g" "$REPO/infra/nginx-tls.conf" >> "$NEW"
 fi
+
+if cmp -s "$NEW" /etc/nginx/sites-available/jobtoo; then
+  # Ничего не изменилось — не трогаем работающий шлюз.
+  rm -f "$NEW"
+else
+cp "$NEW" /etc/nginx/sites-available/jobtoo
 ln -sf /etc/nginx/sites-available/jobtoo /etc/nginx/sites-enabled/jobtoo
 rm -f /etc/nginx/sites-enabled/default
 
 if nginx -t >/tmp/jt-nginx.log 2>&1; then
   systemctl reload nginx
-  say "шлюз" "собран${HOST:+, tls на $HOST}"
+  say "шлюз" "пересобран${HOST:+, tls на $HOST}"
 else
   say "шлюз" "не прошёл проверку: $(grep -a -m1 -iE 'emerg|error' /tmp/jt-nginx.log | cut -c1-200)"
   # Лучше без шифрования, чем без шлюза вовсе.
   cp "$REPO/infra/nginx.conf" /etc/nginx/sites-available/jobtoo
   nginx -t >/dev/null 2>&1 && systemctl reload nginx
+fi
 fi
 
 set +e
