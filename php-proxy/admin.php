@@ -213,6 +213,107 @@ if (!$allowed) {
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 if (!in_array($method, ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'], true)) fail(405, 'Method not allowed');
 
+// ── Рассылка ─────────────────────────────────────────────────────────────────
+// Раньше её делала облачная функция push-notify, и сюда запрос просто
+// пересылался. На своём сервере функций нет вовсе: их движок не поднимали,
+// а единственную функцию решили переписать. Пока это не было сделано, кнопка
+// рассылки в дашборде отвечала 404 — и никто бы не узнал почему.
+//
+// Логика повторяет прежнюю дословно, включая её главную осторожность:
+// без userId и без target запрос отвергается. Однажды такой запрос молча
+// ушёл всем, у кого есть токен, и 96 человек получили слово «проверка».
+if (preg_match('#^/functions/v1/push-notify(\?|$)#', $path)) {
+    $in = json_decode((string)file_get_contents('php://input'), true) ?: [];
+    $userId = (string)($in['userId'] ?? '');
+    $target = (string)($in['target'] ?? '');
+    $title  = (string)($in['title'] ?? '');
+    $body   = (string)($in['body'] ?? '');
+    $metro  = (string)($in['metro'] ?? '');
+    $mode   = (string)($in['mode'] ?? 'push');   // push | inapp | both
+
+    if ($userId === '' && $target === '') {
+        fail(400, 'Нужен userId или target (all / workers / employers / metro)');
+    }
+
+    // Кого оповещаем.
+    $q = ['select' => 'id,push_token'];
+    if ($userId !== '') {
+        $q['id'] = 'eq.' . $userId;
+    } else {
+        if ($target === 'workers')   $q['role'] = 'eq.worker';
+        if ($target === 'employers') $q['role'] = 'eq.employer';
+        if ($target === 'metro' && $metro !== '') $q['metro_station'] = 'eq.' . $metro;
+        // Для чистого пуша берём только тех, кому есть куда его слать.
+        // Колокольчику токен не нужен — там нужны все.
+        if ($mode === 'push') $q['push_token'] = 'not.is.null';
+    }
+
+    $ch = curl_init(SB_URL . '/rest/v1/jm_users?' . http_build_query($q));
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['apikey: ' . SB_KEY, 'Authorization: Bearer ' . SB_KEY],
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    $rows = json_decode((string)curl_exec($ch), true);
+    curl_close($ch);
+    if (!is_array($rows) || !$rows) fail(400, 'Нет подходящих пользователей');
+
+    $ids    = array_values(array_filter(array_map(fn($u) => (string)($u['id'] ?? ''), $rows)));
+    $tokens = array_values(array_filter(array_map(fn($u) => (string)($u['push_token'] ?? ''), $rows)));
+
+    $pushCount = 0;
+    if ($tokens && $mode !== 'inapp') {
+        foreach (array_chunk($tokens, 100) as $chunk) {
+            $msgs = array_map(fn($to) => [
+                'to' => $to, 'title' => $title, 'body' => $body,
+                'sound' => 'default', 'channelId' => 'default', 'priority' => 'high',
+                'data' => ['type' => 'broadcast'],
+            ], $chunk);
+            $c = curl_init('https://exp.host/--/api/v2/push/send');
+            curl_setopt_array($c, [
+                CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
+                CURLOPT_POSTFIELDS => json_encode(count($msgs) === 1 ? $msgs[0] : $msgs),
+                CURLOPT_TIMEOUT => 20,
+            ]);
+            curl_exec($c); curl_close($c);
+            $pushCount += count($chunk);
+        }
+    }
+
+    $inappCount = 0;
+    if ($ids && ($mode === 'inapp' || $mode === 'both')) {
+        foreach (array_chunk($ids, 500) as $chunk) {
+            // id и время задаём сами: облачная функция полагалась на значения
+            // по умолчанию, а они уже однажды потерялись при переносе схемы.
+            $now = gmdate('Y-m-d\TH:i:s\Z');
+            $payload = array_map(fn($uid) => [
+                'id' => bin2hex(random_bytes(12)),
+                'user_id' => $uid, 'title' => $title, 'body' => $body,
+                'is_read' => false, 'created_at' => $now,
+            ], $chunk);
+            $c = curl_init(SB_URL . '/rest/v1/jm_notifications');
+            curl_setopt_array($c, [
+                CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => [
+                    'apikey: ' . SB_KEY, 'Authorization: Bearer ' . SB_KEY,
+                    'Content-Type: application/json', 'Prefer: return=minimal',
+                ],
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_TIMEOUT => 30,
+            ]);
+            curl_exec($c);
+            $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE);
+            curl_close($c);
+            if ($code >= 200 && $code < 300) $inappCount += count($chunk);
+        }
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['pushCount' => $pushCount, 'inappCount' => $inappCount], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $hdrs = [
     'apikey: ' . SB_KEY,
     'Authorization: Bearer ' . SB_KEY,
