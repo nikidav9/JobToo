@@ -116,14 +116,19 @@ TMP=/tmp/jt-status.$$
       $s = @include "/var/www/api/app_secrets.php";
       $t = is_array($s) ? ($s["TG_BOT_TOKEN"] ?? "") : "";
       if (!strlen($t)) { echo "токена нет"; exit; }
-      $get = function ($m) use ($t) {
+      // Причину отказа сохраняем: «не отвечает» не отличает заблокированную
+      // сеть от просроченного токена, а чинится это по-разному.
+      $why = "";
+      $get = function ($m) use ($t, &$why) {
         $c = curl_init("https://api.telegram.org/bot" . $t . "/" . $m);
         curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10]);
-        $r = json_decode((string) curl_exec($c), true); curl_close($c);
+        $body = curl_exec($c);
+        if ($body === false && $why === "") $why = "curl " . curl_errno($c) . ": " . curl_error($c);
+        $r = json_decode((string) $body, true); curl_close($c);
         return is_array($r) ? $r : [];
       };
       $me = $get("getMe");
-      echo "бот=" . ($me["ok"] ?? false ? ($me["result"]["username"] ?? "?") : "не отвечает");
+      echo "бот=" . ($me["ok"] ?? false ? ($me["result"]["username"] ?? "?") : ("не отвечает [" . ($why ?: ($me["description"] ?? "пустой ответ")) . "]"));
       $g = $get("getChat?chat_id=-1001709270025");
       echo " группа=" . ($g["ok"] ?? false ? ($g["result"]["title"] ?? "?") : ("отказ: " . ($g["description"] ?? "?")));
       if (($g["ok"] ?? false) && !empty($me["result"]["id"])) {
@@ -140,9 +145,17 @@ TMP=/tmp/jt-status.$$
         echo " вебхук=" . ($r["url"] ?? "нет")
            . " в_очереди=" . ($r["pending_update_count"] ?? 0);
         if (!empty($r["last_error_message"])) echo " последняя_ошибка=" . $r["last_error_message"];
-      }' 2>&1 | tr -d '"\\\n\r' | cut -c1-300) > /var/lib/jt-tg-check 2>/dev/null
+      }
+      // Отдельно — умеет ли контейнер вообще выходить наружу по https.
+      // Без этого «бот не отвечает» ничего не значит: виноват может быть
+      // и токен, и сеть, и отсутствие корневых сертификатов в образе.
+      $c = curl_init("https://ya.ru/");
+      curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_NOBODY => true]);
+      $ok = curl_exec($c) !== false;
+      echo " сеть_наружу=" . ($ok ? "есть" : ("нет [curl " . curl_errno($c) . "]"));
+      curl_close($c);' 2>&1 | tr -d '"\\\n\r' | cut -c1-400) > /var/lib/jt-tg-check 2>/dev/null
   fi
-  echo "  \"телеграм\": \"$(cat /var/lib/jt-tg-check 2>/dev/null | cut -c1-300)\","
+  echo "  \"телеграм\": \"$(cat /var/lib/jt-tg-check 2>/dev/null | cut -c1-400)\","
 
   # Чем закончилась последняя публикация вакансии в группу. Записывает
   # db.php при каждой рассылке. Без этого причина отказа Telegram остаётся
