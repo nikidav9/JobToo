@@ -70,10 +70,30 @@ export async function registerWebPush(userId: string): Promise<boolean> {
     }
 
     wpDebug('Создаём push-подписку...');
-    const existing = await wpTimeout(reg.pushManager.getSubscription(), 8_000, 'проверка подписки');
+    const wanted = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+    let existing = await wpTimeout(reg.pushManager.getSubscription(), 8_000, 'проверка подписки');
+
+    // Подписка привязана к ключу, под которым выдана. Если ключи сменили, а
+    // подписку оставили прежнюю, она молча перестаёт работать: браузер её
+    // держит, сервер шлёт под новым ключом, человек не получает ничего — и
+    // никогда не узнает почему.
+    //
+    // Раньше здесь стояло «есть подписка — берём её», без всякой сверки.
+    // Это делало ключи незаменимыми: потеряли приватный — потеряли всех, кто
+    // уже подписан. Теперь несовпадение просто переподписывает.
+    if (existing) {
+      const current = new Uint8Array(existing.options?.applicationServerKey ?? new ArrayBuffer(0));
+      const same = current.length === wanted.length && current.every((b, i) => b === wanted[i]);
+      if (!same) {
+        wpDebug('Подписка выдана под другой ключ — переподписываемся');
+        try { await wpTimeout(existing.unsubscribe(), 8_000, 'отписка'); } catch {}
+        existing = null;
+      }
+    }
+
     const sub = existing ?? await wpTimeout(reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      applicationServerKey: wanted,
     }), 12_000, 'создание подписки');
 
     wpDebug('Сохраняем в базу...');
