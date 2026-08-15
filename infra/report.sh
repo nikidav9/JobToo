@@ -29,6 +29,10 @@ TMP=/tmp/jt-status.$$
   # даже когда Docker не отвечает вовсе.
   echo "  \"порты\": \"$(ss -ltn 2>/dev/null | awk 'NR>1{print $4}' | grep -oE '[0-9]+$' | sort -un | tr '\n' ' ')\","
   echo "  \"версия\": \"$(cd /opt/jobtoo 2>/dev/null && git rev-parse --short HEAD 2>/dev/null || echo нет)\","
+  # Отдельной строкой, с адресом, а не только номером порта: прокси работает
+  # в сети машины, и разница между 127.0.0.1:9000 и 0.0.0.0:9000 — это
+  # разница между «закрыто» и «обработчик PHP открыт всему интернету».
+  echo "  \"php_слушает\": \"$(ss -ltn 2>/dev/null | awk '$4 ~ /:9000$/ {print $4}' | tr '\n' ' ')\","
 
   st=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 20 docker compose ps --format '{{.Service}}={{.State}}' 2>&1 | tr '\n' ' ' | tr -d '"')
   echo "  \"контейнеры\": \"${st:-docker не ответил за 20 секунд}\","
