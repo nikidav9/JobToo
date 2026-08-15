@@ -58,6 +58,9 @@ TMP=/tmp/jt-status.$$
   # только «DatabaseError» без текста. Причина видна лишь здесь.
   echo "  \"ошибки_базы\": \"$(cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose logs --tail=120 --no-log-prefix db 2>&1 | grep -aiE 'error|fatal' | tail -4 | tr -d '"\r' | tr '\n' ' ' | tail -c 500)\","
 
+  # Realtime отвергает подключения: надо знать, какого арендатора он завёл.
+  echo "  \"realtime_арендаторы\": \"$(cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose exec -T -e PGPASSWORD="$(grep -m1 '^POSTGRES_PASSWORD=' /opt/jobtoo-secrets/env | cut -d= -f2)" db psql -tAq -U supabase_admin -d postgres -c \"select external_id || ':' || name from _realtime.tenants\" 2>&1 | tr -d '\"' | tr '\n' ' ' | cut -c1-200)\","
+
   # Состав схемы: имя таблицы и сколько в ней колонок и строк. Нужно, чтобы
   # сверить перенос по существу, а не по числу строк: пустая таблица нужна
   # ничуть не меньше полной, и её отсутствие по счётчикам не увидишь.
