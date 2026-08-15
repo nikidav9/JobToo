@@ -2377,6 +2377,35 @@ try {
         // каждому. Адрес группы берётся из настроек сервера и не приходит
         // в запросе: APP_SECRET лежит в открытом коде, и с параметром-адресом
         // ботом можно было бы писать в любой чат.
+        // Состояние группы: жив ли доступ и не сменился ли её номер.
+        //
+        // Понадобилось, когда объявления перестали приходить в «ПОДРАБОТКИ»,
+        // а причину было нечем посмотреть: код публикации на месте, токен
+        // рабочий, а сообщений нет. Классическая причина — группу повысили
+        // до супергруппы, и её номер сменился; старый перестаёт отвечать.
+        // Ничего не отправляет, только спрашивает.
+        case 'tgGroupInfo': {
+            if (TG_BOT_TOKEN === '') { $data = ['ok' => false, 'error' => 'нет токена']; break; }
+            $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/getChat?chat_id=' . TG_GROUP_CHAT_ID);
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15]);
+            $chat = json_decode((string)curl_exec($ch), true); curl_close($ch);
+
+            $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/getMe');
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15]);
+            $me = json_decode((string)curl_exec($ch), true); curl_close($ch);
+            $botId = (int)($me['result']['id'] ?? 0);
+
+            $member = null;
+            if ($botId) {
+                $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN
+                    . '/getChatMember?chat_id=' . TG_GROUP_CHAT_ID . '&user_id=' . $botId);
+                curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15]);
+                $member = json_decode((string)curl_exec($ch), true); curl_close($ch);
+            }
+            $data = ['chat_id' => TG_GROUP_CHAT_ID, 'chat' => $chat, 'бот_в_группе' => $member];
+            break;
+        }
+
         case 'tgPostToGroup': {
             if (TG_BOT_TOKEN === '') { $data = ['ok' => false, 'error' => 'TG_BOT_TOKEN не задан на сервере']; break; }
             if (TG_GROUP_CHAT_ID === 0) { $data = ['ok' => false, 'error' => 'Группа не настроена']; break; }
