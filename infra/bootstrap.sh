@@ -36,11 +36,17 @@ if [ ! -f /swapfile ]; then
   echo 'vm.swappiness=10' > /etc/sysctl.d/99-swappiness.conf
 fi
 
+# dig нужен отдельно: docker ставился до того, как он понадобился, и на
+# уже работающей машине блок ниже не выполняется.
+if ! command -v dig >/dev/null 2>&1; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y dnsutils >/dev/null 2>&1 || true
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   say "установка" "ставлю docker"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y
-  apt-get install -y jq openssl python3 certbot python3-certbot-nginx
+  apt-get install -y jq openssl python3 certbot python3-certbot-nginx dnsutils
   curl -fsSL https://get.docker.com -o /tmp/get-docker.sh && sh /tmp/get-docker.sh
   systemctl enable --now docker
   say "установка" "docker=$(docker --version 2>/dev/null || echo не встал)"
@@ -316,25 +322,36 @@ chmod +x /etc/letsencrypt/renewal-hooks/deploy/nginx.sh
 #
 # Второй путь — на случай, если перенаправление на хостинге не сложится:
 # имя уже указывает сюда. Тогда выпускать надо как можно быстрее, потому
-# что это и есть тот самый провал. Кэш преобразователя перед проверкой
-# сбрасываем: иначе сервер до конца старого TTL будет видеть прежний адрес
-# и ждать неизвестно чего, пока люди упираются в чужой сертификат.
+# что это и есть тот самый провал.
+#
+# Спрашиваем не обычным способом, а прямо у ответственных за домен
+# серверов. TTL записи — час: обычный преобразователь ещё целый час будет
+# отдавать прежний адрес, и всё это время сервер не знал бы, что запись
+# уже поменяли. Сброса своего кэша мало — кэшируют и вышестоящие.
+#
+# Заодно это даёт то, ради чего всё затевалось: у ответственных серверов
+# новая запись появляется в ту же секунду, как её сохранили, а до людей
+# доходит в течение часа. Значит сертификат успевает встать на место
+# раньше, чем хоть кто-то придёт по новому адресу.
 DOMAIN=jobtoo.ru
 if [ ! -d "/etc/letsencrypt/live/$DOMAIN" ] && command -v certbot >/dev/null 2>&1; then
   mkdir -p /var/www/html/.well-known/acme-challenge
   echo "jt-ok" > /var/www/html/.well-known/acme-challenge/jt-probe
-  resolvectl flush-caches >/dev/null 2>&1 || true
   P1=$(curl -fsSL -m 20 "http://$DOMAIN/.well-known/acme-challenge/jt-probe" 2>/dev/null || true)
   P2=$(curl -fsSL -m 20 "http://www.$DOMAIN/.well-known/acme-challenge/jt-probe" 2>/dev/null || true)
   # Пауза между попытками: обычно час, но если имя уже указывает сюда —
   # десять минут. В этом случае каждая минута ожидания это минута, когда
   # приложение упирается в чужой сертификат.
   PAUSE=3600
-  if [ "$P1" != "jt-ok" ] || [ "$P2" != "jt-ok" ]; then
-    if getent hosts "$DOMAIN" 2>/dev/null | grep -q "^$IP " \
-       && getent hosts "www.$DOMAIN" 2>/dev/null | grep -q "^$IP "; then
-      P1=jt-ok; P2=jt-ok; PAUSE=600
-      say "сертификат" "$DOMAIN уже указывает сюда — выпускаю"
+  if { [ "$P1" != "jt-ok" ] || [ "$P2" != "jt-ok" ]; } && command -v dig >/dev/null 2>&1; then
+    NS=$(dig +short +time=5 +tries=1 NS "$DOMAIN" 2>/dev/null | head -1)
+    if [ -n "$NS" ]; then
+      A1=$(dig +short +time=5 +tries=1 A "$DOMAIN"      "@$NS" 2>/dev/null | grep -c "^$IP$" || true)
+      A2=$(dig +short +time=5 +tries=1 A "www.$DOMAIN"  "@$NS" 2>/dev/null | grep -c "^$IP$" || true)
+      if [ "${A1:-0}" -ge 1 ] && [ "${A2:-0}" -ge 1 ]; then
+        P1=jt-ok; P2=jt-ok; PAUSE=600
+        say "сертификат" "$DOMAIN уже указывает сюда — выпускаю"
+      fi
     fi
   fi
   if [ "$P1" = "jt-ok" ] && [ "$P2" = "jt-ok" ]; then
