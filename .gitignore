@@ -51,3 +51,4 @@ supabase/.temp/
 php-proxy/sb_service_key.php
 php-proxy/admin_credentials.php
 php-proxy/app_secrets.php
+php-proxy/sb_url.php

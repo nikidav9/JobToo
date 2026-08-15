@@ -22,7 +22,28 @@ function jt_respond(array $payload, int $code = 200): void {
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
 }
 
-define('SB_URL', 'https://bbiqmkeysalwdonlnylb.supabase.co');
+// Адрес бэкенда — из секрета, как и ключ рядом.
+//
+// Так переключение между облаком и своим сервером (и откат обратно) — это
+// смена одного значения в настройках, а не правка трёх файлов и выкладка.
+// Откат важнее: если после переезда что-то пойдёт не так, вернуться надо
+// быстро, а не собирать релиз.
+//
+// Значение не задано — работает облако. Выкладка сама по себе ничего не
+// переключает, и это намеренно.
+function sb_resolve_url(): string {
+    $env = getenv('SB_URL');
+    if (is_string($env) && trim($env) !== '') return rtrim(trim($env), '/');
+
+    $file = __DIR__ . '/sb_url.php';
+    if (is_readable($file)) {
+        $v = @include $file;
+        if (is_string($v) && trim($v) !== '') return rtrim(trim($v), '/');
+    }
+    return 'https://bbiqmkeysalwdonlnylb.supabase.co';
+}
+
+define('SB_URL', sb_resolve_url());
 
 // Ключ доступа к базе.
 //

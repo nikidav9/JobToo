@@ -53,6 +53,7 @@ jobs:
       - name: Write server secrets
         env:
           SB_SERVICE_KEY: ${{ secrets.SB_SERVICE_KEY }}
+          SB_URL: ${{ secrets.SB_URL }}
           DASHBOARD_LOGIN: ${{ secrets.DASHBOARD_LOGIN }}
           DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
           APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
@@ -72,6 +73,17 @@ jobs:
             echo "app_secrets.php: собран"
           else
             echo "app_secrets.php: секреты не заданы, пропускаю"
+          fi
+
+          # Адрес бэкенда. Не задан — работает облако: выкладка сама по себе
+          # ничего не переключает. Смена этого секрета и есть переключение,
+          # а его очистка — откат.
+          if [ -n "$SB_URL" ]; then
+            U=$(printf '%s' "$SB_URL" | base64 -w0)
+            printf "<?php return base64_decode('%s');\n" "$U" > dist/api/sb_url.php
+            echo "sb_url.php: собран"
+          else
+            echo "sb_url.php: секрет SB_URL не задан, останемся на облаке"
           fi
 
           if [ -n "$SB_SERVICE_KEY" ]; then
