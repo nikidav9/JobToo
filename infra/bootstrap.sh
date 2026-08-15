@@ -227,6 +227,33 @@ if [ "${#REALTIME_ENC_KEY}" -ne 16 ]; then
   say "realtime" "ключ шифрования заменён на верную длину"
 fi
 
+# ── Временный мост по ключу ───────────────────────────────────────────────
+# Прокси на хостинге ходит со старым ключом облака: новый лежит в секретах
+# GitHub, а поменять их может только владелец. Пока это не сделано, nginx
+# принимает старый ключ и подставляет вместо него новый.
+#
+# Это мост, а не решение. Он не расширяет доступ: старый ключ и раньше давал
+# те же права на те же данные, а знают его те же места, что и прежде.
+# Убрать сразу, как в настройках появится SB_SERVICE_KEY от нового сервера.
+#
+# Сам ключ берётся из файла на машине и в репозиторий не попадает.
+if [ -f /opt/jobtoo-secrets/cloud ]; then
+  OLDKEY=$(grep -m1 '^SB_KEY=' /opt/jobtoo-secrets/cloud | cut -d= -f2-)
+  if [ -n "$OLDKEY" ] && [ -n "${SERVICE_ROLE_KEY:-}" ]; then
+    cat > /etc/nginx/conf.d/jt-authswap.conf <<EOF
+map \$http_authorization \$jt_auth {
+    default   \$http_authorization;
+    "Bearer $OLDKEY" "Bearer $SERVICE_ROLE_KEY";
+}
+map \$http_apikey \$jt_apikey {
+    default  \$http_apikey;
+    "$OLDKEY" "$SERVICE_ROLE_KEY";
+}
+EOF
+    chmod 600 /etc/nginx/conf.d/jt-authswap.conf
+  fi
+fi
+
 # ── Резервные копии ───────────────────────────────────────────────────────
 # Ставим таймер один раз. Копия делается раньше переключения намеренно:
 # после него данные 420 человек будут жить в единственном экземпляре.
