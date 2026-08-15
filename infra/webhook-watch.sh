@@ -32,8 +32,34 @@ api() { curl -s -m 20 "https://api.telegram.org/bot$TOKEN/$1" "${@:2}"; }
 field() { python3 -c 'import sys,json;print(json.load(sys.stdin).get("result",{}).get(sys.argv[1],""))' "$1" 2>/dev/null; }
 
 INFO=$(api getWebhookInfo)
+
+# Телеграм не ответил вовсе. Молчать тут нельзя: раньше сторож в этом случае
+# просто выходил, отметку не трогал — и снаружи это выглядело точно так же,
+# как «вебхук стёрт». Полдня можно гадать, что именно сломалось.
+case "$INFO" in
+  *'"ok":true'*) ;;
+  *)
+    echo "$(date +%H:%M) Телеграм не отвечает — вебхук не проверить" > /var/lib/jt-webhook-check
+    exit 0;;
+esac
+
 URL=$(echo "$INFO" | field url)
-[ "$URL" = "$MINE" ] || exit 0
+
+# Пустой адрес — вебхука нет ни у нас, ни у пересылки, и бот не получает
+# ничего. Само по себе это не чинится: Телеграм так и будет копить очередь.
+# Ставим свой адрес обратно — хуже, чем «никуда», уже не будет.
+if [ -z "$URL" ]; then
+  api setWebhook -d "url=$MINE" -d "secret_token=$SECRET" >/dev/null
+  echo "$(date +%H:%M) вебхука не было вовсе — поставил $MINE" > /var/lib/jt-webhook-check
+  exit 0
+fi
+
+# Не наш адрес — значит откат уже случился. Отмечаемся всё равно: без записи
+# сторож считал бы отметку просроченной и ходил в Телеграм каждую минуту.
+if [ "$URL" != "$MINE" ]; then
+  echo "$(date +%H:%M) вебхук на $URL — прямой путь не используется" > /var/lib/jt-webhook-check
+  exit 0
+fi
 
 ERR=$(echo "$INFO" | field last_error_message)
 
