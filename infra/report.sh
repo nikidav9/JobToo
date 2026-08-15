@@ -157,21 +157,31 @@ TMP=/tmp/jt-status.$$
   # Поэтому проверяем заранее и тем же токеном, которым будет ходить сервер:
   # видно ли репозиторий через API, отвечает ли git и находится ли файл в
   # выпуске. Три ответа «да» — закрывать можно хоть сейчас.
-  echo "  \"github\": \"$(
+  #
+  # Всё склеивается в одну строку и чистится от переводов строки: первая же
+  # версия этой проверки вставила в отчёт лишний перенос, и весь status.json
+  # перестал разбираться. Проверка исправности не имеет права ломать то, во
+  # что она пишет.
+  echo "  \"github\": \"$( {
     t=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose exec -T php php -r '
       $v = @include "/var/www/api/gh_token.php"; echo is_string($v) ? $v : "";' 2>/dev/null | tr -d '\r\n')
     if [ -z "$t" ]; then printf 'токена нет'; else
-      printf 'api=%s ' "$(curl -s -o /dev/null -m 15 -w '%{http_code}' \
-        -H "Authorization: Bearer $t" https://api.github.com/repos/nikidav9/JobToo 2>/dev/null)"
+      # Длина, а не значение: по ней видно, доехал ли токен целиком, и при
+      # этом его нельзя списать с открытой страницы.
+      printf 'длина=%s ' "${#t}"
+      R=$(curl -s -m 15 -H "Authorization: Bearer $t" -w '\n%{http_code}' \
+        https://api.github.com/repos/nikidav9/JobToo 2>/dev/null)
+      printf 'api=%s ' "$(printf '%s' "$R" | tail -1)"
+      # Своими словами GitHub объясняет отказ лучше, чем номер: 401 значит
+      # «токен не тот», 404 — «токен не про этот репозиторий».
+      printf 'ответ=%s ' "$(printf '%s' "$R" | grep -o '"message": *"[^"]*"' | head -1 | cut -c13-60 | tr -d '"')"
       printf 'git=%s ' "$(GIT_TERMINAL_PROMPT=0 timeout 20 git ls-remote \
-        https://x-access-token:$t@github.com/nikidav9/JobToo HEAD >/dev/null 2>&1 && echo да || echo нет)"
+        "https://x-access-token:$t@github.com/nikidav9/JobToo" HEAD >/dev/null 2>&1 && echo да || echo нет)"
       printf 'сборка_сайта=%s ' "$(curl -s -m 15 -H "Authorization: Bearer $t" \
         https://api.github.com/repos/nikidav9/JobToo/releases/tags/web 2>/dev/null \
-        | grep -c '"name": *"dist.tar.gz"' || echo 0)"
-      printf 'закрыт=%s' "$(curl -s -m 15 -H "Authorization: Bearer $t" \
-        https://api.github.com/repos/nikidav9/JobToo 2>/dev/null \
-        | grep -o '\"private\": *[a-z]*' | head -1 | awk '{print $2}')"
-    fi)\","
+        | grep -c '"name": *"dist.tar.gz"')"
+      printf 'закрыт=%s' "$(printf '%s' "$R" | grep -o '"private": *[a-z]*' | head -1 | awk '{print $2}')"
+    fi; } | tr -d '\n\r"' )\","
   # Куда указывает домен по мнению ответственных за него серверов. Обычный
   # преобразователь здесь бесполезен: TTL записи час, и он ещё час будет
   # показывать прежнее — то есть в самый нужный момент соврёт.
