@@ -290,6 +290,26 @@ else
   say "роли" "ОШИБКА($rc): $(tail -4 /tmp/jt-roles.log | tr '\n' ' ' | cut -c1-300)"
 fi
 
+# ── Сброс схемы Storage, если он не встал ─────────────────────────────────
+# Storage ведёт в базе собственный набор миграций. Я создал схему storage
+# заранее, своими руками, и она разошлась с тем, что служба ожидает увидеть:
+# контейнер значится работающим, но на каждый запрос отвечает отказом, и
+# шлюз отдаёт 502.
+#
+# Чиним один раз: отдаём схему службе и даём завести всё заново. Файлы при
+# этом не теряются — они лежат на диске, в томе, а не в базе.
+if [ ! -f /opt/jobtoo-secrets/.storage-reset ]; then
+  if [ "$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:5000/status 2>/dev/null)" != "200" ]; then
+    docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+      psql -q -U supabase_admin -d postgres \
+      -c "drop schema if exists storage cascade;" >/dev/null 2>&1
+    docker compose up -d --force-recreate storage >/dev/null 2>&1
+    touch /opt/jobtoo-secrets/.storage-reset
+    say "storage" "схема сброшена, служба пересоздана"
+    sleep 20
+  fi
+fi
+
 # ── Миграции ──────────────────────────────────────────────────────────────
 # После контейнеров: накатыватель сам подождёт базу и Storage, а если те
 # ещё не готовы — тихо отложит до следующего запуска таймера.
