@@ -85,6 +85,21 @@ TMP=/tmp/jt-status.$$
             on c.attrelid = t.oid;" 2>&1 | tr -d '"\n' | cut -c1-1200)
   echo "  \"схема\": \"${sch:-не прочитать}\","
 
+  # Переезд домена: три вещи, каждая из которых по отдельности выглядит
+  # исправно, а вместе должны сойтись до смены записи в DNS.
+  echo "  \"сертификаты\": \"$(ls /etc/letsencrypt/live 2>/dev/null | grep -v README | tr '\n' ' ')\","
+  echo "  \"сайт\": \"файлов $(find /var/www/jobtoo -type f 2>/dev/null | wc -l), оболочка $([ -s /var/www/jobtoo/index.html ] && echo есть || echo нет)\","
+  # Только наличие, без значений: страница открыта всем. Без токена бота
+  # после переезда молча умрёт вебхук, без пароля — вход в дашборд.
+  echo "  \"секреты_прокси\": \"$(cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose exec -T php php -r '
+      foreach (["app_secrets.php","admin_credentials.php","sb_service_key.php","sb_url.php"] as $f) {
+        $p = "/var/www/api/" . $f;
+        if (!is_readable($p)) { echo "$f=нет "; continue; }
+        $v = include $p;
+        if (is_array($v)) { foreach ($v as $k => $x) echo $k . "=" . (strlen((string)$x) ? "есть" : "пусто") . " "; }
+        else { echo $f . "=" . (strlen((string)$v) ? "есть" : "пусто") . " "; }
+      }' 2>&1 | tr -d '"' | tr '\n' ' ' | cut -c1-300)\","
+
   # Ключевые шаги отдельно: в общем хвосте их забивают журналы контейнеров.
   echo "  \"роли\": \"$(grep -a '\[роли\]' /var/log/jt-apply.log 2>/dev/null | tail -2 | tr -d '"' | tr '\n' ' ' | cut -c1-400)\","
   echo "  \"миграции\": \"$(grep -a '\[миграции\]' /var/log/jt-apply.log 2>/dev/null | tail -2 | tr -d '"' | tr '\n' ' ' | cut -c1-300)\","

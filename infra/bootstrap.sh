@@ -144,6 +144,38 @@ printf "<?php return '%s';\n" "https://147.45.184.99.sslip.io" > "$PROXY/sb_url.
 chown -R 82:82 "$PROXY" 2>/dev/null || true
 chmod 750 "$PROXY"
 
+# ── Сайт ──────────────────────────────────────────────────────────────────
+# Собранная веб-версия приезжает не так, как на Reg.ru. Туда её кладёт
+# GitHub по FTP; сюда положить нечем — ни FTP, ни ssh, и заводить их значит
+# держать ключ от сервера в настройках репозитория.
+#
+# Поэтому наоборот: сборка выкладывается выпуском с постоянной меткой web,
+# а сервер забирает её сам — тем же движением, каким забирает infra/.
+#
+# Разворачиваем во временный каталог и подменяем готовым: если архив побит
+# или скачался наполовину, на месте останется прежний рабочий сайт, а не
+# половина нового.
+WEBSRC=https://github.com/nikidav9/JobToo/releases/download/web/dist.tar.gz
+if curl -fsSL -m 300 -o /tmp/jt-web.tgz "$WEBSRC" 2>/dev/null; then
+  SUM=$(sha256sum /tmp/jt-web.tgz | cut -d' ' -f1)
+  if [ "$SUM" != "$(cat /var/lib/jt-web.sha 2>/dev/null || true)" ]; then
+    rm -rf /tmp/jt-web && mkdir -p /tmp/jt-web
+    if tar -xzf /tmp/jt-web.tgz -C /tmp/jt-web 2>/dev/null && [ -s /tmp/jt-web/index.html ]; then
+      rm -rf /var/www/jobtoo.old
+      if [ -d /var/www/jobtoo ]; then mv /var/www/jobtoo /var/www/jobtoo.old; fi
+      mv /tmp/jt-web /var/www/jobtoo
+      chmod -R a+rX /var/www/jobtoo
+      rm -rf /var/www/jobtoo.old
+      echo "$SUM" > /var/lib/jt-web.sha
+      say "сайт" "обновлён, файлов: $(find /var/www/jobtoo -type f | wc -l)"
+    else
+      say "сайт" "архив не распаковался — оставляю прежний"
+      rm -rf /tmp/jt-web
+    fi
+  fi
+  rm -f /tmp/jt-web.tgz
+fi
+
 # ── Контейнеры ────────────────────────────────────────────────────────────
 cd "$REPO/infra"
 chmod +x init/*.sh 2>/dev/null || true
@@ -232,6 +264,46 @@ if [ ! -d "/etc/letsencrypt/live/$HOST" ] && command -v certbot >/dev/null 2>&1;
     || say "сертификат" "не вышло, работаем по http"
 fi
 
+# Перезагрузка шлюза после продления. Сам certbot её не делает, а nginx
+# держит сертификат в памяти: без этого через 60 дней он молча продолжит
+# отдавать просроченный, и браузеры перестанут открывать сайт.
+mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+cat > /etc/letsencrypt/renewal-hooks/deploy/nginx.sh <<'EOF'
+#!/bin/sh
+systemctl reload nginx
+EOF
+chmod +x /etc/letsencrypt/renewal-hooks/deploy/nginx.sh
+
+# ── Сертификат на сам домен ───────────────────────────────────────────────
+# Выпускаем ДО того, как jobtoo.ru начнёт указывать сюда. Иначе неизбежен
+# провал: пока идёт выпуск, https не отвечает, а это и приложение, и вебхук
+# бота. Работает это благодаря строке в public/.htaccess — хостинг
+# перенаправляет проверку Let's Encrypt на этот сервер.
+#
+# Сначала проверяем сами, своим файлом, что цепочка сложилась. Пустая
+# попытка стоит дорого: пять неудачных проверок в час — и Let's Encrypt
+# закрывает выпуск на этот домен, а таймер здесь ходит каждую минуту.
+DOMAIN=jobtoo.ru
+if [ ! -d "/etc/letsencrypt/live/$DOMAIN" ] && command -v certbot >/dev/null 2>&1; then
+  mkdir -p /var/www/html/.well-known/acme-challenge
+  echo "jt-ok" > /var/www/html/.well-known/acme-challenge/jt-probe
+  P1=$(curl -fsSL -m 20 "http://$DOMAIN/.well-known/acme-challenge/jt-probe" 2>/dev/null || true)
+  P2=$(curl -fsSL -m 20 "http://www.$DOMAIN/.well-known/acme-challenge/jt-probe" 2>/dev/null || true)
+  if [ "$P1" = "jt-ok" ] && [ "$P2" = "jt-ok" ]; then
+    # Не чаще раза в час: если что-то всё же не сложится, попытки не должны
+    # выесть недельный лимит за первые десять минут.
+    LAST=$(cat /var/lib/jt-cert-last 2>/dev/null || echo 0)
+    NOW=$(date +%s)
+    if [ $((NOW - LAST)) -gt 3600 ]; then
+      date +%s > /var/lib/jt-cert-last
+      certbot certonly --webroot -w /var/www/html -n --agree-tos \
+        -m nikidav9@gmail.com -d "$DOMAIN" -d "www.$DOMAIN" >>/var/log/jt-apply.log 2>&1 \
+        && say "сертификат" "выпущен на $DOMAIN и www" \
+        || say "сертификат" "на $DOMAIN не вышел, повтор через час"
+    fi
+  fi
+fi
+
 # Собираем во временный файл и сравниваем с действующим: перезапускать
 # nginx каждую минуту незачем. Он это переживает, но не бесследно — часть
 # запросов в момент перезагрузки обрывается, и снаружи это выглядит как
@@ -241,6 +313,11 @@ NEW=/tmp/jt-nginx-new.conf
 cp "$REPO/infra/nginx.conf" "$NEW"
 if [ -d "/etc/letsencrypt/live/$HOST" ] && [ -f "$REPO/infra/nginx-tls.conf" ]; then
   sed "s/__HOST__/$HOST/g" "$REPO/infra/nginx-tls.conf" >> "$NEW"
+fi
+# Блок самого домена — только когда сертификат на него уже есть. Иначе
+# nginx не поднимется вовсе, и вместе с сайтом ляжет всё остальное.
+if [ -d "/etc/letsencrypt/live/$DOMAIN" ] && [ -f "$REPO/infra/nginx-site.conf" ]; then
+  cat "$REPO/infra/nginx-site.conf" >> "$NEW"
 fi
 
 if cmp -s "$NEW" /etc/nginx/sites-available/jobtoo; then

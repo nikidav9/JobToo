@@ -11,6 +11,9 @@ jobs:
   deploy:
     name: Build web + FTP deploy
     runs-on: ubuntu-latest
+    # Нужно, чтобы выложить собранный сайт выпуском — его забирает московский сервер.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -114,6 +117,31 @@ jobs:
               f.write(html)
           print("Metrika injected OK")
           PYEOF
+
+      # Тот же сайт — для московского сервера.
+      #
+      # Туда нет ни FTP, ни ssh, и заводить их значит класть ключ в настройки
+      # репозитория. Поэтому наоборот: сервер забирает сборку сам, как он уже
+      # забирает infra/. Выпуск с постоянной меткой web — чтобы адрес не
+      # менялся, а в репозитории не копилась история сборок.
+      #
+      # Каталог api/ выбрасываем: PHP и секреты на сервере свои, из
+      # /opt/jobtoo-proxy. Иначе собранные здесь пароли уехали бы в выпуск,
+      # открытый всем.
+      - name: Publish web build for the Moscow server
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          rm -rf pack && mkdir pack
+          cp -a dist/. pack/
+          rm -rf pack/api pack/.htaccess
+          tar -czf dist.tar.gz -C pack .
+          ls -l dist.tar.gz
+          gh release view web >/dev/null 2>&1 \
+            || gh release create web --latest=false \
+                 -t "Веб-сборка" \
+                 -n "Собирается автоматически. Московский сервер забирает отсюда dist.tar.gz."
+          gh release upload web dist.tar.gz --clobber
 
       - name: Deploy to Reg.ru via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
