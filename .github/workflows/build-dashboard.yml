@@ -1,0 +1,67 @@
+name: Build dashboard (для переезда с Vercel)
+
+# Заготовка. Дашборд пока живёт на Vercel, и этот ход ничего там не меняет —
+# он только собирает то же самое в переносимом виде и кладёт выпуском, откуда
+# сервер сможет его забрать, когда переезд решат сделать.
+#
+# Сам по себе не запускается: собирать при каждом коммите незачем, пока это
+# никем не используется. Запуск — кнопкой, либо когда правится сам дашборд.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'dashboard/**'
+      - '.github/workflows/build-dashboard.yml'
+
+jobs:
+  build:
+    name: Standalone-сборка
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+
+      - name: Install
+        working-directory: dashboard
+        run: npm ci
+
+      # Значения окружения нужны на этапе сборки только те, что попадают в
+      # код страниц (NEXT_PUBLIC_*). Секреты сервера — ключи VAPID, пропуск
+      # приложения — читаются во время работы и в сборку не входят: иначе
+      # они уехали бы в выпуск, открытый всем.
+      - name: Build
+        working-directory: dashboard
+        env:
+          NEXT_PUBLIC_ADMIN_PROXY_URL: https://jobtoo.ru/api/admin.php
+          NEXT_PUBLIC_APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+        run: npm run build
+
+      # Складываем ровно то, что нужно для запуска: сам сервер, статику и
+      # public. Next.js кладёт статику мимо standalone — про это забывают, и
+      # тогда страница открывается без стилей.
+      - name: Pack
+        working-directory: dashboard
+        run: |
+          rm -rf pack && mkdir pack
+          cp -a .next/standalone/. pack/
+          mkdir -p pack/.next
+          cp -a .next/static pack/.next/static
+          [ -d public ] && cp -a public pack/public || true
+          tar -czf ../dashboard.tar.gz -C pack .
+          ls -lh ../dashboard.tar.gz
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view dashboard >/dev/null 2>&1 \
+            || gh release create dashboard --latest=false \
+                 -t "Дашборд" \
+                 -n "Переносимая сборка. Сервер заберёт отсюда, когда дашборд переедет с Vercel."
+          gh release upload dashboard dashboard.tar.gz --clobber

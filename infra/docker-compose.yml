@@ -228,6 +228,40 @@ services:
       SB_URL: https://jobtoo.ru
     depends_on: [rest]
 
+  # Дашборд — заготовка к переезду с Vercel.
+  #
+  # Не запускается: помечен профилем, а профили docker compose поднимает
+  # только по явной просьбе. Значит эта часть может лежать готовой сколько
+  # угодно и ничего не потреблять — ни памяти, ни внимания.
+  #
+  # Чтобы включить, нужно три вещи, и все три за владельцем:
+  #   1. запись admin.jobtoo.ru в DNS на этот сервер;
+  #   2. ключи VAPID из настроек Vercel — без них отвалятся уведомления
+  #      в браузере, потому что подписки людей выданы под старые ключи;
+  #   3. убрать profiles отсюда и добавить блок шлюза.
+  #
+  # Сборка приезжает выпуском, как и веб-версия: собирать Next.js на самой
+  # машине нельзя — он съедает под два гигабайта и уронит базу.
+  dashboard:
+    image: node:22-alpine
+    profiles: ["dashboard"]
+    restart: unless-stopped
+    ports: ["127.0.0.1:3002:3000"]
+    working_dir: /app
+    command: ["node", "server.js"]
+    volumes:
+      - /opt/jobtoo-dashboard:/app:ro
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      ADMIN_API_URL: https://jobtoo.ru/api/admin.php
+      # Секреты подставляются из того же файла, что и всё остальное.
+      # Ключей VAPID там пока нет — их надо забрать из Vercel до включения.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:nikidav9@gmail.com}
+
 volumes:
   db-data:
   storage-data:
