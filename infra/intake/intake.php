@@ -7,7 +7,7 @@
 // Защищена тем же паролем, что и панель (basic-auth на 8443), и работает
 // только по TLS. Удаляется сразу после использования — это времянка, а не
 // часть системы. Если файл остался, значит про него забыли: удалить.
-$dir = '/var/www/secrets';
+$dir = '/var/www/api';
 $body = json_decode((string)file_get_contents('php://input'), true);
 if (!is_array($body)) { http_response_code(400); echo 'нужен json'; exit; }
 

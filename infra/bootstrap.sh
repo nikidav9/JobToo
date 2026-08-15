@@ -125,23 +125,24 @@ grep -q "^PUBLIC_URL=" "$SECRETS" || echo "PUBLIC_URL=http://$(hostname -I | awk
 # Секреты нужны не только docker compose, но и самому скрипту — для psql.
 set -a; . "$SECRETS"; set +a
 
-# ── Секреты прокси ────────────────────────────────────────────────────────
-# Прокси хранит свои секреты отдельными файлами рядом с кодом — так заведено
-# на Reg.ru, и менять это при переносе незачем: меньше отличий, меньше
-# сюрпризов.
+# ── Рабочий каталог прокси ────────────────────────────────────────────────
+# Прокси ищет свои секреты рядом с собой — так устроен jt_secret(), и так же
+# это лежит на Reg.ru. Поэтому собираем каталог, где код и секреты вместе:
+# код из репозитория, секреты остаются между обновлениями.
 #
-# Сервисный ключ берём свой, локальный: прокси теперь ходит в свою же базу,
-# и старый облачный ему не нужен. Остальное — пропуск приложения и токен
-# бота — приезжает извне, в репозитории им не место.
-mkdir -p /opt/jobtoo-secrets/proxy
-# 82 — это www-data в alpine-образе PHP. Каталог должен быть доступен ему на
-# запись: приёмная секретов работает от его имени. Наружу каталог не смотрит.
-chown -R 82:82 /opt/jobtoo-secrets/proxy 2>/dev/null || true
-chmod 750 /opt/jobtoo-secrets/proxy
-printf "<?php return '%s';\n" "$SERVICE_ROLE_KEY" > /opt/jobtoo-secrets/proxy/sb_service_key.php
-printf "<?php return '%s';\n" "https://147.45.184.99.sslip.io" > /opt/jobtoo-secrets/proxy/sb_url.php
-chmod 640 /opt/jobtoo-secrets/proxy/*.php
-chown 82:82 /opt/jobtoo-secrets/proxy/*.php 2>/dev/null || true
+# Сервисный ключ берём свой, локальный: прокси теперь ходит в свою же базу.
+# Пропуск приложения и токен бота приезжают извне — в репозитории им не место.
+PROXY=/opt/jobtoo-proxy
+mkdir -p "$PROXY"
+cp -f "$REPO"/php-proxy/*.php "$PROXY"/ 2>/dev/null || true
+rm -f "$PROXY"/*.example.php
+
+printf "<?php return '%s';\n" "$SERVICE_ROLE_KEY" > "$PROXY/sb_service_key.php"
+printf "<?php return '%s';\n" "https://147.45.184.99.sslip.io" > "$PROXY/sb_url.php"
+
+# 82 — www-data в alpine-образе PHP: от его имени работает приёмная секретов.
+chown -R 82:82 "$PROXY" 2>/dev/null || true
+chmod 750 "$PROXY"
 
 # ── Контейнеры ────────────────────────────────────────────────────────────
 cd "$REPO/infra"
