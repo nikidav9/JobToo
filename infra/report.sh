@@ -107,10 +107,11 @@ TMP=/tmp/jt-status.$$
   # Жив ли токен бота на этом сервере и виден ли ему группа.
   #
   # После переезда домена вебхук бота придёт сюда, и проверять это будет
-  # поздно. Раз в час, а не каждую минуту: Telegram незачем дёргать по кругу,
-  # а ответ меняется редко.
+  # поздно. Раз в десять минут, а не каждую минуту: Telegram незачем дёргать
+  # по кругу, но и час ждать нельзя — в момент переключения ответ нужен
+  # свежий, а не позавчерашний.
   if [ ! -f /var/lib/jt-tg-check ] \
-     || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-tg-check 2>/dev/null || echo 0) )) -gt 3600 ]; then
+     || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-tg-check 2>/dev/null || echo 0) )) -gt 600 ]; then
     (cd /opt/jobtoo/infra 2>/dev/null && timeout 30 docker compose exec -T php php -r '
       $s = @include "/var/www/api/app_secrets.php";
       $t = is_array($s) ? ($s["TG_BOT_TOKEN"] ?? "") : "";
@@ -130,6 +131,15 @@ TMP=/tmp/jt-status.$$
         echo " права=" . ($m2["ok"] ?? false ? ($m2["result"]["status"] ?? "?") : "не прочитать");
         $sm = $g["result"]["slow_mode_delay"] ?? 0;
         if ($sm) echo " медленный_режим=" . $sm . "с";
+      }
+      // Вебхук: после переезда домена он приведёт Telegram сюда. Ошибка
+      // доставки видна только отсюда — сам бот об этом никому не скажет.
+      $w = $get("getWebhookInfo");
+      if ($w["ok"] ?? false) {
+        $r = $w["result"];
+        echo " вебхук=" . ($r["url"] ?? "нет")
+           . " в_очереди=" . ($r["pending_update_count"] ?? 0);
+        if (!empty($r["last_error_message"])) echo " последняя_ошибка=" . $r["last_error_message"];
       }' 2>&1 | tr -d '"\\\n\r' | cut -c1-300) > /var/lib/jt-tg-check 2>/dev/null
   fi
   echo "  \"телеграм\": \"$(cat /var/lib/jt-tg-check 2>/dev/null | cut -c1-300)\","
