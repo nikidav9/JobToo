@@ -2102,8 +2102,12 @@ try {
         }
 
         case 'dbMarkRead': {
+            // Вместе со счётчиком запоминаем и время: по нему собеседник
+            // увидит вторую галочку. Одно без другого бессмысленно —
+            // счётчик говорит «сколько», а галочка «с какого момента».
             $f = $args[1] === 'worker' ? 'unread_worker' : 'unread_employer';
-            sb_update('jm_chats', ['id' => 'eq.' . $args[0]], [$f => 0]); break;
+            $t = $args[1] === 'worker' ? 'worker_read_at' : 'employer_read_at';
+            sb_update('jm_chats', ['id' => 'eq.' . $args[0]], [$f => 0, $t => now_iso()]); break;
         }
 
         case 'dbIncrementUnread': {

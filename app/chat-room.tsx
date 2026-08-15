@@ -17,6 +17,7 @@ import {
 } from 'expo-audio';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
+import { ReadTicks, isSeenByOther } from '@/components/ReadTicks';
 import { useApp } from '@/hooks/useApp';
 import { Message, Chat } from '@/constants/types';
 import { nameColorFromString, getInitials, formatDate, uid, nowISO } from '@/services/storage';
@@ -931,7 +932,17 @@ export default function ChatRoom() {
           ) : (
             <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>{item.text}</Text>
           )}
-          <Text style={[styles.timestamp, isMe && styles.timestampMe]}>{formatTime(item.timestamp)}</Text>
+          {isMe ? (
+            <View style={styles.stampRow}>
+              <Text style={[styles.timestamp, styles.timestampMe]}>{formatTime(item.timestamp)}</Text>
+              <ReadTicks
+                seen={isSeenByOther(chat, currentUser.role, item.timestamp)}
+                onDark
+              />
+            </View>
+          ) : (
+            <Text style={styles.timestamp}>{formatTime(item.timestamp)}</Text>
+          )}
         </View>
       </View>
       </>
@@ -1311,6 +1322,9 @@ const styles = StyleSheet.create({
   },
   timestamp: { fontSize: rf(10), color: Colors.textMuted, marginTop: rs(4) },
   timestampMe: { color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
+  // Время и галочки в одну строку, прижатые вправо: так они читаются как
+  // одна подпись под сообщением, а не как два отдельных значка.
+  stampRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: rs(3) },
   // Раньше подсказки лежали в ленте, прокручиваемой вбок: видно было две-три,
   // остальные приходилось искать пальцем. Теперь переносятся на строки и видны
   // сразу. Высоту ограничиваем, иначе восемь фраз съедят пол-экрана над

@@ -9,6 +9,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
+import { ReadTicks, isSeenByOther } from '@/components/ReadTicks';
 import { useApp } from '@/hooks/useApp';
 import { Chat } from '@/constants/types';
 import { nameColorFromString, getInitials, formatChatTime } from '@/services/storage';
@@ -116,9 +117,16 @@ function ChatRow({ item, currentUser, users, onPress, onDelete }: {
               {last ? <Text style={styles.chatTime}>{formatChatTime(last.timestamp)}</Text> : null}
             </View>
             <Text style={styles.chatVac} numberOfLines={1}>{item.vacTitle}</Text>
-            <Text style={styles.chatLast} numberOfLines={1}>
-              {messagePreview(last?.text)}
-            </Text>
+            <View style={styles.lastRow}>
+              {/* Галочки только если последнее слово за нами: у чужого
+                  сообщения показывать нечего — мы его и так читаем. */}
+              {last && last.senderId === currentUser.id ? (
+                <ReadTicks seen={isSeenByOther(item, currentUser.role, last.timestamp)} />
+              ) : null}
+              <Text style={styles.chatLast} numberOfLines={1}>
+                {messagePreview(last?.text)}
+              </Text>
+            </View>
           </View>
           {unread > 0 ? (
             <View style={styles.badge}>
@@ -270,7 +278,10 @@ const styles = StyleSheet.create({
   chatName: { fontSize: rf(14), fontWeight: '700', color: Colors.textPrimary, flex: 1 },
   chatTime: { fontSize: rf(12), color: Colors.textMuted },
   chatVac: { fontSize: rf(12), color: Colors.textMuted, marginTop: rs(2) },
-  chatLast: { fontSize: rf(13), color: '#374151', marginTop: rs(2) },
+  chatLast: { fontSize: rf(13), color: '#374151', flexShrink: 1 },
+  // flexShrink на тексте, а не на строке: длинное сообщение должно
+  // обрезаться само, не выдавливая галочки за край.
+  lastRow: { flexDirection: 'row', alignItems: 'center', gap: rs(3), marginTop: rs(2) },
   badge: { backgroundColor: Colors.primary, borderRadius: rs(100), minWidth: rs(20), height: rs(20), alignItems: 'center', justifyContent: 'center', paddingHorizontal: rs(4) },
   badgeText: { color: '#fff', fontSize: rf(10), fontWeight: '700' },
 });

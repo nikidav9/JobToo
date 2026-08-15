@@ -608,6 +608,8 @@ function rowToChat(r: any, messages: Message[] = []): Chat {
     messages,
     unreadWorker: r.unread_worker ?? 0,
     unreadEmployer: r.unread_employer ?? 0,
+    workerReadAt: r.worker_read_at ?? undefined,
+    employerReadAt: r.employer_read_at ?? undefined,
     createdAt: r.created_at,
     bulletinId: r.bulletin_id ?? undefined,
     isLocked: r.is_locked ?? false,
@@ -715,9 +717,12 @@ export async function dbCreateChat(
 
 export async function dbMarkRead(chatId: string, role: 'worker' | 'employer'): Promise<void> {
   if (IS_NATIVE) { await proxy('dbMarkRead', [chatId, role]); return; }
+  // Время прочтения рядом со счётчиком: по нему собеседник видит вторую
+  // галочку. Счётчик отвечает «сколько», отметка — «с какого момента».
   const field = role === 'worker' ? 'unread_worker' : 'unread_employer';
+  const stamp = role === 'worker' ? 'worker_read_at' : 'employer_read_at';
   const { error } = await withTimeout(
-    supabase.from('jm_chats').update({ [field]: 0 }).eq('id', chatId)
+    supabase.from('jm_chats').update({ [field]: 0, [stamp]: new Date().toISOString() }).eq('id', chatId)
   );
   if (error) throwOnError('dbMarkRead', error);
 }
