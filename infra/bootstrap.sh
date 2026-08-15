@@ -84,6 +84,16 @@ if [ -f "$REPO/infra/report.sh" ]; then
   install -m 755 "$REPO/infra/report.sh" /usr/local/bin/jt-report
 fi
 
+# Проверка анонимного пути — того, чем приложение грузит файлы и держит
+# живые подписки. Раз в десять минут: она лазает в базу и в три службы,
+# а ответ меняется только когда мы сами что-то поменяли.
+if [ -f "$REPO/infra/check-anon.sh" ]; then
+  if [ ! -f /var/lib/jt-anon-check ] \
+     || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-anon-check 2>/dev/null || echo 0) )) -gt 600 ]; then
+    bash "$REPO/infra/check-anon.sh" >/dev/null 2>&1 || true
+  fi
+fi
+
 # ── Секреты ───────────────────────────────────────────────────────────────
 if [ ! -f "$SECRETS" ]; then
   mkdir -p "$(dirname "$SECRETS")"

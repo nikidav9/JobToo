@@ -228,6 +228,10 @@ TMP=/tmp/jt-status.$$
   echo "  \"телеграм\": \"$(date -d "@$(stat -c %Y /var/lib/jt-tg-check2 2>/dev/null || echo 0)" +%H:%M 2>/dev/null) $(cat /var/lib/jt-tg-check2 2>/dev/null | cut -c1-400)\","
   echo "  \"сеть\": \"$(cat /var/lib/jt-net-check2 2>/dev/null | tr -d '"\\\n\r' | cut -c1-200)\","
 
+  # Анонимный путь: им приложение грузит файлы и держит живые подписки.
+  # Подробности — в infra/check-anon.sh.
+  echo "  \"анонимный_путь\": \"$(cat /var/lib/jt-anon-check 2>/dev/null | tr -d '"\\\n\r' | cut -c1-300)\","
+
   # Чем закончилась последняя публикация вакансии в группу. Записывает
   # db.php при каждой рассылке. Без этого причина отказа Telegram остаётся
   # внутри одного запроса и пропадает вместе с ним: снаружи видно только
