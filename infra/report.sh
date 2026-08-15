@@ -113,22 +113,36 @@ TMP=/tmp/jt-status.$$
   if [ ! -f /var/lib/jt-tg-check ] \
      || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-tg-check 2>/dev/null || echo 0) )) -gt 600 ]; then
     (cd /opt/jobtoo/infra 2>/dev/null && timeout 90 docker compose exec -T php php -r '
-      // Сначала контрольный выход наружу, потом уже Telegram. В прошлый раз
-      // было наоборот, и проверка сети не выполнилась вовсе: пять запросов
-      // по десять секунд не уложились в отведённое время, а обрезано было
-      // ровно то, ради чего всё и затевалось.
-      foreach (["https://ya.ru/" => "ya", "https://api.github.com/" => "github",
-                "https://api.telegram.org/" => "telegram"] as $u => $n) {
-        $c = curl_init($u);
-        curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8,
-                               CURLOPT_NOBODY => true, CURLOPT_CONNECTTIMEOUT => 6]);
-        $ok = curl_exec($c) !== false;
-        echo $n . "=" . ($ok ? "есть" : ("нет/" . curl_errno($c))) . " ";
-        curl_close($c);
-      }
       $s = @include "/var/www/api/app_secrets.php";
       $t = is_array($s) ? ($s["TG_BOT_TOKEN"] ?? "") : "";
       if (!strlen($t)) { echo "токена нет"; exit; }
+
+      // Отказы непостоянные: один и тот же getMe то проходит, то умирает по
+      // тайм-ауту. Одиночная проверка тут врёт в обе стороны, поэтому меряем
+      // счётом — и сразу сравниваем с принудительным IPv4.
+      //
+      // Сравнение нужно, чтобы отличить две разные болезни: если IPv4 берёт
+      // всегда, а обычный запрос через раз, виноват недоступный из контейнера
+      // IPv6 и лечится это одной строкой. Если плохо и там и там — это уже
+      // фильтрация на пути к Telegram, и лечится совсем иначе.
+      $try = function ($v4) use ($t) {
+        $c = curl_init("https://api.telegram.org/bot" . $t . "/getMe");
+        $o = [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 5];
+        if ($v4) $o[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+        curl_setopt_array($c, $o);
+        $b = curl_exec($c); $e = curl_errno($c); curl_close($c);
+        $j = json_decode((string) $b, true);
+        return [is_array($j) && ($j["ok"] ?? false), $e];
+      };
+      $cnt = ["как есть" => 0, "только IPv4" => 0]; $errs = [];
+      for ($i = 0; $i < 4; $i++) {
+        foreach ([false => "как есть", true => "только IPv4"] as $v4 => $name) {
+          [$ok, $e] = $try((bool) $v4);
+          if ($ok) $cnt[$name]++; elseif ($e) $errs[$name . "/" . $e] = 1;
+        }
+      }
+      foreach ($cnt as $name => $n) echo $name . "=" . $n . "/4 ";
+      if ($errs) echo "ошибки:" . implode(",", array_keys($errs)) . " ";
       // Причину отказа сохраняем: «не отвечает» не отличает заблокированную
       // сеть от просроченного токена, а чинится это по-разному.
       $why = "";
@@ -167,11 +181,12 @@ TMP=/tmp/jt-status.$$
     # докерная сеть, а не провайдер, лечится это совсем иначе.
     {
       printf 'машина: '
-      for u in https://ya.ru/ https://api.telegram.org/; do
-        printf '%s=%s ' "$(echo "$u" | cut -d/ -f3)" \
-          "$(curl -sS -o /dev/null -m 8 -w '%{http_code}' "$u" 2>&1 | tr -d '"' | cut -c1-40)"
+      ok=0; for i in 1 2 3 4; do
+        c=$(curl -sS -o /dev/null -m 8 -w '%{http_code}' "https://api.telegram.org/" 2>/dev/null)
+        [ "$c" = "302" ] && ok=$((ok + 1))
       done
-      printf 'адрес=%s' "$(getent hosts api.telegram.org 2>/dev/null | awk '{print $1}' | tr '\n' ',')"
+      printf 'telegram=%s/4 ' "$ok"
+      printf 'адреса=%s' "$(getent ahosts api.telegram.org 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ',')"
     } > /var/lib/jt-net-check 2>/dev/null
   fi
   echo "  \"телеграм\": \"$(cat /var/lib/jt-tg-check 2>/dev/null | cut -c1-400)\","
