@@ -159,6 +159,7 @@ jobs:
           DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
           STUDIO_LOGIN: ${{ secrets.STUDIO_LOGIN }}
           STUDIO_PASSWORD: ${{ secrets.STUDIO_PASSWORD }}
+          GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
         run: |
           if [ -z "$JT_DEPLOY_TOKEN" ]; then
             echo "JT_DEPLOY_TOKEN не задан — пропускаю доставку"
@@ -182,6 +183,8 @@ jobs:
                   "login":    e("STUDIO_LOGIN", ""),
                   "password": e("STUDIO_PASSWORD", ""),
               },
+              # Чтение репозитория. Нужен, только если его закроют.
+              "github": { "token": e("GH_READ_TOKEN", "") },
           }))
           PY
           code=$(curl -sS -o resp.json -w '%{http_code}' -m 60 \

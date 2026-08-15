@@ -317,6 +317,28 @@ chown root:www-data /var/www/private/token.txt 2>/dev/null || true
 chown -R 33:33 "$PROXY" 2>/dev/null || true
 chmod 750 "$PROXY"
 
+# ── Доступ к GitHub ───────────────────────────────────────────────────────
+# Пока репозиторий открыт, ни git, ни загрузка сборок пароля не требуют.
+# Стоит его закрыть — и то, и другое начнёт отказывать, причём загрузка
+# сборок молча: сервер просто оставит старую версию сайта.
+#
+# Поэтому заранее: если токен доставлен (см. php-proxy/deploy.php), git
+# начинает ходить с ним, а curl добавляет заголовок. Нет токена — всё
+# работает как раньше, ни одна строка ниже не меняется.
+GH_TOKEN=$(docker compose exec -T php php -r '
+  $v = @include "/var/www/api/gh_token.php";
+  echo is_string($v) ? $v : "";' 2>/dev/null | tr -d '\r\n' || true)
+
+GH_HDR=()
+if [ -n "${GH_TOKEN:-}" ]; then
+  GH_HDR=(-H "Authorization: Bearer $GH_TOKEN")
+  # git — через отдельный файл, а не через адрес: токен в адресе остаётся
+  # в .git/config и всплывает в каждом сообщении об ошибке.
+  git config --global credential.helper store 2>/dev/null || true
+  printf 'https://x-access-token:%s@github.com\n' "$GH_TOKEN" > /root/.git-credentials
+  chmod 600 /root/.git-credentials
+fi
+
 # ── Сайт ──────────────────────────────────────────────────────────────────
 # Собранная веб-версия приезжает не так, как на Reg.ru. Туда её кладёт
 # GitHub по FTP; сюда положить нечем — ни FTP, ни ssh, и заводить их значит
@@ -329,7 +351,7 @@ chmod 750 "$PROXY"
 # или скачался наполовину, на месте останется прежний рабочий сайт, а не
 # половина нового.
 WEBSRC=https://github.com/nikidav9/JobToo/releases/download/web/dist.tar.gz
-if curl -fsSL -m 300 -o /tmp/jt-web.tgz "$WEBSRC" 2>/dev/null; then
+if curl -fsSL -m 300 "${GH_HDR[@]}" -o /tmp/jt-web.tgz "$WEBSRC" 2>/dev/null; then
   SUM=$(sha256sum /tmp/jt-web.tgz | cut -d' ' -f1)
   if [ "$SUM" != "$(cat /var/lib/jt-web.sha 2>/dev/null || true)" ]; then
     rm -rf /tmp/jt-web && mkdir -p /tmp/jt-web
@@ -347,6 +369,12 @@ if curl -fsSL -m 300 -o /tmp/jt-web.tgz "$WEBSRC" 2>/dev/null; then
     fi
   fi
   rm -f /tmp/jt-web.tgz
+  echo ok > /var/lib/jt-web.ok
+else
+  # Молчать здесь нельзя. Сборка не скачалась — сайт остаётся прежним, и
+  # снаружи это выглядит как «выкладка не доехала», без единой подсказки.
+  rm -f /var/lib/jt-web.ok
+  say "сайт" "сборка не скачалась (репозиторий закрыт без токена?)"
 fi
 
 # ── Дашборд ───────────────────────────────────────────────────────────────
@@ -356,7 +384,7 @@ fi
 # Забираем всегда, а запускаем только когда есть что запускать: пока файла
 # server.js нет, служба не поднимается и место не занимает.
 DASHSRC=https://github.com/nikidav9/JobToo/releases/download/dashboard/dashboard.tar.gz
-if curl -fsSL -m 300 -o /tmp/jt-dash.tgz "$DASHSRC" 2>/dev/null; then
+if curl -fsSL -m 300 "${GH_HDR[@]}" -o /tmp/jt-dash.tgz "$DASHSRC" 2>/dev/null; then
   DSUM=$(sha256sum /tmp/jt-dash.tgz | cut -d' ' -f1)
   if [ "$DSUM" != "$(cat /var/lib/jt-dash.sha 2>/dev/null || true)" ]; then
     rm -rf /tmp/jt-dash && mkdir -p /tmp/jt-dash
