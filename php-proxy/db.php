@@ -260,22 +260,31 @@ function sb_single(string $t, array $f = [], string $sel = '*'): ?array {
     return !empty($rows) ? $rows[0] : null;
 }
 
+// Сигнал приложению уходит отсюда, из обёрток записи, а не из мест вызова:
+// так о нём невозможно забыть при следующей правке. Он идёт после самой
+// записи — сначала данные, потом слово о них.
 function sb_insert(string $t, array $data, bool $ret = false): array {
-    return sb('POST', $t, [], $data, [$ret ? 'Prefer: return=representation' : 'Prefer: return=minimal']);
+    $r = sb('POST', $t, [], $data, [$ret ? 'Prefer: return=representation' : 'Prefer: return=minimal']);
+    rt_touch($t);
+    return $r;
 }
 
 function sb_upsert(string $t, array $data, string $conflict = '', bool $ret = false): array {
     $pref = 'resolution=merge-duplicates,return=' . ($ret ? 'representation' : 'minimal');
     $q = $conflict ? ['on_conflict' => $conflict] : [];
-    return sb('POST', $t, $q, $data, ['Prefer: ' . $pref]);
+    $r = sb('POST', $t, $q, $data, ['Prefer: ' . $pref]);
+    rt_touch($t);
+    return $r;
 }
 
 function sb_update(string $t, array $f, array $data): void {
     sb('PATCH', $t, $f, $data, ['Prefer: return=minimal']);
+    rt_touch($t);
 }
 
 function sb_delete(string $t, array $f): void {
     sb('DELETE', $t, $f);
+    rt_touch($t);
 }
 
 function sb_rpc(string $fn, array $params = []): mixed {
@@ -324,7 +333,62 @@ function jt_secret(string $name, string $fallback = ''): string {
 // туда попадёт, сможет прочитать любой, кто угадает имя канала. Пусть знает
 // только то, что где-то шевельнулось.
 
-function rt_broadcast(string $topic, string $event, array $payload = []): void {
+/**
+ * Разделы, об изменении которых приложению стоит узнать сразу.
+ *
+ * Раньше оно узнавало об этом подпиской на сами таблицы. Но чтобы такая
+ * подписка что-то приносила, ключу приложения нужны права на чтение — а он
+ * лежит в каждой установленной сборке и достаётся оттуда кем угодно. Ради
+ * живой ленты пришлось бы открыть постороннему телефоны и переписку.
+ *
+ * Поэтому наружу уходит только имя раздела, без единой строки данных. По
+ * нему приложение перечитывает нужное через этот же прокси, где проверяется
+ * пропуск. Ключ из телефона годится ровно на одно: услышать «обновись».
+ */
+const RT_SECTIONS = [
+    'jm_vacancies'        => 'vacancies',
+    'jm_chats'            => 'chats',
+    'jm_messages'         => 'chats',
+    'jm_likes'            => 'likes',
+    'jm_perm_vacancies'   => 'perm_vacancies',
+    'jm_perm_applications'=> 'perm_applications',
+    // jm_users намеренно нет. В эту таблицу пишется отметка «был в сети» —
+    // у каждого человека раз в несколько минут. Сигнал оттуда заставлял бы
+    // все открытые приложения перечитывать список из четырёхсот профилей
+    // без всякого повода. Профиль меняется редко, и его подхватывает
+    // обычное обновление по таймеру.
+    'jm_saved'            => 'saved',
+    'jm_perm_saved'       => 'perm_saved',
+    'jm_ratings'          => 'ratings',
+    'jm_notifications'    => 'notifications',
+];
+
+/**
+ * Сказать приложению, что раздел изменился.
+ *
+ * Зовётся из обёрток записи, а не из мест вызова: так о новом разделе
+ * невозможно забыть, а забытый сигнал — это молча не обновляющийся экран,
+ * и никто не поймёт почему.
+ */
+function rt_touch(string $table): void {
+    // За один запрос про раздел говорим однажды. Одна отправка отклика
+    // трогает и лайки, и чаты, и сообщения; рассылка уведомлений — четыреста
+    // строк подряд, и столько же сигналов были бы вредны, а не полезны.
+    static $sent = [];
+    static $broken = false;
+    if ($broken) return;
+
+    $what = RT_SECTIONS[$table] ?? null;
+    if ($what === null || isset($sent[$what])) return;
+    $sent[$what] = true;
+
+    // Realtime молчит — перестаём его дёргать до конца запроса. Иначе
+    // одиннадцать разделов по четыре секунды тайм-аута превратятся в
+    // сорок секунд ожидания у человека, отправившего одно сообщение.
+    if (!rt_broadcast('jt', 'changed', ['что' => $what])) $broken = true;
+}
+
+function rt_broadcast(string $topic, string $event, array $payload = []): bool {
     $body = json_encode([
         'messages' => [['topic' => $topic, 'event' => $event, 'payload' => $payload]],
     ], JSON_UNESCAPED_UNICODE);
@@ -343,8 +407,10 @@ function rt_broadcast(string $topic, string $event, array $payload = []): void {
             'Content-Type: application/json',
         ],
     ]);
-    curl_exec($ch);
+    $resp = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+    return $resp !== false && $code >= 200 && $code < 300;
 }
 
 // Единственное место, где сообщения попадают в базу: и обычные, и системные.

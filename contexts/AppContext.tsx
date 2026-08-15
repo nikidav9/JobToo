@@ -401,18 +401,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     };
 
-    safeSub(supabase.channel('rt_vacancies').on('postgres_changes', { event: '*', schema: 'public', table: 'jm_vacancies' }, () => refreshVacancies()));
-    safeSub(supabase.channel('rt_chats').on('postgres_changes', { event: '*', schema: 'public', table: 'jm_chats' }, () => refreshChats(user)));
-    safeSub(supabase.channel('rt_messages_global').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jm_messages' }, () => refreshChats(user)));
-    safeSub(supabase.channel('rt_likes').on('postgres_changes', { event: '*', schema: 'public', table: 'jm_likes' }, () => refreshLikes(user)));
-    safeSub(supabase.channel('rt_perm_vac').on('postgres_changes', { event: '*', schema: 'public', table: 'jm_perm_vacancies' }, () => refreshPermVacancies(user)));
-    safeSub(supabase.channel('rt_perm_apps').on('postgres_changes', { event: '*', schema: 'public', table: 'jm_perm_applications' }, () => refreshPermApplications(user)));
-    safeSub(supabase.channel('rt_users').on('postgres_changes', { event: '*', schema: 'public', table: 'jm_users' }, () => refreshUsers()));
-    safeSub(supabase.channel('rt_saved').on('postgres_changes', { event: '*', schema: 'public', table: 'jm_saved' }, () => refreshSaved(user)));
-    safeSub(supabase.channel('rt_perm_saved').on('postgres_changes', { event: '*', schema: 'public', table: 'jm_perm_saved' }, () => refreshPermSaved(user)));
-    safeSub(supabase.channel('rt_ratings').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jm_ratings' }, () => refreshUsers()));
+    // Один канал сигналов вместо одиннадцати подписок на таблицы.
+    //
+    // Подписка на таблицу приносит строки, а значит требует права их читать.
+    // Ключ приложения лежит в каждой установленной сборке, и выдать ему такие
+    // права — то же самое, что открыть телефоны и переписку четырёхсот
+    // человек любому, кто этот ключ оттуда достанет.
+    //
+    // Поэтому сервер шлёт только имя раздела — ни строчки данных, — а мы по
+    // нему перечитываем нужное через прокси, где проверяется пропуск.
+    // Сигналы расставлены в обёртках записи (php-proxy/db.php, rt_touch),
+    // чтобы о них нельзя было забыть.
+    const onChange: Record<string, () => void> = {
+      vacancies: () => refreshVacancies(),
+      chats: () => refreshChats(user),
+      likes: () => refreshLikes(user),
+      perm_vacancies: () => refreshPermVacancies(user),
+      perm_applications: () => refreshPermApplications(user),
+      users: () => refreshUsers(),
+      saved: () => refreshSaved(user),
+      perm_saved: () => refreshPermSaved(user),
+      ratings: () => refreshUsers(),
+      notifications: () => refreshNotifications(),
+    };
 
-    safeSub(supabase.channel('rt_notifications').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jm_notifications', filter: `user_id=eq.${user.id}` }, () => refreshNotifications()));
+    safeSub(
+      supabase.channel('jt').on('broadcast', { event: 'changed' }, ({ payload }) => {
+        // Ключ по-русски — такой же, как на стороне сервера: разбирать это
+        // придётся вместе с php-proxy, и разные имена там и тут только мешают.
+        const what = (payload as { что?: string } | undefined)?.что;
+        if (what && onChange[what]) onChange[what]();
+      })
+    );
 
     return () => {
       subs.forEach(s => { try { s.unsubscribe(); } catch {} });
@@ -537,15 +557,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     let ch: any = null;
     try {
+      // Тот же канал сигналов, что и на вебе: подписка на таблицу требует
+      // права её читать, а ключ приложения лежит в каждой сборке.
+      //
+      // Отбора по человеку здесь больше нет — сигнал общий. Значит уведомления
+      // перечитает и тот, кому ничего не пришло: один дешёвый запрос вместо
+      // права читать чужие уведомления. Обмен того стоит.
       const client = getSupabaseClient();
       ch = client
-        .channel(`rt_notif_native_${currentUser.id}`)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'jm_notifications',
-          filter: `user_id=eq.${currentUser.id}`,
-        }, () => refreshNotifications());
+        .channel('jt')
+        .on('broadcast', { event: 'changed' }, ({ payload }: { payload?: { что?: string } }) => {
+          if (payload?.что === 'notifications') refreshNotifications();
+        });
       ch.subscribe();
     } catch (e) {
       console.warn('[AppContext] native notif realtime failed:', e);
