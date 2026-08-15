@@ -122,10 +122,96 @@ timeout 600 docker compose --env-file "$SECRETS" up -d --remove-orphans || say "
 # ── Шлюз ──────────────────────────────────────────────────────────────────
 # Свою конфигурацию кладём вместо стандартной: две одновременно спорят
 # за default_server, и nginx не поднимется.
+# Конфигурацию собираем целиком и перезапускаем ОДИН раз.
+#
+# Раньше сначала клался вариант без TLS с перезапуском, а защищённая часть
+# дописывалась в самом конце — после ролей, миграций, переноса и копий. Всё
+# это время порт 443 не слушал, и прокси на хостинге получал отказ. Каждую
+# минуту, по несколько минут кряду.
+
+# ── Временный мост по ключу ───────────────────────────────────────────────
+# Прокси на хостинге ходит со старым ключом облака: новый лежит в секретах
+# GitHub, а поменять их может только владелец. Пока это не сделано, nginx
+# принимает старый ключ и подставляет вместо него новый.
+#
+# Это мост, а не решение. Он не расширяет доступ: старый ключ и раньше давал
+# те же права на те же данные, а знают его те же места, что и прежде.
+# Убрать сразу, как в настройках появится SB_SERVICE_KEY от нового сервера.
+#
+# Сам ключ берётся из файла на машине и в репозиторий не попадает.
+if [ -f /opt/jobtoo-secrets/cloud ]; then
+  OLDKEY=$(grep -m1 '^SB_KEY=' /opt/jobtoo-secrets/cloud | cut -d= -f2-)
+  if [ -n "$OLDKEY" ] && [ -n "${SERVICE_ROLE_KEY:-}" ]; then
+    cat > /etc/nginx/conf.d/jt-authswap.conf <<EOF
+# Ключи — длинные строки, в стандартный буфер сопоставления не помещаются:
+# nginx отвечает «could not build map_hash».
+map_hash_bucket_size 512;
+map_hash_max_size 2048;
+
+map \$http_authorization \$jt_auth {
+    default   \$http_authorization;
+    "Bearer $OLDKEY" "Bearer $SERVICE_ROLE_KEY";
+}
+map \$http_apikey \$jt_apikey {
+    default  \$http_apikey;
+    "$OLDKEY" "$SERVICE_ROLE_KEY";
+}
+EOF
+    chmod 600 /etc/nginx/conf.d/jt-authswap.conf
+  fi
+fi
+
+# ── Панель и сертификат ───────────────────────────────────────────────────
+# Пароль к панели создаётся один раз и лежит рядом с остальными секретами.
+if [ ! -f /opt/jobtoo-secrets/studio ]; then
+  SPASS=$(openssl rand -base64 12 | tr -d '/+=' | cut -c1-12)
+  echo "STUDIO_USER=admin"      >  /opt/jobtoo-secrets/studio
+  echo "STUDIO_PASS=$SPASS"     >> /opt/jobtoo-secrets/studio
+  chmod 600 /opt/jobtoo-secrets/studio
+fi
+. /opt/jobtoo-secrets/studio
+if [ ! -f /etc/nginx/.htpasswd ]; then
+  printf '%s:%s\n' "$STUDIO_USER" "$(openssl passwd -apr1 "$STUDIO_PASS")" > /etc/nginx/.htpasswd
+  chmod 640 /etc/nginx/.htpasswd
+  chown root:www-data /etc/nginx/.htpasswd 2>/dev/null || true
+fi
+
+# Сертификат на имя вида <адрес>.sslip.io: своего домена пока нет, а без
+# TLS пароль к панели ходил бы открытым текстом. Имя временное, поменяем
+# на db.jobtoo.ru, когда до записи дойдут руки.
+# Строго IPv4: ifconfig.me отдавал IPv6, и имя получалось несуществующим —
+# certbot честно не мог выпустить сертификат на 2a03:...sslip.io.
+# Строго IPv4: ifconfig.me отдавал IPv6, и имя получалось несуществующим —
+# certbot честно не мог выпустить сертификат на 2a03:...sslip.io.
+IP=$(ip -4 addr show scope global 2>/dev/null | grep -oE 'inet [0-9.]+' | awk '{print $2}' | head -1)
+HOST="${IP}.sslip.io"
+
+# certonly, а не --nginx: правки certbot в конфигурации не выживали. Этот
+# скрипт переписывает её каждую минуту и стирал всё, что тот вносил —
+# сертификат был выпущен, а отдавать его было некому.
+if [ ! -d "/etc/letsencrypt/live/$HOST" ] && command -v certbot >/dev/null 2>&1; then
+  certbot certonly --webroot -w /var/www/html -n --agree-tos \
+    -m nikidav9@gmail.com -d "$HOST" >>/var/log/jt-apply.log 2>&1 \
+    && say "сертификат" "выпущен на $HOST" \
+    || say "сертификат" "не вышло, работаем по http"
+fi
+
 cp "$REPO/infra/nginx.conf" /etc/nginx/sites-available/jobtoo
+if [ -d "/etc/letsencrypt/live/$HOST" ] && [ -f "$REPO/infra/nginx-tls.conf" ]; then
+  sed "s/__HOST__/$HOST/g" "$REPO/infra/nginx-tls.conf" >> /etc/nginx/sites-available/jobtoo
+fi
 ln -sf /etc/nginx/sites-available/jobtoo /etc/nginx/sites-enabled/jobtoo
 rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl reload nginx
+
+if nginx -t >/tmp/jt-nginx.log 2>&1; then
+  systemctl reload nginx
+  say "шлюз" "собран${HOST:+, tls на $HOST}"
+else
+  say "шлюз" "не прошёл проверку: $(grep -a -m1 -iE 'emerg|error' /tmp/jt-nginx.log | cut -c1-200)"
+  # Лучше без шифрования, чем без шлюза вовсе.
+  cp "$REPO/infra/nginx.conf" /etc/nginx/sites-available/jobtoo
+  nginx -t >/dev/null 2>&1 && systemctl reload nginx
+fi
 
 set +e
 # ── Роли ──────────────────────────────────────────────────────────────────
@@ -227,38 +313,6 @@ if [ "${#REALTIME_ENC_KEY}" -ne 16 ]; then
   say "realtime" "ключ шифрования заменён на верную длину"
 fi
 
-# ── Временный мост по ключу ───────────────────────────────────────────────
-# Прокси на хостинге ходит со старым ключом облака: новый лежит в секретах
-# GitHub, а поменять их может только владелец. Пока это не сделано, nginx
-# принимает старый ключ и подставляет вместо него новый.
-#
-# Это мост, а не решение. Он не расширяет доступ: старый ключ и раньше давал
-# те же права на те же данные, а знают его те же места, что и прежде.
-# Убрать сразу, как в настройках появится SB_SERVICE_KEY от нового сервера.
-#
-# Сам ключ берётся из файла на машине и в репозиторий не попадает.
-if [ -f /opt/jobtoo-secrets/cloud ]; then
-  OLDKEY=$(grep -m1 '^SB_KEY=' /opt/jobtoo-secrets/cloud | cut -d= -f2-)
-  if [ -n "$OLDKEY" ] && [ -n "${SERVICE_ROLE_KEY:-}" ]; then
-    cat > /etc/nginx/conf.d/jt-authswap.conf <<EOF
-# Ключи — длинные строки, в стандартный буфер сопоставления не помещаются:
-# nginx отвечает «could not build map_hash».
-map_hash_bucket_size 512;
-map_hash_max_size 2048;
-
-map \$http_authorization \$jt_auth {
-    default   \$http_authorization;
-    "Bearer $OLDKEY" "Bearer $SERVICE_ROLE_KEY";
-}
-map \$http_apikey \$jt_apikey {
-    default  \$http_apikey;
-    "$OLDKEY" "$SERVICE_ROLE_KEY";
-}
-EOF
-    chmod 600 /etc/nginx/conf.d/jt-authswap.conf
-  fi
-fi
-
 # ── Резервные копии ───────────────────────────────────────────────────────
 # Ставим таймер один раз. Копия делается раньше переключения намеренно:
 # после него данные 420 человек будут жить в единственном экземпляре.
@@ -286,57 +340,6 @@ EOF
   # Первую копию делаем сразу, не дожидаясь ночи: без неё данные существуют
   # в одном экземпляре прямо сейчас.
   /usr/local/bin/jt-backup || true
-fi
-
-# ── Панель и сертификат ───────────────────────────────────────────────────
-# Пароль к панели создаётся один раз и лежит рядом с остальными секретами.
-if [ ! -f /opt/jobtoo-secrets/studio ]; then
-  SPASS=$(openssl rand -base64 12 | tr -d '/+=' | cut -c1-12)
-  echo "STUDIO_USER=admin"      >  /opt/jobtoo-secrets/studio
-  echo "STUDIO_PASS=$SPASS"     >> /opt/jobtoo-secrets/studio
-  chmod 600 /opt/jobtoo-secrets/studio
-fi
-. /opt/jobtoo-secrets/studio
-if [ ! -f /etc/nginx/.htpasswd ]; then
-  printf '%s:%s\n' "$STUDIO_USER" "$(openssl passwd -apr1 "$STUDIO_PASS")" > /etc/nginx/.htpasswd
-  chmod 640 /etc/nginx/.htpasswd
-  chown root:www-data /etc/nginx/.htpasswd 2>/dev/null || true
-fi
-
-# Сертификат на имя вида <адрес>.sslip.io: своего домена пока нет, а без
-# TLS пароль к панели ходил бы открытым текстом. Имя временное, поменяем
-# на db.jobtoo.ru, когда до записи дойдут руки.
-# Строго IPv4: ifconfig.me отдавал IPv6, и имя получалось несуществующим —
-# certbot честно не мог выпустить сертификат на 2a03:...sslip.io.
-# Строго IPv4: ifconfig.me отдавал IPv6, и имя получалось несуществующим —
-# certbot честно не мог выпустить сертификат на 2a03:...sslip.io.
-IP=$(ip -4 addr show scope global 2>/dev/null | grep -oE 'inet [0-9.]+' | awk '{print $2}' | head -1)
-HOST="${IP}.sslip.io"
-
-# certonly, а не --nginx: правки certbot в конфигурации не выживали. Этот
-# скрипт переписывает её каждую минуту и стирал всё, что тот вносил —
-# сертификат был выпущен, а отдавать его было некому.
-if [ ! -d "/etc/letsencrypt/live/$HOST" ] && command -v certbot >/dev/null 2>&1; then
-  certbot certonly --webroot -w /var/www/html -n --agree-tos \
-    -m nikidav9@gmail.com -d "$HOST" >>/var/log/jt-apply.log 2>&1 \
-    && say "сертификат" "выпущен на $HOST" \
-    || say "сертификат" "не вышло, работаем по http"
-fi
-
-# TLS-часть подставляем сами, из своего файла.
-if [ -d "/etc/letsencrypt/live/$HOST" ] && [ -f "$REPO/infra/nginx-tls.conf" ]; then
-  sed "s/__HOST__/$HOST/g" "$REPO/infra/nginx-tls.conf" \
-    >> /etc/nginx/sites-available/jobtoo
-  if nginx -t >/tmp/jt-nginx.log 2>&1; then
-    systemctl reload nginx
-    say "tls" "включён: https://$HOST и панель https://$HOST:8443"
-  else
-    say "tls" "конфигурация не прошла: $(grep -a -m1 -iE 'emerg|error' /tmp/jt-nginx.log | cut -c1-220)"
-    # Возвращаем рабочую конфигурацию без TLS, иначе перезапуск nginx
-    # оставит сервер без шлюза вообще.
-    cp "$REPO/infra/nginx.conf" /etc/nginx/sites-available/jobtoo
-    nginx -t >/dev/null 2>&1 && systemctl reload nginx
-  fi
 fi
 
 # ── Перенос данных из облака ──────────────────────────────────────────────
