@@ -190,7 +190,8 @@ services:
     ports: ["127.0.0.1:9000:9000"]
     volumes:
       - /opt/jobtoo/php-proxy:/var/www/api:ro
-      - /opt/jobtoo-secrets/proxy:/var/www/secrets:ro
+      - /opt/jobtoo/infra/intake:/var/www/intake:ro
+      - /opt/jobtoo-secrets/proxy:/var/www/secrets
     environment:
       # Через свой же шлюз, а не напрямую в PostgREST: прокси добавляет к
       # адресу /rest/v1/ сам, и путь должен совпадать с боевым. Петля внутри
