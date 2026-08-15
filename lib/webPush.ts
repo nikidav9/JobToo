@@ -1,6 +1,14 @@
 import { Platform } from 'react-native';
 
-const VAPID_PUBLIC_KEY = 'BMps5FNvS_ODiL0Rf2d76P8cy_xLh2C7EVXb9mHABkZLQz58mwUzTVzkle_5R0ACYR0IGD-zuS4cuYEhuvCMYE4';
+// Публичная половина пары, которую сервер создал сам (infra/bootstrap.sh).
+// Прежняя жила в настройках Vercel, и её приватная часть однажды прошла
+// через переписку — то есть перестала быть секретом. Новую приватную часть
+// не знает никто, кроме самой машины.
+//
+// Ключ здесь не секрет: браузер получает его при каждой подписке. Менять
+// его безопасно — ниже подписка сверяется с ним и перевыпускается, если
+// выдана под другой.
+const VAPID_PUBLIC_KEY = 'BOGmoT8nUYJHXx8zLh7kmn_xDoaaLKu0wbSgWhqphsImHNeiTIscMLFEZsndZflZ6Xp9sJ8UMC1iIIkiLCecNzs';
 
 // Supabase напрямую из браузера блокируется в РФ — сохраняем через прокси jobtoo.ru
 const PROXY_URL = process.env.EXPO_PUBLIC_API_URL
