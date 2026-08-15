@@ -116,15 +116,23 @@ TMP=/tmp/jt-status.$$
   # свежий, а не позавчерашний.
   if [ ! -f /var/lib/jt-tg-check2 ] \
      || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-tg-check2 2>/dev/null || echo 0) )) -gt 600 ]; then
-    (cd /opt/jobtoo/infra 2>/dev/null && timeout 90 docker compose exec -T php php -r '
+    (cd /opt/jobtoo/infra 2>/dev/null && timeout 150 docker compose exec -T php php -r '
       $s = @include "/var/www/api/app_secrets.php";
       $t = is_array($s) ? ($s["TG_BOT_TOKEN"] ?? "") : "";
       if (!strlen($t)) { echo "токена нет"; exit; }
 
       // Достался ли контейнеру IPv6. Без него до Telegram отсюда не дойти
       // вовсе: его IPv4-адрес закрыт, и это единственная работающая дорога.
-      echo "свой_ipv6=" . (trim((string) @shell_exec(
-        "ip -6 addr show scope global 2>/dev/null | grep -c inet6")) > 0 ? "есть" : "нет") . " ";
+      //
+      // Читаем из самой системы, а не спрашиваем утилиту ip: в этом образе
+      // её нет, и проверка отвечала «нет» независимо от истины. Пятый столбец
+      // здесь — область видимости, 00 значит глобальный адрес.
+      $v6 = "нет";
+      foreach (@file("/proc/net/if_inet6") ?: [] as $line) {
+        $p = preg_split("/\s+/", trim($line));
+        if (($p[3] ?? "") === "00" && ($p[0] ?? "") !== str_repeat("0", 32)) { $v6 = "есть"; break; }
+      }
+      echo "свой_ipv6=" . $v6 . " ";
 
       // Отказы непостоянные: один и тот же getMe то проходит, то умирает по
       // тайм-ауту. Одиночная проверка тут врёт в обе стороны, поэтому меряем
@@ -134,23 +142,29 @@ TMP=/tmp/jt-status.$$
       // всегда, а обычный запрос через раз, виноват недоступный из контейнера
       // IPv6 и лечится это одной строкой. Если плохо и там и там — это уже
       // фильтрация на пути к Telegram, и лечится совсем иначе.
-      $try = function ($v4) use ($t) {
+      // Три способа: как получится, строго по IPv6 и строго по IPv4.
+      // Третий — заведомо закрытый — оставлен как контроль: если и он
+      // вдруг начнёт отвечать, значит изменилась сеть, а не наша настройка.
+      $try = function ($mode) use ($t) {
         $c = curl_init("https://api.telegram.org/bot" . $t . "/getMe");
-        $o = [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 5];
-        if ($v4) $o[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+        $o = [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 4];
+        if ($mode === 4) $o[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+        if ($mode === 6) $o[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V6;
         curl_setopt_array($c, $o);
         $b = curl_exec($c); $e = curl_errno($c); curl_close($c);
         $j = json_decode((string) $b, true);
         return [is_array($j) && ($j["ok"] ?? false), $e];
       };
-      $cnt = ["как есть" => 0, "только IPv4" => 0]; $errs = [];
-      for ($i = 0; $i < 4; $i++) {
-        foreach ([false => "как есть", true => "только IPv4"] as $v4 => $name) {
-          [$ok, $e] = $try((bool) $v4);
-          if ($ok) $cnt[$name]++; elseif ($e) $errs[$name . "/" . $e] = 1;
+      $plan = [["как есть", 0, 4], ["только IPv6", 6, 4], ["только IPv4", 4, 2]];
+      $errs = [];
+      foreach ($plan as [$name, $mode, $times]) {
+        $n = 0;
+        for ($i = 0; $i < $times; $i++) {
+          [$ok, $e] = $try($mode);
+          if ($ok) $n++; elseif ($e) $errs[$name . "/" . $e] = 1;
         }
+        echo $name . "=" . $n . "/" . $times . " ";
       }
-      foreach ($cnt as $name => $n) echo $name . "=" . $n . "/4 ";
       if ($errs) echo "ошибки:" . implode(",", array_keys($errs)) . " ";
       // Причину отказа сохраняем: «не отвечает» не отличает заблокированную
       // сеть от просроченного токена, а чинится это по-разному.
