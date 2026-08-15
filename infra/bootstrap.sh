@@ -367,36 +367,26 @@ chmod +x /etc/letsencrypt/renewal-hooks/deploy/nginx.sh
 # раньше, чем хоть кто-то придёт по новому адресу.
 DOMAIN=jobtoo.ru
 if [ ! -d "/etc/letsencrypt/live/$DOMAIN" ] && command -v certbot >/dev/null 2>&1; then
-  mkdir -p /var/www/html/.well-known/acme-challenge
-  echo "jt-ok" > /var/www/html/.well-known/acme-challenge/jt-probe
-  P1=$(curl -fsSL -m 20 "http://$DOMAIN/.well-known/acme-challenge/jt-probe" 2>/dev/null || true)
-  P2=$(curl -fsSL -m 20 "http://www.$DOMAIN/.well-known/acme-challenge/jt-probe" 2>/dev/null || true)
-  # Пауза между попытками: обычно час, но если имя уже указывает сюда —
-  # десять минут. В этом случае каждая минута ожидания это минута, когда
-  # приложение упирается в чужой сертификат.
-  PAUSE=3600
-  if { [ "$P1" != "jt-ok" ] || [ "$P2" != "jt-ok" ]; } && command -v dig >/dev/null 2>&1; then
-    NS=$(dig +short +time=5 +tries=1 NS "$DOMAIN" 2>/dev/null | head -1)
-    if [ -n "$NS" ]; then
-      A1=$(dig +short +time=5 +tries=1 A "$DOMAIN"      "@$NS" 2>/dev/null | grep -c "^$IP$" || true)
-      A2=$(dig +short +time=5 +tries=1 A "www.$DOMAIN"  "@$NS" 2>/dev/null | grep -c "^$IP$" || true)
-      if [ "${A1:-0}" -ge 1 ] && [ "${A2:-0}" -ge 1 ]; then
-        P1=jt-ok; P2=jt-ok; PAUSE=600
-        say "сертификат" "$DOMAIN уже указывает сюда — выпускаю"
-      fi
-    fi
-  fi
-  if [ "$P1" = "jt-ok" ] && [ "$P2" = "jt-ok" ]; then
-    # Впустую пробовать нельзя: пять неудач в час закрывают выпуск на домен.
-    LAST=$(cat /var/lib/jt-cert-last 2>/dev/null || echo 0)
-    NOW=$(date +%s)
-    if [ $((NOW - LAST)) -gt "$PAUSE" ]; then
-      date +%s > /var/lib/jt-cert-last
-      certbot certonly --webroot -w /var/www/html -n --agree-tos \
-        -m nikidav9@gmail.com -d "$DOMAIN" -d "www.$DOMAIN" >>/var/log/jt-apply.log 2>&1 \
-        && say "сертификат" "выпущен на $DOMAIN и www" \
-        || say "сертификат" "на $DOMAIN не вышел, повтор через $((PAUSE / 60)) мин"
-    fi
+  # Раньше здесь стояла предварительная проверка своим файлом: она берегла
+  # от пустых попыток, пока домен ещё указывал на хостинг. В день переезда
+  # она же и подвела — условие не сложилось, выпуск не начался, а сайт всё
+  # это время не отдавался вовсе. Причина осталась невыясненной, и это
+  # решающий довод против неё: страховка, которая сама может не сработать и
+  # тем остановить главное, вредна.
+  #
+  # Домен теперь указывает сюда, и Let's Encrypt проверяет владение сам,
+  # приходя прямо на этот сервер. Второй сторож не нужен.
+  #
+  # Пауза 15 минут: пять неудачных проверок в час закрывают выпуск на домен,
+  # а таймер здесь ходит каждую минуту.
+  LAST=$(cat /var/lib/jt-cert-last 2>/dev/null || echo 0)
+  NOW=$(date +%s)
+  if [ "$((NOW - ${LAST:-0}))" -gt 900 ]; then
+    date +%s > /var/lib/jt-cert-last
+    certbot certonly --webroot -w /var/www/html -n --agree-tos \
+      -m nikidav9@gmail.com -d "$DOMAIN" -d "www.$DOMAIN" >>/var/log/jt-apply.log 2>&1 \
+      && say "сертификат" "выпущен на $DOMAIN и www" \
+      || say "сертификат" "на $DOMAIN не вышел, повтор через 15 мин"
   fi
 fi
 
