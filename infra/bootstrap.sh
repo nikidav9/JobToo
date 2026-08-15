@@ -177,11 +177,21 @@ mkdir -p /var/www/private
 {
   echo "# Вписать в Settings → Secrets and variables → Actions"
   echo
+  echo "## Можно вписывать сейчас"
+  echo
   echo "JT_DEPLOY_TOKEN=$DEPLOY_TOKEN"
   echo "SB_SERVICE_KEY=$SERVICE_ROLE_KEY"
-  echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+  echo
+  echo "## ТОЛЬКО ПОСЛЕ переезда домена на этот сервер"
+  echo "#"
+  echo "# Эти два уводят живые чаты и загрузку файлов с облака сюда."
+  echo "# Пока jobtoo.ru указывает на Reg.ru, там нет ни /rest/v1, ни"
+  echo "# /storage/v1 — и первое же обновление по воздуху сломает чаты и"
+  echo "# фотографии у всех разом. Обновление уходит само, на каждый коммит,"
+  echo "# так что ошибиться здесь можно ровно один раз."
+  echo
   echo "EXPO_PUBLIC_SUPABASE_URL=https://jobtoo.ru"
-  echo "SB_URL=https://jobtoo.ru"
+  echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
 } > /var/www/private/token.txt
 chmod 640 /var/www/private/token.txt
 chown root:www-data /var/www/private/token.txt 2>/dev/null || true
