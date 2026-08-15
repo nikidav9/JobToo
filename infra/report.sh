@@ -104,6 +104,36 @@ TMP=/tmp/jt-status.$$
         else { echo $f . "=" . (strlen((string)$v) ? "есть" : "пусто") . " "; }
       }' 2>&1 | tr -d '"' | tr '\n' ' ' | cut -c1-300)\","
 
+  # Жив ли токен бота на этом сервере и виден ли ему группа.
+  #
+  # После переезда домена вебхук бота придёт сюда, и проверять это будет
+  # поздно. Раз в час, а не каждую минуту: Telegram незачем дёргать по кругу,
+  # а ответ меняется редко.
+  if [ ! -f /var/lib/jt-tg-check ] \
+     || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-tg-check 2>/dev/null || echo 0) )) -gt 3600 ]; then
+    (cd /opt/jobtoo/infra 2>/dev/null && timeout 30 docker compose exec -T php php -r '
+      $s = @include "/var/www/api/app_secrets.php";
+      $t = is_array($s) ? ($s["TG_BOT_TOKEN"] ?? "") : "";
+      if (!strlen($t)) { echo "токена нет"; exit; }
+      $get = function ($m) use ($t) {
+        $c = curl_init("https://api.telegram.org/bot" . $t . "/" . $m);
+        curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10]);
+        $r = json_decode((string) curl_exec($c), true); curl_close($c);
+        return is_array($r) ? $r : [];
+      };
+      $me = $get("getMe");
+      echo "бот=" . ($me["ok"] ?? false ? ($me["result"]["username"] ?? "?") : "не отвечает");
+      $g = $get("getChat?chat_id=-1001709270025");
+      echo " группа=" . ($g["ok"] ?? false ? ($g["result"]["title"] ?? "?") : ("отказ: " . ($g["description"] ?? "?")));
+      if (($g["ok"] ?? false) && !empty($me["result"]["id"])) {
+        $m2 = $get("getChatMember?chat_id=-1001709270025&user_id=" . $me["result"]["id"]);
+        echo " права=" . ($m2["ok"] ?? false ? ($m2["result"]["status"] ?? "?") : "не прочитать");
+        $sm = $g["result"]["slow_mode_delay"] ?? 0;
+        if ($sm) echo " медленный_режим=" . $sm . "с";
+      }' 2>&1 | tr -d '"\\\n\r' | cut -c1-300) > /var/lib/jt-tg-check 2>/dev/null
+  fi
+  echo "  \"телеграм\": \"$(cat /var/lib/jt-tg-check 2>/dev/null | cut -c1-300)\","
+
   # Чем закончилась последняя публикация вакансии в группу. Записывает
   # db.php при каждой рассылке. Без этого причина отказа Telegram остаётся
   # внутри одного запроса и пропадает вместе с ним: снаружи видно только
