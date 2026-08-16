@@ -377,3 +377,31 @@ export async function setComplaintStatus(id: string, status: 'pending' | 'in_rev
   if (error) throw new Error(error.message)
   logActivity('Статус жалобы изменён', `ID: ${id} → ${status}`)
 }
+
+/**
+ * Личное сообщение боту каждому из списка.
+ *
+ * От рассылки отличается адресатами: там «все, у кого есть телеграм», здесь
+ * — те, кого выбрали на экране. В тексте {name} заменяется на имя, поэтому
+ * получается обращение, а не объявление.
+ *
+ * Отвечает не только числом отправленных, но и списком пропущенных: у
+ * человека мог отвалиться телеграм или он заблокировал бота, и знать об
+ * этом важнее, чем видеть красивую цифру.
+ */
+export async function sendTelegramToUsers(
+  ids: string[],
+  template: string,
+): Promise<{ sent: number; skipped: string[] }> {
+  const res = await fetch('/api/admin/tg-send-users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getToken() },
+    body: JSON.stringify({ ids, template }),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) throw new Error(data.error ?? 'Ошибка отправки')
+  const sent = (data.data?.sent ?? 0) as number
+  const skipped = (data.data?.skipped ?? []) as string[]
+  logActivity('Сообщение боту по списку', `Адресатов: ${ids.length}, доставлено: ${sent}`)
+  return { sent, skipped }
+}

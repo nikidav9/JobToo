@@ -8,6 +8,7 @@ const NAV = [
   { href: '/summary',     icon: IconSummary,  label: 'Сводка' },
   { href: '/users',       icon: IconUsers,    label: 'Пользователи' },
   { href: '/last-seen',   icon: IconClock,    label: 'Последний вход' },
+  { href: '/dormant',     icon: IconClock,    label: 'Ни разу не заходили' },
   { href: '/vacancies',   icon: IconJobs,     label: 'Вакансии' },
   { href: '/matching',    icon: IconMatch,    label: 'Совпадения' },
   { href: '/engagement',  icon: IconPulse,    label: 'Активность' },
