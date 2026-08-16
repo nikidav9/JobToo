@@ -605,11 +605,35 @@ grep -qE "Started|Recreated|Created" /tmp/jt-compose.log 2>/dev/null \
 if [ -s /opt/jobtoo-dashboard/server.js ]; then
   DFP=$(cat /var/lib/jt-dash.sha 2>/dev/null; grep -m1 '^EXPO_PUBLIC_APP_SECRET=' "$SECRETS" 2>/dev/null)
   DFP=$(printf '%s' "$DFP" | sha256sum | cut -d' ' -f1)
+
+  # Сверяем сборку внутри контейнера с той, что лежит на диске.
+  #
+  # Из-за этого и был белый экран. Новая сборка приезжает так: старый каталог
+  # переименовывается, новый встаёт на его место, а на следующем заходе
+  # переименованный удаляется. Контейнер же примонтирован не к пути, а к
+  # каталогу — и после удаления остаётся подключён к тому, чего больше нет.
+  #
+  # Снаружи это выглядит издевательски: сам сервер уже в памяти и страницы
+  # отдаёт, а всё, что ему нужно прочитать с диска, — скрипты, стили, даже
+  # его собственная страница ошибки — исчезло. Отсюда 200 на страницу и 500
+  # на каждый файл к ней. И «running» в списке контейнеров, конечно.
+  #
+  # Номер сборки читается с диска через контейнер: не совпал или не
+  # прочитался — значит контейнер смотрит в пустоту, и его надо поднять заново.
+  DBUILD_ON=$(cat /opt/jobtoo-dashboard/.next/BUILD_ID 2>/dev/null || echo нет)
+  DBUILD_IN=$(docker compose exec -T dashboard cat /app/.next/BUILD_ID 2>/dev/null | tr -d '\r\n' || true)
+
   if [ "$DFP" != "$(cat /var/lib/jt-dash.fp 2>/dev/null || true)" ] \
+     || [ "$DBUILD_IN" != "$DBUILD_ON" ] \
      || ! docker compose ps dashboard --format '{{.State}}' 2>/dev/null | grep -q running; then
-    timeout 300 docker compose --env-file "$SECRETS" --profile dashboard up -d dashboard \
+    # --force-recreate: при подмене каталога обычный up видит «настройки те
+    # же» и контейнер не трогает — а трогать надо, потому что смотрит он в
+    # удалённый каталог.
+    timeout 300 docker compose --env-file "$SECRETS" --profile dashboard up -d --force-recreate dashboard \
       >/tmp/jt-dash-up.log 2>&1 && printf '%s' "$DFP" > /var/lib/jt-dash.fp \
       || say "дашборд" "up не уложился"
+    [ "$DBUILD_IN" != "$DBUILD_ON" ] \
+      && say "дашборд" "контейнер смотрел в удалённый каталог (было «$DBUILD_IN», стало «$DBUILD_ON») — поднял заново"
     grep -qE "Started|Recreated|Created" /tmp/jt-dash-up.log 2>/dev/null \
       && say "дашборд" "$(grep -aE "Started|Recreated|Created" /tmp/jt-dash-up.log | tr -d '\r' | tr '\n' ' ' | cut -c1-160)"
   fi
