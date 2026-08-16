@@ -221,17 +221,25 @@ function ensure_chat(string $workerId, string $employerId, string $vacancyId, st
 // ── Telegram helpers ──────────────────────────────────────────────────────────
 
 function tg(string $method, array $payload): array {
-    $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/' . $method);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-        CURLOPT_TIMEOUT => 10,
-        CURLOPT_POSTFIELDS => json_encode($payload),
-    ]);
-    $resp = curl_exec($ch); curl_close($ch);
-    $dec = json_decode($resp ?: 'null', true);
-    return is_array($dec) ? $dec : [];
+    // Два захода: сперва по IPv6, потом как выйдет. К Телеграму с этой
+    // машины IPv4 не доходит — 0 ответов из 2 в каждом замере, — а когда
+    // стек не указан, система нет-нет да и выберет именно его. Здесь это
+    // означало бы, что человек нажал кнопку в боте и не получил ответа.
+    foreach ([CURL_IPRESOLVE_V6, CURL_IPRESOLVE_WHATEVER] as $mode) {
+        $ch = curl_init('https://api.telegram.org/bot' . TG_BOT_TOKEN . '/' . $method);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_IPRESOLVE => $mode,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+        ]);
+        $resp = curl_exec($ch); curl_close($ch);
+        $dec = json_decode($resp ?: 'null', true);
+        if (is_array($dec)) return $dec;
+    }
+    return [];
 }
 
 function expo_push_one(string $token, string $title, string $body): void {

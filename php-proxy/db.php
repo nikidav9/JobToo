@@ -839,6 +839,16 @@ function tg_send_message(int $chatId, string $text, bool|string $withAppButton =
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_TIMEOUT => 10,
             CURLOPT_SSL_VERIFYPEER => true,
+            // Сперва по IPv6, и это не вкусовщина. Замеры с этой машины
+            // изо дня в день одинаковы: по IPv6 к Телеграму доходит 4 из 4,
+            // по IPv4 — 0 из 2. А когда стек не указан, выбирает система, и
+            // примерно в четверти случаев она выбирает сломанный путь.
+            // Отсюда и «иногда объявление не уходит».
+            //
+            // Последняя попытка — без указания: если однажды отвалится уже
+            // IPv6, жёсткая привязка к нему превратила бы редкий сбой в
+            // постоянный.
+            CURLOPT_IPRESOLVE => $try < 3 ? CURL_IPRESOLVE_V6 : CURL_IPRESOLVE_WHATEVER,
             CURLOPT_POSTFIELDS => json_encode($payload),
         ]);
         $resp = curl_exec($ch);

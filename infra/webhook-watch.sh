@@ -45,7 +45,19 @@ SECRET_PREV=$(docker compose exec -T php php -r '
 # Каким ключом подписывать вебхук на этот адрес.
 sec_for() { if [ "$1" = "$MINE" ] || [ -z "${SECRET_PREV:-}" ]; then printf '%s' "$SECRET"; else printf '%s' "$SECRET_PREV"; fi; }
 
-api() { curl -s -m 20 "https://api.telegram.org/bot$TOKEN/$1" "${@:2}"; }
+# Сперва по IPv6. К Телеграму с этой машины IPv4 не доходит: в каждом замере
+# 0 ответов из 2, тогда как по IPv6 — 4 из 4. Без указания стека выбирает
+# система, и раз в несколько попыток берёт сломанный путь — отсюда и
+# «Телеграм не отвечает» там, где он прекрасно отвечает. Вторая попытка без
+# указания: если однажды отвалится уже IPv6, привязка сделала бы редкий сбой
+# постоянным.
+api() {
+  local m="$1"; shift
+  local r
+  r=$(curl -s -6 -m 20 "https://api.telegram.org/bot$TOKEN/$m" "$@" 2>/dev/null)
+  case "$r" in *'"ok"'*) printf '%s' "$r"; return 0;; esac
+  curl -s -m 20 "https://api.telegram.org/bot$TOKEN/$m" "$@" 2>/dev/null
+}
 field() { python3 -c 'import sys,json;print(json.load(sys.stdin).get("result",{}).get(sys.argv[1],""))' "$1" 2>/dev/null; }
 
 INFO=$(api getWebhookInfo)
@@ -132,7 +144,7 @@ if [ -n "$ERR" ]; then
     echo "$(date +%H:%M) прямой путь с ошибкой ($ERR), откатываться некуда" > /var/lib/jt-webhook-check
     exit 0
   fi
-  api setWebhook -d "url=$PREV" -d "secret_token=$SECRET" >/dev/null
+  api setWebhook -d "url=$PREV" -d "secret_token=$(sec_for "$PREV")" >/dev/null
   # Пересылка на Vercel заголовок дальше не передаёт — на время отката
   # обработчик должен принимать обновления и без него.
   touch /opt/jobtoo-proxy/tg_relay_mode 2>/dev/null || true
@@ -144,7 +156,7 @@ fi
 # это last_synchronization_error_date пусто и очередь не растёт.
 PEND=$(echo "$INFO" | field pending_update_count)
 if [ "${PEND:-0}" -gt 20 ] && [ -n "$PREV" ] 2>/dev/null; then
-  api setWebhook -d "url=$PREV" -d "secret_token=$SECRET" >/dev/null
+  api setWebhook -d "url=$PREV" -d "secret_token=$(sec_for "$PREV")" >/dev/null
   touch /opt/jobtoo-proxy/tg_relay_mode 2>/dev/null || true
   echo "$(date +%H:%M) очередь выросла до $PEND без ошибки — вернул на $PREV" > /var/lib/jt-webhook-check
   exit 0

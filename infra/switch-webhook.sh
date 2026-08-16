@@ -35,7 +35,19 @@ SECRET=$(docker compose exec -T php php -r '
 
 [ -z "$TOKEN" ] && { echo "нет токена" > /var/lib/jt-webhook-check; exit 0; }
 
-api() { curl -s -m 20 "https://api.telegram.org/bot$TOKEN/$1" "${@:2}"; }
+# Сперва по IPv6. К Телеграму с этой машины IPv4 не доходит: в каждом замере
+# 0 ответов из 2, тогда как по IPv6 — 4 из 4. Без указания стека выбирает
+# система, и раз в несколько попыток берёт сломанный путь — отсюда и
+# «Телеграм не отвечает» там, где он прекрасно отвечает. Вторая попытка без
+# указания: если однажды отвалится уже IPv6, привязка сделала бы редкий сбой
+# постоянным.
+api() {
+  local m="$1"; shift
+  local r
+  r=$(curl -s -6 -m 20 "https://api.telegram.org/bot$TOKEN/$m" "$@" 2>/dev/null)
+  case "$r" in *'"ok"'*) printf '%s' "$r"; return 0;; esac
+  curl -s -m 20 "https://api.telegram.org/bot$TOKEN/$m" "$@" 2>/dev/null
+}
 
 field() { python3 -c 'import sys,json;print(json.load(sys.stdin).get("result",{}).get(sys.argv[1],""))' "$1" 2>/dev/null; }
 
