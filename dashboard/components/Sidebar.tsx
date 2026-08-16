@@ -3,26 +3,34 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { clearAuth } from './AuthGuard'
 
-const NAV = [
-  { href: '/',            icon: IconGrid,     label: 'Обзор' },
-  { href: '/summary',     icon: IconSummary,  label: 'Сводка' },
-  { href: '/users',       icon: IconUsers,    label: 'Пользователи' },
-  { href: '/last-seen',   icon: IconClock,    label: 'Последний вход' },
-  { href: '/dormant',     icon: IconClock,    label: 'Ни разу не заходили' },
-  { href: '/vacancies',   icon: IconJobs,     label: 'Вакансии' },
-  { href: '/matching',    icon: IconMatch,    label: 'Совпадения' },
-  { href: '/engagement',  icon: IconPulse,    label: 'Активность' },
-  { href: '/quality',     icon: IconStar,     label: 'Качество' },
-  { href: '/chats',       icon: IconChat,     label: 'Переписки' },
-  { href: '/reviews',     icon: IconReview,   label: 'Отзывы' },
-  { href: '/moderation',  icon: IconShield,   label: 'Модерация' },
-  { href: '/tickets',     icon: IconTicket,   label: 'Тикеты' },
-  { href: '/outreach',    icon: IconPhone,    label: 'Обзвон' },
-  { href: '/support',     icon: IconTicket,   label: 'Поддержка' },
-  { href: '/bot-inbox',   icon: IconChat,     label: 'Бот' },
-  { href: '/broadcast',      icon: IconBell,     label: 'Рассылка' },
-  { href: '/api-keys',    icon: IconShield,   label: 'Ключи API' },
-]
+import { NAV as NAV_ITEMS } from '@/lib/nav'
+
+const ICONS: Record<string, any> = {
+  grid: IconGrid,
+  summary: IconSummary,
+  users: IconUsers,
+  clock: IconClock,
+  jobs: IconJobs,
+  phone: IconPhone,
+  ticket: IconTicket,
+  chat: IconChat,
+  match: IconMatch,
+  pulse: IconPulse,
+  star: IconStar,
+  review: IconReview,
+  shield: IconShield,
+  bell: IconBell,
+  funnel: IconFunnel,
+  cohort: IconCohort,
+  geo: IconGeo,
+}
+
+
+// Список разделов — общий, из lib/nav. Раньше он был свой и здесь, и в
+// нижнем меню для телефона; они разошлись, и часть разделов существовала
+// только на одном из двух.
+const NAV = NAV_ITEMS.map(n => ({ href: n.href, label: n.label, icon: ICONS[n.icon] }))
+
 
 export default function Sidebar() {
   const path = usePathname()

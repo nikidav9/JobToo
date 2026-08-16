@@ -16,28 +16,33 @@ function isOnLoginPage(): boolean {
   return window.location.pathname.replace(/\/$/, '').endsWith('/login')
 }
 
-const NAV = [
-  { href: '/', label: 'Обзор', icon: IconGrid },
-  { href: '/summary', label: 'Сводка', icon: IconSummary },
-  { href: '/users', label: 'Юзеры', icon: IconUsers },
-  { href: '/last-seen', label: 'Последний вход', icon: IconClock },
-  { href: '/vacancies', label: 'Вакансии', icon: IconJobs },
-  { href: '/outreach', label: 'Обзвон', icon: IconJobs },
-  { href: '/support', label: 'Поддержка', icon: IconTicket },
-  { href: '/bot-inbox', label: 'Бот', icon: IconChat },
-  { href: '/matching', label: 'Матчи', icon: IconMatch },
-  { href: '/engagement', label: 'Активность', icon: IconPulse },
-  { href: '/quality', label: 'Качество', icon: IconStar },
-  { href: '/chats', label: 'Чаты', icon: IconChat },
-  { href: '/reviews', label: 'Отзывы', icon: IconReview },
-  { href: '/moderation', label: 'Модерация', icon: IconShield },
-  { href: '/tickets', label: 'Тикеты', icon: IconTicket },
-  { href: '/broadcast', label: 'Рассылка', icon: IconBell },
-  { href: '/funnel', label: 'Воронка', icon: IconFunnel },
-  { href: '/cohorts', label: 'Когорты', icon: IconCohort },
-  { href: '/geo', label: 'Гео', icon: IconGeo },
-]
+// Список разделов — общий, из lib/nav. Своя копия здесь отставала: новые
+// разделы появлялись в боковом меню и не появлялись в нижнем.
+import { NAV as NAV_ITEMS } from '@/lib/nav'
+// Значки по имени — чтобы общий список разделов не тянул за собой импорты
+// компонентов. Отсутствующий значок заменяется нейтральным, а не роняет
+// всё меню: раздел без картинки читается, меню без раздела — нет.
+const ICONS: Record<string, any> = {
+  grid: IconGrid,
+  summary: IconSummary,
+  users: IconUsers,
+  clock: IconClock,
+  jobs: IconJobs,
+  phone: IconGrid,
+  ticket: IconTicket,
+  chat: IconChat,
+  match: IconMatch,
+  pulse: IconPulse,
+  star: IconStar,
+  review: IconReview,
+  shield: IconShield,
+  bell: IconBell,
+  funnel: IconFunnel,
+  cohort: IconCohort,
+  geo: IconGeo,
+}
 
+const NAV = NAV_ITEMS.map(n => ({ href: n.href, label: n.short ?? n.label, icon: ICONS[n.icon] }))
 export default function Shell({ children }: { children: React.ReactNode }) {
   const rawPath = usePathname()
   const path = rawPath.replace(/\/$/, '') || '/'
@@ -60,7 +65,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   }
 
   if (authed === null) {
-    return <div style={{ minHeight: '100vh', background: '#FAFAF7' }} />
+    return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />
   }
 
   return (
