@@ -79,7 +79,12 @@ services:
       PORT: 4000
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: supabase_admin
+      # Своя роль вместо суперпользователя. По умолчанию здесь по-прежнему
+      # supabase_admin: переменную выставляет bootstrap и только после того,
+      # как убедится, что роль заведена и служба на ней поднялась. Если не
+      # поднялась — он же возвращает значение обратно. Так правка не может
+      # оставить чаты без живого обновления дольше одного захода.
+      DB_USER: ${REALTIME_DB_USER:-supabase_admin}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: postgres
       DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
@@ -159,7 +164,9 @@ services:
       PG_META_DB_HOST: db
       PG_META_DB_PORT: 5432
       PG_META_DB_NAME: postgres
-      PG_META_DB_USER: supabase_admin
+      # Studio — смотрелка: роль читает всё и не меняет ничего. Правки схемы
+      # идут миграциями из репозитория, а не мышкой в браузере.
+      PG_META_DB_USER: ${META_DB_USER:-supabase_admin}
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
 
   studio:

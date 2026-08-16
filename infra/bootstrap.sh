@@ -976,15 +976,51 @@ docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
       if not exists (select from pg_roles where rolname = 'postgres') then
         create role postgres superuser login createrole createdb replication bypassrls;
       end if;
+
+      -- Realtime и Studio ходили в базу суперпользователем. Обе службы
+      -- смотрят наружу — Realtime держит вебсокеты, Studio отдаёт страницу
+      -- в браузер, — и взлом любой из них означал полный доступ к базе:
+      -- телефоны, переписка, возможность всё стереть.
+      --
+      -- Разводим по своим ролям. Storage так уже развели раньше; уроки того
+      -- раза (членство в anon/authenticated/service_role, владение своей
+      -- схемой) учтены ниже.
+      if not exists (select from pg_roles where rolname = 'supabase_realtime_admin') then
+        create role supabase_realtime_admin login noinherit;
+      end if;
+      -- NOINHERIT — не мелочь, а половина смысла всей правки. Realtime состоит
+      -- в service_role, чтобы уметь в неё переключаться при проверке политик.
+      -- С наследованием он заодно молча получал и её права: «всё на все
+      -- таблицы». Проверка это и показала — update чужой таблицы проходил.
+      -- Без наследования переключиться он по-прежнему может, а даром права не
+      -- получает. Ровно поэтому authenticator рядом заведён так же.
+      alter role supabase_realtime_admin with noinherit;
+      -- REPLICATION обязателен: Realtime читает журнал упреждающей записи
+      -- через слот логической репликации. Без этого признака он поднимется
+      -- и будет отвечать, но изменения перестанут доходить — то есть чаты
+      -- замрут, а контейнер останется здоровым. Самая тихая из поломок.
+      alter role supabase_realtime_admin with replication;
+
+      -- Studio: читает всё, не меняет ничего.
+      if not exists (select from pg_roles where rolname = 'supabase_meta_reader') then
+        create role supabase_meta_reader login noinherit;
+      end if;
+      -- bypassrls при праве только на чтение — это «видит, но не трогает».
+      -- Без него таблицы jm_* выглядели бы пустыми: с 013_lock_down_rls.sql
+      -- всё закрыто политиками, и обычная роль не увидела бы ни строки.
+      -- Пустая таблица вместо запрета читается как поломка.
+      alter role supabase_meta_reader with bypassrls noinherit nocreatedb nocreaterole nosuperuser noreplication;
     end \$\$;
 
     -- Схема realtime (без подчёркивания): её ждут миграции Realtime, а
     -- рабочее хозяйство он держит в _realtime. Имена разные, нужны обе.
     create schema if not exists realtime;
-    alter schema realtime owner to supabase_admin;
+    alter schema realtime owner to supabase_realtime_admin;
 
     alter role authenticator          with login password '${POSTGRES_PASSWORD}';
     alter role supabase_storage_admin with login password '${POSTGRES_PASSWORD}';
+    alter role supabase_realtime_admin with login password '${POSTGRES_PASSWORD}';
+    alter role supabase_meta_reader    with login password '${POSTGRES_PASSWORD}';
 
     grant anon, authenticated, service_role to authenticator;
 
@@ -996,7 +1032,7 @@ docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
     grant anon, authenticated, service_role to supabase_storage_admin;
 
     create schema if not exists _realtime;
-    alter schema _realtime owner to supabase_admin;
+    alter schema _realtime owner to supabase_realtime_admin;
     create schema if not exists storage;
     alter schema storage owner to supabase_storage_admin;
 
@@ -1011,7 +1047,60 @@ docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
       for r in select tablename from pg_tables where schemaname = 'storage' loop
         execute format('alter table storage.%I owner to supabase_storage_admin', r.tablename);
       end loop;
+      -- Ровно та же беда ждала бы Realtime: таблицы _realtime.tenants,
+      -- extensions и его собственный журнал миграций заводились раньше под
+      -- суперпользователем. Сменить владельца схемы мало — новый владелец
+      -- не сможет ни дописать миграцию, ни поправить арендатора.
+      for r in select schemaname, tablename from pg_tables
+               where schemaname in ('_realtime', 'realtime') loop
+        execute format('alter table %I.%I owner to supabase_realtime_admin',
+                       r.schemaname, r.tablename);
+      end loop;
+      for r in select schemaname, sequencename from pg_sequences
+               where schemaname in ('_realtime', 'realtime') loop
+        execute format('alter sequence %I.%I owner to supabase_realtime_admin',
+                       r.schemaname, r.sequencename);
+      end loop;
     end \$\$;
+
+    -- Публикация, на которую смотрит слежение за изменениями в таблицах.
+    -- Само приложение ею не пользуется: и оно, и дашборд подписаны на
+    -- broadcast — обычные сообщения по вебсокету, мимо журнала базы. Но
+    -- арендатор Realtime настроен на неё, и без публикации он сыпал бы
+    -- ошибками в журнал при каждом заходе. Поэтому просто заводим, если её
+    -- нет, и оставляем за суперпользователем: владеть ею Realtime незачем —
+    -- добавление таблицы всё равно требует владения самой таблицей.
+    do \$\$ begin
+      if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+        create publication supabase_realtime;
+      end if;
+    end \$\$;
+
+    -- ── Права Realtime ───────────────────────────────────────────────────
+    -- Он должен уметь переключаться в роль подписчика: изменения из журнала
+    -- проходят через политики RLS того, кто подписался, а переключиться
+    -- можно только в роль, в которой состоишь. Тот же урок, что с картинками
+    -- выше, — и цена ошибки та же: служба жива, а данные не идут.
+    grant anon, authenticated, service_role to supabase_realtime_admin;
+    grant usage on schema public to supabase_realtime_admin;
+    grant select on all tables in schema public to supabase_realtime_admin;
+    alter default privileges in schema public
+      grant select on tables to supabase_realtime_admin;
+
+    -- ── Права Studio ─────────────────────────────────────────────────────
+    -- Только select и только usage: ни create, ни insert, ни update. Права
+    -- перевыдаются на каждом заходе, поэтому таблицы, появившиеся между
+    -- заходами, тоже становятся видны — не дожидаясь default privileges.
+    grant usage on schema public, storage, realtime, _realtime to supabase_meta_reader;
+    grant select on all tables in schema public    to supabase_meta_reader;
+    grant select on all tables in schema storage   to supabase_meta_reader;
+    grant select on all tables in schema realtime  to supabase_meta_reader;
+    grant select on all tables in schema _realtime to supabase_meta_reader;
+    alter default privileges in schema public  grant select on tables to supabase_meta_reader;
+    alter default privileges in schema storage grant select on tables to supabase_meta_reader;
+    -- Раздел «Reports» в Studio читает статистику сервера. Роль pg_monitor
+    -- даёт только чтение счётчиков и ничего больше.
+    grant pg_monitor to supabase_meta_reader;
 
     grant usage on schema public  to anon, authenticated, service_role;
     grant usage on schema storage to anon, authenticated, service_role;
@@ -1046,6 +1135,66 @@ if [ $rc -eq 0 ]; then
   fi
 else
   say "роли" "ОШИБКА($rc): $(tail -4 /tmp/jt-roles.log | tr '\n' ' ' | cut -c1-300)"
+fi
+
+# ── Перевод Realtime и Studio на свои роли ────────────────────────────────
+# Обе службы ходили в базу суперпользователем. Роли для них заведены выше;
+# здесь происходит сама пересадка — и она обставлена так, чтобы неудача
+# стоила одного захода, а не простоя до утра.
+#
+# Порядок: подставить роль → пересоздать службу → убедиться, что она вошла в
+# базу именно под ней → при неудаче вернуть суперпользователя и доложить.
+# Номер попытки. Если пересадка не удалась, отметка о неудаче остаётся, и
+# больше мы не пробуем — иначе служба пересоздавалась бы каждую минуту, то
+# есть неудачная правка превратилась бы в бесконечный перезапуск. Чтобы
+# попробовать снова после исправления, достаточно увеличить это число.
+ROLE_REV=1
+
+switch_role() {                 # служба переменная роль
+  local svc="$1" var="$2" role="$3" was mark="/opt/jobtoo-secrets/.role-$1-v$ROLE_REV-failed"
+  was=$(grep -E "^$var=" "$SECRETS" 2>/dev/null | tail -1 | cut -d= -f2-)
+  [ "$was" = "$role" ] && return 0        # уже переведена, ничего не делаем
+  [ -f "$mark" ] && return 1              # уже пробовали и не вышло
+
+  sed -i "/^$var=/d" "$SECRETS"
+  echo "$var=$role" >> "$SECRETS"
+  docker compose --env-file "$SECRETS" up -d --force-recreate "$svc" >/dev/null 2>&1
+
+  # Ждём не «контейнер запустился», а «служба вошла в базу именно этой ролью».
+  # Первое ничего не доказывает: Realtime без права на репликацию поднимается
+  # совершенно здоровым и просто перестаёт доставлять изменения. Живое
+  # соединение под новым именем в pg_stat_activity изобразить нельзя.
+  local i ok=""
+  for i in $(seq 1 12); do
+    sleep 5
+    [ "$(docker compose ps "$svc" --format '{{.State}}' 2>/dev/null)" = "running" ] || continue
+    if [ -n "$(docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+                 psql -tAq -U supabase_admin -d postgres \
+                 -c "select 1 from pg_stat_activity where usename = '$role' limit 1" \
+                 2>/dev/null | tr -d '[:space:]')" ]; then
+      ok=1; break
+    fi
+  done
+
+  if [ -n "$ok" ]; then
+    rm -f /opt/jobtoo-secrets/.role-"$svc"-v*-failed
+    say "$svc" "работает под ролью $role, суперпользователь больше не нужен"
+    return 0
+  fi
+
+  # Не получилось — возвращаем как было и приносим причину. Молчаливый откат
+  # хуже поломки: правка выглядела бы применённой, а дыра осталась бы.
+  sed -i "/^$var=/d" "$SECRETS"
+  docker compose --env-file "$SECRETS" up -d --force-recreate "$svc" >/dev/null 2>&1
+  touch "$mark"
+  say "$svc" "роль $role не подошла, вернул суперпользователя: $(
+    docker compose logs --tail=6 --no-log-prefix "$svc" 2>&1 | tr -d '\r' | tr '\n' ' ' | cut -c1-220)"
+  return 1
+}
+
+if [ $rc -eq 0 ]; then
+  switch_role realtime REALTIME_DB_USER supabase_realtime_admin
+  switch_role meta     META_DB_USER     supabase_meta_reader
 fi
 
 # ── Арендатор Realtime ────────────────────────────────────────────────────
