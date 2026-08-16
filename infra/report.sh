@@ -51,11 +51,14 @@ TMP=/tmp/jt-status.$$
 
   echo "  \"журналы\": {"
   first=1
-  for svc in db rest realtime storage; do
+  for svc in db rest realtime storage dashboard; do
     s=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 10 docker compose ps "$svc" --format '{{.State}}' 2>/dev/null)
     # storage и realtime показываем всегда: оба бывают «running» и при этом
     # не работают — первый отвечал 502, второй отвергает подписки.
-    [ "$s" = "running" ] && [ "$svc" != "storage" ] && [ "$svc" != "realtime" ] && continue
+    # dashboard показываем всегда: он бывает «running» и при этом отдаёт
+    # ошибку на каждый файл статики — снаружи это белый экран без единой
+    # записи в отчёте.
+    [ "$s" = "running" ] && [ "$svc" != "storage" ] && [ "$svc" != "realtime" ] && [ "$svc" != "dashboard" ] && continue
     [ -n "$s" ] || continue
     [ $first -eq 0 ] && echo ","
     first=0

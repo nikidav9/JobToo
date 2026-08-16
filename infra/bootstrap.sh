@@ -593,11 +593,26 @@ grep -qE "Started|Recreated|Created" /tmp/jt-compose.log 2>/dev/null \
 # Теперь как у всех остальных: зовём каждый раз, а в журнал пишем, только
 # когда что-то действительно изменилось. Compose сам не трогает контейнер,
 # у которого совпали образ, переменные и настройки.
+#
+# По отпечатку, а не каждую минуту. Прошлая правка звала up -d на каждом
+# заходе — «compose сам не тронет то, что не менялось». На деле контейнер
+# пересоздавался снова и снова, и в эти секунды статика отдавалась с ошибкой:
+# страница открывалась, а стили и скрипты к ней — нет. Снаружи это выглядело
+# как белый экран.
+#
+# Отпечаток — из того, от чего контейнер действительно зависит: версии сборки
+# и пропуска приложения. Изменилось что-то из этого — поднимаем заново.
 if [ -s /opt/jobtoo-dashboard/server.js ]; then
-  timeout 300 docker compose --env-file "$SECRETS" --profile dashboard up -d dashboard \
-    >/tmp/jt-dash-up.log 2>&1 || say "дашборд" "up не уложился"
-  grep -qE "Started|Recreated|Created" /tmp/jt-dash-up.log 2>/dev/null \
-    && say "дашборд" "$(grep -aE "Started|Recreated|Created" /tmp/jt-dash-up.log | tr -d '\r' | tr '\n' ' ' | cut -c1-160)"
+  DFP=$(cat /var/lib/jt-dash.sha 2>/dev/null; grep -m1 '^EXPO_PUBLIC_APP_SECRET=' "$SECRETS" 2>/dev/null)
+  DFP=$(printf '%s' "$DFP" | sha256sum | cut -d' ' -f1)
+  if [ "$DFP" != "$(cat /var/lib/jt-dash.fp 2>/dev/null || true)" ] \
+     || ! docker compose ps dashboard --format '{{.State}}' 2>/dev/null | grep -q running; then
+    timeout 300 docker compose --env-file "$SECRETS" --profile dashboard up -d dashboard \
+      >/tmp/jt-dash-up.log 2>&1 && printf '%s' "$DFP" > /var/lib/jt-dash.fp \
+      || say "дашборд" "up не уложился"
+    grep -qE "Started|Recreated|Created" /tmp/jt-dash-up.log 2>/dev/null \
+      && say "дашборд" "$(grep -aE "Started|Recreated|Created" /tmp/jt-dash-up.log | tr -d '\r' | tr '\n' ' ' | cut -c1-160)"
+  fi
 fi
 
 # ── Шлюз ──────────────────────────────────────────────────────────────────
