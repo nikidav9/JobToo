@@ -3,6 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getToken } from '@/lib/adminApi'
 import PageHeader from '@/components/PageHeader'
+import KpiCard from '@/components/KpiCard'
+import Button from '@/components/Button'
+import Chip from '@/components/Chip'
+import FilterChips from '@/components/FilterChips'
+import { IconUser, IconSend, IconCheck } from '@/components/icons'
 
 /**
  * Переписка с ботом.
@@ -138,7 +143,7 @@ export default function BotInboxPage() {
 
   // Группируем по собеседнику: разговор читается целиком, а не строками
   // вперемешку с чужими.
-  const threads = useMemo(() => {
+  const allThreads = useMemo(() => {
     const by = new Map<number, Msg[]>()
     for (const m of msgs) {
       const list = by.get(m.telegram_id) ?? []
@@ -161,59 +166,62 @@ export default function BotInboxPage() {
       return { tg, who, user: uid ? users[uid] : undefined, msgs: sorted, last, waiting, urgent, noOutgoing }
     })
     out.sort((a, b) => b.last.created_at.localeCompare(a.last.created_at))
-    return onlyWaiting ? out.filter(t => t.waiting || t.urgent) : out
-  }, [msgs, users, onlyWaiting])
+    return out
+  }, [msgs, users])
 
   const waitingCount = useMemo(
-    () => threads.filter(t => t.waiting || t.urgent).length, [threads])
+    () => allThreads.filter(t => t.waiting || t.urgent).length, [allThreads])
+  const urgentCount = useMemo(
+    () => allThreads.filter(t => t.urgent).length, [allThreads])
+  const threads = onlyWaiting ? allThreads.filter(t => t.waiting || t.urgent) : allThreads
 
   return (
     <div>
       <PageHeader title="Переписка с ботом" lastUpdated={updated} onRefresh={load} />
 
-      <div style={{ padding: '14px 24px', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button
-          onClick={() => setOnlyWaiting(v => !v)}
-          style={{
-            padding: '7px 14px', borderRadius: 100, cursor: 'pointer',
-            border: '1px solid var(--line)', fontSize: 13, fontWeight: 600,
-            background: onlyWaiting ? 'var(--ink)' : 'transparent',
-            color: onlyWaiting ? '#fff' : 'var(--ink-3)',
-          }}
-        >
-          {onlyWaiting ? 'Показать все' : 'Только те, кто ждёт ответа'}
-        </button>
-        <span style={{ fontSize: 13, color: 'var(--ink-4)' }}>
-          {loading ? 'Загружаю…' : `Разговоров: ${threads.length}${onlyWaiting ? '' : ` · ждут ответа: ${waitingCount}`}`}
-        </span>
-      </div>
+      <div className="page-content">
+        <div className="g-3">
+          <KpiCard label="Разговоров" value={allThreads.length} sub="с ботом за всё время" />
+          <KpiCard label="Ждут ответа" value={waitingCount}
+            sub={allThreads.length ? `${Math.round(waitingCount / allThreads.length * 100)}% разговоров` : '—'} />
+          <KpiCard label="Срочные" value={urgentCount} sub="есть тема из списка срочных" />
+        </div>
 
-      <div style={{ padding: '0 24px 40px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <FilterChips
+          options={[
+            { key: 'all' as const, label: 'Все разговоры', count: allThreads.length },
+            { key: 'waiting' as const, label: 'Ждут ответа', count: waitingCount },
+          ]}
+          value={onlyWaiting ? 'waiting' : 'all'}
+          onChange={k => setOnlyWaiting(k === 'waiting')}
+        />
+
         {!loading && threads.length === 0 ? (
-          <div style={{ color: 'var(--ink-4)', fontSize: 14 }}>Боту пока никто не писал.</div>
+          <div style={{ color: 'var(--ink-3)', fontSize: 14 }}>
+            {allThreads.length === 0 ? 'Боту пока никто не писал.' : 'Все ответы даны.'}
+          </div>
         ) : null}
 
         {threads.map(t => (
-          <div key={t.tg} style={{
-            border: '1px solid var(--line)', borderRadius: 14, padding: 14, background: '#fff',
-          }}>
+          <div key={t.tg} className="jt-card" style={{ padding: 14 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
               <strong style={{ fontSize: 15 }}>{t.who}</strong>
-              {t.urgent ? <Tag color="#B33C2A">🔴 срочно</Tag>
-                : t.waiting ? <Tag color="#A87020">❗ ждёт ответа</Tag>
-                : <Tag color="#2E7D54">🤖 бот ответил</Tag>}
-              <span style={{ fontSize: 12.5, color: 'var(--ink-4)' }}>
-                {[t.user?.role, t.user?.phone, t.user?.metro_station].filter(Boolean).join(' · ') || 'нет профиля'}
+              {t.urgent ? <Chip tone="negative" dot>Срочно</Chip>
+                : t.waiting ? <Chip tone="accent" dot>Ждёт ответа</Chip>
+                : <Chip tone="positive"><IconCheck size={11} />Бот ответил</Chip>}
+              <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+                {[t.user?.role === 'worker' ? 'работник' : t.user?.role === 'employer' ? 'работодатель' : null,
+                  t.user?.phone, t.user?.metro_station].filter(Boolean).join(' · ') || 'нет профиля'}
               </span>
-              <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'var(--ink-4)' }}>
+              <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--ink-3)' }}>
                 {ago(t.last.created_at)}
               </span>
             </div>
 
             {t.noOutgoing ? (
               <div style={{
-                marginTop: 10, fontSize: 12.5, color: 'var(--ink-4)',
-                background: '#F7F6F4', borderRadius: 8, padding: '7px 10px',
+                marginTop: 10, fontSize: 13, color: 'var(--ink-3)',
+                background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)', padding: '7px 10px',
               }}>
                 Наши сообщения этому человеку в журнал не попали — исходящие начали
                 сохраняться позже. Дальше диалог будет виден целиком.
@@ -226,16 +234,18 @@ export default function BotInboxPage() {
                 const digit = !out ? surveyDigit(m.text) : null
                 return (
                   <div key={m.id} style={{ display: 'flex', gap: 8, fontSize: 13.5, lineHeight: 1.45 }}>
-                    <span style={{ flexShrink: 0, width: 46, color: 'var(--ink-4)', fontSize: 12 }}>
+                    <span className="num" style={{ flexShrink: 0, width: 52, color: 'var(--ink-3)', fontSize: 12 }}>
                       {ago(m.created_at)}
                     </span>
-                    <span style={{ flexShrink: 0 }}>{out ? '🤖' : '👤'}</span>
+                    <span style={{ flexShrink: 0, color: out ? 'var(--accent)' : 'var(--ink-3)' }}>
+                      {out ? <IconSend size={13} /> : <IconUser size={13} />}
+                    </span>
                     <span style={{ minWidth: 0 }}>
-                      <span style={{ whiteSpace: 'pre-wrap', color: out ? 'var(--ink-3)' : 'var(--ink)' }}>
+                      <span style={{ whiteSpace: 'pre-wrap', color: out ? 'var(--ink-2)' : 'var(--ink)' }}>
                         {m.text}
                       </span>
                       {digit ? (
-                        <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: 'var(--ink-4)' }}>
+                        <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: 'var(--ink-3)' }}>
                           {`«${SURVEY_ANSWERS[digit]}» — ответ на вопрос: «${SURVEY_QUESTION}»`}
                         </span>
                       ) : null}
@@ -251,37 +261,27 @@ export default function BotInboxPage() {
                 onChange={e => setDrafts(d => ({ ...d, [t.tg]: e.target.value }))}
                 placeholder="Ответить — уйдёт человеку в телеграм от бота"
                 rows={2}
-                style={{
-                  flex: 1, resize: 'vertical', minHeight: 44, padding: '9px 11px',
-                  border: '1px solid var(--line)', borderRadius: 10, fontSize: 13.5,
-                  fontFamily: 'inherit', lineHeight: 1.4,
-                }}
+                className="jt-input" style={{ flex: 1, minHeight: 44 }}
               />
-              <button
+              <Button variant="primary"
                 onClick={() => send(t.tg)}
-                disabled={sending === t.tg || !(drafts[t.tg] ?? '').trim()}
-                style={{
-                  padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                  fontSize: 13.5, fontWeight: 700, color: '#fff',
-                  background: (drafts[t.tg] ?? '').trim() ? '#C8501E' : '#C9C5BF',
-                }}
-              >
+                disabled={sending === t.tg || !(drafts[t.tg] ?? '').trim()}>
                 {sending === t.tg ? '…' : 'Отправить'}
-              </button>
+              </Button>
             </div>
 
             <div style={{ marginTop: 6, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               {notice[t.tg] ? (
                 <span style={{
-                  fontSize: 12.5,
-                  color: notice[t.tg] === 'Отправлено' ? '#2E7D54' : '#B33C2A',
+                  fontSize: 13,
+                  color: notice[t.tg] === 'Отправлено' ? 'var(--positive)' : 'var(--negative)',
                 }}>{notice[t.tg]}</span>
               ) : null}
               {t.user?.phone ? (
                 <a href={`https://t.me/+${t.user.phone.replace(/\D/g, '')}`}
                    target="_blank" rel="noreferrer"
-                   style={{ fontSize: 12.5, color: 'var(--ink-4)' }}>
-                  или написать лично со своего телеграма →
+                   style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+                  или написать лично со своего телеграма
                 </a>
               ) : null}
             </div>
@@ -289,15 +289,5 @@ export default function BotInboxPage() {
         ))}
       </div>
     </div>
-  )
-}
-
-function Tag({ children, color }: { children: React.ReactNode; color: string }) {
-  return (
-    <span style={{
-      fontSize: 12, fontWeight: 700, color,
-      border: `1px solid ${color}33`, background: `${color}14`,
-      borderRadius: 100, padding: '2px 9px',
-    }}>{children}</span>
   )
 }
