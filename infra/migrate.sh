@@ -70,6 +70,12 @@ for f in $(ls "$REPO"/supabase/migrations/*.sql | sort); do
 done
 
 if [ "$applied" -gt 0 ]; then
+  # PostgREST держит устройство базы в памяти и сам о новых таблицах не
+  # узнаёт. Без этой строки миграция «применена», таблица есть, а на запрос
+  # приходит «Could not find the table in the schema cache» — и выглядит это
+  # как поломка кода, а не как несказанное слово.
+  q -c "notify pgrst, 'reload schema'" >/dev/null 2>&1 || true
+
   tables=$(q -tAc "select count(*) from information_schema.tables
                    where table_schema='public' and table_name like 'jm_%'")
   say "миграции" "применено $applied, таблиц jm_*: $tables"
