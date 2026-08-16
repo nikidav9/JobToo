@@ -51,27 +51,24 @@ export default function GeoPage() {
 
       <div className="page-content">
         <div className="g-3">
-          <KpiCard label="Всего пользователей" value={d.kpi.totalUsers} sparkColor={PALETTE.blue} />
-          <KpiCard label="Указали метро" value={`${d.kpi.withMetro} (${d.kpi.metroFill}%)`} sparkColor={PALETTE.orange} />
-          <KpiCard label="Уникальных станций" value={d.kpi.uniqueStations} sparkColor={PALETTE.purple} />
+          <KpiCard label="Всего пользователей" value={d.kpi.totalUsers} sub="в базе" sparkColor={PALETTE.blue} />
+          <KpiCard label="Указали метро" value={d.kpi.withMetro}
+            sub={`${d.kpi.metroFill}% базы · без метро ${d.kpi.withoutMetro}`} sparkColor={PALETTE.orange} />
+          <KpiCard label="Станций задействовано" value={d.kpi.uniqueStations}
+            sub="разных станций в профилях" sparkColor={PALETTE.purple} />
         </div>
 
         <div className="g-3">
-          <KpiCard label="Всего вакансий" value={d.kpi.totalVacancies} sparkColor={PALETTE.green} />
-          <KpiCard label="Вакансий с метро" value={d.kpi.vacsWithMetro} sparkColor={PALETTE.cyan} />
-          <KpiCard label="Без метро (юзеры)" value={d.kpi.withoutMetro} sparkColor={PALETTE.amber} />
+          <KpiCard label="Всего вакансий" value={d.kpi.totalVacancies} sub="смены и постоянные" sparkColor={PALETTE.green} />
+          <KpiCard label="Вакансий с метро" value={d.kpi.vacsWithMetro}
+            sub={d.kpi.totalVacancies ? `${Math.round(d.kpi.vacsWithMetro / d.kpi.totalVacancies * 100)}% вакансий` : '—'}
+            sparkColor={PALETTE.cyan} />
+          <KpiCard label="Вакансий без метро" value={d.kpi.totalVacancies - d.kpi.vacsWithMetro}
+            sub="их не найдут поиском по станции" sparkColor={PALETTE.amber} />
         </div>
 
         {d.userMetroTop.length === 0 ? (
-          <div style={{
-            padding: '24px 20px',
-            background: 'var(--bg-elev)',
-            borderRadius: 'var(--radius)',
-            border: '1px solid var(--line)',
-            color: 'var(--ink-3)',
-            fontSize: 13,
-            textAlign: 'center',
-          }}>
+          <div className="jt-card" style={{ padding: '24px 20px', color: 'var(--ink-3)', fontSize: 13, textAlign: 'center' }}>
             Данные о метро отсутствуют — попросите пользователей указать станцию метро в профиле
           </div>
         ) : (

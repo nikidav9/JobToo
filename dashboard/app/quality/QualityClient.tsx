@@ -5,8 +5,10 @@ import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
+import Donut from '@/components/Donut'
+import Chip from '@/components/Chip'
 import {
-  BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
+  BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 import { AXIS, GRID, LEGEND, TT } from '@/lib/chart'
@@ -31,19 +33,34 @@ export default function QualityPage() {
 
       <div className="page-content">
         <div className="g-5">
-          <KpiCard label="Средний рейтинг" value={d.kpi.avgRating} sub="Все оценки" sparkColor={ratingColor} />
-          <KpiCard label="Рейтинг работников" value={d.kpi.avgWorkerRating} sparkColor={PALETTE.orange} />
-          <KpiCard label="Рейтинг работодат." value={d.kpi.avgEmployerRating} sparkColor={PALETTE.blue} />
-          <KpiCard label="Всего оценок" value={d.kpi.totalRatings} sparkColor={PALETTE.purple} />
+          {/* При нуле оценок средние приходят нулями. Ноль и «оценок ещё не
+              было» — разные сообщения, и второе здесь правда. */}
+          <KpiCard label="Средний рейтинг"
+            value={d.kpi.totalRatings > 0 ? d.kpi.avgRating : null}
+            sub={d.kpi.totalRatings > 0 ? `по ${d.kpi.totalRatings} оценкам` : 'оценок пока нет'}
+            sparkColor={ratingColor} />
+          <KpiCard label="Оценки работникам"
+            value={d.kpi.totalRatings > 0 ? d.kpi.avgWorkerRating : null}
+            sub="ставят работодатели" sparkColor={PALETTE.orange} />
+          <KpiCard label="Оценки работодателям"
+            value={d.kpi.totalRatings > 0 ? d.kpi.avgEmployerRating : null}
+            sub="ставят работники" sparkColor={PALETTE.blue} />
+          <KpiCard label="Всего оценок" value={d.kpi.totalRatings} sub="за всё время" sparkColor={PALETTE.purple} />
           <KpiCard label="Жалоб всего" value={d.kpi.totalComplaints}
-            sub={`${d.kpi.workerComplaints} рабочих · ${d.kpi.employerComplaints} работодат.`}
+            sub={`${d.kpi.workerComplaints} на работников · ${d.kpi.employerComplaints} на работодателей`}
             sparkColor={PALETTE.red} />
         </div>
 
         <div className="g-3">
-          <KpiCard label="Заявок (пост.)" value={d.kpi.totalApplications} sparkColor={PALETTE.cyan} />
-          <KpiCard label="Ожидает" value={d.kpi.pendingApplications} sparkColor={PALETTE.amber} />
-          <KpiCard label="Одобрено" value={d.appStatus.find((a: any) => a.name === 'Одобрено')?.value ?? 0} sparkColor={PALETTE.green} />
+          <KpiCard label="Заявок на постоянные" value={d.kpi.totalApplications}
+            sub="за всё время" sparkColor={PALETTE.cyan} />
+          <KpiCard label="Ожидают ответа" value={d.kpi.pendingApplications}
+            sub={d.kpi.totalApplications ? `${Math.round(d.kpi.pendingApplications / d.kpi.totalApplications * 100)}% заявок` : '—'}
+            sparkColor={PALETTE.amber} />
+          <KpiCard label="Одобрено"
+            value={d.appStatus.find((a: any) => a.name === 'Одобрено')?.value ?? 0}
+            sub={d.kpi.totalApplications ? `${Math.round(((d.appStatus.find((a: any) => a.name === 'Одобрено')?.value ?? 0) / d.kpi.totalApplications) * 100)}% заявок` : '—'}
+            sparkColor={PALETTE.green} />
         </div>
 
         <div className="g-2">
@@ -77,26 +94,13 @@ export default function QualityPage() {
         </div>
 
         <div className="g-3">
-          <ChartCard title="Жалобы" sub="По типу">
-            <ResponsiveContainer width="100%" height={160}>
-              <PieChart>
-                <Pie data={d.complaintSplit} cx="50%" cy="50%" innerRadius={44} outerRadius={64} dataKey="value" paddingAngle={4}>
-                  {d.complaintSplit.map((e: any, i: number) => <Cell key={i} fill={e.fill} />)}
-                </Pie>
-                <Tooltip contentStyle={TT} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 6 }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 500, color: PALETTE.orange }}>{d.kpi.workerComplaints}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>На работников</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 500, color: PALETTE.blue }}>{d.kpi.employerComplaints}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>На работодат.</div>
-              </div>
-            </div>
+          {/* Числа под кольцом повторяли то же, что легенда: два одинаковых
+              счётчика на одной карточке. Оставлено одно место. */}
+          <ChartCard title="Жалобы" sub="На кого жалуются">
+            <Donut
+              data={d.complaintSplit.map((e: any) => ({ name: e.name, value: e.value, color: e.fill }))}
+              caption="жалоб"
+            />
           </ChartCard>
 
           <ChartCard title="Жалобы по дням" sub="30 дней">
@@ -111,59 +115,35 @@ export default function QualityPage() {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard title="Заявки (пост. вакансии)" sub="По статусу">
-            <ResponsiveContainer width="100%" height={160}>
-              <PieChart>
-                <Pie data={d.appStatus} cx="50%" cy="50%" innerRadius={44} outerRadius={64} dataKey="value" paddingAngle={4}>
-                  {d.appStatus.map((e: any, i: number) => <Cell key={i} fill={e.fill} />)}
-                </Pie>
-                <Tooltip contentStyle={TT} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginTop: 6 }}>
-              {d.appStatus.map((a: any) => (
-                <div key={a.name} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 18, fontWeight: 500, color: a.fill }}>{a.value}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{a.name}</div>
-                </div>
-              ))}
-            </div>
+          <ChartCard title="Заявки на постоянные" sub="По статусу">
+            <Donut
+              data={d.appStatus.map((e: any) => ({ name: e.name, value: e.value, color: e.fill }))}
+              caption="заявок"
+            />
           </ChartCard>
         </div>
 
         {d.recentComplaints.length > 0 && (
           <ChartCard title="Последние жалобы" sub={`${d.kpi.totalComplaints} всего`}>
-            <div style={{ overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="jt-table">
                 <thead>
                   <tr>
-                    {['Тип', 'От кого', 'На кого', 'Описание', 'Дата'].map(h => (
-                      <th key={h} style={{
-                        textAlign: 'left', fontSize: 10.5, textTransform: 'uppercase',
-                        letterSpacing: '0.06em', color: 'var(--ink-3)', fontWeight: 500,
-                        padding: '8px 16px', borderBottom: '1px solid var(--line)',
-                        background: 'var(--bg)',
-                      }}>{h}</th>
-                    ))}
+                    {['На кого жалуются', 'От кого', 'На кого', 'Описание', 'Дата'].map(h => <th key={h}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {d.recentComplaints.map((c: any, i: number) => (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--line)' }}>
-                      <td style={{ padding: '10px 16px' }}>
-                        <span style={{
-                          padding: '2px 7px', borderRadius: 5, fontSize: 11,
-                          color: c.type === 'worker' ? 'var(--accent)' : 'var(--info)',
-                          background: c.type === 'worker' ? 'var(--accent-soft)' : 'rgba(59,91,181,.08)',
-                        }}>
-                          {c.type === 'worker' ? 'Работник' : 'Работодат.'}
-                        </span>
+                    <tr key={i}>
+                      <td>
+                        <Chip tone={c.type === 'worker' ? 'accent' : 'info'}>
+                          {c.type === 'worker' ? 'Работник' : 'Работодатель'}
+                        </Chip>
                       </td>
-                      <td style={{ padding: '10px 16px', color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace', fontSize: 11.5 }}>{c.reporter}</td>
-                      <td style={{ padding: '10px 16px', color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace', fontSize: 11.5 }}>{c.target}</td>
-                      <td style={{ padding: '10px 16px', color: 'var(--ink-2)', fontSize: 12, maxWidth: 240 }}>{c.desc}</td>
-                      <td style={{ padding: '10px 16px', color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace', fontSize: 11.5 }}>{c.date}</td>
+                      <td className="num" style={{ color: 'var(--ink-2)', fontSize: 12 }}>{c.reporter}</td>
+                      <td className="num" style={{ color: 'var(--ink-2)', fontSize: 12 }}>{c.target}</td>
+                      <td style={{ color: 'var(--ink-2)', maxWidth: 240 }}>{c.desc}</td>
+                      <td className="num" style={{ color: 'var(--ink-3)', fontSize: 12 }}>{c.date}</td>
                     </tr>
                   ))}
                 </tbody>
