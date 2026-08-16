@@ -163,7 +163,7 @@ export default function QualityPage() {
                       <td style={{ padding: '10px 16px', color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace', fontSize: 11.5 }}>{c.reporter}</td>
                       <td style={{ padding: '10px 16px', color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace', fontSize: 11.5 }}>{c.target}</td>
                       <td style={{ padding: '10px 16px', color: 'var(--ink-2)', fontSize: 12, maxWidth: 240 }}>{c.desc}</td>
-                      <td style={{ padding: '10px 16px', color: 'var(--ink-4)', fontFamily: 'Geist Mono, monospace', fontSize: 11.5 }}>{c.date}</td>
+                      <td style={{ padding: '10px 16px', color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace', fontSize: 11.5 }}>{c.date}</td>
                     </tr>
                   ))}
                 </tbody>

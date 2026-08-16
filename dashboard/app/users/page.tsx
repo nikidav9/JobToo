@@ -42,7 +42,7 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
 
   if (loading || !data) return (
     <div style={{ flex: 1, display: 'grid', placeItems: 'center' }}>
-      <div style={{ fontSize: 13, color: 'var(--ink-4)' }}>Загрузка…</div>
+      <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>Загрузка…</div>
     </div>
   )
 
@@ -87,7 +87,7 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
                   <IconBuilding size={12} />{user.company}
                 </span>
               )}
-              <span style={{ color: 'var(--ink-4)' }}>с {user.created_at?.slice(0, 10)}</span>
+              <span style={{ color: 'var(--ink-3)' }}>с {user.created_at?.slice(0, 10)}</span>
             </div>
           </div>
           <button
@@ -166,9 +166,9 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
                   <div style={{ fontSize: 11.5, color: 'var(--ink)', fontWeight: 500 }}>
                     {l.is_match ? 'Совпадение' : l.worker_liked ? 'Лайк' : 'Просмотр'}
                   </div>
-                  <div style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'Geist Mono, monospace' }}>{l.created_at?.slice(0, 10)}</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace' }}>{l.created_at?.slice(0, 10)}</div>
                 </div>
-                <div style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'Geist Mono, monospace', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {l.vacancy_id?.slice(0, 8)}…
                 </div>
               </div>
@@ -187,7 +187,7 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
                         style={{ color: n <= Number(r.rating) ? 'var(--accent)' : 'var(--line-strong)' }} />
                     ))}
                   </span>
-                  <span style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'Geist Mono, monospace' }}>{r.created_at?.slice(0, 10)}</span>
+                  <span style={{ fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace' }}>{r.created_at?.slice(0, 10)}</span>
                 </div>
                 {r.review_text && <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.5 }}>{r.review_text}</div>}
               </div>
@@ -202,7 +202,7 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
                 <Chip tone="accent">Смена</Chip>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{v.work_type_label || v.work_type || 'Вакансия'}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{v.address || '—'} · {v.created_at?.slice(0, 10)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{v.address || '—'} · {v.created_at?.slice(0, 10)}</div>
                 </div>
                 <Chip tone={v.status === 'open' ? 'positive' : 'neutral'}>
                   {v.status === 'open' ? 'Открыта' : 'Закрыта'}
@@ -214,7 +214,7 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
                 <Chip tone="info">Постоянная</Chip>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{v.title || 'Вакансия'}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{v.address || '—'} · {v.created_at?.slice(0, 10)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{v.address || '—'} · {v.created_at?.slice(0, 10)}</div>
                 </div>
                 <Chip tone={v.status === 'open' ? 'positive' : 'neutral'}>
                   {v.status === 'open' ? 'Открыта' : 'Закрыта'}
@@ -229,7 +229,7 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
             {chats.map((c: any) => (
               <div key={c.id} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)' }}>
                 <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{c.vac_title || 'Чат'}</div>
-                <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
                   {c.company_name && `${c.company_name} · `}{c.created_at?.slice(0, 10)}
                 </div>
               </div>
@@ -251,7 +251,7 @@ function StatBox({ label, value }: { label: string; value: any }) {
 }
 
 function Empty({ text }: { text: string }) {
-  return <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>{text}</div>
+  return <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>{text}</div>
 }
 
 export default function UsersPage() {
@@ -462,7 +462,7 @@ export default function UsersPage() {
                 </thead>
                 <tbody>
                   {filteredUsers.length === 0
-                    ? <tr><td colSpan={9} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Не найдено</td></tr>
+                    ? <tr><td colSpan={9} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>Не найдено</td></tr>
                     : filteredUsers.map((u: any) => {
                         const isWorker = u.role === 'worker'
                         const expanded = expandedId === u.id

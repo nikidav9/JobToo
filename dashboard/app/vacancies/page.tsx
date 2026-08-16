@@ -411,7 +411,7 @@ function TempCard({ c, onRefresh }: { c: TempCardData; onRefresh: () => void }) 
             {c.workersFound}/{c.workersNeeded} найдено
           </span>
         )}
-        {c.createdAt && <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 'auto' }}>Опубл. {c.createdAt}</span>}
+        {c.createdAt && <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 'auto' }}>Опубл. {c.createdAt}</span>}
       </div>
 
       {/* shift info row */}
@@ -454,7 +454,7 @@ function TempCard({ c, onRefresh }: { c: TempCardData; onRefresh: () => void }) 
               <Pill color={PALETTE.amber}  label="ожид." value={c.apps.pending} />
               <Pill color={PALETTE.red}    label="откл." value={c.apps.rejected} />
             </div>
-            <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 2 }}>{open ? '▲' : '▼'}</span>
+            <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 2 }}>{open ? '▲' : '▼'}</span>
           </>
         )}
       </button>
@@ -685,7 +685,7 @@ function PermCard({ c, onRefresh }: { c: PermCard; onRefresh: () => void }) {
           </span>
         )}
         {c.schedule && <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{c.schedule}</span>}
-        {c.createdAt && <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 'auto' }}>{c.createdAt}</span>}
+        {c.createdAt && <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 'auto' }}>{c.createdAt}</span>}
       </div>
 
       {/* divider */}
@@ -713,7 +713,7 @@ function PermCard({ c, onRefresh }: { c: PermCard; onRefresh: () => void }) {
               <Pill color={PALETTE.green} label="одобр." value={c.apps.approved} />
               <Pill color={PALETTE.red} label="откл." value={c.apps.rejected} />
             </div>
-            <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 2 }}>{open ? '▲' : '▼'}</span>
+            <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 2 }}>{open ? '▲' : '▼'}</span>
           </>
         )}
       </button>
@@ -771,7 +771,7 @@ function ApplicantGroup({ title, color, people }: { title: string; color: string
               </div>
               <div style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace' }}>{p.phone}</div>
             </div>
-            <div style={{ fontSize: 10.5, color: 'var(--ink-4)', flexShrink: 0 }}>{p.date}</div>
+            <div style={{ fontSize: 10.5, color: 'var(--ink-3)', flexShrink: 0 }}>{p.date}</div>
           </div>
         ))}
       </div>

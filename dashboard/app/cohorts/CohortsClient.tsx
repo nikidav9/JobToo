@@ -32,20 +32,34 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
   )
 }
 
+/**
+ * Лестница удержания.
+ *
+ * Ступени и подписи под ними берутся из одного списка. До этого легенда была
+ * набрана отдельно и осталась на прежних цветах, когда лестница поменялась:
+ * клетка и её пояснение показывали разные оттенки одного процента. Подписи
+ * при этом читались накопительно («≥60%»), а ступени были непересекающимися
+ * диапазонами — то же расхождение, что уже ловили на «Последнем входе».
+ */
+const STEPS: { upTo: number; bg: string; fg: string; label: string }[] = [
+  { upTo: 0,   bg: 'var(--bg-sunken)', fg: 'var(--ink-3)', label: 'никто' },
+  { upTo: 20,  bg: '#D3E7DC',          fg: 'var(--positive)', label: 'до 20%' },
+  { upTo: 40,  bg: '#A3CDB7',          fg: 'var(--positive)', label: '20–40%' },
+  { upTo: 60,  bg: '#6BAE8B',          fg: '#fff',            label: '40–60%' },
+  { upTo: 80,  bg: '#3D8E62',          fg: '#fff',            label: '60–80%' },
+  { upTo: 101, bg: 'var(--positive)',  fg: '#fff',            label: '80% и выше' },
+]
+
+function stepOf(pct: number) {
+  return STEPS.find(s => pct <= s.upTo) ?? STEPS[STEPS.length - 1]
+}
+
 function cellBg(pct: number | null): string {
-  if (pct === null) return 'transparent'
-  if (pct === 0) return 'var(--bg-sunken)'
-  if (pct < 20) return '#D3E7DC'
-  if (pct < 40) return '#A3CDB7'
-  if (pct < 60) return '#6BAE8B'
-  if (pct < 80) return '#3D8E62'
-  return '#1E7A4C'
+  return pct === null ? 'transparent' : stepOf(pct).bg
 }
 
 function cellText(pct: number | null): string {
-  if (pct === null) return 'var(--ink-4)'
-  if (pct >= 40) return '#fff'
-  return '#2E7D54'
+  return pct === null ? 'var(--ink-3)' : stepOf(pct).fg
 }
 
 export default function CohortsPage() {
@@ -68,11 +82,17 @@ export default function CohortsPage() {
 
       <div className="page-content">
         <div className="g-3">
-          <KpiCard label="Когорт (12 нед.)" value={cohorts.table.length} sparkColor={PALETTE.blue} />
-          <KpiCard label="Недель отслеживания" value={5} sparkColor={PALETTE.purple} />
+          <KpiCard label="Когорт" value={cohorts.table.length}
+            sub="недель регистрации под наблюдением" sparkColor={PALETTE.blue} />
+          <KpiCard label="Всего в когортах"
+            value={cohorts.table.reduce((s, r) => s + r.size, 0)}
+            sub="зарегистрировались за 12 недель" sparkColor={PALETTE.purple} />
+          {/* Раньше при отсутствии данных сюда шла строка «Н/Д» — карточка
+              умеет показывать прочерк сама, и он отличается от нуля. */}
           <KpiCard
-            label="Макс. удержание нед. 1"
-            value={maxRet1 !== null && isFinite(maxRet1) ? `${maxRet1}%` : 'Н/Д'}
+            label="Лучшее удержание · неделя 1"
+            value={maxRet1 !== null && isFinite(maxRet1) ? `${maxRet1}%` : null}
+            sub="доля вернувшихся в лучшей когорте"
             sparkColor={PALETTE.green}
           />
         </div>
@@ -93,43 +113,31 @@ export default function CohortsPage() {
 
         <ChartCard title="Когортный анализ" sub="Удержание пользователей · % активных (лайки / сообщения)">
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <table className="jt-table">
               <thead>
                 <tr>
                   {['Неделя', 'Регистраций', 'Нед. 0', 'Нед. 1', 'Нед. 2', 'Нед. 3', 'Нед. 4'].map(col => (
-                    <th key={col} style={{
-                      padding: '8px 12px',
-                      textAlign: col === 'Неделя' ? 'left' : 'center',
-                      fontSize: 11,
-                      fontWeight: 500,
-                      color: 'var(--ink-3)',
-                      borderBottom: '1px solid var(--line)',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      {col}
-                    </th>
+                    <th key={col} style={{ textAlign: col === 'Неделя' ? 'left' : 'center' }}>{col}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {cohorts.table.map((row, i) => (
-                  <tr key={row.label} style={{ borderBottom: i < cohorts.table.length - 1 ? '1px solid var(--line)' : 'none' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 500, color: 'var(--ink)', whiteSpace: 'nowrap', fontFamily: 'Geist Mono, monospace', fontSize: 12 }}>
+                {cohorts.table.map(row => (
+                  <tr key={row.label}>
+                    <td className="num" style={{ fontWeight: 500, color: 'var(--ink)', whiteSpace: 'nowrap' }}>
                       {row.label}
                     </td>
-                    <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--ink-2)', fontFamily: 'Geist Mono, monospace', fontSize: 12 }}>
+                    <td className="num" style={{ textAlign: 'center', color: 'var(--ink-2)' }}>
                       {row.size}
                     </td>
                     {row.cols.map((pct, ci) => (
-                      <td key={ci} style={{
-                        padding: '6px 12px',
+                      <td key={ci} className="num" style={{
                         textAlign: 'center',
                         background: cellBg(pct),
                         color: cellText(pct),
-                        fontFamily: 'Geist Mono, monospace',
-                        fontSize: 12,
                         fontWeight: pct !== null && pct >= 40 ? 600 : 400,
                       }}>
+                        {/* Прочерк значит «эта неделя ещё не наступила», а не ноль. */}
                         {pct === null ? '—' : `${pct}%`}
                       </td>
                     ))}
@@ -139,22 +147,16 @@ export default function CohortsPage() {
             </table>
           </div>
 
-          {/* Color legend */}
-          <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: 'var(--ink-3)', marginRight: 4 }}>Удержание:</span>
-            {[
-              { label: '≥80%', bg: '#1A6644', text: '#fff' },
-              { label: '≥60%', bg: '#2E7D54', text: '#fff' },
-              { label: '≥40%', bg: '#5BA07A', text: '#fff' },
-              { label: '≥20%', bg: '#8EC4A7', text: '#2E7D54' },
-              { label: '<20%', bg: '#C4E0D3', text: '#2E7D54' },
-              { label: '0%', bg: 'var(--bg-sunken)', text: 'var(--ink-4)' },
-            ].map(({ label, bg, text }) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 24, height: 16, borderRadius: 3, background: bg, display: 'grid', placeItems: 'center' }}>
-                  <span style={{ fontSize: 9, color: text, fontWeight: 600 }}>{label.split('%')[0]}%</span>
-                </div>
-                <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{label}</span>
+          {/* Легенда строится из того же списка, что и заливка клеток. */}
+          <div style={{ display: 'flex', gap: 14, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Вернулись:</span>
+            {STEPS.map(step => (
+              <div key={step.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span aria-hidden="true" style={{
+                  width: 22, height: 14, borderRadius: 3, background: step.bg,
+                  border: step.upTo === 0 ? '1px solid var(--line)' : 'none',
+                }} />
+                <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{step.label}</span>
               </div>
             ))}
           </div>

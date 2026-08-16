@@ -22,24 +22,20 @@ function FunnelBar({ items }: { items: { name: string; value: number; fill: stri
           ? ((item.value / items[i - 1].value) * 100).toFixed(0) : null
         return (
           <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 11.5, color: 'var(--ink-2)', width: 150, flexShrink: 0 }}>{item.name}</span>
-            <div style={{ flex: 1, height: 28, background: 'var(--bg-sunken)', borderRadius: 5, overflow: 'hidden' }}>
+            <span style={{ fontSize: 13, color: 'var(--ink-2)', width: 150, flexShrink: 0 }}>{item.name}</span>
+            <div style={{ flex: 1, height: 10, background: 'var(--bg-sunken)', borderRadius: 5 }}>
               <div style={{
-                width: `${Math.max(pct, 2)}%`, height: '100%',
+                width: `${Math.max(pct, item.value > 0 ? 2 : 0)}%`, height: '100%',
                 background: item.fill, borderRadius: 5,
-                display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8,
-                transition: 'width .3s ease',
-              }}>
-                <span style={{ color: '#fff', fontSize: 11, fontFamily: 'Geist Mono, monospace', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                  {item.value.toLocaleString('ru')}
-                </span>
-              </div>
+                transition: 'width var(--slow) var(--ease)',
+              }} />
             </div>
-            {convPct !== null && (
-              <span style={{ fontSize: 11, color: 'var(--ink-4)', width: 48, textAlign: 'right', fontFamily: 'Geist Mono, monospace', flexShrink: 0 }}>
-                →{convPct}%
-              </span>
-            )}
+            <span className="num" style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 550, width: 56, textAlign: 'right', flexShrink: 0 }}>
+              {item.value.toLocaleString('ru-RU')}
+            </span>
+            <span className="num" style={{ fontSize: 12, color: 'var(--ink-3)', width: 52, textAlign: 'right', flexShrink: 0 }}>
+              {convPct !== null ? `${convPct}%` : '—'}
+            </span>
           </div>
         )
       })}
@@ -62,45 +58,54 @@ export default function FunnelPage() {
 
       <div className="page-content">
         {/* Активация */}
-        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-4)', fontWeight: 500, paddingBottom: 2 }}>
+        <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', fontWeight: 500, fontFamily: 'Geist Mono, monospace', paddingBottom: 2 }}>
           Активация
         </div>
         <div className="g-4">
-          <KpiCard label="Воркеров всего" value={d.kpi.workers} sparkColor={PALETTE.blue} />
-          <KpiCard label="Лайкнули хоть раз" value={d.kpi.activatedWorkers} sparkColor={PALETTE.cyan} />
-          <KpiCard label="% активации" value={`${d.kpi.activationRate}%`} sparkColor={PALETTE.cyan} />
-          <KpiCard label="% активны в 7 дней" value={`${d.kpi.activation7d}%`} sparkColor={PALETTE.purple} />
+          <KpiCard label="Работников всего" value={d.kpi.workers} sub="в базе" sparkColor={PALETTE.blue} />
+          <KpiCard label="Лайкнули хоть раз" value={d.kpi.activatedWorkers}
+            sub={`из ${d.kpi.workers} работников`} sparkColor={PALETTE.cyan} />
+          <KpiCard label="Активация" value={`${d.kpi.activationRate}%`}
+            sub="дошли до первого лайка" sparkColor={PALETTE.cyan} />
+          <KpiCard label="Активация за 7 дней" value={`${d.kpi.activation7d}%`}
+            sub="успели лайкнуть в первую неделю" sparkColor={PALETTE.purple} />
         </div>
 
         {/* Конверсия */}
-        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-4)', fontWeight: 500, paddingBottom: 2, paddingTop: 4 }}>
+        <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', fontWeight: 500, fontFamily: 'Geist Mono, monospace', paddingBottom: 2, paddingTop: 4 }}>
           Конверсия
         </div>
         <div className="g-4">
-          <KpiCard label="Всего лайков" value={d.kpi.totalLikes} sparkColor={PALETTE.pink} />
-          <KpiCard label="Матчей" value={d.kpi.totalMatches} sparkColor={PALETTE.purple} />
-          <KpiCard label="% лайк → матч" value={`${d.kpi.matchRate}%`} sparkColor={PALETTE.purple} />
-          <KpiCard label="% матч → смена" value={`${d.kpi.completionRate}%`} sparkColor={PALETTE.green} />
+          <KpiCard label="Всего лайков" value={d.kpi.totalLikes} sub="за всё время" sparkColor={PALETTE.pink} />
+          <KpiCard label="Совпадений" value={d.kpi.totalMatches}
+            sub={`из ${d.kpi.totalLikes} лайков`} sparkColor={PALETTE.purple} />
+          <KpiCard label="Лайк становится совпадением" value={`${d.kpi.matchRate}%`}
+            sub="доля лайков" sparkColor={PALETTE.purple} />
+          <KpiCard label="Совпадение доходит до смены" value={`${d.kpi.completionRate}%`}
+            sub="доля совпадений" sparkColor={PALETTE.green} />
         </div>
 
         {/* Удержание */}
-        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-4)', fontWeight: 500, paddingBottom: 2, paddingTop: 4 }}>
+        <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', fontWeight: 500, fontFamily: 'Geist Mono, monospace', paddingBottom: 2, paddingTop: 4 }}>
           Удержание
         </div>
         <div className="g-4">
-          <KpiCard label="Смен завершено" value={d.kpi.completedCount} sparkColor={PALETTE.green} />
-          <KpiCard label="Ср. смен/воркер" value={d.kpi.avgShiftsPerWorker} sparkColor={PALETTE.orange} />
-          <KpiCard label="Вернулись (2+ смен)" value={d.kpi.returningWorkers} sparkColor={PALETTE.orange} />
-          <KpiCard label="% повторных" value={`${d.kpi.returningRate}%`} sparkColor={PALETTE.amber} />
+          <KpiCard label="Смен завершено" value={d.kpi.completedCount} sub="за всё время" sparkColor={PALETTE.green} />
+          <KpiCard label="Смен на работника" value={d.kpi.avgShiftsPerWorker}
+            sub="в среднем среди отработавших" sparkColor={PALETTE.orange} />
+          <KpiCard label="Вернулись за второй" value={d.kpi.returningWorkers}
+            sub="отработали две смены и больше" sparkColor={PALETTE.orange} />
+          <KpiCard label="Доля вернувшихся" value={`${d.kpi.returningRate}%`}
+            sub="от тех, кто отработал хоть раз" sparkColor={PALETTE.amber} />
         </div>
 
         {/* Воронки */}
         <div className="g-2">
-          <ChartCard title="Воронка по воркерам" sub="Уникальные пользователи на каждом шаге">
+          <ChartCard title="Воронка по людям" sub="Уникальные работники на каждом шаге · справа доля от предыдущего">
             <FunnelBar items={d.mainFunnel} />
           </ChartCard>
 
-          <ChartCard title="Событийная воронка" sub="Всего событий на каждом шаге">
+          <ChartCard title="Воронка по событиям" sub="Всего событий на каждом шаге · справа доля от предыдущего">
             <FunnelBar items={d.eventFunnel} />
           </ChartCard>
         </div>
@@ -173,7 +178,7 @@ export default function FunnelPage() {
           <FunnelBar items={d.permFunnel} />
           <div style={{ marginTop: 16, display: 'flex', gap: 32, paddingTop: 8, borderTop: '1px solid var(--line)' }}>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>% одобрения</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>% одобрения</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: PALETTE.green, fontFamily: 'Geist Mono, monospace' }}>
                 {d.kpi.permApplications > 0
                   ? ((d.kpi.permApproved / d.kpi.permApplications) * 100).toFixed(1)
@@ -181,7 +186,7 @@ export default function FunnelPage() {
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>Всего заявок</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Всего заявок</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Geist Mono, monospace' }}>
                 {d.kpi.permApplications.toLocaleString('ru')}
               </div>

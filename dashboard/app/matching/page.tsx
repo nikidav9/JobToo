@@ -28,16 +28,22 @@ export default function MatchingPage() {
       <div className="page-content">
         <div className="g-4">
           <KpiCard label="Откликов" value={d.kpi.totalLikes} sub="лайки работников, без скипов" sparkColor={PALETTE.pink} />
-          <KpiCard label="Мэтчей" value={d.kpi.totalMatches} sparkColor={PALETTE.purple} />
-          <KpiCard label="Конверсия отклик→мэтч" value={`${d.kpi.matchRate}%`} sparkColor={PALETTE.purple} />
-          <KpiCard label="Завершено смен" value={d.kpi.completed} sparkColor={PALETTE.green} />
+          <KpiCard label="Совпадений" value={d.kpi.totalMatches}
+            sub={`из ${d.kpi.totalLikes} откликов`} sparkColor={PALETTE.purple} />
+          <KpiCard label="Отклик становится совпадением" value={`${d.kpi.matchRate}%`}
+            sub="доля откликов" sparkColor={PALETTE.purple} />
+          <KpiCard label="Завершено смен" value={d.kpi.completed}
+            sub={`из ${d.kpi.totalMatches} совпадений`} sparkColor={PALETTE.green} />
         </div>
 
         <div className="g-4">
           <KpiCard label="Скипов" value={d.kpi.skipped} sub="свайпы «мимо», не отклики" sparkColor={PALETTE.gray} />
-          <KpiCard label="Подтверждено" value={d.kpi.confirmed} sparkColor={PALETTE.orange} />
-          <KpiCard label="% подтверждения" value={`${d.kpi.confirmRate}%`} sparkColor={PALETTE.orange} />
-          <KpiCard label="% завершения" value={`${d.kpi.completionRate}%`} sparkColor={PALETTE.green} />
+          <KpiCard label="Подтверждено обеими сторонами" value={d.kpi.confirmed}
+            sub={`из ${d.kpi.totalMatches} совпадений`} sparkColor={PALETTE.orange} />
+          <KpiCard label="Совпадение подтверждают" value={`${d.kpi.confirmRate}%`}
+            sub="доля совпадений" sparkColor={PALETTE.orange} />
+          <KpiCard label="Совпадение доходит до смены" value={`${d.kpi.completionRate}%`}
+            sub="доля совпадений" sparkColor={PALETTE.green} />
         </div>
 
         <ChartCard title="Отклики и мэтчи по дням" sub="30 дней">
@@ -57,13 +63,13 @@ export default function MatchingPage() {
               <Tooltip contentStyle={TT} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
               <Area type="monotone" dataKey="likes" name="Отклики" stroke={PALETTE.pink} fill="url(#gLk)" strokeWidth={1.7} dot={false} />
-              <Area type="monotone" dataKey="matches" name="Мэтчи" stroke={PALETTE.purple} fill="url(#gMt)" strokeWidth={1.7} dot={false} />
+              <Area type="monotone" dataKey="matches" name="Совпадения" stroke={PALETTE.purple} fill="url(#gMt)" strokeWidth={1.7} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
 
         <div className="g-2">
-          <ChartCard title="Воронка совпадений" sub="От лайка до завершения смены">
+          <ChartCard title="Воронка совпадений" sub="От отклика до завершения смены · справа доля от предыдущего шага">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8 }}>
               {d.funnel.map((item, i) => {
                 const maxVal = d.funnel[0].value
@@ -72,19 +78,22 @@ export default function MatchingPage() {
                   ? ((item.value / d.funnel[i - 1].value) * 100).toFixed(0) : null
                 return (
                   <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 11.5, color: 'var(--ink-2)', width: 110, flexShrink: 0 }}>{item.name}</span>
-                    <div style={{ flex: 1, height: 26, background: 'var(--bg-sunken)', borderRadius: 4, overflow: 'hidden' }}>
+                    <span style={{ fontSize: 13, color: 'var(--ink-2)', width: 110, flexShrink: 0 }}>{item.name}</span>
+                    <div style={{ flex: 1, height: 10, background: 'var(--bg-sunken)', borderRadius: 5 }}>
                       <div style={{
-                        width: `${Math.max(pct, 3)}%`, height: '100%',
-                        background: item.fill, borderRadius: 4,
-                        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8,
-                      }}>
-                        <span style={{ color: '#fff', fontSize: 11, fontFamily: 'Geist Mono, monospace', fontWeight: 600 }}>
-                          {item.value.toLocaleString('ru')}
-                        </span>
-                      </div>
+                        width: `${Math.max(pct, item.value > 0 ? 2 : 0)}%`, height: '100%',
+                        background: item.fill, borderRadius: 5,
+                        transition: 'width var(--slow) var(--ease)',
+                      }} />
                     </div>
-                    {convPct && <span style={{ fontSize: 11, color: 'var(--ink-4)', width: 44, textAlign: 'right', fontFamily: 'Geist Mono, monospace' }}>→{convPct}%</span>}
+                    <span className="num" style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 550, width: 56, textAlign: 'right', flexShrink: 0 }}>
+                      {item.value.toLocaleString('ru-RU')}
+                    </span>
+                    {/* `convPct` — строка: «0» проходила как ложь, и шаг с нулевой
+                        конверсией оставался вообще без подписи. */}
+                    <span className="num" style={{ fontSize: 12, color: 'var(--ink-3)', width: 48, textAlign: 'right', flexShrink: 0 }}>
+                      {convPct !== null ? `${convPct}%` : '—'}
+                    </span>
                   </div>
                 )
               })}
@@ -101,7 +110,7 @@ export default function MatchingPage() {
                   formatter={(value: any, name: string) => [name === 'rate' ? `${value}%` : value, name === 'rate' ? 'Конверсия %' : name === 'likes' ? 'Лайки' : 'Совпадения']} />
                 <Legend iconType="square" iconSize={8} wrapperStyle={LEGEND} />
                 <Bar dataKey="likes" name="Отклики" fill={PALETTE.pink} opacity={0.7} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="matches" name="Мэтчи" fill={PALETTE.purple} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="matches" name="Совпадения" fill={PALETTE.purple} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
