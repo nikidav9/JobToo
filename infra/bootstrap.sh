@@ -204,6 +204,22 @@ if [ -f "$REPO/infra/webhook-watch.sh" ] \
   fi
 fi
 
+# Забор чужих вакансий. Расписание у каждого источника своё и проверяется
+# внутри скрипта — здесь просто регулярно даём ему повод посмотреть, не
+# пора ли. Раз в десять минут: смены на сегодня протухают за часы, и сутки
+# ожидания сделали бы агрегатор бесполезным.
+if [ -f /opt/jobtoo-proxy/ingest.php ]; then
+  if [ ! -f /var/lib/jt-ingest ] \
+     || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-ingest 2>/dev/null || echo 0) )) -gt 600 ]; then
+    touch /var/lib/jt-ingest
+    AS=$(grep -m1 '^EXPO_PUBLIC_APP_SECRET=' "$SECRETS" 2>/dev/null | cut -d= -f2-)
+    if [ -n "${AS:-}" ]; then
+      curl -s -m 120 -o /var/lib/jt-ingest.out -H "X-App-Secret: $AS" \
+        https://jobtoo.ru/api/ingest.php >/dev/null 2>&1 || true
+    fi
+  fi
+fi
+
 # Проверка анонимного пути — того, чем приложение грузит файлы и держит
 # живые подписки. Раз в десять минут: она лазает в базу и в три службы,
 # а ответ меняется только когда мы сами что-то поменяли.

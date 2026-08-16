@@ -23,62 +23,10 @@
 @ini_set('display_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
 
-// Свои обращения к базе, а не общие из db.php: подключить тот файл значит
-// запустить весь его обработчик запроса заодно. Здесь нужно ровно три
-// действия — выбрать, выбрать одну, обновить, — и лучше повторить их на
-// двадцати строках, чем тянуть за собой две тысячи чужих.
-function api_sb_url(): string {
-    $env = getenv('SB_URL');
-    if (is_string($env) && trim($env) !== '') return rtrim(trim($env), '/');
-    $f = __DIR__ . '/sb_url.php';
-    if (is_readable($f)) { $v = @include $f; if (is_string($v) && trim($v) !== '') return rtrim(trim($v), '/'); }
-    return 'https://jobtoo.ru';
-}
-
-function api_sb_key(): string {
-    $env = getenv('SB_SERVICE_KEY');
-    if (is_string($env) && trim($env) !== '') return trim($env);
-    $f = __DIR__ . '/sb_service_key.php';
-    if (is_readable($f)) { $v = @include $f; if (is_string($v) && trim($v) !== '') return trim($v); }
-    return '';
-}
-
-function sb(string $method, string $table, array $query = [], $body = null, array $extra = []): array {
-    $url = api_sb_url() . '/rest/v1/' . $table;
-    if (!empty($query)) $url .= '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CUSTOMREQUEST  => $method,
-        CURLOPT_HTTPHEADER     => array_merge([
-            'apikey: ' . api_sb_key(),
-            'Authorization: Bearer ' . api_sb_key(),
-            'Content-Type: application/json',
-        ], $extra),
-        CURLOPT_TIMEOUT => 15,
-    ]);
-    if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
-    $resp = curl_exec($ch); curl_close($ch);
-    $dec = json_decode($resp ?: '[]', true);
-    return is_array($dec) ? $dec : [];
-}
-
-function sb_select(string $t, array $f = [], string $sel = '*'): array {
-    return sb('GET', $t, array_merge(['select' => $sel], $f));
-}
-
-function sb_single(string $t, array $f = [], string $sel = '*'): ?array {
-    $rows = sb_select($t, array_merge($f, ['limit' => '1']), $sel);
-    return $rows[0] ?? null;
-}
-
-function sb_update(string $t, array $f, array $data): void {
-    sb('PATCH', $t, $f, $data, ['Prefer: return=minimal']);
-}
-
-function now_iso(): string {
-    return gmdate('Y-m-d\TH:i:s') . '.000Z';
-}
+// Общие обращения к базе — в отдельном файле: тем же набором пользуется
+// забор чужих фидов, и держать две расходящиеся копии одних и тех же
+// двадцати строк себе дороже.
+require_once __DIR__ . '/sb_lite.php';
 
 function api_out(int $code, array $body): void
 {
@@ -208,6 +156,13 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 // здесь вообще есть.
 if ($path === 'openapi.json') {
     readfile(__DIR__ . '/openapi.json');
+    exit;
+}
+
+// Образец фида — того вида, в котором мы принимаем чужие вакансии. Тоже без
+// ключа: партнёр должен видеть, что от него хотят, до всяких договорённостей.
+if ($path === 'sample-feed.json') {
+    readfile(__DIR__ . '/sample-feed.json');
     exit;
 }
 

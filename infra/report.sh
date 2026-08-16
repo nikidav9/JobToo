@@ -165,6 +165,10 @@ TMP=/tmp/jt-status.$$
   # файле переменных и при этом не быть внутри контейнера — ровно так и было:
   # отчёт показывал «есть», а дашборд отвечал «не задан на сервере». Значение
   # в файле и значение в работающем контейнере — разные вещи, и знать надо обе.
+  # Чужие вакансии: сколько живых и что сказал последний заход по каждому
+  # источнику. Сломавшийся фид иначе не отличить от источника, у которого
+  # просто нет открытых смен.
+  echo "  \"чужие_вакансии\": \"$(cat /var/lib/jt-ingest.out 2>/dev/null | tr -d '"\\\r\n' | cut -c1-260)\","
   echo "  \"дашборд_пропуск\": \"файл=$(grep -c '^EXPO_PUBLIC_APP_SECRET=.\+' /opt/jobtoo-secrets/env 2>/dev/null | tr -d '\n') внутри=$(
     cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose --profile dashboard exec -T dashboard \
       printenv EXPO_PUBLIC_APP_SECRET 2>/dev/null | tr -d '\r\n' | wc -c | tr -d ' ')\","

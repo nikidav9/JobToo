@@ -1,0 +1,89 @@
+<?php
+// Короткий доступ к базе для тех файлов, которым не нужен весь db.php.
+//
+// db.php подключать нельзя: он не библиотека, а обработчик запроса — включив
+// его, вы запускаете разбор входящего JSON и всё остальное заодно. А нужно
+// здесь ровно четыре действия: выбрать, выбрать одну, вставить-или-обновить,
+// обновить.
+//
+// Один файл на всех, кому это нужно, а не копия в каждом: три копии одних и
+// тех же двадцати строк расходятся через месяц, и потом одна из них ходит в
+// базу не с теми заголовками.
+
+if (!function_exists('sb')) {
+
+    function sb_lite_url(): string
+    {
+        $env = getenv('SB_URL');
+        if (is_string($env) && trim($env) !== '') return rtrim(trim($env), '/');
+        $f = __DIR__ . '/sb_url.php';
+        if (is_readable($f)) {
+            $v = @include $f;
+            if (is_string($v) && trim($v) !== '') return rtrim(trim($v), '/');
+        }
+        return 'https://jobtoo.ru';
+    }
+
+    function sb_lite_key(): string
+    {
+        $env = getenv('SB_SERVICE_KEY');
+        if (is_string($env) && trim($env) !== '') return trim($env);
+        $f = __DIR__ . '/sb_service_key.php';
+        if (is_readable($f)) {
+            $v = @include $f;
+            if (is_string($v) && trim($v) !== '') return trim($v);
+        }
+        return '';
+    }
+
+    function sb(string $method, string $table, array $query = [], $body = null, array $extra = []): array
+    {
+        $url = sb_lite_url() . '/rest/v1/' . $table;
+        if (!empty($query)) $url .= '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST  => $method,
+            CURLOPT_HTTPHEADER     => array_merge([
+                'apikey: ' . sb_lite_key(),
+                'Authorization: Bearer ' . sb_lite_key(),
+                'Content-Type: application/json',
+            ], $extra),
+            CURLOPT_TIMEOUT => 20,
+        ]);
+        if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_UNESCAPED_UNICODE));
+        $resp = curl_exec($ch);
+        curl_close($ch);
+        $dec = json_decode($resp ?: '[]', true);
+        return is_array($dec) ? $dec : [];
+    }
+
+    function sb_select(string $t, array $f = [], string $sel = '*'): array
+    {
+        return sb('GET', $t, array_merge(['select' => $sel], $f));
+    }
+
+    function sb_single(string $t, array $f = [], string $sel = '*'): ?array
+    {
+        $rows = sb_select($t, array_merge($f, ['limit' => '1']), $sel);
+        return $rows[0] ?? null;
+    }
+
+    function sb_update(string $t, array $f, array $data): void
+    {
+        sb('PATCH', $t, $f, $data, ['Prefer: return=minimal']);
+    }
+
+    /** Вставить или обновить по ключу конфликта — одним запросом на пачку. */
+    function sb_upsert_rows(string $t, array $rows, string $on_conflict): void
+    {
+        if (!$rows) return;
+        sb('POST', $t, ['on_conflict' => $on_conflict], $rows,
+           ['Prefer: return=minimal,resolution=merge-duplicates']);
+    }
+
+    function now_iso(): string
+    {
+        return gmdate('Y-m-d\TH:i:s') . '.000Z';
+    }
+}
