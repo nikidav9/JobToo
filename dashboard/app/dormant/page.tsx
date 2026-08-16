@@ -60,6 +60,7 @@ export default function DormantPage() {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<string | null>(null)
   const [updated, setUpdated] = useState<string>('')
+  const [copied, setCopied] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -133,6 +134,28 @@ export default function DormantPage() {
     setBusy(false)
   }
 
+  // Текст в буфер — потому что подставить его в ссылку нельзя.
+  //
+  // t.me/+<номер> открывает переписку с этим человеком, если он есть в
+  // телеграме, но предзаполнить сообщение телеграм не даёт. Значит порядок
+  // такой: нажали «Текст», нажали «Телеграм», вставили. Два движения вместо
+  // одного, зато работает и с теми, кто бота не подключал, — а таких как раз
+  // большинство среди не заходивших.
+  //
+  // Пишется при этом с вашего личного аккаунта, а не от бота. Для десятка
+  // человек это нормально, для трёхсот — нет: телеграм считает такое
+  // рассылкой и ограничивает отправку незнакомым.
+  async function copyFor(r: Row) {
+    if (!text.trim()) return
+    try {
+      await navigator.clipboard.writeText(text.replace(/\{name\}/g, r.first_name ?? ''))
+      setCopied(r.id)
+      setTimeout(() => setCopied(c => (c === r.id ? null : c)), 1500)
+    } catch {
+      setResult('Браузер не дал доступ к буферу обмена')
+    }
+  }
+
   function exportPhones() {
     downloadCSV(
       groups.phone.map(r => ({
@@ -183,7 +206,8 @@ export default function DormantPage() {
           <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
             Текст сообщения. <code>{'{name}'}</code> заменится на имя человека.
             Пустое имя — подставится пустота, поэтому лучше писать так, чтобы
-            фраза читалась и без него.
+            фраза читалась и без него. Кнопка «Текст» в строке кладёт это
+            сообщение в буфер — для тех, кому пишут вручную с личного аккаунта.
           </div>
           <textarea value={text} onChange={e => setText(e.target.value)} rows={5}
             placeholder="{name}, здравствуйте! Вы регистрировались в JobToo…"
@@ -231,17 +255,17 @@ export default function DormantPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: 'var(--bg-sunken)', textAlign: 'left' }}>
-                {['Имя', 'Роль', 'Телефон', 'Метро', 'Зарегистрирован', 'Как достучаться'].map(h => (
+                {['Имя', 'Роль', 'Телефон', 'Метро', 'Зарегистрирован', 'Как достучаться', 'Написать'].map(h => (
                   <th key={h} style={{ padding: '10px 12px', fontWeight: 500, color: 'var(--ink-3)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={6} style={{ padding: 16, color: 'var(--ink-4)' }}>Загружаю…</td></tr>
+                <tr><td colSpan={7} style={{ padding: 16, color: 'var(--ink-4)' }}>Загружаю…</td></tr>
               )}
               {!loading && !filtered.length && (
-                <tr><td colSpan={6} style={{ padding: 16, color: 'var(--ink-4)' }}>Никого нет — все хоть раз заходили.</td></tr>
+                <tr><td colSpan={7} style={{ padding: 16, color: 'var(--ink-4)' }}>Никого нет — все хоть раз заходили.</td></tr>
               )}
               {filtered.slice(0, 500).map(r => (
                 <tr key={r.id} style={{ borderTop: '1px solid var(--line)' }}>
@@ -251,6 +275,21 @@ export default function DormantPage() {
                   <td style={{ padding: '9px 12px' }}>{r.metro_station ?? '—'}</td>
                   <td style={{ padding: '9px 12px' }}>{new Date(r.created_at).toLocaleDateString('ru-RU')}</td>
                   <td style={{ padding: '9px 12px' }}>{REACH_LABEL[reachOf(r)]}</td>
+                  <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
+                    <a href={`tel:+${(r.phone ?? '').replace(/\D/g, '')}`}
+                       style={{ marginRight: 10, color: 'var(--accent)', textDecoration: 'none' }}>Позвонить</a>
+                    <a href={`https://t.me/+${(r.phone ?? '').replace(/\D/g, '')}`}
+                       target="_blank" rel="noreferrer"
+                       style={{ marginRight: 10, color: 'var(--accent)', textDecoration: 'none' }}>Телеграм</a>
+                    <button onClick={() => copyFor(r)} disabled={!text.trim()}
+                      style={{
+                        border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--ink-2)',
+                        borderRadius: 6, fontSize: 12.5, padding: '3px 8px',
+                        cursor: text.trim() ? 'pointer' : 'not-allowed', opacity: text.trim() ? 1 : 0.5,
+                      }}>
+                      {copied === r.id ? 'Скопировано' : 'Текст'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
