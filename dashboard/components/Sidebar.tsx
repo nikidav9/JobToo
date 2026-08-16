@@ -62,7 +62,7 @@ export default function Sidebar() {
       }}>
         <div style={{
           width: 28, height: 28, borderRadius: 'var(--radius-sm)', flexShrink: 0,
-          background: 'var(--accent)', color: '#14100C',
+          background: 'var(--accent)', color: '#FFFFFF',
           display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 13,
         }}>J</div>
         <div style={{ minWidth: 0 }}>
