@@ -567,10 +567,21 @@ grep -qE "Started|Recreated|Created" /tmp/jt-compose.log 2>/dev/null \
 # Дашборд — отдельным ходом и только когда сборка приехала. Он в профиле,
 # то есть общий up его не касается: это и позволяет держать его готовым, но
 # выключенным, пока не решат переносить.
-if [ -s /opt/jobtoo-dashboard/server.js ] && [ ! -f /var/lib/jt-dash.up ]; then
+#
+# Раньше здесь стояла отметка «уже поднимали», и поднимался он ровно один раз
+# за всю жизнь машины. Из-за неё контейнер так и работал со старым набором
+# переменных: пропуск приложения приехал, в файле лежал, а внутрь не попал —
+# и дашборд отвечал «EXPO_PUBLIC_APP_SECRET не задан на сервере» тому, кто
+# в этот момент отвечал человеку в поддержке.
+#
+# Теперь как у всех остальных: зовём каждый раз, а в журнал пишем, только
+# когда что-то действительно изменилось. Compose сам не трогает контейнер,
+# у которого совпали образ, переменные и настройки.
+if [ -s /opt/jobtoo-dashboard/server.js ]; then
   timeout 300 docker compose --env-file "$SECRETS" --profile dashboard up -d dashboard \
-    >/tmp/jt-dash-up.log 2>&1 && touch /var/lib/jt-dash.up
-  say "дашборд" "$(tail -2 /tmp/jt-dash-up.log | tr -d '\r' | tr '\n' ' ' | cut -c1-160)"
+    >/tmp/jt-dash-up.log 2>&1 || say "дашборд" "up не уложился"
+  grep -qE "Started|Recreated|Created" /tmp/jt-dash-up.log 2>/dev/null \
+    && say "дашборд" "$(grep -aE "Started|Recreated|Created" /tmp/jt-dash-up.log | tr -d '\r' | tr '\n' ' ' | cut -c1-160)"
 fi
 
 # ── Шлюз ──────────────────────────────────────────────────────────────────
