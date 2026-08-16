@@ -863,7 +863,16 @@ export async function fetchReviews() {
 
   const withText = list.filter((r: any) => r.reviewText).length
 
-  return { list, avgRating, total: list.length, withText }
+  // Сколько отзывов на каждую оценку — чтобы фильтр показывал, что за ним
+  // лежит, и не приходилось нажимать наугад.
+  const byStars: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  for (const r of list as any[]) if (byStars[r.rating] !== undefined) byStars[r.rating]++
+  const byRole = {
+    worker: (list as any[]).filter(r => r.fromRole === 'worker').length,
+    employer: (list as any[]).filter(r => r.fromRole === 'employer').length,
+  }
+
+  return { list, avgRating, total: list.length, withText, byStars, byRole }
 }
 
 // ─── user profile ────────────────────────────────────────────────────────────

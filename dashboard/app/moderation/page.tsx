@@ -5,6 +5,20 @@ import { useRealtime } from '@/lib/useRealtime'
 import PageHeader from '@/components/PageHeader'
 import { blockUser, sendSystemMessage } from '@/lib/admin-actions'
 import { fetchChats } from '@/lib/queries'
+import KpiCard from '@/components/KpiCard'
+import Button from '@/components/Button'
+import Chip from '@/components/Chip'
+import FilterChips from '@/components/FilterChips'
+import { IconSend, IconUser, IconCheck, IconX, IconBan } from '@/components/icons'
+
+/** Статусы приходят из базы по-английски. Показывать их как есть нельзя:
+ *  панель русская, а «dismissed» ничего не говорит тому, кто её открыл. */
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'Новая',
+  resolved: 'Решена',
+  dismissed: 'Отклонена',
+  reviewing: 'Разбираем',
+}
 
 async function fetchModeration() {
   const [{ data: complaints }, { data: users }] = await Promise.all([
@@ -55,6 +69,7 @@ export default function ModerationPage() {
   const [sysMsgChat, setSysMsgChat] = useState('')
   const [sysMsgText, setSysMsgText] = useState('')
   const [sysMsgStatus, setSysMsgStatus] = useState<Status>('idle')
+  const [tab, setTab] = useState<'pending' | 'done' | 'all'>('pending')
 
   function setS(id: string, s: Status, msg?: string) {
     setStatus(prev => ({ ...prev, [id]: { s, msg } }))
@@ -88,22 +103,38 @@ export default function ModerationPage() {
 
   const pending = d.list.filter((c: any) => c.status === 'pending')
   const resolved = d.list.filter((c: any) => c.status !== 'pending')
+  const blockedTargets = new Set(
+    d.list.filter((c: any) => c.targetBlocked && c.targetId).map((c: any) => c.targetId),
+  ).size
+
+  // Заголовок обещал «столько-то новых», а под ним шёл весь список целиком —
+  // и решённые вперемешку с новыми. Теперь что выбрано, то и показывается.
+  const shown = tab === 'pending' ? pending : tab === 'done' ? resolved : d.list
 
   return (
     <div>
       <PageHeader title="Модерация" intervalSec={30} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
       <div className="page-content">
 
+        <div className="g-3">
+          <KpiCard label="Новые жалобы" value={pending.length}
+            sub={d.list.length ? `из ${d.list.length} за всё время` : 'жалоб не поступало'} />
+          <KpiCard label="Разобрано" value={resolved.length}
+            sub={d.list.length ? `${Math.round(resolved.length / d.list.length * 100)}% всех жалоб` : '—'} />
+          <KpiCard label="Заблокировано по жалобам" value={blockedTargets}
+            sub="людей, на которых жаловались" />
+        </div>
+
         {/* System message sender */}
-        <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 10, padding: '16px 18px', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--ink)', marginBottom: 12 }}>
-            💬 Системное сообщение в чат
+        <div className="jt-card" style={{ padding: '16px 18px' }}>
+          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--ink)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 7 }}>
+            <IconSend size={14} />Системное сообщение в чат
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <select
               value={sysMsgChat}
               onChange={e => setSysMsgChat(e.target.value)}
-              style={{ flex: '0 0 240px', height: 34, padding: '0 10px', border: '1px solid var(--line)', borderRadius: 7, background: 'var(--bg-sunken)', color: 'var(--ink)', fontSize: 12.5, outline: 'none' }}
+              className="jt-input" style={{ flex: '0 0 260px' }}
             >
               <option value="">— Выберите чат —</option>
               {(chats ?? []).map((c: any) => (
@@ -114,100 +145,107 @@ export default function ModerationPage() {
               placeholder="Текст системного сообщения..."
               value={sysMsgText}
               onChange={e => setSysMsgText(e.target.value)}
-              style={{ flex: 1, minWidth: 200, height: 34, padding: '0 12px', border: '1px solid var(--line)', borderRadius: 7, background: 'var(--bg-sunken)', color: 'var(--ink)', fontSize: 12.5, outline: 'none' }}
+              className="jt-input" style={{ flex: 1, minWidth: 200 }}
             />
-            <button
+            <Button
+              variant={sysMsgStatus === 'err' ? 'danger' : 'primary'}
               onClick={handleSysMsg}
               disabled={!sysMsgChat || !sysMsgText.trim() || sysMsgStatus === 'loading'}
-              style={{
-                height: 34, padding: '0 16px', borderRadius: 7, border: 'none', cursor: 'pointer',
-                background: sysMsgStatus === 'ok' ? 'var(--positive)' : sysMsgStatus === 'err' ? 'var(--negative)' : 'var(--ink)',
-                color: '#fff', fontSize: 12.5, fontWeight: 500, transition: 'background .15s',
-              }}
+              icon={sysMsgStatus === 'ok' ? <IconCheck size={13} /> : sysMsgStatus === 'err' ? <IconX size={13} /> : undefined}
             >
-              {sysMsgStatus === 'loading' ? 'Отправка…' : sysMsgStatus === 'ok' ? '✓ Отправлено' : sysMsgStatus === 'err' ? 'Ошибка' : 'Отправить'}
-            </button>
+              {sysMsgStatus === 'loading' ? 'Отправка…'
+                : sysMsgStatus === 'ok' ? 'Отправлено'
+                : sysMsgStatus === 'err' ? 'Не отправилось'
+                : 'Отправить'}
+            </Button>
           </div>
         </div>
 
         {/* Complaints */}
-        <Section title={`Жалобы · ${pending.length} новых`}>
-          {d.list.length === 0 && (
-            <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Жалоб нет</div>
+        <FilterChips
+          options={[
+            { key: 'pending' as const, label: 'Новые', count: pending.length },
+            { key: 'done' as const, label: 'Разобранные', count: resolved.length },
+            { key: 'all' as const, label: 'Все', count: d.list.length },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {shown.length === 0 && (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+              {d.list.length === 0 ? 'Жалоб не поступало' : 'В этом срезе пусто'}
+            </div>
           )}
-          {d.list.map((c: any) => {
+          {shown.map((c: any) => {
             const st = status[c.id]
+            const isDone = c.status !== 'pending'
             return (
-              <div key={c.id} style={{
-                border: '1px solid var(--line)', borderRadius: 10, padding: '14px 16px',
-                background: 'var(--bg-elev)', boxShadow: 'var(--shadow-sm)',
-                opacity: c.status !== 'pending' ? 0.6 : 1,
+              <div key={c.id} className="jt-card" style={{
+                padding: '14px 16px',
+                // Разобранная жалоба уходит фоном, а не прозрачностью: её всё
+                // ещё читают, когда сверяются с историей по человеку.
+                background: isDone ? 'var(--bg-sunken)' : 'var(--bg-elev)',
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)' }}>
-                        Жалоба · {c.type}
+                      <span className="mono" style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)' }}>
+                        {c.type}
                       </span>
-                      <span style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'Geist Mono, monospace' }}>{c.date}</span>
-                      {c.status !== 'pending' && (
-                        <span style={{ fontSize: 10.5, padding: '1px 6px', borderRadius: 4, background: 'rgba(46,125,84,.1)', color: 'var(--positive)', fontWeight: 500 }}>{c.status}</span>
-                      )}
+                      <span className="num" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{c.date}</span>
+                      <Chip tone={isDone ? 'positive' : 'accent'}>
+                        {STATUS_LABEL[c.status] ?? c.status}
+                      </Chip>
                     </div>
-                    <div style={{ fontSize: 13, color: 'var(--ink)', marginBottom: 8, lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 14, color: 'var(--ink)', marginBottom: 10, lineHeight: 1.55 }}>
                       {c.description}
                     </div>
-                    <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--ink-3)', flexWrap: 'wrap' }}>
-                      <span>👤 От: <strong style={{ color: 'var(--ink)' }}>{c.reporterName}</strong> {c.reporterPhone}</span>
-                      <span>🎯 На: <strong style={{ color: c.targetBlocked ? 'var(--negative)' : 'var(--ink)' }}>{c.targetName}</strong> {c.targetPhone}
-                        {c.targetBlocked && <span style={{ marginLeft: 4, fontSize: 10.5, color: 'var(--negative)', fontWeight: 600 }}>БЛОК</span>}
+                    <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--ink-3)', flexWrap: 'wrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        <IconUser size={12} />От:&nbsp;
+                        <strong style={{ color: 'var(--ink)' }}>{c.reporterName}</strong>
+                        <span className="num">{c.reporterPhone}</span>
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        <IconUser size={12} />На:&nbsp;
+                        <strong style={{ color: c.targetBlocked ? 'var(--negative)' : 'var(--ink)' }}>{c.targetName}</strong>
+                        <span className="num">{c.targetPhone}</span>
+                        {c.targetBlocked && <Chip tone="negative"><IconBan size={11} />Заблокирован</Chip>}
                       </span>
                     </div>
                   </div>
                   {c.targetId && (
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                      <ActionBtn
-                        label={c.targetBlocked ? 'Разблокировать' : 'Заблокировать'}
-                        tone={c.targetBlocked ? 'neutral' : 'danger'}
-                        loading={st?.s === 'loading'}
-                        result={st?.s === 'ok' ? st.msg : st?.s === 'err' ? '✗ ' + st.msg : undefined}
-                        onClick={() => handleBlock(c)}
-                      />
+                      {/* Отказ раньше показывался зелёным: ветка «есть результат»
+                          красила в positive и успех, и ошибку. */}
+                      {st?.s === 'ok' ? (
+                        <span style={{ fontSize: 13, color: 'var(--positive)', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                          <IconCheck size={13} />{st.msg}
+                        </span>
+                      ) : st?.s === 'err' ? (
+                        <span style={{ fontSize: 13, color: 'var(--negative)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                          <IconX size={13} />{st.msg}
+                        </span>
+                      ) : (
+                        <Button
+                          variant={c.targetBlocked ? 'secondary' : 'danger'}
+                          disabled={st?.s === 'loading'}
+                          onClick={() => handleBlock(c)}
+                        >
+                          {st?.s === 'loading' ? '…' : c.targetBlocked ? 'Разблокировать' : 'Заблокировать'}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
             )
           })}
-        </Section>
+        </div>
       </div>
     </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-3)', marginBottom: 10 }}>{title}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{children}</div>
-    </div>
-  )
-}
-
-function ActionBtn({ label, tone, loading, result, onClick }: {
-  label: string; tone: 'danger' | 'neutral' | 'primary'; loading?: boolean; result?: string; onClick: () => void
-}) {
-  const bg = tone === 'danger' ? 'var(--negative)' : tone === 'primary' ? 'var(--ink)' : 'var(--bg-sunken)'
-  const col = tone === 'neutral' ? 'var(--ink-2)' : '#fff'
-  if (result) return <span style={{ fontSize: 12, color: 'var(--positive)', fontWeight: 500 }}>{result}</span>
-  return (
-    <button onClick={onClick} disabled={loading} style={{
-      padding: '5px 12px', borderRadius: 7, border: tone === 'neutral' ? '1px solid var(--line)' : 'none',
-      background: bg, color: col, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-      opacity: loading ? 0.6 : 1, transition: 'opacity .12s',
-    }}>
-      {loading ? '…' : label}
-    </button>
   )
 }
 
