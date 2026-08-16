@@ -143,9 +143,9 @@ fi
 # и потому только по IPv6. Отметка новая, иначе опыт не повторился бы.
 # Ждём сертификат: без него Телеграм откажется от вебхука на TLS-ошибке,
 # и одна попытка сгорела бы впустую.
-if [ -f "$REPO/infra/switch-webhook.sh" ] && [ ! -f /var/lib/jt-webhook-tg.done ] \
+if [ -f "$REPO/infra/switch-webhook.sh" ] && [ ! -f /var/lib/jt-webhook-tg2.done ] \
    && [ -d /etc/letsencrypt/live/tg.jobtoo.ru ]; then
-  touch /var/lib/jt-webhook-tg.done
+  touch /var/lib/jt-webhook-tg2.done
   bash "$REPO/infra/switch-webhook.sh" >/dev/null 2>&1 || true
 fi
 

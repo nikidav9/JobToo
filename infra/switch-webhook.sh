@@ -76,12 +76,27 @@ PEND0=$(echo "$BEFORE" | field pending_update_count)
 [ -n "$WAS" ] && echo "$WAS" > /var/lib/jt-webhook.prev
 
 T0=$(date +%s)
-api setWebhook -d "url=$NEW" -d "secret_token=$SECRET" -d "drop_pending_updates=false" >/dev/null
 
-# Даём Телеграму время попробовать доставить. Ошибку смотрим не по тексту,
-# а по времени: last_error_message остаётся от прошлого адреса и без свежей
-# даты доказывает только то, что когда-то что-то не вышло.
-sleep 45
+# Ответ на setWebhook читаем, а не выбрасываем.
+#
+# Прошлый заход этого не делал, и целые сутки было неизвестно самое главное:
+# принял Телеграм адрес или отказал. Если отказал — вебхук остался на прежнем
+# месте, бот не пострадал, и всё, что нам нужно, это дословная причина.
+SET=$(api setWebhook -d "url=$NEW" -d "secret_token=$SECRET" -d "drop_pending_updates=false")
+case "$SET" in
+  *'"ok":true'*) ;;
+  *)
+    echo "$(date +%H:%M) Телеграм не принял $NEW: $(echo "$SET" | tr -d '\r\n"' | cut -c1-160)" \
+      > /var/lib/jt-webhook-check
+    exit 0;;
+esac
+
+# Даём Телеграму время попробовать доставить. Минуту, не больше: пока идёт
+# опыт, бот отвечает через непроверенный путь, и растягивать это на людях
+# незачем. Ошибку смотрим не по тексту, а по времени: last_error_message
+# остаётся от прошлого адреса и без свежей даты доказывает только то, что
+# когда-то что-то не вышло.
+sleep 60
 
 INFO=$(api getWebhookInfo)
 ERR=$(echo "$INFO" | field last_error_message)
