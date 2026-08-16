@@ -318,3 +318,49 @@ html, body {
   border-radius: var(--radius-sm);
   animation: jt-pulse 1.4s var(--ease) infinite;
 }
+
+/* ─── Боковое меню ──────────────────────────────────────────────────────
+   Активный раздел не заливается сплошным светлым блоком: на тёмном фоне
+   белый прямоугольник — самое яркое пятно на экране, и глаз цепляется за
+   меню вместо цифр. Мягкая подложка акцента и полоска слева говорят то же
+   самое и не слепят. */
+
+.jt-nav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  color: var(--ink-2);
+  text-decoration: none;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.jt-nav svg { color: var(--ink-3); transition: color var(--fast) var(--ease); }
+
+.jt-nav:hover { background: var(--bg-sunken); color: var(--ink); }
+.jt-nav:hover svg { color: var(--ink-2); }
+
+.jt-nav.is-active { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.jt-nav.is-active svg { color: var(--accent); }
+
+/* Полоска слева — второй признак, кроме цвета. Тот, кто различает цвета
+   плохо, по одной подложке активный раздел не найдёт. */
+.jt-nav-rail {
+  position: absolute;
+  left: -8px;
+  top: 7px;
+  bottom: 7px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: transparent;
+  transition: background var(--fast) var(--ease);
+}
+
+.jt-nav.is-active .jt-nav-rail { background: var(--accent); }
+
+/* Полоса прокрутки в меню — тонкая и незаметная, пока не нужна. */
+.jt-nav-scroll::-webkit-scrollbar { width: 4px; }

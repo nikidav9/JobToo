@@ -3,15 +3,34 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { clearAuth } from './AuthGuard'
 
-import { NAV as NAV_ITEMS } from '@/lib/nav'
+import { NAV as NAV_ITEMS, GROUPS } from '@/lib/nav'
+
+/**
+ * Боковое меню.
+ *
+ * Две правки по существу.
+ *
+ * Первая: активный раздел больше не заливается сплошным светлым блоком. На
+ * тёмном фоне белый прямоугольник — самое яркое пятно на экране, и глаз
+ * цепляется за меню вместо цифр. Теперь это мягкая подложка акцента и
+ * полоска слева: видно, где вы, и не слепит.
+ *
+ * Вторая: список прокручивается. Разделов двадцать два, в экран ноутбука они
+ * не помещаются — нижние просто обрезались, и «Рассылка» была видна наполовину.
+ * Прокрутка своя, а не общая со страницей: меню должно оставаться на месте,
+ * когда вы листаете таблицу.
+ *
+ * Плюс группировка. Двадцать два пункта подряд не читаются: глаз ищет нужный
+ * перебором. Шесть групп по три-пять — просматриваются целиком.
+ */
 
 const ICONS: Record<string, any> = {
   grid: IconGrid,
-  summary: IconSummary,
+  summary: IconGrid,
   users: IconUsers,
   clock: IconClock,
   jobs: IconJobs,
-  phone: IconPhone,
+  phone: IconGrid,
   ticket: IconTicket,
   chat: IconChat,
   match: IconMatch,
@@ -25,159 +44,64 @@ const ICONS: Record<string, any> = {
   geo: IconGeo,
 }
 
-
-// Список разделов — общий, из lib/nav. Раньше он был свой и здесь, и в
-// нижнем меню для телефона; они разошлись, и часть разделов существовала
-// только на одном из двух.
-const NAV = NAV_ITEMS.map(n => ({ href: n.href, label: n.label, icon: ICONS[n.icon] }))
-
-
 export default function Sidebar() {
-  const path = usePathname()
+  const rawPath = usePathname()
+  const path = rawPath.replace(/\/$/, '') || '/'
 
-  function logout() {
-    clearAuth()
-    window.location.href = window.location.origin + (window.location.pathname.includes('/JobMatch') ? '/JobMatch/login/' : '/login/')
-  }
   return (
     <aside style={{
+      position: 'sticky', top: 0, height: '100vh',
+      display: 'flex', flexDirection: 'column', minHeight: 0,
       background: 'var(--bg-elev)',
       borderRight: '1px solid var(--line)',
-      position: 'sticky',
-      top: 0,
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
     }}>
-      {/* Brand */}
-      <div style={{ padding: '18px 20px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--line)' }}>
-        <div style={{
-          width: 26, height: 26, borderRadius: 7,
-          background: 'var(--ink)', color: 'var(--bg)',
-          display: 'grid', placeItems: 'center',
-          fontWeight: 700, fontSize: 13, letterSpacing: '-0.02em',
-        }}>J</div>
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: '-0.01em', color: 'var(--ink)' }}>JobToo</div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>Аналитика · Admin</div>
-        </div>
-      </div>
-
-      {/* Section */}
-      <div style={{ padding: '14px 12px 6px', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-4)', fontWeight: 500 }}>
-        Дашборд
-      </div>
-
-      {/* Nav */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 1, padding: '0 8px' }}>
-        {NAV.map(({ href, icon: Icon, label }) => {
-          const active = path === href
-          return (
-            <Link key={href} href={href} style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '7px 10px', borderRadius: 6,
-              color: active ? 'var(--bg)' : 'var(--ink-2)',
-              background: active ? 'var(--ink)' : 'transparent',
-              fontSize: 13, fontWeight: 450,
-              textDecoration: 'none',
-              transition: 'background .12s, color .12s',
-            }}
-            onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--bg-sunken)'; (e.currentTarget as HTMLElement).style.color = active ? 'var(--bg)' : 'var(--ink)' }}
-            onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--ink-2)' } }}
-            >
-              <Icon style={{ width: 16, height: 16, flexShrink: 0, color: active ? 'var(--bg)' : 'var(--ink-3)' }} />
-              <span>{label}</span>
-            </Link>
-          )
-        })}
-      </nav>
-
-      {/* Reports section */}
-      <div style={{ padding: '18px 12px 6px', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-4)', fontWeight: 500 }}>
-        Отчёты
-      </div>
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 1, padding: '0 8px' }}>
-        {[{ href: '/funnel', label: 'Воронка' }].map(({ href, label }) => {
-          const active = path === href
-          return (
-            <Link key={href} href={href} style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '7px 10px', borderRadius: 6,
-              color: active ? 'var(--bg)' : 'var(--ink-2)',
-              background: active ? 'var(--ink)' : 'transparent',
-              fontSize: 13, fontWeight: 450, textDecoration: 'none',
-              transition: 'background .12s, color .12s',
-            }}
-            onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--bg-sunken)'; (e.currentTarget as HTMLElement).style.color = active ? 'var(--bg)' : 'var(--ink)' }}
-            onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--ink-2)' } }}
-            >
-              <IconFunnel style={{ width: 16, height: 16, flexShrink: 0, color: active ? 'var(--bg)' : 'var(--ink-3)' }} />
-              <span>{label}</span>
-            </Link>
-          )
-        })}
-        {[{ href: '/cohorts', label: 'Когорты', icon: IconCohort }, { href: '/geo', label: 'Гео', icon: IconGeo }].map(({ href, label, icon: Icon }) => {
-          const active = path === href
-          return (
-            <Link key={href} href={href} style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '7px 10px', borderRadius: 6,
-              color: active ? 'var(--bg)' : 'var(--ink-2)',
-              background: active ? 'var(--ink)' : 'transparent',
-              fontSize: 13, fontWeight: 450, textDecoration: 'none',
-              transition: 'background .12s, color .12s',
-            }}
-            onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--bg-sunken)'; (e.currentTarget as HTMLElement).style.color = active ? 'var(--bg)' : 'var(--ink)' }}
-            onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--ink-2)' } }}
-            >
-              <Icon style={{ width: 16, height: 16, flexShrink: 0, color: active ? 'var(--bg)' : 'var(--ink-3)' }} />
-              <span>{label}</span>
-            </Link>
-          )
-        })}
-      </nav>
-
-      {/* Footer */}
+      {/* Шапка меню */}
       <div style={{
-        marginTop: 'auto', padding: '12px 14px',
-        borderTop: '1px solid var(--line)',
         display: 'flex', alignItems: 'center', gap: 10,
-        fontSize: 11.5, color: 'var(--ink-3)',
+        padding: '16px 14px 14px', borderBottom: '1px solid var(--line)', flexShrink: 0,
       }}>
         <div style={{
-          width: 26, height: 26, borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--accent), #7D2D0E)',
-          display: 'grid', placeItems: 'center',
-          color: '#fff', fontWeight: 600, fontSize: 11, flexShrink: 0,
-        }}>N</div>
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2, flex: 1, minWidth: 0 }}>
-          <span style={{ color: 'var(--ink)', fontWeight: 500, fontSize: 12 }}>nikidav23</span>
-          <span style={{ color: 'var(--ink-4)', fontSize: 11 }}>Admin</span>
+          width: 28, height: 28, borderRadius: 'var(--radius-sm)', flexShrink: 0,
+          background: 'var(--accent)', color: '#14100C',
+          display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 13,
+        }}>J</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, letterSpacing: '-0.01em', color: 'var(--ink)' }}>JobToo</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 1 }}>Аналитика</div>
         </div>
-        <button
-          onClick={logout}
-          title="Выйти"
-          style={{
-            background: 'transparent', border: 0, cursor: 'pointer',
-            color: 'var(--ink-4)', padding: 4, borderRadius: 4,
-            display: 'grid', placeItems: 'center',
-          }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--ink)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--ink-4)'}
-        >
-          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 12H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3M10 11l3-3-3-3M13 8H6"/>
-          </svg>
-        </button>
       </div>
+
+      {/* Разделы. Прокручивается только этот кусок. */}
+      <nav style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '6px 8px 16px' }}>
+        {GROUPS.map(group => {
+          const items = NAV_ITEMS.filter(n => n.group === group)
+          if (!items.length) return null
+          return (
+            <div key={group} style={{ marginTop: 10 }}>
+              <div style={{
+                padding: '8px 10px 6px', fontSize: 10.5, fontWeight: 500,
+                textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)',
+              }}>{group}</div>
+
+              {items.map(({ href, label, icon }) => {
+                const Icon = ICONS[icon] ?? IconGrid
+                const active = path === href
+                return (
+                  <Link key={href} href={href} className={`jt-nav${active ? ' is-active' : ''}`}>
+                    <span className="jt-nav-rail" aria-hidden="true" />
+                    <Icon style={{ width: 16, height: 16, flexShrink: 0 }} />
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          )
+        })}
+      </nav>
     </aside>
   )
 }
 
-function IconSummary({ style }: { style?: React.CSSProperties }) {
-  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"><path d="M2.5 13.5v-4M6.2 13.5V6.5M9.8 13.5V9M13.5 13.5v-9"/></svg>
-}
 function IconGrid({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
 }

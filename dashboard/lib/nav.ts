@@ -16,31 +16,37 @@ export type NavItem = {
   /** Короткая подпись для нижнего меню на телефоне, где места мало. */
   short?: string
   icon: string
+  /** Группа в боковом меню. Двадцать два пункта подряд не читаются. */
+  group: Group
 }
 
+export type Group = 'Обзор' | 'Люди' | 'Работа' | 'Общение' | 'Аналитика' | 'Система'
+
+export const GROUPS: Group[] = ['Обзор', 'Люди', 'Работа', 'Общение', 'Аналитика', 'Система']
+
 export const NAV: NavItem[] = [
-  { href: '/',            label: 'Обзор',                short: 'Обзор',    icon: 'grid' },
-  { href: '/summary',     label: 'Сводка',                                  icon: 'summary' },
-  { href: '/users',       label: 'Пользователи',         short: 'Люди',     icon: 'users' },
-  { href: '/last-seen',   label: 'Последний вход',       short: 'Входы',    icon: 'clock' },
-  { href: '/dormant',     label: 'Ни разу не заходили',  short: 'Спящие',   icon: 'clock' },
-  { href: '/vacancies',   label: 'Вакансии',                                icon: 'jobs' },
-  { href: '/outreach',    label: 'Обзвон',                                  icon: 'phone' },
-  { href: '/support',     label: 'Поддержка',                               icon: 'ticket' },
-  { href: '/bot-inbox',   label: 'Бот',                                     icon: 'chat' },
-  { href: '/matching',    label: 'Совпадения',           short: 'Матчи',    icon: 'match' },
-  { href: '/engagement',  label: 'Активность',                              icon: 'pulse' },
-  { href: '/quality',     label: 'Качество',                                icon: 'star' },
-  { href: '/chats',       label: 'Переписки',            short: 'Чаты',     icon: 'chat' },
-  { href: '/reviews',     label: 'Отзывы',                                  icon: 'review' },
-  { href: '/moderation',  label: 'Модерация',                               icon: 'shield' },
-  { href: '/tickets',     label: 'Тикеты',                                  icon: 'ticket' },
-  { href: '/broadcast',   label: 'Рассылка',                                icon: 'bell' },
-  { href: '/api-keys',    label: 'Ключи API',            short: 'API',      icon: 'shield' },
-  { href: '/funnel',      label: 'Воронка',                                 icon: 'funnel' },
-  { href: '/cohorts',     label: 'Когорты',                                 icon: 'cohort' },
-  { href: '/geo',         label: 'Гео',                                     icon: 'geo' },
-  { href: '/activity',    label: 'Лог действий',         short: 'Лог',      icon: 'pulse' },
+  { href: '/',            label: 'Обзор',                short: 'Обзор',    icon: 'grid',    group: 'Обзор' },
+  { href: '/summary',     label: 'Сводка',                                  icon: 'summary', group: 'Обзор' },
+  { href: '/users',       label: 'Пользователи',         short: 'Люди',     icon: 'users',   group: 'Люди' },
+  { href: '/last-seen',   label: 'Последний вход',       short: 'Входы',    icon: 'clock',   group: 'Люди' },
+  { href: '/dormant',     label: 'Ни разу не заходили',  short: 'Спящие',   icon: 'clock',   group: 'Люди' },
+  { href: '/vacancies',   label: 'Вакансии',                                icon: 'jobs',    group: 'Работа' },
+  { href: '/outreach',    label: 'Обзвон',                                  icon: 'phone',   group: 'Люди' },
+  { href: '/support',     label: 'Поддержка',                               icon: 'ticket',  group: 'Общение' },
+  { href: '/bot-inbox',   label: 'Бот',                                     icon: 'chat',    group: 'Общение' },
+  { href: '/matching',    label: 'Совпадения',           short: 'Матчи',    icon: 'match',   group: 'Работа' },
+  { href: '/engagement',  label: 'Активность',                              icon: 'pulse',   group: 'Аналитика' },
+  { href: '/quality',     label: 'Качество',                                icon: 'star',    group: 'Работа' },
+  { href: '/chats',       label: 'Переписки',            short: 'Чаты',     icon: 'chat',    group: 'Общение' },
+  { href: '/reviews',     label: 'Отзывы',                                  icon: 'review',  group: 'Работа' },
+  { href: '/moderation',  label: 'Модерация',                               icon: 'shield',  group: 'Работа' },
+  { href: '/tickets',     label: 'Тикеты',                                  icon: 'ticket',  group: 'Общение' },
+  { href: '/broadcast',   label: 'Рассылка',                                icon: 'bell',    group: 'Общение' },
+  { href: '/api-keys',    label: 'Ключи API',            short: 'API',      icon: 'shield',  group: 'Система' },
+  { href: '/funnel',      label: 'Воронка',                                 icon: 'funnel',  group: 'Аналитика' },
+  { href: '/cohorts',     label: 'Когорты',                                 icon: 'cohort',  group: 'Аналитика' },
+  { href: '/geo',         label: 'Гео',                                     icon: 'geo',     group: 'Аналитика' },
+  { href: '/activity',    label: 'Лог действий',         short: 'Лог',      icon: 'pulse',   group: 'Аналитика' },
 ]
 
 /** Название раздела по адресу — для заголовка страницы. */
