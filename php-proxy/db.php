@@ -1831,6 +1831,47 @@ try {
             break;
         }
 
+        // ── Ключи внешнего API ─────────────────────────────────────────────
+        //
+        // Управление отсюда, а не правкой таблицы руками: ключ, выданный в
+        // обход учёта, живёт вечно и без имени — а потом ищи, чей он.
+        case 'apiKeysList': {
+            $rows = sb_select('jm_api_keys', ['order' => 'created_at.desc'],
+                'id,name,scopes,created_at,revoked_at,last_used_at,hits,rate_limit');
+            $data = $rows; break;
+        }
+
+        // Ключ показывается ровно один раз — здесь, в ответе. В базе только
+        // отпечаток, так что «покажи ещё раз» невозможно даже для нас. Это
+        // неудобно один раз при выдаче и спасает при утечке базы.
+        case 'apiKeyCreate': {
+            $name = trim((string)($args[0] ?? ''));
+            if ($name === '') { $data = ['error' => 'нужно имя']; break; }
+            $scopes = is_array($args[1] ?? null) && $args[1] ? $args[1] : ['vacancies:read'];
+            $limit = (int)($args[2] ?? 1000);
+
+            $secret = 'jt_' . bin2hex(random_bytes(24));
+            sb_insert('jm_api_keys', [
+                'id' => uid(),
+                'name' => $name,
+                'key_hash' => hash('sha256', $secret),
+                'scopes' => $scopes,
+                'rate_limit' => $limit,
+                'created_at' => now_iso(),
+            ]);
+            $data = ['key' => $secret, 'name' => $name, 'scopes' => $scopes];
+            break;
+        }
+
+        // Отзыв отметкой, а не удалением: строка нужна, чтобы через полгода
+        // можно было ответить, кто и когда выгружал наши вакансии.
+        case 'apiKeyRevoke': {
+            $id = (string)($args[0] ?? '');
+            if ($id === '') { $data = ['error' => 'нужен id']; break; }
+            sb_update('jm_api_keys', ['id' => 'eq.' . $id], ['revoked_at' => now_iso()]);
+            $data = ['ok' => true]; break;
+        }
+
         // Кому бот пересылает то, что люди пишут ему в личку.
         case 'botAdminGet':
             $data = sb_single('jm_settings', ['key' => 'eq.admin_chat_id'], 'value'); break;
