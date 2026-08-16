@@ -9,9 +9,8 @@ import {
   AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
+import { AXIS, GRID, TT } from '@/lib/chart'
 
-const TT = { borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, boxShadow: 'var(--shadow-md)' }
-const AXIS = { fontSize: 10, fill: '#9A9690', fontFamily: 'Geist Mono, monospace' }
 
 function FunnelBar({ items }: { items: { name: string; value: number; fill: string }[] }) {
   const max = items[0]?.value || 1
@@ -121,7 +120,7 @@ export default function FunnelPage() {
                   <stop offset="5%" stopColor={PALETTE.green} stopOpacity={0.18} /><stop offset="95%" stopColor={PALETTE.green} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false} interval={3} />
               <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip contentStyle={TT}
@@ -138,7 +137,7 @@ export default function FunnelPage() {
           <ChartCard title="Распределение активности" sub="Сколько лайков сделал каждый воркер">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={d.activityBuckets} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                 <XAxis dataKey="name" tick={AXIS} tickLine={false} axisLine={false} />
                 <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TT} formatter={(v: any) => [v, 'Воркеров']} />
@@ -155,7 +154,7 @@ export default function FunnelPage() {
           <ChartCard title="Смены по воркерам" sub="Сколько смен завершил каждый воркер">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={d.shiftBuckets} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                 <XAxis dataKey="name" tick={AXIS} tickLine={false} axisLine={false} />
                 <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TT} formatter={(v: any) => [v, 'Воркеров']} />

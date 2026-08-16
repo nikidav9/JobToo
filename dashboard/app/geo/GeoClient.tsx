@@ -8,9 +8,8 @@ import PageHeader from '@/components/PageHeader'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
+import { AXIS, GRID, LEGEND, TT } from '@/lib/chart'
 
-const TT = { borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, boxShadow: 'var(--shadow-sm)' }
-const AXIS = { fontSize: 10, fill: '#9A9690', fontFamily: 'Geist Mono, monospace' }
 
 function Loader() {
   return (
@@ -83,11 +82,11 @@ export default function GeoPage() {
                 layout="vertical"
                 margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" horizontal={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
                 <YAxis dataKey="station" type="category" width={120} tick={{ ...AXIS, fontSize: 11 }} tickLine={false} axisLine={false} />
                 <XAxis type="number" allowDecimals={false} tick={AXIS} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={TT} />
-                <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+                <Legend iconType="square" iconSize={8} wrapperStyle={LEGEND} />
                 <Bar dataKey="workers" name="Работники" fill={PALETTE.orange} stackId="a" />
                 <Bar dataKey="employers" name="Работодатели" fill={PALETTE.blue} stackId="a" radius={[0, 4, 4, 0]} />
               </BarChart>
@@ -103,7 +102,7 @@ export default function GeoPage() {
                 layout="vertical"
                 margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" horizontal={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
                 <YAxis dataKey="station" type="category" width={120} tick={{ ...AXIS, fontSize: 11 }} tickLine={false} axisLine={false} />
                 <XAxis type="number" allowDecimals={false} tick={AXIS} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={TT} />

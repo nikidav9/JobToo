@@ -1,27 +1,26 @@
 'use client'
-import { useCallback, useState, useEffect } from 'react'
+import { useCallback, useState, useEffect, Fragment } from 'react'
 import { fetchUsers, fetchUserProfile, PALETTE } from '@/lib/queries'
 import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
 import { blockUser, resetPassword, sendBothToUser, deleteUser, changeRole } from '@/lib/admin-actions'
+import DonutRoles from '@/components/DonutRoles'
+import Avatar from '@/components/Avatar'
+import Chip from '@/components/Chip'
+import {
+  IconBan, IconMetro, IconBuilding, IconApp, IconBell, IconUser,
+  IconTrash, IconKey, IconSwap, IconCheck, IconX, IconChevron, IconStar,
+} from '@/components/icons'
 import { downloadCSV } from '@/lib/csv-export'
 import { getVerifiedUsers, setUserVerified } from '@/lib/verification'
 import {
-  AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar,
+  AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
+import { AXIS, AXIS_CAT, GRID, LEGEND, TT } from '@/lib/chart'
 
-const TT = { borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, boxShadow: 'var(--shadow-md)' }
-const AXIS = { fontSize: 10, fill: '#9A9690', fontFamily: 'Geist Mono, monospace' }
-
-function initials(name: string, phone: string) {
-  const parts = name.trim().split(' ').filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return phone.slice(-2)
-}
 
 type ActionState = 'idle' | 'loading' | 'ok' | 'err'
 
@@ -52,7 +51,6 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
 
   const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.phone || '—'
   const isWorker = user.role === 'worker'
-  const ini = initials(name, user.phone ?? '')
 
   const tabs = [
     { id: 'overview', label: 'Обзор' },
@@ -66,25 +64,29 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', background: 'var(--bg-elev)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-            background: isWorker ? 'linear-gradient(135deg,#C8501E,#7D2D0E)' : 'linear-gradient(135deg,#3B5BB5,#1F3A8A)',
-            display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700, fontSize: 16,
-          }}>{ini}</div>
+          <Avatar name={name} phone={user.phone} role={user.role} size={48} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>{name}</span>
               {isVerified && (
-                <span style={{ fontSize: 11.5, padding: '1px 7px', borderRadius: 4, background: 'rgba(46,125,84,.1)', color: 'var(--positive)', border: '1px solid rgba(46,125,84,.25)', fontWeight: 500 }}>✓ Верифицирован</span>
+                <Chip tone="positive"><IconCheck size={11} />Верифицирован</Chip>
               )}
               {user.is_blocked && (
-                <span style={{ fontSize: 11.5, padding: '1px 7px', borderRadius: 4, background: 'rgba(179,60,42,.1)', color: 'var(--negative)', border: '1px solid rgba(179,60,42,.25)', fontWeight: 500 }}>🚫 Заблокирован</span>
+                <Chip tone="negative"><IconBan size={11} />Заблокирован</Chip>
               )}
             </div>
             <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 3, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <span style={{ fontFamily: 'Geist Mono, monospace' }}>{user.phone || '—'}</span>
-              {user.metro_station && <span>😇 {user.metro_station}</span>}
-              {user.company && <span>🏢 {user.company}</span>}
+              {user.metro_station && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <IconMetro size={12} />{user.metro_station}
+                </span>
+              )}
+              {user.company && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <IconBuilding size={12} />{user.company}
+                </span>
+              )}
               <span style={{ color: 'var(--ink-4)' }}>с {user.created_at?.slice(0, 10)}</span>
             </div>
           </div>
@@ -98,12 +100,14 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
             onClick={() => { setUserVerified(userId, !isVerified); onVerifyToggle(userId) }}
             style={{
               height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 500,
-              background: isVerified ? 'rgba(46,125,84,.1)' : 'var(--bg-sunken)',
-              border: `1px solid ${isVerified ? 'rgba(46,125,84,.3)' : 'var(--line)'}`,
+              background: isVerified ? 'var(--positive-soft)' : 'var(--bg-sunken)',
+              border: `1px solid ${isVerified ? 'var(--positive-line)' : 'var(--line)'}`,
               color: isVerified ? 'var(--positive)' : 'var(--ink-2)',
             }}
           >
-            {isVerified ? '✓ Верифицирован' : '☑ Верифицировать'}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <IconCheck size={12} />{isVerified ? 'Верифицирован' : 'Верифицировать'}
+            </span>
           </button>
         </div>
       </div>
@@ -124,7 +128,7 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
               <StatBox label="Лайков" value={totalLikes} />
               <StatBox label="Совпадений" value={totalMatches} />
               <StatBox label="Чатов" value={chats.length} />
-              {avgRating && <StatBox label="Средний рейтинг" value={avgRating + ' ★'} />}
+              <StatBox label="Средний рейтинг" value={avgRating ?? '—'} />
               <StatBox label="Отзывов о нём" value={ratingsReceived.length} />
             </div>
             <div style={{ background: 'var(--bg-sunken)', borderRadius: 8, padding: '12px 14px' }}>
@@ -137,8 +141,8 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
                   ['Метро', user.metro_station || '—'],
                   ['Компания', user.company || '—'],
                   ['Регистрация', user.created_at?.slice(0, 10) || '—'],
-                  ['Push-токен', user.push_token ? '✓ Expo (Android/APK)' : '✗ Нет'],
-                  ['iPhone Web Push', data.hasWebPush ? `✓ Подключён · ${data.webPushDate}` : '✗ Нет'],
+                  ['Push-токен', user.push_token ? 'Есть · Expo (Android/APK)' : 'Нет'],
+                  ['iPhone Web Push', data.hasWebPush ? `Подключён ${data.webPushDate}` : 'Нет'],
                 ].map(([k, v]) => (
                   <div key={k as string} style={{ display: 'flex', gap: 8 }}>
                     <span style={{ color: 'var(--ink-3)', minWidth: 100 }}>{k}</span>
@@ -154,7 +158,10 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
             {likes.length === 0 && <Empty text="Нет лайков" />}
             {likes.map((l: any) => (
               <div key={l.id} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 13 }}>{l.is_match ? '💚' : l.worker_liked ? '🟡' : '⚪'}</span>
+                <span aria-hidden="true" style={{
+                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                  background: l.is_match ? 'var(--positive)' : l.worker_liked ? 'var(--accent)' : 'var(--line-strong)',
+                }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11.5, color: 'var(--ink)', fontWeight: 500 }}>
                     {l.is_match ? 'Совпадение' : l.worker_liked ? 'Лайк' : 'Просмотр'}
@@ -174,7 +181,12 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
             {ratingsReceived.map((r: any) => (
               <div key={r.id} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 14, letterSpacing: 1 }}>{'★'.repeat(Number(r.rating))}{'☆'.repeat(5 - Number(r.rating))}</span>
+                  <span style={{ display: 'inline-flex', gap: 1, color: 'var(--accent)' }}>
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <IconStar key={n} size={13} filled={n <= Number(r.rating)}
+                        style={{ color: n <= Number(r.rating) ? 'var(--accent)' : 'var(--line-strong)' }} />
+                    ))}
+                  </span>
                   <span style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'Geist Mono, monospace' }}>{r.created_at?.slice(0, 10)}</span>
                 </div>
                 {r.review_text && <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.5 }}>{r.review_text}</div>}
@@ -187,26 +199,26 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
             {vacancies.length === 0 && permVacancies.length === 0 && <Empty text="Нет вакансий" />}
             {vacancies.map((v: any) => (
               <div key={v.id} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', display: 'flex', gap: 10, alignItems: 'center' }}>
-                <span style={{ fontSize: 13 }}>⚡</span>
+                <Chip tone="accent">Смена</Chip>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{v.work_type_label || v.work_type || 'Вакансия'}</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{v.address || '—'} · {v.created_at?.slice(0, 10)}</div>
                 </div>
-                <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 4, background: v.status === 'open' ? 'rgba(46,125,84,.1)' : 'var(--bg-sunken)', color: v.status === 'open' ? 'var(--positive)' : 'var(--ink-4)' }}>
+                <Chip tone={v.status === 'open' ? 'positive' : 'neutral'}>
                   {v.status === 'open' ? 'Открыта' : 'Закрыта'}
-                </span>
+                </Chip>
               </div>
             ))}
             {permVacancies.map((v: any) => (
               <div key={v.id} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', display: 'flex', gap: 10, alignItems: 'center' }}>
-                <span style={{ fontSize: 13 }}>💼</span>
+                <Chip tone="info">Постоянная</Chip>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{v.title || 'Вакансия'}</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{v.address || '—'} · {v.created_at?.slice(0, 10)}</div>
                 </div>
-                <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 4, background: v.status === 'open' ? 'rgba(46,125,84,.1)' : 'var(--bg-sunken)', color: v.status === 'open' ? 'var(--positive)' : 'var(--ink-4)' }}>
+                <Chip tone={v.status === 'open' ? 'positive' : 'neutral'}>
                   {v.status === 'open' ? 'Открыта' : 'Закрыта'}
-                </span>
+                </Chip>
               </div>
             ))}
           </div>
@@ -292,7 +304,7 @@ export default function UsersPage() {
     if (!text) return
     setA(u.id + '_push', 'loading')
     try {
-      await sendBothToUser(u.id, '📢 Сообщение от администратора', text)
+      await sendBothToUser(u.id, 'Сообщение от администратора', text)
       setA(u.id + '_push', 'ok', 'Отправлено')
       setPushText(prev => ({ ...prev, [u.id]: '' }))
     } catch (e: any) { setA(u.id + '_push', 'err', e.message) }
@@ -355,15 +367,24 @@ export default function UsersPage() {
       <PageHeader title="Пользователи" intervalSec={30} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
       <div className="page-content">
         <div className="g-6">
-          <KpiCard label="Всего" value={d.kpi.total} />
-          <KpiCard label="Работники" value={d.kpi.workers} sub={`${workerPct}% базы`} sparkColor={PALETTE.orange} />
-          <KpiCard label="Работодатели" value={d.kpi.employers} sub={`${100 - workerPct}% базы`} sparkColor={PALETTE.blue} />
-          <KpiCard label="Заблокировано" value={d.kpi.blocked} sparkColor={PALETTE.red} />
-          <KpiCard label="Новых · 7 дней" value={d.kpi.newWeek} deltaTone="pos" delta={`+${d.kpi.newWeek}`} />
-          <KpiCard label="Новых · 30 дней" value={d.kpi.newMonth} deltaTone="pos" delta={`+${d.kpi.newMonth}`} />
-          <KpiCard label="С пуш-токеном" value={d.kpi.withPushToken} sub={`${d.kpi.total ? Math.round(d.kpi.withPushToken / d.kpi.total * 100) : 0}% базы`} sparkColor={PALETTE.green} />
-          <KpiCard label="Без пуш-токена" value={d.kpi.withoutPushToken} sub="не получат пуши" sparkColor={PALETTE.red} />
-          <KpiCard label="📱 iPhone Web Push" value={d.kpi.withWebPush} sub={`+${d.kpi.webPushNewWeek} за 7 дн`} sparkColor="#A855F7" />
+          <KpiCard label="Всего" value={d.kpi.total} sub="в базе" />
+          <KpiCard label="Работники" value={d.kpi.workers} sub={`${d.kpi.workerPct}% базы`} sparkColor={PALETTE.orange} />
+          <KpiCard label="Работодатели" value={d.kpi.employers} sub={`${d.kpi.employerPct}% базы`} sparkColor={PALETTE.blue} />
+          <KpiCard label="Заблокировано" value={d.kpi.blocked}
+            sub={`${d.kpi.total ? Math.round(d.kpi.blocked / d.kpi.total * 100) : 0}% базы`} sparkColor={PALETTE.red} />
+          {/* Чип «+N» рядом с числом N ничего не добавлял: он повторял его же.
+              Масштаб полезнее — сколько это от базы. */}
+          <KpiCard label="Новых · 7 дней" value={d.kpi.newWeek}
+            sub={`${d.kpi.total ? Math.round(d.kpi.newWeek / d.kpi.total * 100) : 0}% базы`} />
+          <KpiCard label="Новых · 30 дней" value={d.kpi.newMonth}
+            sub={`${d.kpi.total ? Math.round(d.kpi.newMonth / d.kpi.total * 100) : 0}% базы`} />
+          <KpiCard label="Пуши в приложении" value={d.kpi.withPushToken} sub={`${d.kpi.total ? Math.round(d.kpi.withPushToken / d.kpi.total * 100) : 0}% базы`} sparkColor={PALETTE.green} />
+          <KpiCard label="Веб-пуш · iPhone" value={d.kpi.withWebPush} sub={`+${d.kpi.webPushNewWeek} за 7 дней`} sparkColor={PALETTE.purple} />
+          {/* Раньше здесь стояло «без пуш-токена — не получат пуши»: неправда,
+              часть этих людей подписана веб-пушем с айфона. Считаем тех, до
+              кого не достучаться ни одним каналом. */}
+          <KpiCard label="Пуши не дойдут" value={d.kpi.noPushAtAll}
+            sub="ни приложения, ни веб-пуша" sparkColor={PALETTE.red} />
         </div>
         <div className="g-14">
           <ChartCard title="Новые регистрации" sub="Работники vs работодатели · 90 дней">
@@ -373,36 +394,28 @@ export default function UsersPage() {
                   <linearGradient id="gW2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={PALETTE.orange} stopOpacity={0.2}/><stop offset="95%" stopColor={PALETTE.orange} stopOpacity={0}/></linearGradient>
                   <linearGradient id="gE2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={PALETTE.blue} stopOpacity={0.2}/><stop offset="95%" stopColor={PALETTE.blue} stopOpacity={0}/></linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                 <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false} interval={8} />
                 <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TT} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
                 <Area type="monotone" dataKey="workers" name="Работники" stroke={PALETTE.orange} fill="url(#gW2)" strokeWidth={1.7} dot={false} />
                 <Area type="monotone" dataKey="employers" name="Работодатели" stroke={PALETTE.blue} fill="url(#gE2)" strokeWidth={1.7} dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </ChartCard>
-          <ChartCard title="Соотношение ролей" sub={`${d.kpi.total} пользователей`}>
-            <ResponsiveContainer width="100%" height={140}>
-              <PieChart>
-                <Pie data={[{ name: 'Работники', value: d.kpi.workers }, { name: 'Работодатели', value: d.kpi.employers }]} cx="50%" cy="50%" innerRadius={42} outerRadius={60} dataKey="value" paddingAngle={3}>
-                  <Cell fill={PALETTE.orange} /><Cell fill={PALETTE.blue} />
-                </Pie>
-                <Tooltip contentStyle={TT} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
-              </PieChart>
-            </ResponsiveContainer>
+          <ChartCard title="Соотношение ролей" sub="Доли от всей базы">
+            <DonutRoles workers={d.kpi.workers} employers={d.kpi.employers} />
           </ChartCard>
         </div>
         <ChartCard title="Топ станций метро" sub="Работники и работодатели">
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={d.metroTop.slice(0, 10)} layout="vertical" margin={{ left: 0, right: 24, top: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" horizontal={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
               <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
-              <YAxis type="category" dataKey="station" tick={{ ...AXIS, fill: '#3D3A33' }} tickLine={false} axisLine={false} width={120} />
+              <YAxis type="category" dataKey="station" tick={AXIS_CAT} tickLine={false} axisLine={false} width={120} />
               <Tooltip contentStyle={TT} />
-              <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+              <Legend iconType="square" iconSize={8} wrapperStyle={LEGEND} />
               <Bar dataKey="workers" name="Работники" fill={PALETTE.orange} stackId="a" />
               <Bar dataKey="employers" name="Работодатели" fill={PALETTE.blue} stackId="a" radius={[0, 3, 3, 0]} />
             </BarChart>
@@ -452,7 +465,6 @@ export default function UsersPage() {
                     ? <tr><td colSpan={9} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Не найдено</td></tr>
                     : filteredUsers.map((u: any) => {
                         const isWorker = u.role === 'worker'
-                        const ini = initials(u.name || '', u.phone || '')
                         const expanded = expandedId === u.id
                         const aBlock = actions[u.id]
                         const aPwd = actions[u.id + '_pwd']
@@ -461,8 +473,8 @@ export default function UsersPage() {
                         const isVerified = verifiedSet.has(u.id)
                         const isConfirmDel = confirmDelete[u.id]
                         return (
-                          <>
-                            <tr key={u.id}
+                          <Fragment key={u.id}>
+                            <tr
                               style={{ borderBottom: expanded ? 'none' : '1px solid var(--line)', background: expanded ? 'var(--bg-sunken)' : undefined, cursor: 'pointer' }}
                               onClick={() => setExpandedId(expanded ? null : u.id)}
                               onMouseEnter={e => { if (!expanded) (e.currentTarget as HTMLElement).style.background = 'var(--bg-sunken)' }}
@@ -470,7 +482,7 @@ export default function UsersPage() {
                             >
                               <td style={{ padding: '10px 12px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                  <div style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, background: isWorker ? 'linear-gradient(135deg,#C8501E,#7D2D0E)' : 'linear-gradient(135deg,#3B5BB5,#1F3A8A)', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 600, fontSize: 11 }}>{ini}</div>
+                                  <Avatar name={u.name} phone={u.phone} role={u.role} />
                                   <div>
                                     <div style={{ fontWeight: 550, color: u.blocked ? 'var(--negative)' : 'var(--ink)', fontSize: 13, lineHeight: 1.2 }}>
                                       {u.name || <span style={{ color: 'var(--ink-3)' }}>Имя не указано</span>}
@@ -480,102 +492,107 @@ export default function UsersPage() {
                                 </div>
                               </td>
                               <td style={{ padding: '10px 12px' }}>
-                                <span style={{ display: 'inline-flex', padding: '3px 8px', borderRadius: 5, fontSize: 11.5, fontWeight: 500, color: isWorker ? 'var(--accent)' : 'var(--info)', background: isWorker ? 'var(--accent-soft)' : 'rgba(59,91,181,.08)', border: `1px solid ${isWorker ? 'var(--accent-line)' : 'rgba(59,91,181,.18)'}` }}>
+                                <Chip tone={isWorker ? 'accent' : 'info'}>
                                   {isWorker ? 'Работник' : 'Работодатель'}
-                                </span>
+                                </Chip>
                               </td>
                               <td style={{ padding: '10px 12px', color: 'var(--ink-2)', fontSize: 12.5 }}>
-                                {u.metro && u.metro !== '—' ? <><span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--ink-3)', display: 'inline-block', marginRight: 5 }} />{u.metro}</> : <span style={{ color: 'var(--ink-4)' }}>—</span>}
+                                {u.metro && u.metro !== '—'
+                                  ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconMetro size={12} style={{ color: 'var(--ink-3)' }} />{u.metro}</span>
+                                  : <span style={{ color: 'var(--ink-3)' }}>—</span>}
                               </td>
                               <td style={{ padding: '10px 12px', color: u.company && u.company !== '—' ? 'var(--ink-2)' : 'var(--ink-4)', maxWidth: 140 }}>
                                 <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.company || '—'}</span>
                               </td>
                               <td style={{ padding: '10px 12px' }}>
                                 {u.blocked
-                                  ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 7px', borderRadius: 999, fontSize: 11.5, color: 'var(--negative)', background: 'rgba(179,60,42,.08)', border: '1px solid rgba(179,60,42,.18)' }}>🚫 Заблокирован</span>
-                                  : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 7px', borderRadius: 999, fontSize: 11.5, color: 'var(--positive)', background: 'rgba(46,125,84,.08)', border: '1px solid rgba(46,125,84,.18)' }}>
-                                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--positive)', display: 'inline-block' }} />Активен
-                                    </span>}
+                                  ? <Chip tone="negative"><IconBan size={11} />Заблокирован</Chip>
+                                  : <Chip tone="positive" dot>Активен</Chip>}
                               </td>
                               <td style={{ padding: '10px 12px' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                  {u.hasPushToken
-                                    ? <span title="Expo push token (Android/iOS APK)" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, fontSize: 11, fontWeight: 500, color: 'var(--positive)', background: 'rgba(46,125,84,.08)', border: '1px solid rgba(46,125,84,.2)' }}>
-                                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--positive)', display: 'inline-block' }} />📲 Expo
-                                      </span>
-                                    : null}
-                                  {u.hasWebPush
-                                    ? <span title={`Web Push (iPhone Safari PWA) · подключён ${u.webPushDate}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, fontSize: 11, fontWeight: 500, color: '#7C3AED', background: 'rgba(168,85,247,.08)', border: '1px solid rgba(168,85,247,.25)' }}>
-                                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#A855F7', display: 'inline-block' }} />📱 iPhone
-                                      </span>
-                                    : null}
-                                  {!u.hasPushToken && !u.hasWebPush
-                                    ? <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>— нет</span>
-                                    : null}
+                                  {u.hasPushToken && (
+                                    <Chip tone="positive" title="Expo push token — приложение на Android или APK">
+                                      <IconApp size={11} />Приложение
+                                    </Chip>
+                                  )}
+                                  {u.hasWebPush && (
+                                    <Chip tone="violet" title={`Веб-пуш из Safari на iPhone · подключён ${u.webPushDate}`}>
+                                      <IconBell size={11} />iPhone
+                                    </Chip>
+                                  )}
+                                  {!u.hasPushToken && !u.hasWebPush && (
+                                    <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>не дойдут</span>
+                                  )}
                                 </div>
                               </td>
                               <td style={{ padding: '10px 12px' }}>
                                 {isVerified
-                                  ? <span style={{ fontSize: 11.5, color: 'var(--positive)', fontWeight: 500 }}>✓ Верифицирован</span>
-                                  : <span style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>—</span>}
+                                  ? <Chip tone="positive"><IconCheck size={11} />Да</Chip>
+                                  : <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>—</span>}
                               </td>
                               <td style={{ padding: '10px 12px', fontFamily: 'Geist Mono, monospace', fontSize: 11.5, color: 'var(--ink-3)' }}>{u.date || '—'}</td>
                               <td style={{ padding: '10px 12px' }} onClick={e => e.stopPropagation()}>
                                 <div style={{ display: 'flex', gap: 5 }}>
-                                  <button onClick={() => setProfileId(u.id)}
-                                    style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-sunken)', color: 'var(--ink-2)', fontSize: 11.5, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                                    👤
+                                  <button onClick={() => setProfileId(u.id)} title="Открыть профиль" className="jt-icon-btn">
+                                    <IconUser size={13} />
                                   </button>
                                   {aBlock?.s === 'ok'
                                     ? <span style={{ fontSize: 11.5, color: 'var(--positive)', fontWeight: 500 }}>{aBlock.msg}</span>
                                     : <button onClick={() => handleBlock(u)} disabled={aBlock?.s === 'loading'}
-                                        style={{ padding: '3px 9px', borderRadius: 6, border: '1px solid var(--line)', background: u.blocked ? 'rgba(46,125,84,.08)' : 'rgba(179,60,42,.08)', color: u.blocked ? 'var(--positive)' : 'var(--negative)', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                                        {aBlock?.s === 'loading' ? '…' : u.blocked ? 'Разблок.' : 'Блок.'}
+                                        className="jt-icon-btn"
+                                        style={{ width: 'auto', padding: '0 9px', background: u.blocked ? 'var(--positive-soft)' : 'var(--negative-soft)', color: u.blocked ? 'var(--positive)' : 'var(--negative)', fontWeight: 500 }}>
+                                        {aBlock?.s === 'loading' ? '…' : u.blocked ? 'Разблокировать' : 'Заблокировать'}
                                       </button>}
                                   <button onClick={() => setExpandedId(expanded ? null : u.id)}
-                                    style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-sunken)', color: 'var(--ink-3)', fontSize: 11.5, cursor: 'pointer' }}>
-                                    {expanded ? '▲' : '▼'}
+                                    title={expanded ? 'Свернуть' : 'Пароль и пуш'} className="jt-icon-btn">
+                                    <IconChevron size={13} open={expanded} />
                                   </button>
                                   {(() => {
                                     const aRole = actions[u.id + '_role']
                                     if (aRole?.s === 'ok') return <span style={{ fontSize: 11, color: 'var(--positive)', fontWeight: 500 }}>{aRole.msg}</span>
-                                    if (aRole?.s === 'err') return <span style={{ fontSize: 11, color: 'var(--negative)' }} title={aRole.msg}>✗</span>
+                                    if (aRole?.s === 'err') return <span style={{ color: 'var(--negative)', display: 'inline-flex' }} title={aRole.msg}><IconX size={13} /></span>
                                     const target = u.role === 'worker' ? 'работодателем' : 'работником'
                                     return (
                                       <button onClick={() => handleRole(u)} disabled={aRole?.s === 'loading'}
                                         title={`Сделать ${target}. Открытые вакансии при этом закроются.`}
+                                        className="jt-icon-btn"
                                         style={{
-                                          padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap',
-                                          border: confirmRole[u.id] ? '1px solid rgba(179,60,42,.4)' : '1px solid var(--line)',
-                                          background: confirmRole[u.id] ? 'rgba(179,60,42,.12)' : 'var(--bg-sunken)',
-                                          color: confirmRole[u.id] ? 'var(--negative)' : 'var(--ink-4)',
-                                          fontSize: 11.5, cursor: 'pointer',
+                                          width: 'auto', padding: '0 9px',
+                                          borderColor: confirmRole[u.id] ? 'var(--negative-line)' : undefined,
+                                          background: confirmRole[u.id] ? 'var(--negative-soft)' : undefined,
+                                          color: confirmRole[u.id] ? 'var(--negative)' : 'var(--ink-2)',
                                         }}>
-                                        {aRole?.s === 'loading' ? '…' : confirmRole[u.id] ? `Сделать ${target}?` : '⇄ роль'}
+                                        {aRole?.s === 'loading'
+                                          ? '…'
+                                          : confirmRole[u.id]
+                                          ? `Сделать ${target}?`
+                                          : <><IconSwap size={13} />роль</>}
                                       </button>
                                     )
                                   })()}
                                   {aDel?.s === 'ok'
                                     ? <span style={{ fontSize: 11, color: 'var(--negative)', fontWeight: 500 }}>Удалён</span>
                                     : aDel?.s === 'err'
-                                    ? <span style={{ fontSize: 11, color: 'var(--negative)' }}>✗</span>
+                                    ? <span style={{ color: 'var(--negative)', display: 'inline-flex' }}><IconX size={13} /></span>
                                     : isConfirmDel
-                                    ? <button onClick={() => handleDelete(u)} style={{ padding: '3px 9px', borderRadius: 6, border: '1px solid rgba(179,60,42,.4)', background: 'rgba(179,60,42,.12)', color: 'var(--negative)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', animation: 'pulse 0.5s ease' }}>
+                                    ? <button onClick={() => handleDelete(u)} className="jt-icon-btn"
+                                        style={{ width: 'auto', padding: '0 9px', borderColor: 'var(--negative-line)', background: 'var(--negative-soft)', color: 'var(--negative)', fontWeight: 600 }}>
                                         Удалить?
                                       </button>
                                     : <button onClick={() => handleDelete(u)} disabled={aDel?.s === 'loading'} title="Удалить пользователя и все его данные"
-                                        style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-sunken)', color: 'var(--ink-4)', fontSize: 11.5, cursor: 'pointer' }}>
-                                        {aDel?.s === 'loading' ? '…' : '🗑'}
+                                        className="jt-icon-btn">
+                                        {aDel?.s === 'loading' ? '…' : <IconTrash size={13} />}
                                       </button>}
                                 </div>
                               </td>
                             </tr>
                             {expanded && (
-                              <tr key={u.id + '_exp'} style={{ borderBottom: '1px solid var(--line)' }}>
+                              <tr style={{ borderBottom: '1px solid var(--line)' }}>
                                 <td colSpan={9} style={{ padding: '0 12px 14px 60px', background: 'var(--bg-sunken)' }}>
                                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingTop: 10 }}>
                                     <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '12px 14px', minWidth: 200 }}>
-                                      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 8 }}>🔑 Сбросить пароль</div>
+                                      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><IconKey size={12} />Сбросить пароль</div>
                                       {aPwd?.s === 'ok'
                                         ? <div style={{ fontSize: 13, color: 'var(--positive)' }}>
                                             <div style={{ fontWeight: 500, marginBottom: 2 }}>Новый пароль:</div>
@@ -591,7 +608,7 @@ export default function UsersPage() {
                                             </button>}
                                     </div>
                                     <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '12px 14px', flex: 1, minWidth: 260 }}>
-                                      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 8 }}>📲 Отправить пуш</div>
+                                      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><IconApp size={12} />Отправить пуш</div>
                                       <div style={{ display: 'flex', gap: 6 }}>
                                         <input
                                           placeholder="Текст уведомления..."
@@ -604,14 +621,14 @@ export default function UsersPage() {
                                           {aPush?.s === 'loading' ? '…' : 'Отправить'}
                                         </button>
                                       </div>
-                                      {aPush?.s === 'ok' && <div style={{ fontSize: 11.5, color: 'var(--positive)', marginTop: 5 }}>✓ {aPush.msg}</div>}
-                                      {aPush?.s === 'err' && <div style={{ fontSize: 11.5, color: 'var(--negative)', marginTop: 5 }}>✗ {aPush.msg}</div>}
+                                      {aPush?.s === 'ok' && <div style={{ fontSize: 12, color: 'var(--positive)', marginTop: 5, display: 'flex', alignItems: 'center', gap: 5 }}><IconCheck size={12} />{aPush.msg}</div>}
+                                      {aPush?.s === 'err' && <div style={{ fontSize: 12, color: 'var(--negative)', marginTop: 5, display: 'flex', alignItems: 'center', gap: 5 }}><IconX size={12} />{aPush.msg}</div>}
                                     </div>
                                   </div>
                                 </td>
                               </tr>
                             )}
-                          </>
+                          </Fragment>
                         )
                       })}
                 </tbody>

@@ -12,7 +12,7 @@ const ACTION_COLORS: Record<string, string> = {
   'Вакансия (врем.) обновлена': '#C8501E',
   'Вакансия (пост.) обновлена': '#0E7490',
   'Системное сообщение': '#9D2060',
-  'Заметка к жалобе': '#6B6760',
+  'Заметка к жалобе': '#5E6875',
   'Статус жалобы изменён': '#2E7D54',
 }
 
@@ -20,7 +20,7 @@ function getColor(action: string) {
   for (const [key, color] of Object.entries(ACTION_COLORS)) {
     if (action.includes(key) || key.includes(action)) return color
   }
-  return '#6B6760'
+  return '#5E6875'
 }
 
 const ICONS: Record<string, string> = {

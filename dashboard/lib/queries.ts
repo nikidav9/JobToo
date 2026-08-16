@@ -26,16 +26,27 @@ export const WORK_TYPE_LABELS: Record<string, string> = {
   picker: 'Комплектовщик',
 }
 
+/** Палитра графиков.
+ *
+ *  Первые пять — те же значения, что у токенов `--accent`, `--info`,
+ *  `--positive`, `--negative`, `--ink-4`: Recharts кладёт цвет прямо в
+ *  SVG-атрибут и `var(...)` там не работает, поэтому значения продублированы
+ *  здесь. Дублируются именно значения, а не решения: менять их можно только
+ *  вместе с MASTER.md.
+ *
+ *  Остальные — для рядов, которым не хватает смысловых цветов. Все проверены
+ *  на контраст к белой карточке (≥ 4.5:1), потому что подписи на графиках
+ *  красятся в цвет ряда. */
 export const PALETTE = {
-  orange: '#C8501E',
-  blue: '#3B5BB5',
+  orange: '#BE4C16', // = --accent
+  blue: '#2C6FB5',   // = --info
+  green: '#1E7A4C',  // = --positive
+  red: '#B8342A',    // = --negative
+  gray: '#8B94A1',   // = --ink-4, только заливкой
   purple: '#5F4BB6',
-  green: '#2E7D54',
-  red: '#B33C2A',
-  amber: '#A87020',
+  amber: '#8A5A12',
   cyan: '#0E7490',
   pink: '#9D2060',
-  gray: '#6B6760',
 }
 
 export const CHART_COLORS = Object.values(PALETTE)
@@ -215,7 +226,10 @@ export async function fetchOverview() {
       chats: ch.length,
       messages: ms.length,
       avgMessages: ch.length > 0 ? (ms.length / ch.length).toFixed(1) : '0',
-      avgRating: avgRating.toFixed(2),
+      // null, а не 0: «нет ни одной оценки» и «все поставили ноль» — разные
+      // сообщения, и панель обязана их различать.
+      avgRating: rt.length > 0 ? avgRating.toFixed(2) : null,
+      ratingsCount: rt.length,
       newUsersWeek,
       newUsersMonth,
       newVacsMonth,
@@ -316,8 +330,16 @@ export async function fetchUsers() {
       newWeek: u.filter((x: any) => x.created_at > w7).length,
       newMonth: u.filter((x: any) => x.created_at > w30).length,
       workerPct: u.length > 0 ? ((workers.length / u.length) * 100).toFixed(0) : '0',
+      // Считается отдельно, а не как «сто минус доля работников»: роли двумя
+      // значениями не исчерпываются, и разница уходила бы в работодателей.
+      employerPct: u.length > 0 ? ((employers.length / u.length) * 100).toFixed(0) : '0',
       withPushToken: u.filter((x: any) => x.push_token).length,
       withoutPushToken: u.filter((x: any) => !x.push_token).length,
+      // Без Expo-токена — ещё не «недоступен»: у части этих людей подключён
+      // веб-пуш с айфона. Недоступны только те, у кого нет ни того, ни другого,
+      // и раньше панель называла этим числом всех без Expo — то есть завышала
+      // его на всех айфонщиков разом.
+      noPushAtAll: u.filter((x: any) => !x.push_token && !webPushMap.has(x.id)).length,
       withWebPush,
       webPushNewWeek,
       webPushNewMonth,

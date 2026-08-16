@@ -1,29 +1,61 @@
+'use client'
 import Sparkline from './Sparkline'
+import { useCountUp, parseKpi } from '@/lib/useCountUp'
+
+/**
+ * Карточка числа — самый частый элемент панели, около ста двадцати штук на
+ * двадцати трёх разделах. Поэтому всё, что здесь неверно, неверно везде.
+ *
+ * Что здесь важно, кроме вида:
+ *
+ * — `value === null` показывается прочерком, а не нулём. «Оценок пока нет» и
+ *   «средняя оценка ноль» — разные вещи, и раньше панель говорила второе,
+ *   когда правдой было первое.
+ * — Число докручивается при изменении, чтобы обновление было заметно.
+ * — Цифры табличные: в ряду из четырёх карточек они выстраиваются по разрядам.
+ * — `hint` — подпись мелким под числом, туда идёт масштаб: «из 420», «за 30
+ *   дней». Число без масштаба ничего не значит.
+ */
 
 interface Props {
   label: string
-  value: string | number
+  /** `null` — «не посчитано»: карточка покажет прочерк. */
+  value: string | number | null | undefined
   sub?: string
   delta?: string
   deltaTone?: 'pos' | 'neg' | 'neutral'
   color?: string
-  icon?: string
   spark?: number[]
   sparkColor?: string
 }
 
 export default function KpiCard({
   label, value, sub, delta, deltaTone = 'neutral',
-  color = 'var(--accent)', icon, spark, sparkColor,
+  color = 'var(--accent)', spark, sparkColor,
 }: Props) {
-  const chipColor = deltaTone === 'pos'
-    ? { color: 'var(--positive)', bg: 'rgba(46,125,84,.08)', border: 'rgba(46,125,84,.18)' }
+  const chip = deltaTone === 'pos'
+    ? { color: 'var(--positive)', bg: 'rgba(30,122,76,.08)', border: 'rgba(30,122,76,.20)' }
     : deltaTone === 'neg'
-    ? { color: 'var(--negative)', bg: 'rgba(179,60,42,.08)', border: 'rgba(179,60,42,.18)' }
+    ? { color: 'var(--negative)', bg: 'rgba(184,52,42,.08)', border: 'rgba(184,52,42,.20)' }
     : { color: 'var(--ink-3)', bg: 'var(--bg-sunken)', border: 'var(--line)' }
 
+  const parsed = parseKpi(value)
+  const animated = useCountUp(
+    parsed.kind === 'num' ? parsed.num : 0,
+    parsed.kind === 'num' ? parsed.decimals : 0,
+  )
+
+  const shown = parsed.kind === 'empty'
+    ? '—'
+    : parsed.kind === 'text'
+    ? parsed.text
+    : animated.toLocaleString('ru-RU', {
+        minimumFractionDigits: parsed.decimals,
+        maximumFractionDigits: parsed.decimals,
+      }) + parsed.suffix
+
   return (
-    <div className="kpi-card" style={{
+    <div className="kpi-card jt-rise" style={{
       background: 'var(--bg-elev)',
       border: '1px solid var(--line)',
       borderRadius: 'var(--radius)',
@@ -35,39 +67,36 @@ export default function KpiCard({
       overflow: 'hidden',
     }}>
       <div className="kpi-label" style={{
-        fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em',
+        fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.1em',
+        fontFamily: 'Geist Mono, monospace',
         color: 'var(--ink-3)', fontWeight: 500,
-        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-        gap: 4,
-      }}>
-        <span style={{ minWidth: 0, wordBreak: 'break-word', lineHeight: 1.3 }}>{label}</span>
-        {icon && <span style={{ fontSize: 14, opacity: 0.55, flexShrink: 0 }}>{icon}</span>}
-      </div>
+        minWidth: 0, wordBreak: 'break-word', lineHeight: 1.35,
+      }}>{label}</div>
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-        <div className="kpi-value" style={{
-          fontFamily: 'Geist, sans-serif',
-          fontSize: 30, fontWeight: 500,
-          letterSpacing: '-0.03em',
-          fontVariantNumeric: 'tabular-nums',
-          color: 'var(--ink)', lineHeight: 1,
-        }}>{value}</div>
+        <div className="kpi-value num" style={{
+          fontSize: 30, fontWeight: 620,
+          letterSpacing: '-0.02em',
+          color: parsed.kind === 'empty' ? 'var(--ink-4)' : 'var(--ink)',
+          lineHeight: 1,
+        }}>{shown}</div>
         {delta && (
           <span className="kpi-delta" style={{
             display: 'inline-flex', alignItems: 'center',
-            padding: '2px 6px', borderRadius: 999,
-            fontSize: 11, fontWeight: 500,
-            color: chipColor.color,
-            background: chipColor.bg,
-            border: `1px solid ${chipColor.border}`,
+            padding: '2px 6px', borderRadius: 6,
+            fontSize: 11, fontWeight: 550,
+            color: chip.color, background: chip.bg,
+            border: `1px solid ${chip.border}`,
             whiteSpace: 'nowrap',
           }}>{delta}</span>
         )}
       </div>
 
-      {sub && (
-        <div className="kpi-sub" style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>{sub}</div>
-      )}
+      {/* Место под подпись занято всегда: без этого карточки в ряду прыгают
+          по высоте, стоит одной из них остаться без пояснения. */}
+      <div className="kpi-sub" style={{
+        fontSize: 12, color: 'var(--ink-3)', marginTop: 4, minHeight: 17,
+      }}>{sub ?? ''}</div>
 
       {spark && spark.length > 1 && (
         <div style={{ marginTop: 12 }}>

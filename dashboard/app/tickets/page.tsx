@@ -52,7 +52,7 @@ const STATUS_COLOR: Record<string, string> = {
   pending: '#A87020',
   in_review: '#3B5BB5',
   resolved: '#2E7D54',
-  dismissed: '#9A9690',
+  dismissed: '#8B94A1',
 }
 
 type ActionSt = 'idle' | 'loading' | 'ok' | 'err'
@@ -184,7 +184,7 @@ export default function TicketsPage() {
           )}
           {list.map((c: any) => {
             const expanded = expandedId === c.id
-            const statusColor = STATUS_COLOR[c.status] ?? '#6B6760'
+            const statusColor = STATUS_COLOR[c.status] ?? '#5E6875'
             const aBlock = actions[c.id + '_block']
             const aSt = actions[c.id + '_st']
             const aNote = actions[c.id + '_note']

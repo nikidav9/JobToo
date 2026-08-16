@@ -33,6 +33,21 @@
   --info: #2C6FB5;
   --violet: #5F4BB6;
 
+  /* Мягкие подложки и границы к смысловым цветам. Раньше их писали прямо в
+     разметке — `rgba(46,125,84,.08)` встречалось в панели около полусотни раз,
+     причём от прошлой, более светлой зелени: подложки перестали совпадать со
+     своим же текстом. Теперь пара «цвет — подложка» задаётся один раз. */
+  --positive-soft: rgba(30, 122, 76, .08);
+  --positive-line: rgba(30, 122, 76, .20);
+  --negative-soft: rgba(184, 52, 42, .08);
+  --negative-line: rgba(184, 52, 42, .20);
+  --info-soft: rgba(44, 111, 181, .08);
+  --info-line: rgba(44, 111, 181, .20);
+  --violet-soft: rgba(95, 75, 182, .08);
+  --violet-line: rgba(95, 75, 182, .20);
+  --neutral-soft: var(--bg-sunken);
+  --neutral-line: var(--line);
+
   /* На светлом фоне тень читается и работает — в отличие от тёмного, где мы
      от неё отказывались. Но еле-еле: глубина по-прежнему даётся тоном. */
   --shadow-sm: 0 1px 2px rgba(19, 23, 32, .05);
@@ -369,3 +384,47 @@ html, body {
 
 /* Полоса прокрутки в меню — тонкая и незаметная, пока не нужна. */
 .jt-nav-scroll::-webkit-scrollbar { width: 4px; }
+
+/* ── Кнопка-иконка в таблицах ────────────────────────────────────────────────
+   Действий в строке пользователя пять, и раньше каждое было кнопкой со своим
+   паддингом, своим фоном и своим шрифтом — ряд получался рваным. Здесь один
+   размер на все, и он не меньше 28 px: по MASTER.md зона нажатия должна быть
+   44 × 44, поэтому её добирает невидимая область через ::after.             */
+.jt-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: var(--ink-2);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--fast) var(--ease),
+              border-color var(--fast) var(--ease),
+              color var(--fast) var(--ease);
+}
+
+/* Зона нажатия больше самой кнопки — иконка 13 px пальцем иначе не берётся. */
+.jt-icon-btn::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+.jt-icon-btn:hover:not(:disabled) {
+  background: var(--bg-sunken);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.jt-icon-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}

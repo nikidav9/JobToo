@@ -9,9 +9,8 @@ import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
+import { AXIS, GRID, LEGEND, TT } from '@/lib/chart'
 
-const TT = { borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, boxShadow: 'var(--shadow-md)' }
-const AXIS = { fontSize: 10, fill: '#9A9690', fontFamily: 'Geist Mono, monospace' }
 
 export default function QualityPage() {
   const fetcher = useCallback(() => fetchQuality(), [])
@@ -51,11 +50,11 @@ export default function QualityPage() {
           <ChartCard title="Распределение оценок" sub="Работники и работодатели">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={d.ratingDist} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                 <XAxis dataKey="name" tick={AXIS} tickLine={false} axisLine={false} />
                 <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TT} />
-                <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+                <Legend iconType="square" iconSize={8} wrapperStyle={LEGEND} />
                 <Bar dataKey="workers" name="Работники" fill={PALETTE.orange} stackId="a" />
                 <Bar dataKey="employers" name="Работодатели" fill={PALETTE.blue} stackId="a" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -65,7 +64,7 @@ export default function QualityPage() {
           <ChartCard title="Средний рейтинг по дням" sub="30 дней">
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={d.ratingTrend} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                 <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false} interval={4} />
                 <YAxis domain={[0, 5]} tick={AXIS} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={TT} formatter={(v: any) => [v ? Number(v).toFixed(2) : '—', 'Рейтинг']} />
@@ -85,7 +84,7 @@ export default function QualityPage() {
                   {d.complaintSplit.map((e: any, i: number) => <Cell key={i} fill={e.fill} />)}
                 </Pie>
                 <Tooltip contentStyle={TT} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
               </PieChart>
             </ResponsiveContainer>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 6 }}>
@@ -103,7 +102,7 @@ export default function QualityPage() {
           <ChartCard title="Жалобы по дням" sub="30 дней">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={d.complaintTrend} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                 <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false} interval={4} />
                 <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TT} />
@@ -119,7 +118,7 @@ export default function QualityPage() {
                   {d.appStatus.map((e: any, i: number) => <Cell key={i} fill={e.fill} />)}
                 </Pie>
                 <Tooltip contentStyle={TT} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
               </PieChart>
             </ResponsiveContainer>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginTop: 6 }}>

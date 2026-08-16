@@ -9,9 +9,8 @@ import {
   AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
+import { AXIS, AXIS_CAT, GRID, LEGEND, TT } from '@/lib/chart'
 
-const TT = { borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, boxShadow: 'var(--shadow-md)' }
-const AXIS = { fontSize: 10, fill: '#9A9690', fontFamily: 'Geist Mono, monospace' }
 
 export default function MatchingPage() {
   const fetcher = useCallback(() => fetchMatching(), [])
@@ -52,11 +51,11 @@ export default function MatchingPage() {
                   <stop offset="5%" stopColor={PALETTE.purple} stopOpacity={0.2} /><stop offset="95%" stopColor={PALETTE.purple} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false} interval={3} />
               <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip contentStyle={TT} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
               <Area type="monotone" dataKey="likes" name="Отклики" stroke={PALETTE.pink} fill="url(#gLk)" strokeWidth={1.7} dot={false} />
               <Area type="monotone" dataKey="matches" name="Мэтчи" stroke={PALETTE.purple} fill="url(#gMt)" strokeWidth={1.7} dot={false} />
             </AreaChart>
@@ -95,12 +94,12 @@ export default function MatchingPage() {
           <ChartCard title="Конверсия по типам работ" sub="Лайки → Совпадения">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={d.matchByWorkType} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                 <XAxis dataKey="name" tick={AXIS} tickLine={false} axisLine={false} />
                 <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TT}
                   formatter={(value: any, name: string) => [name === 'rate' ? `${value}%` : value, name === 'rate' ? 'Конверсия %' : name === 'likes' ? 'Лайки' : 'Совпадения']} />
-                <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+                <Legend iconType="square" iconSize={8} wrapperStyle={LEGEND} />
                 <Bar dataKey="likes" name="Отклики" fill={PALETTE.pink} opacity={0.7} radius={[4, 4, 0, 0]} />
                 <Bar dataKey="matches" name="Мэтчи" fill={PALETTE.purple} radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -111,11 +110,11 @@ export default function MatchingPage() {
         <ChartCard title="% конверсии по типам работ" sub="Доля лайков, ставших совпадениями">
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={d.matchByWorkType} layout="vertical" margin={{ left: 8, right: 50, top: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" horizontal={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
               <XAxis type="number" domain={[0, 100]} tick={AXIS} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
-              <YAxis type="category" dataKey="name" tick={{ ...AXIS, fill: '#3D3A33' }} tickLine={false} axisLine={false} width={80} />
+              <YAxis type="category" dataKey="name" tick={AXIS_CAT} tickLine={false} axisLine={false} width={80} />
               <Tooltip contentStyle={TT} formatter={(v: any) => [`${v}%`, 'Конверсия']} />
-              <Bar dataKey="rate" name="Конверсия %" radius={[0, 4, 4, 0]} label={{ position: 'right', fontSize: 11, fill: '#6B6760', formatter: (v: any) => `${v}%` }}>
+              <Bar dataKey="rate" name="Конверсия %" radius={[0, 4, 4, 0]} label={{ position: 'right', fontSize: 11, fill: '#5E6875', formatter: (v: any) => `${v}%` }}>
                 {d.matchByWorkType.map((e, i) => (
                   <Cell key={i} fill={e.rate > 50 ? PALETTE.green : e.rate > 25 ? PALETTE.amber : PALETTE.red} />
                 ))}

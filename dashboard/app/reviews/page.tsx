@@ -10,7 +10,7 @@ function Stars({ value }: { value: number }) {
   return (
     <span style={{ color: '#F59E0B', fontSize: 14, letterSpacing: 1 }}>
       {'★'.repeat(Math.round(value))}
-      <span style={{ color: '#E8E6DF' }}>{'★'.repeat(5 - Math.round(value))}</span>
+      <span style={{ color: 'var(--line-strong)' }}>{'★'.repeat(5 - Math.round(value))}</span>
     </span>
   )
 }

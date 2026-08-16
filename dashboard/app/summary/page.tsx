@@ -9,9 +9,8 @@ import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
+import { AXIS, GRID, LEGEND, TT } from '@/lib/chart'
 
-const TT = { borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, boxShadow: 'var(--shadow-md)' }
-const AXIS = { fontSize: 10, fill: '#9A9690', fontFamily: 'Geist Mono, monospace' }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -111,7 +110,7 @@ export default function SummaryPage() {
                   <stop offset="95%" stopColor={PALETTE.orange} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false} interval={13} />
               <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip contentStyle={TT} />
@@ -123,11 +122,11 @@ export default function SummaryPage() {
         <ChartCard title="Недельная динамика" sub="Новые пользователи · опубликованное предложение · отклики · 12 недель">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={d.weekly} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="week" tick={AXIS} tickLine={false} axisLine={false} />
               <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip contentStyle={TT} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
               <Bar dataKey="users" name="Новые пользователи" fill={PALETTE.orange} radius={[3, 3, 0, 0]} />
               <Bar dataKey="supply" name="Вакансии+смены" fill={PALETTE.blue} radius={[3, 3, 0, 0]} />
               <Bar dataKey="responses" name="Отклики" fill={PALETTE.green} radius={[3, 3, 0, 0]} />

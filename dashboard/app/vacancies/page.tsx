@@ -11,9 +11,8 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
+import { AXIS, AXIS_CAT, GRID, LEGEND, TT } from '@/lib/chart'
 
-const TT = { borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, boxShadow: 'var(--shadow-md)' }
-const AXIS = { fontSize: 10, fill: '#9A9690', fontFamily: 'Geist Mono, monospace' }
 
 export default function VacanciesPage() {
   const fetcher = useCallback(() => fetchVacancies(), [])
@@ -87,11 +86,11 @@ export default function VacanciesPage() {
                   <stop offset="5%" stopColor={PALETTE.blue} stopOpacity={0.2} /><stop offset="95%" stopColor={PALETTE.blue} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false} interval={8} />
               <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip contentStyle={TT} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
               <Area type="monotone" dataKey="temp" name="Временные" stroke={PALETTE.orange} fill="url(#gT)" strokeWidth={1.7} dot={false} />
               <Area type="monotone" dataKey="perm" name="Постоянные" stroke={PALETTE.blue} fill="url(#gP)" strokeWidth={1.7} dot={false} />
             </AreaChart>
@@ -112,11 +111,11 @@ export default function VacanciesPage() {
                   <stop offset="5%" stopColor={PALETTE.cyan} stopOpacity={0.2} /><stop offset="95%" stopColor={PALETTE.cyan} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false} interval={4} />
               <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip contentStyle={TT} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
               <Area type="monotone" dataKey="temp" name="Смены (подработки)" stroke={PALETTE.amber} fill="url(#gVT)" strokeWidth={1.7} dot={false} />
               <Area type="monotone" dataKey="perm" name="Постоянные" stroke={PALETTE.cyan} fill="url(#gVP)" strokeWidth={1.7} dot={false} />
             </AreaChart>
@@ -127,9 +126,9 @@ export default function VacanciesPage() {
           <ChartCard title="Типы работ" sub="Временные вакансии">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={d.workTypeDist} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" horizontal={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
                 <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" tick={{ ...AXIS, fill: '#3D3A33' }} tickLine={false} axisLine={false} width={80} />
+                <YAxis type="category" dataKey="name" tick={AXIS_CAT} tickLine={false} axisLine={false} width={80} />
                 <Tooltip contentStyle={TT} />
                 <Bar dataKey="value" name="Вакансий" radius={[0, 4, 4, 0]}>
                   {d.workTypeDist.map((_, i) => <Cell key={i} fill={Object.values(PALETTE)[i]} />)}
@@ -145,7 +144,7 @@ export default function VacanciesPage() {
                   {d.tempStatus.map((e, i) => <Cell key={i} fill={e.fill} />)}
                 </Pie>
                 <Tooltip contentStyle={TT} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
               </PieChart>
             </ResponsiveContainer>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 4 }}>
@@ -167,7 +166,7 @@ export default function VacanciesPage() {
                   {d.permStatus.map((e, i) => <Cell key={i} fill={e.fill} />)}
                 </Pie>
                 <Tooltip contentStyle={TT} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
               </PieChart>
             </ResponsiveContainer>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 4 }}>
@@ -191,7 +190,7 @@ export default function VacanciesPage() {
           <ChartCard title="Зарплатные диапазоны" sub="Постоянные вакансии">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={d.salaryDist} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                 <XAxis dataKey="name" tick={AXIS} tickLine={false} axisLine={false} />
                 <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TT} />
@@ -348,7 +347,7 @@ function TempCard({ c, onRefresh }: { c: TempCardData; onRefresh: () => void }) 
           <span style={{
             flexShrink: 0, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
             background: isOpen ? '#FFF3EC' : '#F2F1EE',
-            color: isOpen ? PALETTE.orange : '#9A9690',
+            color: isOpen ? PALETTE.orange : 'var(--ink-4)',
             letterSpacing: '0.04em',
           }}>
             {isOpen ? 'ОТКРЫТА' : 'ЗАКРЫТА'}
@@ -630,7 +629,7 @@ function PermCard({ c, onRefresh }: { c: PermCard; onRefresh: () => void }) {
           <span style={{
             flexShrink: 0, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
             background: isOpen ? '#EBF5F0' : '#F2F1EE',
-            color: isOpen ? PALETTE.green : '#9A9690',
+            color: isOpen ? PALETTE.green : 'var(--ink-4)',
             letterSpacing: '0.04em',
           }}>
             {isOpen ? 'ОТКРЫТА' : 'ЗАКРЫТА'}
@@ -794,7 +793,7 @@ function Pill({ color, label, value }: { color: string; label: string; value: nu
 
 function IconCalendar() {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6B6760" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5E6875" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
       <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
     </svg>
   )
@@ -802,7 +801,7 @@ function IconCalendar() {
 
 function IconPin() {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6B6760" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5E6875" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
     </svg>
   )
@@ -818,7 +817,7 @@ function IconBriefcase({ color }: { color: string }) {
 
 function IconMetro() {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9A9690" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8B94A1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10" /><path d="M12 6 8 18M12 6l4 12M8 14h8" />
     </svg>
   )

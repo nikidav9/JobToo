@@ -8,9 +8,8 @@ import PageHeader from '@/components/PageHeader'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell,
 } from 'recharts'
+import { AXIS, GRID, LEGEND, TT } from '@/lib/chart'
 
-const TT = { borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12, boxShadow: 'var(--shadow-sm)' }
-const AXIS = { fontSize: 10, fill: '#9A9690', fontFamily: 'Geist Mono, monospace' }
 
 function Loader() {
   return (
@@ -35,12 +34,12 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
 
 function cellBg(pct: number | null): string {
   if (pct === null) return 'transparent'
-  if (pct === 0) return '#F5F4F0'
-  if (pct < 20) return '#C4E0D3'
-  if (pct < 40) return '#8EC4A7'
-  if (pct < 60) return '#5BA07A'
-  if (pct < 80) return '#2E7D54'
-  return '#1A6644'
+  if (pct === 0) return 'var(--bg-sunken)'
+  if (pct < 20) return '#D3E7DC'
+  if (pct < 40) return '#A3CDB7'
+  if (pct < 60) return '#6BAE8B'
+  if (pct < 80) return '#3D8E62'
+  return '#1E7A4C'
 }
 
 function cellText(pct: number | null): string {
@@ -81,11 +80,11 @@ export default function CohortsPage() {
         <ChartCard title="Новые пользователи по неделям" sub="12 недель">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={cohorts.weeklyBar} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DF" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} />
               <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip contentStyle={TT} />
-              <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B6760' }} />
+              <Legend iconType="square" iconSize={8} wrapperStyle={LEGEND} />
               <Bar dataKey="workers" name="Работники" fill={PALETTE.orange} stackId="a" />
               <Bar dataKey="employers" name="Работодатели" fill={PALETTE.blue} stackId="a" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -149,7 +148,7 @@ export default function CohortsPage() {
               { label: '≥40%', bg: '#5BA07A', text: '#fff' },
               { label: '≥20%', bg: '#8EC4A7', text: '#2E7D54' },
               { label: '<20%', bg: '#C4E0D3', text: '#2E7D54' },
-              { label: '0%', bg: '#F5F4F0', text: '#9A9690' },
+              { label: '0%', bg: 'var(--bg-sunken)', text: 'var(--ink-4)' },
             ].map(({ label, bg, text }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <div style={{ width: 24, height: 16, borderRadius: 3, background: bg, display: 'grid', placeItems: 'center' }}>
