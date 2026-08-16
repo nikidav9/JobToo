@@ -1,6 +1,9 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import PageHeader from '@/components/PageHeader'
+import KpiCard from '@/components/KpiCard'
+import Button from '@/components/Button'
+import Chip from '@/components/Chip'
 import { getToken } from '@/lib/adminApi'
 
 /**
@@ -102,11 +105,20 @@ export default function ApiKeysPage() {
     <div>
       <PageHeader title="Ключи API" lastUpdated={updated} onRefresh={load} />
 
-      <div style={{ padding: 24, display: 'grid', gap: 20, maxWidth: 1000 }}>
+      <div className="page-content" style={{ maxWidth: 1000 }}>
+        <div className="g-3">
+          <KpiCard label="Ключей выдано" value={keys.length} sub="включая отозванные" />
+          <KpiCard label="Работают" value={keys.filter(k => !k.revoked_at).length}
+            sub="принимают запросы прямо сейчас" />
+          <KpiCard label="Запросов за этот час"
+            value={keys.filter(k => !k.revoked_at).reduce((s, k) => s + (k.hits ?? 0), 0)}
+            sub="суммарно по действующим ключам" />
+        </div>
+
 
         {/* Что даёт ключ. Первым делом, до всяких кнопок: партнёр спрашивает
             именно это, и отвечать на это в переписке каждый раз — дорого. */}
-        <div style={box}>
+        <div className="jt-card" style={{ padding: 16 }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Что открывает ключ</div>
           <div style={{ display: 'grid', gap: 6, fontSize: 13.5, color: 'var(--ink-2)' }}>
             <div><code>GET /api/v1/vacancies</code> — открытые смены и постоянные вакансии; фильтры по типу, метро и <code>updated_since</code></div>
@@ -116,7 +128,7 @@ export default function ApiKeysPage() {
           </div>
           <div style={{
             marginTop: 12, padding: '10px 12px', borderRadius: 8, fontSize: 13,
-            background: 'rgba(46,125,84,.08)', color: 'var(--positive)',
+            background: 'var(--positive-soft)', border: '1px solid var(--positive-line)', color: 'var(--positive)',
           }}>
             Персональных данных в выдаче нет: ни телефонов, ни имён, ни того, кто разместил вакансию.
             Поэтому выдача ключа не требует договора об обработке персональных данных.
@@ -124,111 +136,95 @@ export default function ApiKeysPage() {
         </div>
 
         {/* Выдача */}
-        <div style={box}>
+        <div className="jt-card" style={{ padding: 16 }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Выдать ключ</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <input value={name} onChange={e => setName(e.target.value)}
               placeholder="Кому — например, «Яндекс Смены»"
-              style={{
-                flex: '1 1 260px', padding: '9px 12px', borderRadius: 8, fontSize: 14,
-                border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--ink)',
-              }} />
+              className="jt-input" style={{ flex: '1 1 260px' }} />
             <label style={{ fontSize: 13, color: 'var(--ink-3)' }}>
               запросов в час{' '}
               <input type="number" value={limit} min={10} max={100000}
                 onChange={e => setLimit(Math.max(10, Number(e.target.value) || 1000))}
-                style={{
-                  width: 90, padding: '8px 10px', borderRadius: 8, fontSize: 14,
-                  border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--ink)',
-                  fontVariantNumeric: 'tabular-nums',
-                }} />
+                className="jt-input num" style={{ width: 96 }} />
             </label>
-            <button onClick={create} disabled={busy || !name.trim()}
-              style={{
-                padding: '9px 16px', borderRadius: 8, fontSize: 14, fontWeight: 500, border: 'none',
-                background: 'var(--accent)', color: '#fff',
-                cursor: busy || !name.trim() ? 'not-allowed' : 'pointer',
-                opacity: busy || !name.trim() ? 0.5 : 1,
-              }}>
-              Выдать
-            </button>
+            <Button variant="primary" onClick={create} disabled={busy || !name.trim()}>Выдать</Button>
           </div>
-          <div style={{ fontSize: 12.5, color: 'var(--ink-4)', marginTop: 8 }}>
+          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 8 }}>
             Права: {SCOPES.map(s => s.label).join(', ')}. Пока это всё, что есть, — приём откликов появится отдельным правом.
           </div>
 
           {fresh && (
             <div style={{
-              marginTop: 14, padding: 12, borderRadius: 8, border: '1px solid var(--accent)',
-              background: 'rgba(209,78,27,.06)',
+              marginTop: 14, padding: 12, borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--accent)', background: 'var(--accent-soft)',
             }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                 Скопируйте сейчас — второй раз он не покажется
               </div>
-              <code style={{
+              <code className="num" style={{
                 display: 'block', wordBreak: 'break-all', fontSize: 13, padding: '8px 10px',
-                borderRadius: 6, background: 'var(--bg)', border: '1px solid var(--line)',
+                borderRadius: 'var(--radius-sm)', background: 'var(--bg-elev)', border: '1px solid var(--line)',
               }}>{fresh}</code>
-              <button onClick={() => navigator.clipboard.writeText(fresh)}
-                style={{
-                  marginTop: 8, padding: '6px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-                  border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--ink-2)',
-                }}>
+              <Button onClick={() => navigator.clipboard.writeText(fresh)} style={{ marginTop: 8 }}>
                 Скопировать
-              </button>
+              </Button>
             </div>
           )}
         </div>
 
         {err && (
-          <div style={{ ...box, borderColor: 'var(--negative)', color: 'var(--negative)', fontSize: 13.5 }}>{err}</div>
+          <div className="jt-card" style={{ padding: 16, borderColor: 'var(--negative)', color: 'var(--negative)', fontSize: 13.5 }}>{err}</div>
         )}
 
         {/* Список */}
-        <div style={{ border: '1px solid var(--line)', borderRadius: 12, overflow: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5, minWidth: 640 }}>
-            <thead>
-              <tr style={{ background: 'var(--bg-sunken)', textAlign: 'left' }}>
-                {['Кому', 'Права', 'Выдан', 'Последний запрос', 'За этот час', 'Состояние', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', fontWeight: 500, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading && <tr><td colSpan={7} style={{ padding: 16, color: 'var(--ink-4)' }}>Загружаю…</td></tr>}
-              {!loading && !keys.length && (
-                <tr><td colSpan={7} style={{ padding: 16, color: 'var(--ink-4)' }}>Ключей пока нет.</td></tr>
-              )}
-              {keys.map(k => (
-                <tr key={k.id} style={{ borderTop: '1px solid var(--line)', opacity: k.revoked_at ? 0.5 : 1 }}>
-                  <td style={{ padding: '9px 12px', fontWeight: 500 }}>{k.name}</td>
-                  <td style={{ padding: '9px 12px', color: 'var(--ink-3)' }}>{(k.scopes ?? []).join(', ') || '—'}</td>
-                  <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>{when(k.created_at)}</td>
-                  <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>{when(k.last_used_at)}</td>
-                  <td style={{ padding: '9px 12px', fontVariantNumeric: 'tabular-nums' }}>{k.hits} / {k.rate_limit}</td>
-                  <td style={{ padding: '9px 12px' }}>
-                    {k.revoked_at
-                      ? <span style={{ color: 'var(--negative)' }}>отозван {when(k.revoked_at)}</span>
-                      : <span style={{ color: 'var(--positive)' }}>работает</span>}
-                  </td>
-                  <td style={{ padding: '9px 12px' }}>
-                    {!k.revoked_at && (
-                      <button onClick={() => revoke(k)} disabled={busy}
-                        style={{
-                          padding: '5px 10px', borderRadius: 6, fontSize: 12.5, cursor: 'pointer',
-                          border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--negative)',
-                        }}>
-                        Отозвать
-                      </button>
-                    )}
-                  </td>
+        <div className="jt-card" style={{ overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="jt-table" style={{ minWidth: 640 }}>
+              <thead>
+                <tr>
+                  {['Кому', 'Права', 'Выдан', 'Последний запрос', 'За этот час', 'Состояние', ''].map(h => (
+                    <th key={h}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {loading && <tr><td colSpan={7} style={{ padding: 16, color: 'var(--ink-3)' }}>Загружаю…</td></tr>}
+                {!loading && !keys.length && (
+                  <tr><td colSpan={7} style={{ padding: 16, color: 'var(--ink-3)' }}>Ключей пока нет.</td></tr>
+                )}
+                {keys.map(k => (
+                  // Отозванный ключ приглушается фоном: список существует
+                  // ровно затем, чтобы через полгода прочитать его целиком.
+                  <tr key={k.id} style={{ background: k.revoked_at ? 'var(--bg-sunken)' : undefined }}>
+                    <td style={{ fontWeight: 500, color: 'var(--ink)' }}>{k.name}</td>
+                    <td style={{ color: 'var(--ink-2)' }}>{(k.scopes ?? []).join(', ') || '—'}</td>
+                    <td className="num" style={{ whiteSpace: 'nowrap', color: 'var(--ink-2)' }}>{when(k.created_at)}</td>
+                    <td className="num" style={{ whiteSpace: 'nowrap', color: 'var(--ink-2)' }}>{when(k.last_used_at)}</td>
+                    <td className="num" style={{ color: 'var(--ink-2)' }}>
+                      {k.hits} / {k.rate_limit}
+                    </td>
+                    <td>
+                      {k.revoked_at
+                        ? <Chip tone="negative">Отозван {when(k.revoked_at)}</Chip>
+                        : <Chip tone="positive" dot>Работает</Chip>}
+                    </td>
+                    <td>
+                      {!k.revoked_at && (
+                        <Button variant="danger" style={{ height: 28, padding: '0 10px' }}
+                          onClick={() => revoke(k)} disabled={busy}>
+                          Отозвать
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <div style={{ fontSize: 12.5, color: 'var(--ink-4)' }}>
+        <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
           Отозванные ключи остаются в списке намеренно: через полгода по нему можно будет ответить,
           кто и когда выгружал наши вакансии.
         </div>
