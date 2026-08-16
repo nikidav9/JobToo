@@ -5,6 +5,10 @@ import PageHeader from '@/components/PageHeader'
 import KpiCard from '@/components/KpiCard'
 import { downloadCSV } from '@/lib/csv-export'
 import { getCallMarks, setCallMark, type CallMark } from '@/lib/calllog'
+import FilterChips from '@/components/FilterChips'
+import Button from '@/components/Button'
+import Chip from '@/components/Chip'
+import { IconPhone, IconSend, IconCheck } from '@/components/icons'
 
 /**
  * Обзвон директоров.
@@ -68,17 +72,20 @@ export default function OutreachPage() {
   const [bucket, setBucket] = useState<Bucket>('lapsed')
   const [q, setQ] = useState('')
   const [marks, setMarks] = useState<Record<string, CallMark>>({})
+  const [webPush, setWebPush] = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data: u }, { data: v }, { data: p }] = await Promise.all([
+    const [{ data: u }, { data: v }, { data: p }, { data: subs }] = await Promise.all([
       supabase
         .from('jm_users')
         .select('id,first_name,last_name,phone,company,telegram_id,push_token,last_seen_at,created_at')
         .eq('role', 'employer'),
       supabase.from('jm_vacancies').select('employer_id,created_at,id,workers_found'),
       supabase.from('jm_perm_vacancies').select('employer_id,created_at'),
+      supabase.from('jm_web_push_subscriptions').select('user_id'),
     ])
+    setWebPush(new Set((subs ?? []).map((x: any) => x.user_id)))
     setEmps((u ?? []) as Employer[])
     setPubs([...((v ?? []) as Pub[]), ...((p ?? []) as Pub[])])
     setWeekVacs((v ?? []) as unknown as Vac[])
@@ -108,10 +115,10 @@ export default function OutreachPage() {
         published: s.count,
         lastPublish: s.last,
         bucket: b,
-        reachable: Boolean(e.telegram_id || e.push_token),
+        reachable: Boolean(e.telegram_id || e.push_token || webPush.has(e.id)),
       }
     })
-  }, [emps, pubs, now])
+  }, [emps, pubs, now, webPush])
 
   const counts = useMemo(() => {
     const c: Record<Bucket, number> = { lapsed: 0, active: 0, never: 0 }
@@ -240,53 +247,41 @@ export default function OutreachPage() {
     <div>
       <PageHeader title="Обзвон директоров" lastUpdated={updated} onRefresh={load} />
 
-      <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12 }}>
-          <KpiCard label="Публикуют сейчас" value={counts.active} color="var(--positive)" sub="за последние 7 дней" />
-          <KpiCard label="Замолчали" value={counts.lapsed} color="var(--negative)" sub="публиковали раньше" />
-          <KpiCard label="Смен от замолчавших" value={potential} sub="столько они выложили, пока были активны" />
+      <div className="page-content">
+        <div className="g-5">
+          <KpiCard label="Публикуют сейчас" value={counts.active}
+            sub={`из ${emps.length} директоров · за 7 дней`} />
+          <KpiCard label="Замолчали" value={counts.lapsed}
+            sub="публиковали раньше семи дней назад" />
+          <KpiCard label="Смен от замолчавших" value={potential}
+            sub={counts.lapsed ? `по ${Math.round(potential / counts.lapsed)} на человека` : 'пока никого'} />
+          {/* Считаются смены, опубликованные за неделю, на которые кто-то
+              нашёлся, — это не «закрытые смены» в смысле статуса, и подпись
+              раньше обещала именно их. */}
           <KpiCard
-            label="Смен закрыто за неделю"
-            value={week.total ? `${week.filled} из ${week.total}` : '—'}
-            color="var(--positive)"
-            sub="держите под рукой: это ответ на «а люди у вас есть»"
+            label="Смены нашли людей"
+            value={week.total ? `${week.filled} из ${week.total}` : null}
+            sub={week.total ? 'опубликованы за 7 дней · ответ на «а люди у вас есть»' : 'за неделю не публиковали'}
           />
-          <KpiCard label="Обзвонено" value={Object.keys(marks).length} sub="отметки хранятся в этом браузере" />
+          <KpiCard label="Обзвонено" value={Object.keys(marks).length}
+            sub="отметки хранятся в этом браузере" />
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-          {(Object.keys(BUCKET_LABEL) as Bucket[]).map(b => (
-            <button
-              key={b}
-              onClick={() => setBucket(b)}
-              style={{
-                padding: '7px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-                border: '1px solid var(--line)',
-                background: bucket === b ? 'var(--accent)' : 'var(--bg-elev)',
-                color: bucket === b ? '#fff' : 'var(--ink-2)',
-              }}
-            >
-              {BUCKET_LABEL[b]} · {counts[b]}
-            </button>
-          ))}
+          <FilterChips
+            options={(Object.keys(BUCKET_LABEL) as Bucket[]).map(b => ({
+              key: b, label: BUCKET_LABEL[b], count: counts[b],
+            }))}
+            value={bucket}
+            onChange={setBucket}
+          />
           <input
             value={q}
             onChange={e => setQ(e.target.value)}
             placeholder="Имя, телефон, компания"
-            style={{
-              padding: '7px 12px', borderRadius: 8, fontSize: 13, minWidth: 220,
-              border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)',
-            }}
+            className="jt-input" style={{ height: 30, minWidth: 220 }}
           />
-          <button
-            onClick={exportCsv}
-            style={{
-              padding: '7px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-              border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink-2)',
-            }}
-          >
-            Выгрузить CSV
-          </button>
+          <Button onClick={exportCsv} style={{ height: 30 }}>Выгрузить CSV</Button>
         </div>
 
         {loading ? (
@@ -297,41 +292,48 @@ export default function OutreachPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {filtered.map(r => {
               const called = marks[r.id]
+              const digits = (r.phone ?? '').replace(/\D/g, '')
               return (
                 <div
                   key={r.id}
+                  className="jt-card"
                   style={{
                     display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap',
-                    padding: '12px 14px', borderRadius: 10,
-                    border: '1px solid var(--line)',
+                    padding: '12px 14px',
+                    // Отмеченный звонок приглушается фоном, а не прозрачностью:
+                    // 0.6 поверх служебного серого делает строку нечитаемой,
+                    // а она всё ещё нужна — по ней сверяются.
                     background: called ? 'var(--bg-sunken)' : 'var(--bg-elev)',
-                    opacity: called ? 0.6 : 1,
                   }}
                 >
                   <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       {[r.first_name, r.last_name].filter(Boolean).join(' ') || 'Без имени'}
+                      {called && (
+                        <Chip tone="positive" title={`Отмечено ${new Date(called.at).toLocaleDateString('ru')}`}>
+                          <IconCheck size={11} />Звонили
+                        </Chip>
+                      )}
+                      {!r.reachable && <Chip tone="neutral">Только телефон</Chip>}
                     </div>
-                    <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
-                      {r.company || '—'}
-                      {r.reachable ? '' : '  ·  нет связи в приложении'}
-                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>{r.company || '—'}</div>
                   </div>
 
                   <a
-                    href={`tel:+${(r.phone ?? '').replace(/\D/g, '')}`}
+                    href={`tel:+${digits}`}
+                    className="num"
                     style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', flex: '0 0 auto' }}
                   >
                     {r.phone ?? '—'}
                   </a>
 
-                  <div style={{ fontSize: 12.5, color: 'var(--ink-3)', flex: '0 0 auto', minWidth: 150 }}>
-                    выложил <b style={{ color: 'var(--ink-2)' }}>{r.published}</b> смен
+                  <div style={{ fontSize: 13, color: 'var(--ink-3)', flex: '0 0 auto', minWidth: 150 }}>
+                    выложил <b className="num" style={{ color: 'var(--ink)' }}>{r.published}</b> смен
                     <br />
                     последняя — {ago(r.lastPublish, now)}
                   </div>
 
-                  <div style={{ fontSize: 12.5, color: 'var(--ink-3)', flex: '0 0 auto', minWidth: 130 }}>
+                  <div style={{ fontSize: 13, color: 'var(--ink-3)', flex: '0 0 auto', minWidth: 130 }}>
                     заходил {ago(r.last_seen_at, now)}
                   </div>
 
@@ -340,41 +342,27 @@ export default function OutreachPage() {
                       телеграм такого не умеет, — поэтому рядом кнопка,
                       кладущая готовое сообщение в буфер. */}
                   <a
-                    href={`https://t.me/+${(r.phone ?? '').replace(/\D/g, '')}`}
+                    href={`https://t.me/+${digits}`}
                     target="_blank"
                     rel="noreferrer"
-                    style={{
-                      padding: '7px 12px', borderRadius: 8, fontSize: 13, textDecoration: 'none',
-                      border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--accent)',
-                      flex: '0 0 auto',
-                    }}
+                    className="jt-btn jt-btn-secondary"
+                    style={{ textDecoration: 'none', flex: '0 0 auto' }}
                   >
-                    Telegram
+                    <IconSend size={13} />Телеграм
                   </a>
 
-                  <button
-                    onClick={() => copyMessage(r)}
-                    style={{
-                      padding: '7px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-                      border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink-2)',
-                      flex: '0 0 auto',
-                    }}
-                  >
+                  <Button onClick={() => copyMessage(r)} style={{ flex: '0 0 auto' }}>
                     {copied === r.id ? 'Скопировано' : 'Текст'}
-                  </button>
+                  </Button>
 
-                  <button
+                  <Button
+                    variant={called ? 'secondary' : 'primary'}
                     onClick={() => toggleCall(r.id)}
-                    style={{
-                      padding: '7px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-                      border: '1px solid var(--line)',
-                      background: called ? 'var(--bg-elev)' : 'var(--accent)',
-                      color: called ? 'var(--ink-3)' : '#fff',
-                      flex: '0 0 auto',
-                    }}
+                    icon={called ? undefined : <IconPhone size={13} />}
+                    style={{ flex: '0 0 auto' }}
                   >
                     {called ? 'Отменить' : 'Позвонил'}
-                  </button>
+                  </Button>
                 </div>
               )
             })}

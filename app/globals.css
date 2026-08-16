@@ -1,0 +1,61 @@
+
+/* ── Кнопка ──────────────────────────────────────────────────────────────────
+   Пять состояний из MASTER.md, и ни одно не пропускается. Наведение меняет
+   тон и границу, но не двигает кнопку: на плотной таблице подпрыгивающий
+   элемент превращает работу в догонялки.                                   */
+.jt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background var(--fast) var(--ease),
+              border-color var(--fast) var(--ease),
+              color var(--fast) var(--ease);
+}
+
+.jt-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.jt-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.jt-btn-primary:hover:not(:disabled) { background: #A84212; border-color: #A84212; }
+
+.jt-btn-secondary { background: var(--bg-elev); color: var(--ink-2); border-color: var(--line); }
+.jt-btn-secondary:hover:not(:disabled) { background: var(--bg-sunken); border-color: var(--line-strong); color: var(--ink); }
+
+.jt-btn-danger { background: var(--negative-soft); color: var(--negative); border-color: var(--negative-line); }
+.jt-btn-danger:hover:not(:disabled) { background: rgba(184, 52, 42, .14); border-color: var(--negative); }
+
+/* ── Поле ввода ─────────────────────────────────────────────────────────────*/
+.jt-input {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: var(--ink);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--fast) var(--ease);
+}
+
+.jt-input:hover { border-color: var(--line-strong); }
+.jt-input:focus { border-color: var(--accent); }
+
+textarea.jt-input { height: auto; padding: 10px; line-height: 1.55; resize: vertical; }
+
+/* ── Карточка ───────────────────────────────────────────────────────────────*/
+.jt-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
