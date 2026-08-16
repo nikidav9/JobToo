@@ -42,6 +42,12 @@ if [ ! -f /swapfile ]; then
   echo 'vm.swappiness=10' > /etc/sysctl.d/99-swappiness.conf
 fi
 
+# Догоняем то, что появилось позже установки docker: на уже работающей
+# машине блок ниже не выполняется, и новые зависимости туда не попадают.
+if ! command -v aws >/dev/null 2>&1; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y awscli >/dev/null 2>&1 || true
+fi
+
 # dig нужен отдельно: docker ставился до того, как он понадобился, и на
 # уже работающей машине блок ниже не выполняется.
 if ! command -v dig >/dev/null 2>&1; then
@@ -52,7 +58,7 @@ if ! command -v docker >/dev/null 2>&1; then
   say "установка" "ставлю docker"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y
-  apt-get install -y jq openssl python3 certbot python3-certbot-nginx dnsutils
+  apt-get install -y jq openssl python3 certbot python3-certbot-nginx dnsutils awscli
   curl -fsSL https://get.docker.com -o /tmp/get-docker.sh && sh /tmp/get-docker.sh
   systemctl enable --now docker
   say "установка" "docker=$(docker --version 2>/dev/null || echo не встал)"
@@ -1195,6 +1201,24 @@ switch_role() {                 # служба переменная роль
 if [ $rc -eq 0 ]; then
   switch_role realtime REALTIME_DB_USER supabase_realtime_admin
   switch_role meta     META_DB_USER     supabase_meta_reader
+fi
+
+# ── Старый ключ приложения ────────────────────────────────────────────────
+# Прокси принимает и предыдущий секрет: у части людей приложение установлено
+# со старым, зашитым в сборку. Ключ отключается очисткой значения, без
+# выкладки — array_filter в db.php сам выбрасывает пустое.
+#
+# Вопрос только в том, когда. Раз в сутки показываем, сколько запросов ещё
+# приходит со старым ключом: ноль несколько дней подряд и есть тот ответ,
+# после которого его можно убирать не наугад.
+if [ ! -f /var/lib/jt-prev-reported ] || \
+   [ "$(cat /var/lib/jt-prev-reported 2>/dev/null)" != "$(date +%F)" ]; then
+  PREV_USED=$( (cd "$REPO/infra" && docker compose exec -T php \
+    cat /var/www/api/prev_secret_used) 2>/dev/null | tr -d '\r\n' || true)
+  if [ -n "$PREV_USED" ]; then
+    say "старый ключ" "запросов со старым секретом: $PREV_USED"
+  fi
+  date +%F > /var/lib/jt-prev-reported
 fi
 
 # ── Перевозка медиа переписки в закрытый бакет ────────────────────────────

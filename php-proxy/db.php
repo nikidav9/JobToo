@@ -113,8 +113,27 @@ $accepted = array_filter([
     jt_secret('APP_SECRET'),
     jt_secret('APP_SECRET_PREV'),
 ]);
-$ok = false;
-foreach ($accepted as $s) { if (hash_equals($s, $provided)) $ok = true; }
+//
+// Считаем, сколько запросов ещё приходит со старым ключом. Без этого счёта
+// решение «пора убирать» приходится принимать вслепую: уберёшь рано —
+// отвалятся все, кто не обновился, и узнаешь об этом от них. Счётчик
+// превращает догадку в число, которое видно в ежедневном отчёте.
+$ok = false; $viaPrev = false;
+$prev = jt_secret('APP_SECRET_PREV');
+foreach ($accepted as $s) {
+    if (hash_equals($s, $provided)) {
+        $ok = true;
+        if ($prev !== '' && hash_equals($prev, $provided)) $viaPrev = true;
+    }
+}
+if ($ok && $viaPrev) {
+    // Файл, а не база: это диагностика, и ронять из-за неё запрос нельзя.
+    $mark = '/var/www/api/prev_secret_used';
+    $today = gmdate('Y-m-d');
+    $cur = @file_get_contents($mark);
+    [$d, $n] = $cur ? array_pad(explode(' ', trim($cur), 2), 2, '0') : [$today, '0'];
+    @file_put_contents($mark, $today . ' ' . ($d === $today ? (int)$n + 1 : 1), LOCK_EX);
+}
 if (!$ok) {
     jt_respond(['error' => 'Forbidden'], 403); exit;
 }
