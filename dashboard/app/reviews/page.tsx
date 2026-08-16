@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react'
 import { fetchReviews } from '@/lib/queries'
 import { useRealtime } from '@/lib/useRealtime'
 import PageHeader from '@/components/PageHeader'
+import PageSkeleton from '@/components/PageSkeleton'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import Avatar from '@/components/Avatar'
@@ -25,6 +26,14 @@ function Stars({ value }: { value: number }) {
   )
 }
 
+/** «1 звезда», «2 звезды», «5 звёзд» — иначе подписи фильтра читаются как
+ *  машинный перевод. */
+function stars(n: number): string {
+  if (n === 1) return 'звезда'
+  if (n < 5) return 'звезды'
+  return 'звёзд'
+}
+
 function RoleBadge({ role }: { role: string }) {
   return (
     <Chip tone={role === 'worker' ? 'accent' : 'info'} style={{ fontSize: 11, padding: '1px 7px' }}>
@@ -43,7 +52,7 @@ export default function ReviewsPage() {
   const [filterStars, setFilterStars] = useState<number | null>(null)
   const [filterRole, setFilterRole] = useState<string>('all')
 
-  if (loading || !d) return <Loader />
+  if (loading || !d) return <PageSkeleton rows={2} />
 
   const filtered = d.list.filter((r: any) => {
     if (filterStars !== null && r.rating !== filterStars) return false
@@ -78,7 +87,7 @@ export default function ReviewsPage() {
               options={[
                 { key: 'all', label: 'Любая оценка', count: d.total },
                 ...[5, 4, 3, 2, 1].map(n => ({
-                  key: String(n), label: `${n} ★`, count: d.byStars[n] ?? 0,
+                  key: String(n), label: `${n} ${stars(n)}`, count: d.byStars[n] ?? 0,
                 })),
               ]}
               value={filterStars === null ? 'all' : String(filterStars)}
@@ -180,12 +189,3 @@ export default function ReviewsPage() {
   )
 }
 
-function Loader() {
-  return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} style={{ height: i === 0 ? 64 : 120, background: 'var(--bg-sunken)', borderRadius: 10 }} />
-      ))}
-    </div>
-  )
-}

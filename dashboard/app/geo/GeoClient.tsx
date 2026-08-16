@@ -5,19 +5,13 @@ import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
+import PageSkeleton from '@/components/PageSkeleton'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { AXIS, GRID, LEGEND, TT } from '@/lib/chart'
 
 
-function Loader() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300, color: 'var(--ink-3)', fontSize: 14 }}>
-      Загрузка…
-    </div>
-  )
-}
 
 function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
@@ -39,7 +33,7 @@ export default function GeoPage() {
     intervalSec: 120,
   })
 
-  if (loading) return <Loader />
+  if (loading) return <PageSkeleton rows={2} />
   if (error || !d) return <ErrorState message={error ?? 'Нет данных'} onRetry={refresh} />
 
   const userChartHeight = Math.max(200, d.userMetroTop.length * 32)

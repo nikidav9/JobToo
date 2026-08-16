@@ -5,6 +5,7 @@ import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
+import PageSkeleton from '@/components/PageSkeleton'
 import {
   AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -19,7 +20,7 @@ export default function MatchingPage() {
     intervalSec: 30,
   })
 
-  if (loading || !d) return <Loader />
+  if (loading || !d) return <PageSkeleton rows={2} />
 
   return (
     <div>
@@ -136,12 +137,3 @@ export default function MatchingPage() {
   )
 }
 
-function Loader() {
-  return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} style={{ height: 120, background: 'var(--bg-sunken)', borderRadius: 10 }} />
-      ))}
-    </div>
-  )
-}

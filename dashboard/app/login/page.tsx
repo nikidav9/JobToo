@@ -117,7 +117,7 @@ export default function LoginPage() {
           {error && (
             <div style={{
               padding: '8px 12px', borderRadius: 8,
-              background: 'rgba(179,60,42,.08)', border: '1px solid rgba(179,60,42,.2)',
+              background: 'var(--negative-soft)', border: '1px solid var(--negative-line)',
               color: 'var(--negative)', fontSize: 12.5,
             }}>
               {error}
@@ -140,7 +140,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p style={{ fontSize: 11.5, color: 'var(--ink-4)', textAlign: 'center', marginTop: 20 }}>
+        <p style={{ fontSize: 11.5, color: 'var(--ink-3)', textAlign: 'center', marginTop: 20 }}>
           JobToo Analytics · только Admin
         </p>
       </div>

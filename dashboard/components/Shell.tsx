@@ -98,7 +98,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 background: active ? 'var(--accent-soft)' : 'transparent',
                 transition: 'background .12s',
               }}>
-                <Icon style={{ width: 18, height: 18, color: active ? 'var(--accent)' : 'var(--ink-4)' }} />
+                <Icon style={{ width: 18, height: 18, color: active ? 'var(--accent)' : 'var(--ink-3)' }} />
               </span>
               {label}
             </Link>

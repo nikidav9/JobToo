@@ -5,6 +5,7 @@ import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
+import PageSkeleton from '@/components/PageSkeleton'
 import { blockUser, resetPassword, sendBothToUser, deleteUser, changeRole } from '@/lib/admin-actions'
 import DonutRoles from '@/components/DonutRoles'
 import Avatar from '@/components/Avatar'
@@ -92,8 +93,8 @@ function ProfileDrawer({ userId, onClose, verifiedSet, onVerifyToggle }: {
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink-3)', padding: 4, fontSize: 18 }}
-          >✕</button>
+            className="jt-icon-btn" title="Закрыть" style={{ border: 0, background: 'transparent' }}
+          ><IconX size={14} /></button>
         </div>
         <div style={{ marginTop: 10, display: 'flex', gap: 6 }}>
           <button
@@ -271,7 +272,7 @@ export default function UsersPage() {
 
   useEffect(() => { setVerifiedSet(getVerifiedUsers()) }, [])
 
-  if (loading || !d) return <Loader />
+  if (loading || !d) return <PageSkeleton rows={3} />
 
   const workerPct = Math.round(d.kpi.workers / Math.max(d.kpi.total, 1) * 100)
   const filteredUsers = phoneSearch.trim()
@@ -501,7 +502,7 @@ export default function UsersPage() {
                                   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconMetro size={12} style={{ color: 'var(--ink-3)' }} />{u.metro}</span>
                                   : <span style={{ color: 'var(--ink-3)' }}>—</span>}
                               </td>
-                              <td style={{ padding: '10px 12px', color: u.company && u.company !== '—' ? 'var(--ink-2)' : 'var(--ink-4)', maxWidth: 140 }}>
+                              <td style={{ padding: '10px 12px', color: u.company && u.company !== '—' ? 'var(--ink-2)' : 'var(--ink-3)', maxWidth: 140 }}>
                                 <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.company || '—'}</span>
                               </td>
                               <td style={{ padding: '10px 12px' }}>
@@ -665,12 +666,3 @@ export default function UsersPage() {
   )
 }
 
-function Loader() {
-  return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} style={{ height: i === 0 ? 64 : 140, background: 'var(--bg-sunken)', borderRadius: 10 }} />
-      ))}
-    </div>
-  )
-}

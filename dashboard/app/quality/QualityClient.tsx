@@ -5,6 +5,7 @@ import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
+import PageSkeleton from '@/components/PageSkeleton'
 import Donut from '@/components/Donut'
 import Chip from '@/components/Chip'
 import {
@@ -21,7 +22,7 @@ export default function QualityPage() {
     intervalSec: 60,
   })
 
-  if (loading) return <Loader />
+  if (loading) return <PageSkeleton rows={3} />
   if (error || !d) return <ErrorState message={error ?? 'Нет данных'} onRetry={refresh} />
 
   const ratingNum = Number(d.kpi.avgRating)
@@ -64,7 +65,7 @@ export default function QualityPage() {
         </div>
 
         <div className="g-2">
-          <ChartCard title="Распределение оценок" sub="Работники и работодатели">
+          <ChartCard title="Распределение оценок" sub="Сколько каких оценок поставили · 1–5 звёзд">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={d.ratingDist} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
@@ -156,23 +157,17 @@ export default function QualityPage() {
   )
 }
 
-function Loader() {
-  return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} style={{ height: 120, background: 'var(--bg-sunken)', borderRadius: 10 }} />
-      ))}
-    </div>
-  )
-}
 
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div style={{ padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-      <div style={{ fontSize: 32 }}>⚠️</div>
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--negative)"
+           strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3.5L21.5 20H2.5L12 3.5z" /><path d="M12 10v4M12 17h.01" />
+      </svg>
       <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>Не удалось загрузить данные</div>
       <div style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'Geist Mono, monospace', maxWidth: 400, textAlign: 'center' }}>{message}</div>
-      <button onClick={onRetry} style={{ marginTop: 8, padding: '8px 20px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 13, cursor: 'pointer' }}>
+      <button onClick={onRetry} className="jt-btn jt-btn-secondary" style={{ marginTop: 8 }}>
         Повторить
       </button>
     </div>

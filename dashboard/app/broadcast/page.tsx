@@ -352,7 +352,7 @@ export default function BroadcastPage() {
                   </button>
 
                   {result && (
-                    <div style={{ padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, background: st === 'ok' ? 'rgba(46,125,84,.08)' : 'rgba(179,60,42,.08)', color: st === 'ok' ? 'var(--positive)' : 'var(--negative)', border: `1px solid ${st === 'ok' ? 'rgba(46,125,84,.2)' : 'rgba(179,60,42,.2)'}` }}>
+                    <div style={{ padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, background: st === 'ok' ? 'var(--positive-soft)' : 'var(--negative-soft)', color: st === 'ok' ? 'var(--positive)' : 'var(--negative)', border: `1px solid ${st === 'ok' ? 'var(--positive-line)' : 'var(--negative-line)'}` }}>
                       {result}
                     </div>
                   )}
@@ -455,7 +455,7 @@ export default function BroadcastPage() {
                           <td style={{ padding: '8px 10px', fontWeight: 500, color: 'var(--ink)' }}>{n.title}</td>
                           <td style={{ padding: '8px 10px', color: 'var(--ink-3)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.body}</td>
                           <td style={{ padding: '8px 10px' }}>
-                            <span style={{ padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: n.is_read ? 'rgba(46,125,84,.1)' : 'rgba(59,91,181,.08)', color: n.is_read ? 'var(--positive)' : 'var(--info)' }}>
+                            <span style={{ padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: n.is_read ? 'var(--positive-soft)' : 'var(--info-soft)', color: n.is_read ? 'var(--positive)' : 'var(--info)' }}>
                               {n.is_read ? 'Прочитано' : 'Не прочитано'}
                             </span>
                           </td>
@@ -503,7 +503,7 @@ export default function BroadcastPage() {
                       </td>
                       <td style={{ padding: '8px 10px', color: 'var(--ink-2)' }}>{u.phone}</td>
                       <td style={{ padding: '8px 10px' }}>
-                        <span style={{ padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: u.role === 'worker' ? 'rgba(59,91,181,.08)' : 'rgba(95,75,182,.08)', color: u.role === 'worker' ? 'var(--info)' : 'var(--violet)' }}>
+                        <span style={{ padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: u.role === 'worker' ? 'var(--info-soft)' : 'var(--violet-soft)', color: u.role === 'worker' ? 'var(--info)' : 'var(--violet)' }}>
                           {u.role === 'worker' ? 'Работник' : 'Работодатель'}
                         </span>
                       </td>

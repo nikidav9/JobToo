@@ -5,6 +5,7 @@ import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
+import PageSkeleton from '@/components/PageSkeleton'
 import DonutRoles from '@/components/DonutRoles'
 import {
   AreaChart, Area, BarChart, Bar, Cell,
@@ -20,7 +21,7 @@ export default function OverviewPage() {
     intervalSec: 30,
   })
 
-  if (loading || !d) return <PageLoader />
+  if (loading || !d) return <PageSkeleton rows={3} />
 
   return (
     <div>
@@ -182,12 +183,3 @@ export default function OverviewPage() {
   )
 }
 
-function PageLoader() {
-  return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} style={{ height: i === 0 ? 72 : 140, background: 'var(--bg-sunken)', borderRadius: 10 }} />
-      ))}
-    </div>
-  )
-}

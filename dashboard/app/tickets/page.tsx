@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react'
 import { supabaseAdmin } from '@/lib/supabase'
 import { useRealtime } from '@/lib/useRealtime'
 import PageHeader from '@/components/PageHeader'
+import PageSkeleton from '@/components/PageSkeleton'
 import { blockUser, setComplaintStatus, addComplaintNote } from '@/lib/admin-actions'
 import { sendPushToUser } from '@/lib/admin-actions'
 import KpiCard from '@/components/KpiCard'
@@ -82,7 +83,7 @@ export default function TicketsPage() {
     setActions(prev => ({ ...prev, [id]: { s, msg } }))
   }
 
-  if (loading || !d) return <Loader />
+  if (loading || !d) return <PageSkeleton rows={3} />
 
   const list = d.list.filter((c: any) => {
     if (statusFilter !== 'all' && c.status !== statusFilter) return false
@@ -316,12 +317,3 @@ export default function TicketsPage() {
   )
 }
 
-function Loader() {
-  return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {[...Array(5)].map((_, i) => (
-        <div key={i} style={{ height: 88, borderRadius: 10, background: 'var(--bg-sunken)' }} />
-      ))}
-    </div>
-  )
-}

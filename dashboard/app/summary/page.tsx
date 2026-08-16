@@ -5,6 +5,7 @@ import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
+import PageSkeleton from '@/components/PageSkeleton'
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -28,7 +29,7 @@ export default function SummaryPage() {
     intervalSec: 60,
   })
 
-  if (loading || !d) return <Loader />
+  if (loading || !d) return <PageSkeleton rows={3} />
   const k = d.kpi
   const s = d.season
   // Ноль изменений — не рост: чип в этом случае не показывается вовсе.
@@ -152,12 +153,3 @@ export default function SummaryPage() {
   )
 }
 
-function Loader() {
-  return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} style={{ height: 120, background: 'var(--bg-sunken)', borderRadius: 10 }} />
-      ))}
-    </div>
-  )
-}

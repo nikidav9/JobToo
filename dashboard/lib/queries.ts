@@ -730,8 +730,10 @@ export async function fetchQuality() {
 
   const rMap: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
   for (const r of rt) rMap[Math.round(Number((r as any).rating))]++
+  // Подпись оси — цифрой, а не рядом звёзд: символ ★ разной ширины на разных
+  // устройствах, и пять подписей от «★» до «★★★★★» разъезжают ось по ширине.
   const ratingDist = [1, 2, 3, 4, 5].map(v => ({
-    name: '★'.repeat(v),
+    name: String(v),
     value: rMap[v] ?? 0,
     workers: workerRatings.filter((r: any) => Math.round(Number(r.rating)) === v).length,
     employers: employerRatings.filter((r: any) => Math.round(Number(r.rating)) === v).length,

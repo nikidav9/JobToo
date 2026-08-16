@@ -9,8 +9,8 @@ interface Props {
 
 export default function ChartCard({ title, sub, children, action, chip }: Props) {
   const chipStyle = chip ? {
-    pos: { color: 'var(--positive)', bg: 'rgba(46,125,84,.08)', border: 'rgba(46,125,84,.18)' },
-    neg: { color: 'var(--negative)', bg: 'rgba(179,60,42,.08)', border: 'rgba(179,60,42,.18)' },
+    pos: { color: 'var(--positive)', bg: 'var(--positive-soft)', border: 'var(--positive-line)' },
+    neg: { color: 'var(--negative)', bg: 'var(--negative-soft)', border: 'var(--negative-line)' },
     acc: { color: 'var(--accent)', bg: 'var(--accent-soft)', border: 'var(--accent-line)' },
     default: { color: 'var(--ink-2)', bg: 'var(--bg-sunken)', border: 'var(--line)' },
   }[chip.tone ?? 'default'] : null

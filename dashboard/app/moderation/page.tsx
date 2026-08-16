@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react'
 import { supabaseAdmin } from '@/lib/supabase'
 import { useRealtime } from '@/lib/useRealtime'
 import PageHeader from '@/components/PageHeader'
+import PageSkeleton from '@/components/PageSkeleton'
 import { blockUser, sendSystemMessage } from '@/lib/admin-actions'
 import { fetchChats } from '@/lib/queries'
 import KpiCard from '@/components/KpiCard'
@@ -99,7 +100,7 @@ export default function ModerationPage() {
     }
   }
 
-  if (loading || !d) return <Loader />
+  if (loading || !d) return <PageSkeleton rows={2} />
 
   const pending = d.list.filter((c: any) => c.status === 'pending')
   const resolved = d.list.filter((c: any) => c.status !== 'pending')
@@ -249,10 +250,3 @@ export default function ModerationPage() {
   )
 }
 
-function Loader() {
-  return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {[120, 80, 80].map((h, i) => <div key={i} style={{ height: h, background: 'var(--bg-sunken)', borderRadius: 10 }} />)}
-    </div>
-  )
-}

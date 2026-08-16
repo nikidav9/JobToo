@@ -8,6 +8,7 @@ import Chip from '@/components/Chip'
 import { IconCheck } from '@/components/icons'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
+import PageSkeleton from '@/components/PageSkeleton'
 import { updateTempVacancy, updatePermVacancy, deleteVacancy, deletePermVacancy, setVacancyStatus, setPermVacancyStatus } from '@/lib/admin-actions'
 import { downloadCSV } from '@/lib/csv-export'
 import {
@@ -64,7 +65,7 @@ export default function VacanciesPage() {
     downloadCSV(rows, `perm_vacancies_${new Date().toISOString().slice(0, 10)}.csv`)
   }
 
-  if (loading || !d) return <Loader />
+  if (loading || !d) return <PageSkeleton rows={3} />
 
   return (
     <div>
@@ -420,7 +421,7 @@ function TempCard({ c, onRefresh }: { c: TempCardData; onRefresh: () => void }) 
         style={{ all: 'unset', display: 'flex', alignItems: 'center', gap: 8, width: '100%', cursor: hasApps ? 'pointer' : 'default' }}
       >
         <IconPeople color={hasApps ? PALETTE.orange : '#C8C5BF'} />
-        <span style={{ fontSize: 18, fontWeight: 700, color: hasApps ? 'var(--ink)' : 'var(--ink-4)', lineHeight: 1 }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: hasApps ? 'var(--ink)' : 'var(--ink-3)', lineHeight: 1 }}>
           {c.apps.total}
         </span>
         <span style={{ fontSize: 11.5, color: 'var(--ink-3)', flex: 1 }}>
@@ -679,7 +680,7 @@ function PermCard({ c, onRefresh }: { c: PermCard; onRefresh: () => void }) {
         }}
       >
         <IconPeople color={hasApps ? PALETTE.blue : '#C8C5BF'} />
-        <span style={{ fontSize: 18, fontWeight: 700, color: hasApps ? 'var(--ink)' : 'var(--ink-4)', lineHeight: 1 }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: hasApps ? 'var(--ink)' : 'var(--ink-3)', lineHeight: 1 }}>
           {c.apps.total}
         </span>
         <span style={{ fontSize: 11.5, color: 'var(--ink-3)', flex: 1 }}>
@@ -810,12 +811,3 @@ function IconPeople({ color }: { color: string }) {
   )
 }
 
-function Loader() {
-  return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} style={{ height: 120, background: 'var(--bg-sunken)', borderRadius: 10 }} />
-      ))}
-    </div>
-  )
-}

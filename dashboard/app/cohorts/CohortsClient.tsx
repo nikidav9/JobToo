@@ -5,19 +5,13 @@ import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
+import PageSkeleton from '@/components/PageSkeleton'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell,
 } from 'recharts'
 import { AXIS, GRID, LEGEND, TT } from '@/lib/chart'
 
 
-function Loader() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300, color: 'var(--ink-3)', fontSize: 14 }}>
-      Загрузка…
-    </div>
-  )
-}
 
 function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
@@ -69,7 +63,7 @@ export default function CohortsPage() {
     intervalSec: 120,
   })
 
-  if (loading) return <Loader />
+  if (loading) return <PageSkeleton rows={2} />
   if (error || !cohorts) return <ErrorState message={error ?? 'Нет данных'} onRetry={refresh} />
 
   const maxRet1 = cohorts.table.length > 0

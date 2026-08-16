@@ -259,11 +259,11 @@ export default function ChatsPage() {
               {/* Legend */}
               <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5 }}>
-                  <Avatar initials={selected.workerInitials} color="#C8501E" size={18} />
+                  <Avatar initials={selected.workerInitials} color="var(--accent)" size={18} />
                   <span style={{ color: 'var(--ink-3)' }}>Работник</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5 }}>
-                  <Avatar initials={selected.employerInitials} color="#3B5BB5" size={18} />
+                  <Avatar initials={selected.employerInitials} color="var(--info)" size={18} />
                   <span style={{ color: 'var(--ink-3)' }}>Работодатель</span>
                 </div>
               </div>
@@ -306,7 +306,7 @@ export default function ChatsPage() {
                       {showName && (
                         <Avatar
                           initials={isWorker ? selected.workerInitials : selected.employerInitials}
-                          color={isWorker ? '#C8501E' : '#3B5BB5'}
+                          color={isWorker ? 'var(--accent)' : 'var(--info)'}
                           size={28}
                         />
                       )}
@@ -316,14 +316,14 @@ export default function ChatsPage() {
                       {showName && (
                         <div style={{
                           fontSize: 11, fontWeight: 500, marginBottom: 3,
-                          color: isWorker ? '#C8501E' : '#3B5BB5',
+                          color: isWorker ? 'var(--accent)' : 'var(--info)',
                           textAlign: isWorker ? 'left' : 'right',
                         }}>
                           {msg.senderName}
                         </div>
                       )}
                       <div style={{
-                        background: isWorker ? 'var(--bg-elev)' : '#3B5BB5',
+                        background: isWorker ? 'var(--bg-elev)' : 'var(--info)',
                         color: isWorker ? 'var(--ink)' : '#fff',
                         borderRadius: isWorker ? '4px 14px 14px 14px' : '14px 4px 14px 14px',
                         padding: '9px 13px',
@@ -370,7 +370,7 @@ function Loader() {
     <div style={{ display: 'flex', height: 'calc(100vh - 41px)' }}>
       <div style={{ width: 320, borderRight: '1px solid var(--line)', background: 'var(--bg-elev)', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {[...Array(6)].map((_, i) => (
-          <div key={i} style={{ height: 64, borderRadius: 10, background: 'var(--bg-sunken)' }} />
+          <div key={i} className="jt-skeleton" style={{ height: 64 }} />
         ))}
       </div>
       <div style={{ flex: 1, display: 'grid', placeItems: 'center' }}>
