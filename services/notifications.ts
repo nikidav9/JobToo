@@ -267,6 +267,26 @@ async function sendTelegramTo(recipientUserId: string, title: string, body: stri
   }
 }
 
+/**
+ * Отправить уведомление всеми каналами сразу.
+ *
+ * `abroad` — то, что можно выпускать за границу.
+ *
+ * Пуш уходит на exp.host, то есть в США. США нет в перечне государств с
+ * адекватной защитой прав субъектов персональных данных (приказ РКН № 128
+ * от 05.08.2022), и передача туда идёт по самому строгому порядку. А мы
+ * отправляли туда имя работника и — в уведомлениях о чате — первые сто
+ * символов самого сообщения. Переписка открытым текстом на чужой сервер.
+ *
+ * Остальные каналы текст не теряют:
+ *   — колокольчик живёт в нашей базе в Москве;
+ *   — веб-пуш шифруется на нашей стороне (RFC 8291), Apple и Google видят
+ *     только шифртекст;
+ *   — телеграм получает полный текст как и раньше.
+ *
+ * Если `abroad` не передан, наружу идёт обычный текст — так и должно быть
+ * там, где персональных данных нет вовсе: «5 смен рядом с вашим метро».
+ */
 async function pushTo(
   recipientUserId: string,
   title: string,
@@ -275,6 +295,7 @@ async function pushTo(
   channelId = 'default',
   data: Record<string, unknown> = {},
   sendTelegram = true,
+  abroad?: { title?: string; body?: string },
 ): Promise<void> {
   // Save in-app notification so the bell always shows it. type/data кладём
   // рядом — по ним колокольчик понимает, какой экран открыть по нажатию.
@@ -288,8 +309,8 @@ async function pushTo(
     if (!token) return;
     await sendExpoPush([{
       to: token,
-      title,
-      body,
+      title: abroad?.title ?? title,
+      body: abroad?.body ?? body,
       sound: 'default',
       channelId,
       data: { type, ...data },
@@ -314,6 +335,10 @@ export async function notifyEmployerNewApplicant(
     `${workerName} хочет выйти на смену «${vacancyTitle}». Посмотрите кандидата!`,
     'new_applicant',
     'matches',
+    {}, true,
+    // Название смены — не персональные данные, его оставляем: без него
+    // уведомление перестаёт что-либо значить. Имя убираем.
+    { body: `Кто-то хочет выйти на смену «${vacancyTitle}». Посмотрите кандидата!` },
   );
 }
 
@@ -328,6 +353,8 @@ export async function notifyEmployerGotMatch(
     `${workerName} готов выйти на смену «${vacancyTitle}». Откройте чат!`,
     'match_employer',
     'matches',
+    {}, true,
+    { body: `Кандидат готов выйти на смену «${vacancyTitle}». Откройте чат!` },
   );
 }
 
@@ -344,6 +371,11 @@ export async function notifyEmployerNewMessage(
     'message',
     'messages',
     chatId ? { chatId } : {},
+    true,
+    // Ни имени, ни текста: это переписка. Так же устроены WhatsApp и Signal
+    // со спрятанными предпросмотрами — на экране блокировки видно, что
+    // сообщение есть, а что в нём, знает только тот, кто откроет приложение.
+    { title: '💬 Новое сообщение', body: 'Откройте чат в JobToo' },
   );
 }
 
@@ -404,6 +436,8 @@ export async function notifyWorkerNewMessage(
     'message',
     'messages',
     chatId ? { chatId } : {},
+    true,
+    { title: '💬 Новое сообщение', body: 'Откройте чат в JobToo' },
   );
 }
 
@@ -503,6 +537,7 @@ export async function notifyEmployerNewPermApplicant(
     `${workerName} откликнулся на вакансию «${vacancyTitle}». Посмотрите кандидата!`,
     'new_perm_applicant', 'matches',
     {}, false, // Telegram шлём отдельной карточкой ниже — не дублируем
+    { body: `Есть отклик на вакансию «${vacancyTitle}». Посмотрите кандидата!` },
   );
   // Telegram-карточка с кнопками «Одобрить/Отклонить» прямо в чате директора
   if (workerId && vacancyId) {

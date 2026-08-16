@@ -879,7 +879,22 @@ function tg_send_message(int $chatId, string $text, bool|string $withAppButton =
     return $ok;
 }
 
-/** Sends Expo push messages in batches of 100. Never throws. */
+/**
+ * Отправка пушей через Expo, пачками по сотне. Не бросает исключений.
+ *
+ * ВАЖНО про содержимое. Это единственное место, откуда данные уходят на
+ * exp.host, то есть в США, а США нет в перечне государств с адекватной
+ * защитой прав субъектов персональных данных (приказ РКН № 128 от
+ * 05.08.2022). Значит, в title и body не должно быть ни имён, ни телефонов,
+ * ни текста переписки — ничего, что относится к конкретному человеку.
+ *
+ * Названия смен и вакансий, компании и числа — можно: это не персональные
+ * данные, а без них уведомление перестаёт что-либо значить.
+ *
+ * Полный текст с именем при этом никуда не девается: он идёт в колокольчик
+ * (наша база в Москве) и в телеграм. Развилка — в notify_user(), параметр
+ * $pushBody.
+ */
 function expo_push(array $messages): void {
     for ($i = 0; $i < count($messages); $i += 100) {
         $chunk = array_slice($messages, $i, 100);
@@ -958,7 +973,28 @@ function tg_new_application_card(string $employerId, string $workerId, string $v
 }
 
 
-function notify_user(string $userId, string $title, string $body, string $type = '', array $data = []): void {
+/**
+ * Уведомить человека всеми каналами сразу: колокольчик, телеграм, пуш.
+ *
+ * $pushBody — отдельный текст для пуша, и вот почему он появился.
+ *
+ * Пуш уходит на exp.host, то есть в США. США нет в перечне государств,
+ * обеспечивающих адекватную защиту прав субъектов персональных данных
+ * (приказ Роскомнадзора № 128 от 05.08.2022, действует с 01.03.2023), —
+ * а мы отправляли туда имя и фамилию работника прямо в теле уведомления:
+ * «Иван Петров хочет выйти на смену». Это трансграничная передача
+ * персональных данных в страну вне перечня, причём по самому строгому
+ * порядку: до неё нужно отдельное уведомление РКН и выжидание срока, и
+ * ведомство вправе её запретить.
+ *
+ * Колокольчик живёт в нашей базе в Москве, поэтому там имя остаётся: оно
+ * там и полезно. Наружу уходит обезличенный вариант.
+ *
+ * Если $pushBody не передан, в пуш идёт обычный текст — так и должно быть
+ * для сообщений, где имён нет вовсе (а таких большинство).
+ */
+function notify_user(string $userId, string $title, string $body, string $type = '',
+                     array $data = [], ?string $pushBody = null): void {
     if ($userId === '') return;
 
     $since = gmdate('Y-m-d\TH:i:s\Z', time() - 60);
@@ -987,7 +1023,7 @@ function notify_user(string $userId, string $title, string $body, string $type =
     }
     if (!empty($u['push_token'])) {
         expo_push([[
-            'to' => $u['push_token'], 'title' => $title, 'body' => $body,
+            'to' => $u['push_token'], 'title' => $title, 'body' => $pushBody ?? $body,
             'sound' => 'default', 'priority' => 'high', 'channelId' => 'matches',
             'data' => array_merge(['type' => $type], $data),
         ]]);
@@ -2226,9 +2262,14 @@ try {
                 $w = sb_single('jm_users', ['id' => 'eq.' . $wid], 'first_name,last_name');
                 $v = sb_single('jm_vacancies', ['id' => 'eq.' . $vid], 'title');
                 $wName = trim(($w['first_name'] ?? '') . ' ' . ($w['last_name'] ?? '')) ?: 'Кандидат';
+                $vTitle = (string)($v['title'] ?? 'смена');
                 notify_user((string)$eid, '📥 Новый отклик!',
-                    $wName . ' хочет выйти на смену «' . ($v['title'] ?? 'смена') . '». Посмотрите кандидата!',
-                    'new_applicant');
+                    $wName . ' хочет выйти на смену «' . $vTitle . '». Посмотрите кандидата!',
+                    'new_applicant', [],
+                    // В пуш — без имени: он уходит за границу. Директор всё
+                    // равно открывает приложение, чтобы посмотреть кандидата,
+                    // и имя в шторке ничего не решает.
+                    'Кто-то хочет выйти на смену «' . $vTitle . '». Посмотрите кандидата!');
             }
             $data = $row; break;
         }
@@ -2568,7 +2609,8 @@ try {
             $vTitle = (string)($pv['title'] ?? 'вакансию');
             notify_user((string)$eid, '📥 Новая заявка!',
                 "{$wName} откликнулся на вакансию «{$vTitle}». Посмотрите кандидата!",
-                'new_perm_applicant');
+                'new_perm_applicant', [],
+                "Есть отклик на вакансию «{$vTitle}». Посмотрите кандидата!");
             // И карточка с кнопками «Одобрить/Отклонить» — решение в один тап,
             // не открывая приложение.
             tg_new_application_card((string)$eid, (string)$wid, (string)$vid, $vTitle);
