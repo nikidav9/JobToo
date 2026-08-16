@@ -1,38 +1,22 @@
-const CACHE = 'jm-v2'
+// Служебный скрипт браузера.
+//
+// Раньше он складывал в свой кэш всё из /_next/static/ и отдавал оттуда,
+// не спрашивая сеть. Смысла в этом не было: Next.js и так помечает эти файлы
+// как неизменяемые, и браузер кэширует их сам. Зато риск был: свой кэш живёт
+// дольше вкладки и переживает выкладку, а разобраться, почему у одного
+// человека панель белая, а у всех остальных нет, по такому кэшу невозможно.
+//
+// Поэтому статику больше не трогаем совсем. Скрипт остаётся ради одного:
+// чтобы приложение считалось устанавливаемым и открывалось с рабочего стола.
 
-self.addEventListener('install', e => {
-  e.waitUntil(self.skipWaiting())
-})
+self.addEventListener('install', () => self.skipWaiting())
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+self.addEventListener('activate', event => {
+  // Чужие кэши прошлых версий подчищаем: они уже ничему не служат, а место
+  // занимают и путают при разборе.
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   )
-})
-
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url)
-
-  // Never intercept: navigations, Supabase API, non-GET
-  if (e.request.mode === 'navigate') return
-  if (e.request.method !== 'GET') return
-  if (url.hostname.includes('supabase.co')) return
-  if (url.hostname !== location.hostname) return
-
-  // Cache-first for static assets, network-first for pages
-  if (url.pathname.startsWith('/_next/static/')) {
-    e.respondWith(
-      caches.open(CACHE).then(c =>
-        c.match(e.request).then(cached => {
-          if (cached) return cached
-          return fetch(e.request).then(res => {
-            if (res.ok) c.put(e.request, res.clone())
-            return res
-          })
-        })
-      )
-    )
-  }
 })

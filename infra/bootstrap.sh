@@ -556,11 +556,26 @@ if gh_asset dashboard dashboard.tar.gz /tmp/jt-dash.tgz; then
       if [ -d /opt/jobtoo-dashboard ]; then mv /opt/jobtoo-dashboard /opt/jobtoo-dashboard.old; fi
       mv /tmp/jt-dash /opt/jobtoo-dashboard
       chmod -R a+rX /opt/jobtoo-dashboard
-      rm -rf /opt/jobtoo-dashboard.old
       echo "$DSUM" > /var/lib/jt-dash.sha
+
+      # Прежний каталог НЕ удаляем здесь, и это важно.
+      #
+      # Контейнер примонтирован к каталогу, а не к пути. Пока он не поднят
+      # заново, он продолжает читать именно тот каталог, который мы только что
+      # переименовали в .old — и если стереть его сейчас, дашборд на несколько
+      # секунд остаётся без файлов: страница приходит, а все скрипты к ней
+      # отвечают ошибкой. Снаружи это белый экран, и попадает в него ровно тот,
+      # кто обновил страницу сразу после выкладки. Дважды так и вышло.
+      #
+      # Поэтому сначала поднимаем службу на новом каталоге, и только следующий
+      # заход убирает прежний. Лишние двадцать мегабайт на диске — плата за то,
+      # что окна без файлов не существует вовсе.
       say "дашборд" "сборка обновлена"
-      # Новая сборка — служба должна подняться с ней, а не со старой.
-      rm -f /var/lib/jt-dash.up
+      timeout 300 docker compose --env-file "$SECRETS" --profile dashboard \
+        up -d --force-recreate dashboard >/dev/null 2>&1 \
+        && say "дашборд" "поднят на новой сборке" \
+        || say "дашборд" "не поднялся сразу, поднимет следующий заход"
+      rm -f /var/lib/jt-dash.up /var/lib/jt-dash.fp
     else
       say "дашборд" "архив не распаковался — оставляю прежний"
       rm -rf /tmp/jt-dash
