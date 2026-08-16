@@ -339,6 +339,11 @@ chmod 644 /opt/jobtoo-php/zz-listen.conf
 PROXY=/opt/jobtoo-proxy
 mkdir -p "$PROXY"
 cp -f "$REPO"/php-proxy/*.php "$PROXY"/ 2>/dev/null || true
+# И описания рядом с кодом. Раньше копировались только .php, и оба json —
+# описание API для партнёра и образец фида — на сервер не попадали вовсе.
+# Снаружи это выглядело благополучно: адрес отвечает 200, а тело пустое.
+# Партнёр, которому дали такую ссылку, решил бы, что у нас всё сломано.
+cp -f "$REPO"/php-proxy/*.json "$PROXY"/ 2>/dev/null || true
 rm -f "$PROXY"/*.example.php
 
 printf "<?php return '%s';\n" "$SERVICE_ROLE_KEY" > "$PROXY/sb_service_key.php"

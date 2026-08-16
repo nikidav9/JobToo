@@ -1831,6 +1831,50 @@ try {
             break;
         }
 
+        // ── Источники чужих вакансий ───────────────────────────────────────
+        case 'extSourcesList':
+            $data = sb_select('jm_ext_sources', ['order' => 'created_at.desc']); break;
+
+        // args: [{id?, name, url, auth_header?, auth_value?, period_min?, enabled?}]
+        case 'extSourceSave': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $name = trim((string)($v['name'] ?? ''));
+            $url  = trim((string)($v['url'] ?? ''));
+            if ($name === '' || !preg_match('~^https?://~i', $url)) {
+                $data = ['error' => 'нужны имя и адрес фида']; break;
+            }
+            $row = [
+                'id' => (string)($v['id'] ?? '') !== '' ? (string)$v['id'] : uid(),
+                'name' => $name,
+                'url' => $url,
+                'auth_header' => $v['auth_header'] ?? null,
+                'auth_value' => $v['auth_value'] ?? null,
+                'period_min' => max(5, (int)($v['period_min'] ?? 30)),
+                'enabled' => array_key_exists('enabled', $v) ? (bool)$v['enabled'] : true,
+            ];
+            sb_upsert('jm_ext_sources', $row, 'id');
+            $data = ['ok' => true, 'id' => $row['id']]; break;
+        }
+
+        case 'extSourceDelete': {
+            $id = (string)($args[0] ?? '');
+            if ($id === '') { $data = ['error' => 'нужен id']; break; }
+            sb_delete('jm_ext_vacancies', ['source_id' => 'eq.' . $id]);
+            sb_delete('jm_ext_sources', ['id' => 'eq.' . $id]);
+            $data = ['ok' => true]; break;
+        }
+
+        // Сводка по чужим вакансиям — для панели и для проверки, что фид жив.
+        case 'extStats': {
+            $rows = sb_select('jm_ext_vacancies', ['active' => 'is.true', 'select' => 'source_id,kind', 'limit' => '5000']);
+            $by = [];
+            foreach ($rows as $r) {
+                $k = (string)$r['source_id'];
+                $by[$k] = ($by[$k] ?? 0) + 1;
+            }
+            $data = ['всего' => count($rows), 'по_источникам' => $by]; break;
+        }
+
         // ── Ключи внешнего API ─────────────────────────────────────────────
         //
         // Управление отсюда, а не правкой таблицы руками: ключ, выданный в
