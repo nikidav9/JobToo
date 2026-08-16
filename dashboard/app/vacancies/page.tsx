@@ -1,14 +1,17 @@
 'use client'
 import { useCallback, useState } from 'react'
-import { fetchVacancies, PALETTE } from '@/lib/queries'
+import { fetchVacancies, PALETTE, CHART_COLORS } from '@/lib/queries'
 import { useRealtime } from '@/lib/useRealtime'
 import KpiCard from '@/components/KpiCard'
+import Donut from '@/components/Donut'
+import Chip from '@/components/Chip'
+import { IconCheck } from '@/components/icons'
 import ChartCard from '@/components/ChartCard'
 import PageHeader from '@/components/PageHeader'
 import { updateTempVacancy, updatePermVacancy, deleteVacancy, deletePermVacancy, setVacancyStatus, setPermVacancyStatus } from '@/lib/admin-actions'
 import { downloadCSV } from '@/lib/csv-export'
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { AXIS, AXIS_CAT, GRID, LEGEND, TT } from '@/lib/chart'
@@ -69,10 +72,16 @@ export default function VacanciesPage() {
 
       <div className="page-content">
         <div className="g-4">
-          <KpiCard label="Врем. вакансий" value={d.kpi.totalTemp} sub={`${d.kpi.openTemp} открыто`} sparkColor={PALETTE.orange} />
-          <KpiCard label="Пост. вакансий" value={d.kpi.totalPerm} sub={`${d.kpi.openPerm} открыто`} sparkColor={PALETTE.blue} />
-          <KpiCard label="Срочных" value={d.kpi.urgentTemp} sparkColor={PALETTE.red} />
-          <KpiCard label="Новых за месяц" value={d.kpi.newMonth} deltaTone="pos" delta={`+${d.kpi.newMonth}`} />
+          <KpiCard label="Смен" value={d.kpi.totalTemp}
+            sub={`${d.kpi.openTemp} открыто из ${d.kpi.totalTemp}`} sparkColor={PALETTE.orange} />
+          <KpiCard label="Постоянных вакансий" value={d.kpi.totalPerm}
+            sub={`${d.kpi.openPerm} открыто из ${d.kpi.totalPerm}`} sparkColor={PALETTE.blue} />
+          <KpiCard label="Срочных смен" value={d.kpi.urgentTemp}
+            sub={d.kpi.totalTemp ? `${Math.round(d.kpi.urgentTemp / d.kpi.totalTemp * 100)}% всех смен` : '—'}
+            sparkColor={PALETTE.red} />
+          {/* Чип «+N» рядом с числом N повторял его же. */}
+          <KpiCard label="Новых за месяц" value={d.kpi.newMonth}
+            sub={`из ${d.kpi.totalTemp + d.kpi.totalPerm} за всё время`} />
         </div>
 
         <ChartCard title="Публикация вакансий" sub="Временные и постоянные по дням · 90 дней">
@@ -131,54 +140,24 @@ export default function VacanciesPage() {
                 <YAxis type="category" dataKey="name" tick={AXIS_CAT} tickLine={false} axisLine={false} width={80} />
                 <Tooltip contentStyle={TT} />
                 <Bar dataKey="value" name="Вакансий" radius={[0, 4, 4, 0]}>
-                  {d.workTypeDist.map((_, i) => <Cell key={i} fill={Object.values(PALETTE)[i]} />)}
+                  {d.workTypeDist.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard title="Статус врем." sub="Открыто / закрыто">
-            <ResponsiveContainer width="100%" height={150}>
-              <PieChart>
-                <Pie data={d.tempStatus} cx="50%" cy="50%" innerRadius={42} outerRadius={62} dataKey="value" paddingAngle={4}>
-                  {d.tempStatus.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                </Pie>
-                <Tooltip contentStyle={TT} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 4 }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 500, color: PALETTE.green }}>{d.kpi.openTemp}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Открыто</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 500, color: PALETTE.gray }}>{d.kpi.closedTemp}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Закрыто</div>
-              </div>
-            </div>
+          <ChartCard title="Смены" sub="Открыто и закрыто">
+            <Donut
+              data={d.tempStatus.map((e: any) => ({ name: e.name, value: e.value, color: e.fill }))}
+              caption="смен"
+            />
           </ChartCard>
 
-          <ChartCard title="Статус пост." sub="Открыто / закрыто">
-            <ResponsiveContainer width="100%" height={150}>
-              <PieChart>
-                <Pie data={d.permStatus} cx="50%" cy="50%" innerRadius={42} outerRadius={62} dataKey="value" paddingAngle={4}>
-                  {d.permStatus.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                </Pie>
-                <Tooltip contentStyle={TT} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={LEGEND} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 4 }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 500, color: PALETTE.green }}>{d.kpi.openPerm}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Открыто</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 500, color: PALETTE.gray }}>{d.kpi.closedPerm}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Закрыто</div>
-              </div>
-            </div>
+          <ChartCard title="Постоянные вакансии" sub="Открыто и закрыто">
+            <Donut
+              data={d.permStatus.map((e: any) => ({ name: e.name, value: e.value, color: e.fill }))}
+              caption="вакансий"
+            />
           </ChartCard>
         </div>
 
@@ -327,31 +306,31 @@ function TempCard({ c, onRefresh }: { c: TempCardData; onRefresh: () => void }) 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-          background: isOpen ? '#FFF3EC' : '#F2F1EE',
+          background: isOpen ? 'var(--accent-soft)' : 'var(--bg-sunken)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <IconBriefcase color={isOpen ? PALETTE.orange : '#B0ADA6'} />
+          <IconBriefcase color={isOpen ? PALETTE.orange : '#8B94A1'} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.3, wordBreak: 'break-word' }}>
             {c.title}
-            {(editing ? editFields.is_urgent : c.isUrgent) && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: PALETTE.red, background: PALETTE.red + '15', padding: '1px 5px', borderRadius: 4 }}>СРОЧНО</span>}
+            {(editing ? editFields.is_urgent : c.isUrgent) && <Chip tone="negative" style={{ marginLeft: 6, fontSize: 10.5, padding: '1px 6px' }}>Срочно</Chip>}
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{c.company}</div>
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <button onClick={() => setEditing(e => !e)} style={{
-            fontSize: 10.5, padding: '2px 7px', borderRadius: 5, border: '1px solid var(--line)', cursor: 'pointer',
-            background: editing ? 'var(--ink)' : 'var(--bg-sunken)', color: editing ? '#fff' : 'var(--ink-3)',
-          }}>✏️</button>
-          <span style={{
-            flexShrink: 0, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-            background: isOpen ? '#FFF3EC' : '#F2F1EE',
-            color: isOpen ? PALETTE.orange : 'var(--ink-4)',
-            letterSpacing: '0.04em',
-          }}>
-            {isOpen ? 'ОТКРЫТА' : 'ЗАКРЫТА'}
-          </span>
+          <button onClick={() => setEditing(e => !e)} className="jt-icon-btn"
+            title={editing ? 'Закончить правку' : 'Править вакансию'}
+            style={{ width: 26, height: 26,
+              background: editing ? 'var(--accent-soft)' : undefined,
+              borderColor: editing ? 'var(--accent-line)' : undefined,
+              color: editing ? 'var(--accent)' : undefined }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17v3z" />
+            </svg>
+          </button>
+          <Chip tone={isOpen ? 'accent' : 'neutral'}>{isOpen ? 'Открыта' : 'Закрыта'}</Chip>
         </div>
       </div>
 
@@ -393,7 +372,7 @@ function TempCard({ c, onRefresh }: { c: TempCardData; onRefresh: () => void }) 
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={handleSave} disabled={saving}
               style={{ height: 30, padding: '0 14px', borderRadius: 6, border: 'none', background: 'var(--positive)', color: '#fff', fontSize: 12.5, fontWeight: 500, cursor: 'pointer' }}>
-              {saving ? '…' : '✓ Сохранить'}
+              {saving ? '…' : <><IconCheck size={12} />Сохранить</>}
             </button>
             <button onClick={() => setEditing(false)}
               style={{ height: 30, padding: '0 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink-2)', fontSize: 12.5, cursor: 'pointer' }}>
@@ -553,7 +532,7 @@ function PermVacancyCards({ cards, onExport, onRefresh }: { cards: PermCard[]; o
               onClick={copyAllPosts}
               style={{ height: 28, padding: '0 12px', borderRadius: 6, border: 'none', background: allPostCopied ? PALETTE.green : PALETTE.orange, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
             >
-              {allPostCopied ? '✓ Скопировано' : 'Скопировать всё'}
+              {allPostCopied ? 'Скопировано' : 'Скопировать всё'}
             </button>
           </div>
           <pre style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--ink)', fontFamily: 'inherit', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 320, overflowY: 'auto' }}>
@@ -610,10 +589,10 @@ function PermCard({ c, onRefresh }: { c: PermCard; onRefresh: () => void }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-          background: isOpen ? '#EBF5F0' : '#F2F1EE',
+          background: isOpen ? 'var(--positive-soft)' : 'var(--bg-sunken)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <IconBriefcase color={isOpen ? PALETTE.green : '#B0ADA6'} />
+          <IconBriefcase color={isOpen ? PALETTE.green : '#8B94A1'} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.3, wordBreak: 'break-word' }}>
@@ -622,18 +601,18 @@ function PermCard({ c, onRefresh }: { c: PermCard; onRefresh: () => void }) {
           <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{c.company}</div>
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <button onClick={() => setEditing(e => !e)} style={{
-            fontSize: 10.5, padding: '2px 7px', borderRadius: 5, border: '1px solid var(--line)', cursor: 'pointer',
-            background: editing ? 'var(--ink)' : 'var(--bg-sunken)', color: editing ? '#fff' : 'var(--ink-3)',
-          }}>✏️</button>
-          <span style={{
-            flexShrink: 0, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-            background: isOpen ? '#EBF5F0' : '#F2F1EE',
-            color: isOpen ? PALETTE.green : 'var(--ink-4)',
-            letterSpacing: '0.04em',
-          }}>
-            {isOpen ? 'ОТКРЫТА' : 'ЗАКРЫТА'}
-          </span>
+          <button onClick={() => setEditing(e => !e)} className="jt-icon-btn"
+            title={editing ? 'Закончить правку' : 'Править вакансию'}
+            style={{ width: 26, height: 26,
+              background: editing ? 'var(--accent-soft)' : undefined,
+              borderColor: editing ? 'var(--accent-line)' : undefined,
+              color: editing ? 'var(--accent)' : undefined }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17v3z" />
+            </svg>
+          </button>
+          <Chip tone={isOpen ? 'positive' : 'neutral'}>{isOpen ? 'Открыта' : 'Закрыта'}</Chip>
         </div>
       </div>
 
@@ -666,7 +645,7 @@ function PermCard({ c, onRefresh }: { c: PermCard; onRefresh: () => void }) {
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={handleSave} disabled={saving}
               style={{ height: 30, padding: '0 14px', borderRadius: 6, border: 'none', background: 'var(--positive)', color: '#fff', fontSize: 12.5, fontWeight: 500, cursor: 'pointer' }}>
-              {saving ? '…' : '✓ Сохранить'}
+              {saving ? '…' : <><IconCheck size={12} />Сохранить</>}
             </button>
             <button onClick={() => setEditing(false)}
               style={{ height: 30, padding: '0 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink-2)', fontSize: 12.5, cursor: 'pointer' }}>

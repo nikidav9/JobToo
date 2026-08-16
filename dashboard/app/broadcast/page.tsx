@@ -1,6 +1,9 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import PageHeader from '@/components/PageHeader'
+import KpiCard from '@/components/KpiCard'
+import Chip from '@/components/Chip'
+import { IconApp, IconBell } from '@/components/icons'
 import { broadcastBoth, broadcastWebPush, broadcastTelegram, sendBothToUser, sendInAppToUser } from '@/lib/admin-actions'
 import { supabaseAdmin } from '@/lib/supabase'
 import { logActivity } from '@/lib/activity-log'
@@ -30,14 +33,14 @@ interface NotifRow {
 }
 
 const TARGETS: { value: Target; label: string; desc: string }[] = [
-  { value: 'all',       label: '👥 Все пользователи',  desc: 'Работники + работодатели' },
-  { value: 'workers',   label: '👷 Работники',          desc: 'Только работники' },
-  { value: 'employers', label: '🏢 Работодатели',       desc: 'Только работодатели' },
-  { value: 'metro',     label: '🚇 По метро',           desc: 'Пользователи конкретной станции' },
-  { value: 'webpush',   label: '📱 iPhone Web Push',    desc: 'Только подписчики PWA (Safari/iOS)' },
-  { value: 'telegram',           label: '✈️ Telegram — все',        desc: 'Все с привязанным Telegram, доставка ~100%' },
-  { value: 'telegram_workers',   label: '✈️ Telegram — работники',  desc: 'Только работники с Telegram' },
-  { value: 'telegram_employers', label: '✈️ Telegram — директора',  desc: 'Только директора с Telegram' },
+  { value: 'all',       label: 'Все пользователи',  desc: 'Работники + работодатели' },
+  { value: 'workers',   label: 'Работники',          desc: 'Только работники' },
+  { value: 'employers', label: 'Работодатели',       desc: 'Только работодатели' },
+  { value: 'metro',     label: 'По метро',           desc: 'Пользователи конкретной станции' },
+  { value: 'webpush',   label: 'Веб-пуш · iPhone',    desc: 'Только подписчики PWA (Safari/iOS)' },
+  { value: 'telegram',           label: 'Telegram — все',        desc: 'Все с привязанным Telegram, доставка ~100%' },
+  { value: 'telegram_workers',   label: 'Telegram — работники',  desc: 'Только работники с Telegram' },
+  { value: 'telegram_employers', label: 'Telegram — директора',  desc: 'Только директора с Telegram' },
 ]
 
 interface Trigger {
@@ -52,7 +55,7 @@ interface Trigger {
 const TRIGGERS: Trigger[] = [
   {
     id: 'inactive_workers',
-    label: '😴 Неактивные работники',
+    label: 'Неактивные работники',
     desc: 'Работники без активности 30+ дней — напомнить о себе',
     target: 'workers',
     title: '👋 Новые подработки рядом!',
@@ -60,7 +63,7 @@ const TRIGGERS: Trigger[] = [
   },
   {
     id: 'new_week',
-    label: '🎉 Новые пользователи недели',
+    label: 'Новые пользователи недели',
     desc: 'Приветственный пуш новым пользователям',
     target: 'all',
     title: '🎉 Добро пожаловать в JobToo!',
@@ -68,7 +71,7 @@ const TRIGGERS: Trigger[] = [
   },
   {
     id: 'reactivate_employers',
-    label: '📋 Реактивация работодателей',
+    label: 'Реактивация работодателей',
     desc: 'Работодатели без новых вакансий 14+ дней',
     target: 'employers',
     title: '🔔 Нужны сотрудники?',
@@ -76,7 +79,7 @@ const TRIGGERS: Trigger[] = [
   },
   {
     id: 'push_workers_match',
-    label: '💚 Мотивация для работников',
+    label: 'Мотивация для работников',
     desc: 'Работники с 0 совпадений — помочь активироваться',
     target: 'workers',
     title: '💡 Совет: повысьте шансы!',
@@ -84,7 +87,7 @@ const TRIGGERS: Trigger[] = [
   },
   {
     id: 'week_summary',
-    label: '📊 Еженедельный дайджест',
+    label: 'Еженедельный дайджест',
     desc: 'Сводка активности за неделю — всем пользователям',
     target: 'all',
     title: '📊 Итоги недели в JobToo',
@@ -147,19 +150,19 @@ export default function BroadcastPage() {
     try {
       if (target === 'webpush') {
         const { sent, failed } = await broadcastWebPush(title, body)
-        setSt('ok'); setResult(`✓ Web Push отправлено: ${sent}${failed > 0 ? `, ошибок: ${failed}` : ''}`)
+        setSt('ok'); setResult(`Веб-пуш отправлен: ${sent}${failed > 0 ? `, ошибок: ${failed}` : ''}`)
       } else if (target.startsWith('telegram')) {
         const role = target === 'telegram_workers' ? 'worker' : target === 'telegram_employers' ? 'employer' : 'all'
         const { sent, total } = await broadcastTelegram(title, body, role)
-        setSt('ok'); setResult(`✓ Telegram: доставлено ${sent} из ${total}`)
+        setSt('ok'); setResult(`Telegram: доставлено ${sent} из ${total}`)
       } else {
         const { pushCount, inappCount } = await broadcastBoth(target as 'all' | 'workers' | 'employers' | 'metro', title, body, metro || undefined)
         logActivity('Рассылка', `Цель: ${target}, push: ${pushCount}, inapp: ${inappCount}`)
-        setSt('ok'); setResult(`✓ Push: ${pushCount}, уведомлений в приложении: ${inappCount}`)
+        setSt('ok'); setResult(`Пуш: ${pushCount}, уведомлений в приложении: ${inappCount}`)
       }
       load()
     } catch (e: any) {
-      setSt('err'); setResult('✗ ' + e.message)
+      setSt('err'); setResult('Не отправилось: ' + e.message)
     }
     setTimeout(() => setSt('idle'), 5000)
   }
@@ -214,22 +217,17 @@ export default function BroadcastPage() {
       <label style={{ display: 'block', fontSize: 11.5, fontWeight: 500, color: 'var(--ink-2)', marginBottom: 5 }}>{label}</label>
       {area
         ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={3}
-            style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--bg-sunken)', color: 'var(--ink)', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+            className="jt-input" style={{ width: '100%' }} />
         : <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-            style={{ width: '100%', height: 36, padding: '0 12px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--bg-sunken)', color: 'var(--ink)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+            className="jt-input" style={{ width: '100%' }} />
       }
     </div>
   )
 
   const pushBadge = (hasPush: boolean) => (
-    <span style={{
-      display: 'inline-block', padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600,
-      background: hasPush ? 'rgba(46,125,84,.1)' : 'rgba(160,160,160,.1)',
-      color: hasPush ? 'var(--positive)' : 'var(--ink-4)',
-      border: `1px solid ${hasPush ? 'rgba(46,125,84,.2)' : 'var(--line)'}`,
-    }}>
-      {hasPush ? '📲 Push' : '🔔 In-app'}
-    </span>
+    <Chip tone={hasPush ? 'positive' : 'neutral'} style={{ fontSize: 11, padding: '1px 6px' }}>
+      {hasPush ? <><IconApp size={11} />Пуш</> : <><IconBell size={11} />Только в приложении</>}
+    </Chip>
   )
 
   return (
@@ -237,31 +235,27 @@ export default function BroadcastPage() {
       <PageHeader title="Рассылка" />
       <div className="page-content">
 
-        {/* KPI strip */}
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {[
-            { label: 'Всего пользователей', value: users.length, color: 'var(--ink)' },
-            { label: 'С push-токеном', value: withPush, color: 'var(--positive)', hint: 'Push + In-app' },
-            { label: 'Без push-токена', value: withoutPush, color: 'var(--info)', hint: 'Только In-app' },
-            { label: '📱 iPhone Web Push', value: webPushCount, color: 'var(--violet)', hint: 'PWA подписчики' },
-          ].map(k => (
-            <div key={k.label} style={{ flex: '1 1 140px', background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 16px', boxShadow: 'var(--shadow-sm)' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-3)', marginBottom: 4 }}>{k.label}</div>
-              {k.hint && <div style={{ fontSize: 10.5, color: 'var(--ink-4)', marginBottom: 4 }}>{k.hint}</div>}
-              <div style={{ fontSize: 26, fontWeight: 700, color: k.color, letterSpacing: '-0.03em' }}>{dataLoading ? '…' : k.value}</div>
-            </div>
-          ))}
+        <div className="g-4">
+          <KpiCard label="Всего пользователей" value={dataLoading ? null : users.length} sub="в базе" />
+          <KpiCard label="Пуши в приложении" value={dataLoading ? null : withPush}
+            sub={users.length ? `${Math.round(withPush / users.length * 100)}% базы` : 'Expo-токен'} />
+          <KpiCard label="Без пуш-токена" value={dataLoading ? null : withoutPush}
+            sub="увидят только внутри приложения" />
+          <KpiCard label="Веб-пуш · iPhone" value={dataLoading ? null : webPushCount}
+            sub="подписаны из Safari" />
         </div>
 
-        {/* Tabs */}
+        {/* Вкладки. Активная подчёркивалась чёрным — тем самым чёрно-белым,
+            от которого отказались; акцент здесь и означает «вы тут». */}
         <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--line)' }}>
-          {([['send', '✉️ Отправить'], ['history', '📋 История'], ['users', '👥 Пользователи']] as const).map(([t, label]) => (
+          {([['send', 'Отправить'], ['history', 'История'], ['users', 'Пользователи']] as const).map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)} style={{
               padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer',
-              fontSize: 13, fontWeight: tab === t ? 600 : 400,
-              color: tab === t ? 'var(--ink)' : 'var(--ink-3)',
-              borderBottom: tab === t ? '2px solid var(--ink)' : '2px solid transparent',
+              fontSize: 13, fontWeight: tab === t ? 550 : 400, fontFamily: 'inherit',
+              color: tab === t ? 'var(--accent)' : 'var(--ink-3)',
+              borderBottom: `2px solid ${tab === t ? 'var(--accent)' : 'transparent'}`,
               marginBottom: -1,
+              transition: 'color var(--fast) var(--ease)',
             }}>{label}</button>
           ))}
         </div>
@@ -273,7 +267,7 @@ export default function BroadcastPage() {
             {/* Quick templates */}
             <div style={{ flex: '1 1 280px', background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 10, padding: '18px 20px', boxShadow: 'var(--shadow-sm)' }}>
               <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-3)', marginBottom: 12 }}>
-                ⚡ Быстрые шаблоны
+                Быстрые шаблоны
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {TRIGGERS.map(t => {
@@ -286,7 +280,7 @@ export default function BroadcastPage() {
                     }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{t.label}</div>
-                        <div style={{ fontSize: 11.5, color: 'var(--ink-4)', marginTop: 2 }}>{t.desc}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{t.desc}</div>
                         <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>
                           → {TARGETS.find(x => x.value === t.target)?.label.replace(/[^\w\s]/g, '').trim()}
                         </div>
@@ -294,11 +288,11 @@ export default function BroadcastPage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
                         <button onClick={() => handleTrigger(t)} disabled={tst === 'loading'}
                           style={{ height: 28, padding: '0 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 500, background: tst === 'ok' ? 'var(--positive)' : tst === 'err' ? 'var(--negative)' : 'var(--ink)', color: '#fff', whiteSpace: 'nowrap' }}>
-                          {tst === 'loading' ? '…' : tst === 'ok' ? '✓' : tst === 'err' ? '✗' : '🚀 Отправить'}
+                          {tst === 'loading' ? '…' : tst === 'ok' ? 'Отправлено' : tst === 'err' ? 'Ошибка' : 'Отправить'}
                         </button>
                         <button onClick={() => applyTemplate(t)}
                           style={{ height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid var(--line)', cursor: 'pointer', fontSize: 11.5, background: 'var(--bg-elev)', color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>
-                          ✏️ Изменить
+                          Изменить
                         </button>
                       </div>
                     </div>
@@ -313,7 +307,7 @@ export default function BroadcastPage() {
               {/* Target */}
               <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 10, padding: '18px 20px', boxShadow: 'var(--shadow-sm)' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-3)', marginBottom: 8 }}>Кому отправить</div>
-                <div style={{ fontSize: 11.5, color: 'var(--ink-4)', marginBottom: 12 }}>
+                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 12 }}>
                   Push-токен есть → получат push + уведомление в приложении. Нет токена → только уведомление в приложении.
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -341,7 +335,7 @@ export default function BroadcastPage() {
 
                   {(title || body) && (
                     <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-sunken)', border: '1px solid var(--line)' }}>
-                      <div style={{ fontSize: 10.5, color: 'var(--ink-4)', marginBottom: 6 }}>Предпросмотр</div>
+                      <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginBottom: 6 }}>Предпросмотр</div>
                       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                         <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--ink)', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>J</div>
                         <div>
@@ -354,11 +348,11 @@ export default function BroadcastPage() {
 
                   <button onClick={handleBroadcast} disabled={!title.trim() || !body.trim() || st === 'loading'}
                     style={{ height: 40, borderRadius: 8, border: 'none', cursor: 'pointer', background: st === 'ok' ? 'var(--positive)' : st === 'err' ? 'var(--negative)' : 'var(--ink)', color: '#fff', fontSize: 13.5, fontWeight: 500, opacity: (!title.trim() || !body.trim()) ? 0.45 : 1, transition: 'background .15s, opacity .15s' }}>
-                    {st === 'loading' ? 'Отправка…' : '🚀 Отправить'}
+                    {st === 'loading' ? 'Отправка…' : 'Отправить'}
                   </button>
 
                   {result && (
-                    <div style={{ padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, background: result.startsWith('✓') ? 'rgba(46,125,84,.08)' : 'rgba(179,60,42,.08)', color: result.startsWith('✓') ? 'var(--positive)' : 'var(--negative)', border: `1px solid ${result.startsWith('✓') ? 'rgba(46,125,84,.2)' : 'rgba(179,60,42,.2)'}` }}>
+                    <div style={{ padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, background: st === 'ok' ? 'rgba(46,125,84,.08)' : 'rgba(179,60,42,.08)', color: st === 'ok' ? 'var(--positive)' : 'var(--negative)', border: `1px solid ${st === 'ok' ? 'rgba(46,125,84,.2)' : 'rgba(179,60,42,.2)'}` }}>
                       {result}
                     </div>
                   )}
@@ -369,7 +363,7 @@ export default function BroadcastPage() {
             {/* Send to specific user */}
             <div style={{ flex: '1 1 280px', background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 10, padding: '18px 20px', boxShadow: 'var(--shadow-sm)' }}>
               <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-3)', marginBottom: 14 }}>
-                👤 Конкретному пользователю
+                Конкретному пользователю
               </div>
 
               <div style={{ marginBottom: 12 }}>
@@ -391,7 +385,7 @@ export default function BroadcastPage() {
                     </div>
                     <button onClick={() => setSelectedUser(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: 16 }}>×</button>
                   </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--ink-4)', marginBottom: 12 }}>
+                  <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 12 }}>
                     {selectedUser.push_token ? 'Получит push-уведомление + запись в ленте.' : 'Получит только уведомление в приложении (нет push-токена).'}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -399,7 +393,7 @@ export default function BroadcastPage() {
                     {inp('Текст', userBody, setUserBody, 'Текст уведомления', true)}
                     <button onClick={handleSendToUser} disabled={!userTitle.trim() || !userBody.trim() || userSt === 'loading'}
                       style={{ height: 38, borderRadius: 8, border: 'none', cursor: 'pointer', background: userSt === 'ok' ? 'var(--positive)' : userSt === 'err' ? 'var(--negative)' : 'var(--ink)', color: '#fff', fontSize: 13, fontWeight: 500, opacity: !userTitle.trim() || !userBody.trim() ? 0.45 : 1 }}>
-                      {userSt === 'loading' ? '…' : userSt === 'ok' ? '✓ Отправлено' : '📨 Отправить'}
+                      {userSt === 'loading' ? '…' : userSt === 'ok' ? 'Отправлено' : 'Отправить'}
                     </button>
                   </div>
                 </div>
@@ -421,12 +415,12 @@ export default function BroadcastPage() {
                           </span>
                           {pushBadge(!!u.push_token)}
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{u.phone} · {u.role === 'worker' ? '👷' : '🏢'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{u.phone} · {u.role === 'worker' ? 'работник' : 'работодатель'}</div>
                       </div>
                     </button>
                   ))}
-                  {filteredUsers.length === 0 && <div style={{ fontSize: 13, color: 'var(--ink-4)', padding: 12 }}>Ничего не найдено</div>}
-                  {filteredUsers.length > 50 && <div style={{ fontSize: 11.5, color: 'var(--ink-4)', padding: '8px 12px' }}>Показано 50 из {filteredUsers.length} — уточните поиск</div>}
+                  {filteredUsers.length === 0 && <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: 12 }}>Ничего не найдено</div>}
+                  {filteredUsers.length > 50 && <div style={{ fontSize: 11.5, color: 'var(--ink-3)', padding: '8px 12px' }}>Показано 50 из {filteredUsers.length} — уточните поиск</div>}
                 </div>
               )}
             </div>
@@ -439,8 +433,8 @@ export default function BroadcastPage() {
             <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-3)', marginBottom: 14 }}>
               Последние 100 in-app уведомлений
             </div>
-            {dataLoading ? <div style={{ color: 'var(--ink-4)', fontSize: 13 }}>Загрузка…</div> : notifs.length === 0
-              ? <div style={{ color: 'var(--ink-4)', fontSize: 13 }}>Уведомлений ещё не было</div>
+            {dataLoading ? <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Загрузка…</div> : notifs.length === 0
+              ? <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Уведомлений ещё не было</div>
               : (
                 <div className="table-scroll">
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
@@ -456,16 +450,16 @@ export default function BroadcastPage() {
                         <tr key={n.id} style={{ borderBottom: '1px solid var(--line)' }}>
                           <td style={{ padding: '8px 10px', color: 'var(--ink-2)' }}>
                             {(n as any).jm_users?.first_name ?? ''} {(n as any).jm_users?.last_name ?? ''}<br />
-                            <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>{(n as any).jm_users?.phone ?? n.user_id}</span>
+                            <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{(n as any).jm_users?.phone ?? n.user_id}</span>
                           </td>
                           <td style={{ padding: '8px 10px', fontWeight: 500, color: 'var(--ink)' }}>{n.title}</td>
                           <td style={{ padding: '8px 10px', color: 'var(--ink-3)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.body}</td>
                           <td style={{ padding: '8px 10px' }}>
                             <span style={{ padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: n.is_read ? 'rgba(46,125,84,.1)' : 'rgba(59,91,181,.08)', color: n.is_read ? 'var(--positive)' : 'var(--info)' }}>
-                              {n.is_read ? '✓ Прочитано' : 'Не прочитано'}
+                              {n.is_read ? 'Прочитано' : 'Не прочитано'}
                             </span>
                           </td>
-                          <td style={{ padding: '8px 10px', color: 'var(--ink-4)', whiteSpace: 'nowrap', fontSize: 11.5 }}>
+                          <td style={{ padding: '8px 10px', color: 'var(--ink-3)', whiteSpace: 'nowrap', fontSize: 11.5 }}>
                             {new Date(n.created_at).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </td>
                         </tr>
@@ -504,24 +498,24 @@ export default function BroadcastPage() {
                     <tr key={u.id} style={{ borderBottom: '1px solid var(--line)' }}>
                       <td style={{ padding: '8px 10px' }}>
                         <div style={{ fontWeight: 500, color: 'var(--ink)' }}>
-                          {u.first_name || u.last_name ? `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() : <span style={{ color: 'var(--ink-4)' }}>—</span>}
+                          {u.first_name || u.last_name ? `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() : <span style={{ color: 'var(--ink-3)' }}>—</span>}
                         </div>
                       </td>
                       <td style={{ padding: '8px 10px', color: 'var(--ink-2)' }}>{u.phone}</td>
                       <td style={{ padding: '8px 10px' }}>
                         <span style={{ padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: u.role === 'worker' ? 'rgba(59,91,181,.08)' : 'rgba(95,75,182,.08)', color: u.role === 'worker' ? 'var(--info)' : 'var(--violet)' }}>
-                          {u.role === 'worker' ? '👷 Работник' : '🏢 Работодатель'}
+                          {u.role === 'worker' ? 'Работник' : 'Работодатель'}
                         </span>
                       </td>
                       <td style={{ padding: '8px 10px' }}>{pushBadge(!!u.push_token)}</td>
                       <td style={{ padding: '8px 10px', color: 'var(--ink-3)', fontSize: 12 }}>{u.metro_station ?? '—'}</td>
-                      <td style={{ padding: '8px 10px', color: 'var(--ink-4)', fontSize: 12 }}>
+                      <td style={{ padding: '8px 10px', color: 'var(--ink-3)', fontSize: 12 }}>
                         {new Date(u.created_at).toLocaleDateString('ru')}
                       </td>
                       <td style={{ padding: '8px 10px' }}>
                         <button onClick={() => { setSelectedUser(u); setSearch(''); setTab('send') }}
                           style={{ height: 26, padding: '0 10px', borderRadius: 5, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink-2)', fontSize: 11.5, cursor: 'pointer' }}>
-                          📨 Написать
+                          Написать
                         </button>
                       </td>
                     </tr>
