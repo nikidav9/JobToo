@@ -21,6 +21,7 @@ const NAV = [
   { href: '/support',     icon: IconTicket,   label: 'Поддержка' },
   { href: '/bot-inbox',   icon: IconChat,     label: 'Бот' },
   { href: '/broadcast',      icon: IconBell,     label: 'Рассылка' },
+  { href: '/api-keys',    icon: IconShield,   label: 'Ключи API' },
 ]
 
 export default function Sidebar() {
