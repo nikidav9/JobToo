@@ -161,7 +161,13 @@ TMP=/tmp/jt-status.$$
   # Хвост журнала забора: там время обработки каждого сообщения. Без него
   # «бот медленный» — это ощущение, а не число.
   echo "  \"забор_журнал\": \"$(tail -4 /var/log/jt-tgpoll.log 2>/dev/null | tr -d '"\\\r' | tr '\n' ' ' | cut -c1-300)\","
-  echo "  \"дашборд_пропуск\": \"$(grep -c '^EXPO_PUBLIC_APP_SECRET=.\+' /opt/jobtoo-secrets/env 2>/dev/null | tr -d '\n')\","
+  # Двумя числами, а не одним, и это не педантизм. Пропуск может лежать в
+  # файле переменных и при этом не быть внутри контейнера — ровно так и было:
+  # отчёт показывал «есть», а дашборд отвечал «не задан на сервере». Значение
+  # в файле и значение в работающем контейнере — разные вещи, и знать надо обе.
+  echo "  \"дашборд_пропуск\": \"файл=$(grep -c '^EXPO_PUBLIC_APP_SECRET=.\+' /opt/jobtoo-secrets/env 2>/dev/null | tr -d '\n') внутри=$(
+    cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose --profile dashboard exec -T dashboard \
+      printenv EXPO_PUBLIC_APP_SECRET 2>/dev/null | tr -d '\r\n' | wc -c | tr -d ' ')\","
   echo "  \"сайт\": \"файлов $(find /var/www/jobtoo -type f 2>/dev/null | wc -l), оболочка $([ -s /var/www/jobtoo/index.html ] && echo есть || echo нет), страница ключей $([ -s /var/www/private/token.txt ] && echo есть || echo нет)\","
   # Что будет, когда репозиторий закроют.
   #
