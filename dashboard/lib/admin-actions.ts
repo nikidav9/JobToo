@@ -54,50 +54,24 @@ export async function changeRole(
   return { closedVacancies }
 }
 
+/**
+ * Удалить пользователя из панели.
+ *
+ * Раньше здесь было полтора десятка запросов подряд, и они делали не то же
+ * самое, что кнопка в приложении: панель сносила чаты, сообщения, отзывы и
+ * вакансии целиком, а приложение — одну строку (точнее, не сносило ничего,
+ * см. миграцию 032). Две разные правды об одном действии.
+ *
+ * Теперь оба конца зовут одну функцию в базе: своё стирается, чужое
+ * обезличивается. Переписка у собеседника остаётся читаемой, рейтинг
+ * работодателя не рассыпается из-за чужого ухода, а имени и телефона
+ * не остаётся нигде.
+ */
 export async function deleteUser(userId: string, role: string, userName?: string) {
-  // 1. Find chats involving this user
-  const { data: chats } = await supabaseAdmin
-    .from('jm_chats')
-    .select('id')
-    .or(`worker_id.eq.${userId},employer_id.eq.${userId}`)
-  const chatIds = (chats ?? []).map((c: any) => c.id)
-
-  // 2. Delete messages in those chats
-  if (chatIds.length > 0) {
-    await supabaseAdmin.from('jm_messages').delete().in('chat_id', chatIds)
-  }
-
-  // 3. Delete chats
-  await supabaseAdmin.from('jm_chats').delete().or(`worker_id.eq.${userId},employer_id.eq.${userId}`)
-
-  if (role === 'worker') {
-    await supabaseAdmin.from('jm_likes').delete().eq('worker_id', userId)
-    await supabaseAdmin.from('jm_perm_applications').delete().eq('worker_id', userId)
-  } else {
-    // Get vacancy IDs to cascade
-    const [{ data: tempVacs }, { data: permVacs }] = await Promise.all([
-      supabaseAdmin.from('jm_vacancies').select('id').eq('employer_id', userId),
-      supabaseAdmin.from('jm_perm_vacancies').select('id').eq('employer_id', userId),
-    ])
-    const tempIds = (tempVacs ?? []).map((v: any) => v.id)
-    const permIds = (permVacs ?? []).map((v: any) => v.id)
-
-    if (tempIds.length > 0) await supabaseAdmin.from('jm_likes').delete().in('vacancy_id', tempIds)
-    if (permIds.length > 0) await supabaseAdmin.from('jm_perm_applications').delete().in('vacancy_id', permIds)
-
-    await supabaseAdmin.from('jm_vacancies').delete().eq('employer_id', userId)
-    await supabaseAdmin.from('jm_perm_vacancies').delete().eq('employer_id', userId)
-  }
-
-  // Delete shared data
-  await supabaseAdmin.from('jm_ratings').delete().or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
-  await supabaseAdmin.from('jm_notifications').delete().eq('user_id', userId)
-  await supabaseAdmin.from('jm_web_push_subscriptions').delete().eq('user_id', userId)
-
-  const { error } = await supabaseAdmin.from('jm_users').delete().eq('id', userId)
+  const { data, error } = await supabaseAdmin.rpc('jm_delete_account', { uid: userId })
   if (error) throw new Error(error.message)
-
   logActivity('Удалён пользователь', `ID: ${userId}, роль: ${role}`, userId, userName)
+  return data
 }
 
 export async function blockUser(userId: string, block: boolean, userName?: string) {

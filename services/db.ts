@@ -246,10 +246,30 @@ export async function dbUpsertUser(u: User): Promise<void> {
   if (error) throwOnError('dbUpsertUser', error);
 }
 
+/**
+ * Удалить свой аккаунт.
+ *
+ * Только через прокси и только с паролем. Прежняя версия ходила в базу
+ * напрямую анонимным ключом — а у него с миграции 013 нет прав на jm_users,
+ * так что запрос отклонялся. Ответ никто не читал, и человек видел
+ * «Аккаунт удалён», когда не удалялось ничего.
+ *
+ * Пароль здесь не формальность: в прокси приходит идентификатор, и без
+ * проверки по нему можно было бы стереть чужой аккаунт.
+ *
+ * Бросает с текстом причины — вызывающий обязан её показать, а не проглотить.
+ */
+export async function dbDeleteAccount(id: string, password: string): Promise<void> {
+  const res = await proxy<{ error?: string; 'удалён'?: boolean }>(
+    'dbDeleteAccount', [id, password],
+  );
+  if (res?.error) throw new Error(res.error);
+  if (!res?.['удалён']) throw new Error('Не удалось удалить аккаунт');
+}
+
+/** Удаление администратором из дашборда — там пароля человека нет. */
 export async function dbDeleteUser(id: string): Promise<void> {
-  if (IS_NATIVE) { await proxy('dbDeleteUser', [id]); return; }
-  const { error } = await supabase.from('jm_users').delete().eq('id', id);
-  if (error) console.error('dbDeleteUser', error.message);
+  await proxy('dbDeleteUser', [id]);
 }
 
 export function dbWarmup(): void {

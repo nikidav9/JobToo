@@ -1466,8 +1466,37 @@ try {
             try { sb_select('jm_users', ['limit' => '1'], 'id'); } catch (\Throwable $e) {}
             $data = true; break;
 
+        // Удаление аккаунта: своё стирает, чужое обезличивает.
+        //
+        // Раньше здесь было `delete from jm_users`, и приложение вызывало
+        // это напрямую анонимным ключом. С миграции 013 у anon отобраны все
+        // права на таблицу, так что запрос отклонялся — а код ответ не
+        // проверял и показывал «Аккаунт удалён». То есть кнопка не удаляла
+        // ничего вообще, при этом уверяя в обратном.
+        //
+        // Теперь работу делает jm_delete_account (миграция 032) под
+        // служебной ролью, а здесь проверяется главное: что человек удаляет
+        // себя. Без этой проверки по чужому идентификатору стёрся бы чужой
+        // аккаунт — функции всё равно, чей номер ей передали.
+        case 'dbDeleteAccount': {
+            $uid = (string)($args[0] ?? '');
+            $pass = (string)($args[1] ?? '');
+            if ($uid === '' || $pass === '') {
+                $data = ['error' => 'Нужны идентификатор и пароль']; break;
+            }
+            $u = sb_single('jm_users', ['id' => 'eq.' . $uid], 'id,password');
+            if (!$u) { $data = ['error' => 'Пользователь не найден']; break; }
+            $stored = (string)($u['password'] ?? '');
+            $ok = is_bcrypt($stored) ? password_verify($pass, $stored) : hash_equals($stored, $pass);
+            if (!$ok) { $data = ['error' => 'Неверный пароль']; break; }
+            $data = sb_rpc('jm_delete_account', ['uid' => $uid]);
+            break;
+        }
+
+        // Осталось для дашборда: там удаляет администратор, и пароля
+        // человека у него нет. Проверка прав — на входе в дашборд.
         case 'dbDeleteUser':
-            sb_delete('jm_users', ['id' => 'eq.' . $args[0]]); break;
+            $data = sb_rpc('jm_delete_account', ['uid' => (string)$args[0]]); break;
 
         case 'dbCheckPhoneExists':
             $data = sb_single('jm_users', ['phone' => 'eq.' . $args[0]], 'id') !== null; break;

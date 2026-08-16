@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Modal, KeyboardAvoidingView, Platform,
+  TouchableOpacity, Modal, KeyboardAvoidingView, Platform, TextInput,
   ActivityIndicator, FlatList, LayoutAnimation, UIManager, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +14,7 @@ import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { uploadAvatar } from '@/services/avatarUpload';
 import { getInitials, nameColorFromString } from '@/services/storage';
-import { dbGetRatingsForUser, dbChangePassword, UserRating } from '@/services/db';
+import { dbGetRatingsForUser, dbChangePassword, dbDeleteAccount, UserRating } from '@/services/db';
 import { getSupabaseClient } from '@/template';
 import { resetOnboarding } from '@/components/OnboardingOverlay';
 import { TabHeader } from '@/components/ui/TabHeader';
@@ -249,6 +249,8 @@ export default function ProfileScreen() {
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
   const [metroPicker, setMetroPicker] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -412,18 +414,30 @@ export default function ProfileScreen() {
     // Navigation is handled by <Redirect href="/" /> in (tabs)/_layout.tsx
   };
 
+  /**
+   * Удалить аккаунт.
+   *
+   * Прежняя версия звала базу напрямую анонимным ключом, а у него с
+   * миграции 013 нет прав на jm_users. Запрос отклонялся, ответ никто не
+   * читал, и человек видел «Аккаунт удалён», когда не удалялось ничего.
+   *
+   * Теперь через прокси, с паролем, и окно закрывается только после
+   * подтверждённого удаления — ошибка остаётся на экране, а не тонет
+   * в исчезнувшем диалоге.
+   */
   const handleDeleteAccount = async () => {
     if (!currentUser || deletingAccount) return;
-    setShowConfirmDelete(false);
+    if (!deletePassword.trim()) { setDeleteError('Введите пароль'); return; }
+    setDeleteError('');
     setDeletingAccount(true);
     try {
-      const sb = getSupabaseClient();
-      await sb.from('jm_users').delete().eq('id', currentUser.id);
+      await dbDeleteAccount(currentUser.id, deletePassword);
+      setShowConfirmDelete(false);
+      setDeletePassword('');
       await logout();
       showToast('Аккаунт удалён', 'success');
     } catch (e) {
-      console.warn('[Profile] deleteAccount failed', e);
-      showToast('Ошибка при удалении, попробуйте снова', 'error');
+      setDeleteError(e instanceof Error ? e.message : 'Не удалось удалить, попробуйте снова');
     } finally {
       setDeletingAccount(false);
     }
@@ -795,15 +809,41 @@ export default function ProfileScreen() {
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmCard}>
             <Text style={styles.confirmTitle}>Удалить аккаунт?</Text>
+            {/* Обещание сузилось до правды. Профиль, телефон, фотография и
+                переписка с ботом исчезают. А сообщения в чатах остаются у
+                собеседника — уже без имени, — иначе удаление одного забирало
+                бы историю у другого. Обещать полное стирание, оставляя
+                следы, было бы тем же враньём, что и раньше. */}
             <Text style={styles.confirmBody}>
-              Все ваши данные будут удалены безвозвратно. Восстановление невозможно.
+              Профиль, телефон и фотография будут удалены безвозвратно.
+              В чужих переписках и откликах ваши сообщения останутся, но уже
+              без вашего имени. Восстановить аккаунт будет нельзя.
             </Text>
+            <TextInput
+              style={styles.deleteInput}
+              value={deletePassword}
+              onChangeText={(t: string) => { setDeletePassword(t); setDeleteError(''); }}
+              placeholder="Пароль — чтобы это были точно вы"
+              placeholderTextColor={Colors.textMuted}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+            {deleteError ? <Text style={styles.deleteError}>{deleteError}</Text> : null}
             <View style={styles.confirmBtns}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowConfirmDelete(false)}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => { setShowConfirmDelete(false); setDeletePassword(''); setDeleteError(''); }}
+              >
                 <Text style={styles.cancelText}>Отмена</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.logoutConfirmBtn} onPress={handleDeleteAccount}>
-                <Text style={styles.logoutConfirmText}>Удалить</Text>
+              <TouchableOpacity
+                style={styles.logoutConfirmBtn}
+                onPress={handleDeleteAccount}
+                disabled={deletingAccount}
+              >
+                <Text style={styles.logoutConfirmText}>
+                  {deletingAccount ? 'Удаляю…' : 'Удалить'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1062,6 +1102,15 @@ const styles = StyleSheet.create({
   confirmCard: { backgroundColor: Colors.bg, borderRadius: Radius.xl, padding: rs(28), width: '100%', gap: rs(12) },
   confirmTitle: { fontSize: rf(18), fontWeight: '700', textAlign: 'center', color: Colors.textPrimary },
   confirmBody: { fontSize: rf(14), color: Colors.textSecondary, textAlign: 'center' },
+  deleteInput: {
+    width: '100%', height: rs(44), marginTop: rs(14), paddingHorizontal: rs(14),
+    borderWidth: 1, borderColor: Colors.inputBorder, borderRadius: rs(10),
+    backgroundColor: Colors.bg, color: Colors.textPrimary, fontSize: rf(15),
+  },
+  deleteError: {
+    marginTop: rs(8), fontSize: rf(13), color: Colors.red,
+    textAlign: 'center',
+  },
   confirmBtns: { flexDirection: 'row', gap: rs(12), marginTop: rs(8) },
   cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: rs(100), paddingVertical: rs(14), alignItems: 'center' },
   cancelText: { fontSize: rf(15), fontWeight: '600', color: Colors.textSecondary },
