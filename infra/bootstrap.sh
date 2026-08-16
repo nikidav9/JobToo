@@ -149,9 +149,47 @@ if [ -f "$REPO/infra/switch-webhook.sh" ] && [ ! -f /var/lib/jt-webhook-tg2.done
   bash "$REPO/infra/switch-webhook.sh" >/dev/null 2>&1 || true
 fi
 
-# Сторож прямого вебхука: сам вернёт его на Vercel, если Телеграм перестанет
-# доходить. Раз в пять минут — дольше молчащего бота терпеть не хочется.
-if [ -f "$REPO/infra/webhook-watch.sh" ]; then
+# Забор сообщений бота своими силами.
+#
+# Телеграм отказался ставить вебхук на имя без записи A — дословно
+# «IPv6-only addresses are not allowed», — а по IPv4 эта машина с ним не
+# разговаривает ни в одну сторону. Значит входящий путь нам недоступен в
+# принципе, и остаётся обратный: спрашивать самим. Подробности в скрипте.
+if [ -f "$REPO/infra/tg-poll.py" ]; then
+  install -m 755 "$REPO/infra/tg-poll.py" /usr/local/bin/jt-tg-poll
+  if [ ! -f /etc/systemd/system/jt-tgpoll.service ]; then
+    cat > /etc/systemd/system/jt-tgpoll.service <<'EOF'
+[Unit]
+Description=JobToo: забор сообщений телеграм-бота
+After=docker.service
+Wants=docker.service
+
+[Service]
+ExecStart=/usr/local/bin/jt-tg-poll
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/jt-tgpoll.log
+StandardError=append:/var/log/jt-tgpoll.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable --now jt-tgpoll.service >/dev/null 2>&1 || true
+    say "бот" "включён забор сообщений своими силами"
+  fi
+  systemctl is-active --quiet jt-tgpoll.service || systemctl start jt-tgpoll.service 2>/dev/null || true
+fi
+
+# Сторож — теперь запасной выход, а не основной путь.
+#
+# Пока забор жив, вебхука быть не должно вовсе: у Телеграма это
+# взаимоисключающие способы. Поэтому сторож просыпается только когда отметка
+# живости протухла на десять минут — тогда он вернёт вебхук на пересылку,
+# и бот заговорит, пусть и прежним кружным путём.
+BEAT=$(stat -c %Y /var/lib/jt-tg-beat 2>/dev/null || echo 0)
+if [ -f "$REPO/infra/webhook-watch.sh" ] \
+   && [ "$(( $(date +%s) - ${BEAT:-0} ))" -gt 600 ]; then
   if [ ! -f /var/lib/jt-webhook-check ] \
      || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-webhook-check 2>/dev/null || echo 0) )) -gt 300 ]; then
     bash "$REPO/infra/webhook-watch.sh" >/dev/null 2>&1 || true

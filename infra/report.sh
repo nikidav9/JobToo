@@ -152,6 +152,12 @@ TMP=/tmp/jt-status.$$
   # через файл переменных — то есть между ними два шага, и любой может
   # отвалиться молча.
   echo "  \"дашборд\": \"сборка $([ -s /opt/jobtoo-dashboard/server.js ] && echo есть || echo нет), отвечает $(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3002/ 2>/dev/null || echo нет)\","
+  # Забор сообщений бота: жива ли служба и когда в последний раз доходила
+  # до Телеграма. «Работает» тут ничего не значит — процесс может висеть,
+  # ничего не забирая, и снаружи это неотличимо от тишины в чатах.
+  echo "  \"забор_бота\": \"$(systemctl is-active jt-tgpoll.service 2>/dev/null) отметка=$(
+    b=$(stat -c %Y /var/lib/jt-tg-beat 2>/dev/null || echo 0)
+    [ "${b:-0}" -gt 0 ] && echo "$(( ($(date +%s) - b) ))с назад" || echo нет)\","
   echo "  \"дашборд_пропуск\": \"$(grep -c '^EXPO_PUBLIC_APP_SECRET=.\+' /opt/jobtoo-secrets/env 2>/dev/null | tr -d '\n')\","
   echo "  \"сайт\": \"файлов $(find /var/www/jobtoo -type f 2>/dev/null | wc -l), оболочка $([ -s /var/www/jobtoo/index.html ] && echo есть || echo нет), страница ключей $([ -s /var/www/private/token.txt ] && echo есть || echo нет)\","
   # Что будет, когда репозиторий закроют.
