@@ -64,8 +64,14 @@ TMP=/tmp/jt-status.$$
     first=0
     # Берём хвост строки, а не начало: причина обычно в конце сообщения,
     # а начало занято перечислением уже применённых миграций.
-    log=$(cd /opt/jobtoo/infra && timeout 15 docker compose logs --tail=6 --no-log-prefix "$svc" 2>&1 \
-          | tr -d '"\\\r' | tr '\n' ' ' | tail -c 600)
+    # У дашборда берём начало ошибки, а не хвост: в хвосте стек вызовов, а
+    # имя ненайденного модуля — в первой строке. Именно её и не хватало,
+    # чтобы понять, почему страница открывается, а скрипты к ней нет.
+    n=6; cut=600
+    [ "$svc" = "dashboard" ] && { n=40; cut=1400; }
+    log=$(cd /opt/jobtoo/infra && timeout 15 docker compose logs --tail=$n --no-log-prefix "$svc" 2>&1 \
+          | grep -aiE "error|cannot|missing|enoent|warn|Ready|Starting" | head -8 \
+          | tr -d '"\\\r' | tr '\n' ' ' | tail -c $cut)
     printf '    "%s": "%s"' "$svc" "$log"
   done
   echo
