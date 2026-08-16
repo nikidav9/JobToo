@@ -14,9 +14,9 @@ import { AXIS, GRID, LEGEND, TT } from '@/lib/chart'
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{
-      fontSize: 11.5, fontWeight: 600, textTransform: 'uppercase',
-      letterSpacing: '0.08em', color: 'var(--ink-3)', margin: '6px 0 -6px 2px',
+    <div className="mono" style={{
+      fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase',
+      letterSpacing: '.1em', color: 'var(--ink-3)', margin: '10px 0 -4px 2px',
     }}>{children}</div>
   )
 }
@@ -31,8 +31,11 @@ export default function SummaryPage() {
   if (loading || !d) return <Loader />
   const k = d.kpi
   const s = d.season
+  // Ноль изменений — не рост: чип в этом случае не показывается вовсе.
   const wkDelta = (cur: number, prev: number) =>
-    prev > 0 || cur > 0 ? `${cur - prev >= 0 ? '+' : ''}${cur - prev} к прошлой нед.` : undefined
+    cur === prev ? undefined : `${cur > prev ? '+' : '−'}${Math.abs(cur - prev)} к прошлой неделе`
+  const wkTone = (cur: number, prev: number): 'pos' | 'neg' | 'neutral' =>
+    cur === prev ? 'neutral' : cur > prev ? 'pos' : 'neg'
 
   return (
     <div>
@@ -48,7 +51,7 @@ export default function SummaryPage() {
             sub="смены + одобренные заявки · цель в неделю"
             sparkColor={PALETTE.orange}
             delta={wkDelta(s.matches7, s.matchesPrev7)}
-            deltaTone={s.matches7 >= s.matchesPrev7 ? 'pos' : 'neg'}
+            deltaTone={wkTone(s.matches7, s.matchesPrev7)}
           />
           <KpiCard
             label="Директоров публиковали"
@@ -56,10 +59,12 @@ export default function SummaryPage() {
             sub="за 7 дней · цель в неделю"
             sparkColor={PALETTE.purple}
             delta={wkDelta(s.pubs7, s.pubsPrev7)}
-            deltaTone={s.pubs7 >= s.pubsPrev7 ? 'pos' : 'neg'}
+            deltaTone={wkTone(s.pubs7, s.pubsPrev7)}
           />
-          <KpiCard label="Привязано Telegram" value={k.tgLinked} sub={`из них работников: ${k.tgLinkedWorkers}`} sparkColor={PALETTE.cyan} />
-          <KpiCard label="Новых работников · 7 дн" value={s.newWorkers7} sparkColor={PALETTE.green} />
+          <KpiCard label="Смены закрыты людьми" value={`${k.fillRatePct}%`}
+            sub="мест занято в закрытых сменах" sparkColor={PALETTE.cyan} />
+          <KpiCard label="Новых работников · 7 дней" value={s.newWorkers7}
+            sub={`всего работников: ${k.workers}`} sparkColor={PALETTE.green} />
         </div>
 
         <SectionTitle>Рост</SectionTitle>
@@ -72,15 +77,16 @@ export default function SummaryPage() {
             delta={k.userGrowthDelta ? `${k.userGrowthDelta.text} за месяц` : undefined}
             deltaTone={k.userGrowthDelta?.tone}
           />
-          <KpiCard label="Новых за 30 дней" value={k.newUsers30} sparkColor={PALETTE.amber} />
+          <KpiCard label="Новых за 30 дней" value={k.newUsers30}
+            sub={`${k.totalUsers ? Math.round(k.newUsers30 / k.totalUsers * 100) : 0}% базы`} sparkColor={PALETTE.amber} />
           <KpiCard label="MAU" value={k.mau} sub="совершили действие за 30 дней" sparkColor={PALETTE.blue} />
           <KpiCard label="WAU" value={k.wau} sub="совершили действие за 7 дней" sparkColor={PALETTE.cyan} />
         </div>
 
         <SectionTitle>Предложение и спрос · 30 дней</SectionTitle>
         <div className="g-4">
-          <KpiCard label="Смен опубликовано" value={k.shifts30} sparkColor={PALETTE.orange} />
-          <KpiCard label="Пост. вакансий" value={k.perm30} sparkColor={PALETTE.blue} />
+          <KpiCard label="Смен опубликовано" value={k.shifts30} sub="за 30 дней" sparkColor={PALETTE.orange} />
+          <KpiCard label="Постоянных вакансий" value={k.perm30} sub="за 30 дней" sparkColor={PALETTE.blue} />
           <KpiCard label="Активных директоров" value={k.activeDirectors30} sub="публиковали за 30 дней" sparkColor={PALETTE.purple} />
           <KpiCard label="Откликов за 30 дней" value={k.responses30} sub={`${k.totalResponses} за всё время`} sparkColor={PALETTE.pink} />
         </div>
@@ -88,7 +94,10 @@ export default function SummaryPage() {
         <SectionTitle>Здоровье маркетплейса</SectionTitle>
         <div className="g-4">
           <KpiCard label="Вакансий с откликом" value={`${k.supplyWithResponsePct}%`} sub="получили ≥1 отклик" sparkColor={PALETTE.green} />
-          <KpiCard label="Скорость отклика" value={k.medianResponseH ? `${k.medianResponseH} ч` : '—'} sub={`медиана · ${k.respWithin24hPct}% в первые сутки`} sparkColor={PALETTE.cyan} />
+          <KpiCard label="Скорость отклика"
+            value={k.medianResponseH === null ? null : `${k.medianResponseH} ч`}
+            sub={k.medianResponseH === null ? 'откликов ещё не было' : `медиана · ${k.respWithin24hPct}% в первые сутки`}
+            sparkColor={PALETTE.cyan} />
           <KpiCard label="Возврат работников" value={`${k.repeatWorkersPct}%`} sub="откликаются повторно" sparkColor={PALETTE.blue} />
           <KpiCard label="Возврат директоров" value={`${k.repeatDirectorsPct}%`} sub="публикуют повторно" sparkColor={PALETTE.purple} />
         </div>
@@ -97,8 +106,12 @@ export default function SummaryPage() {
         <div className="g-4">
           <KpiCard label="Мэтчей" value={k.matches} sub={`${k.completed} смен завершено`} sparkColor={PALETTE.purple} />
           <KpiCard label="Чатов" value={k.chats} sub={`ср. ${k.avgMsgsPerChat} сообщ./чат`} sparkColor={PALETTE.pink} />
-          <KpiCard label="Привязано Telegram" value={k.tgLinked} sub={`из них работников: ${k.tgLinkedWorkers}`} sparkColor={PALETTE.cyan} />
-          <KpiCard label="Охват уведомлениями" value={`${k.reachPct}%`} sub="пуш, Telegram или веб-пуш" sparkColor={PALETTE.green} />
+          <KpiCard label="Средняя оценка"
+            value={k.ratingsCount > 0 ? k.avgRating : null}
+            sub={k.ratingsCount > 0 ? `по ${k.ratingsCount} оценкам` : 'оценок пока нет'}
+            sparkColor={PALETTE.amber} />
+          <KpiCard label="Охват уведомлениями" value={`${k.reachPct}%`}
+            sub={`пуш, Telegram или веб-пуш · Telegram у ${k.tgLinked}`} sparkColor={PALETTE.green} />
         </div>
 
         <ChartCard title="Рост базы пользователей" sub="Накопительно · 90 дней">

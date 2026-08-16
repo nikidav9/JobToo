@@ -4,6 +4,9 @@ import { supabase } from '@/lib/supabase'
 import PageHeader from '@/components/PageHeader'
 import KpiCard from '@/components/KpiCard'
 import { downloadCSV } from '@/lib/csv-export'
+import FilterChips from '@/components/FilterChips'
+import Chip from '@/components/Chip'
+import { IconBan } from '@/components/icons'
 
 type Row = {
   id: string
@@ -87,7 +90,7 @@ const TONE: Record<Bucket, string> = {
   week: 'var(--ink-2)',
   month: 'var(--ink-3)',
   stale: 'var(--negative)',
-  never: 'var(--ink-4)',
+  never: 'var(--ink-3)',
 }
 
 export default function LastSeenPage() {
@@ -171,7 +174,7 @@ alter table jm_users add column if not exists last_seen_at timestamptz;
         </div>
       ) : null}
 
-      <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="page-content">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
           <KpiCard label="Сейчас в сети" value={counts.online} sub="за последние 3 минуты" color="var(--positive)" />
           <KpiCard label="Заходили за сутки" value={counts.online + counts.today} sub="включая тех, кто в сети" />
@@ -184,28 +187,17 @@ alter table jm_users add column if not exists last_seen_at timestamptz;
         {/* Два ряда, а не один с распоркой посередине. Прежде срезы, роль и
             поиск стояли в одной строке, и на узком экране распорка flex:1
             выталкивала поле поиска на соседние кнопки. */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', minWidth: 0 }}>
-          {BUCKETS.map(b => (
-            <button
-              key={b.key}
-              onClick={() => setBucket(b.key)}
-              style={{
-                padding: '6px 12px', borderRadius: 100, fontSize: 12.5, cursor: 'pointer',
-                border: '1px solid ' + (bucket === b.key ? 'var(--accent)' : 'var(--line)'),
-                background: bucket === b.key ? 'var(--accent)' : 'var(--bg-elev)',
-                color: bucket === b.key ? '#fff' : 'var(--ink-2)',
-              }}
-            >
-              {b.label} <span style={{ opacity: 0.7 }}>{counts[b.key]}</span>
-            </button>
-          ))}
-        </div>
+        <FilterChips
+          options={BUCKETS.map(b => ({ ...b, count: counts[b.key] }))}
+          value={bucket}
+          onChange={setBucket}
+        />
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', minWidth: 0 }}>
           <select
             value={role}
             onChange={e => setRole(e.target.value as any)}
-            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12.5 }}
+            style={{ height: 30, padding: '0 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 13 }}
           >
             <option value="all">Все роли</option>
             <option value="worker">Работники</option>
@@ -215,50 +207,50 @@ alter table jm_users add column if not exists last_seen_at timestamptz;
             value={q}
             onChange={e => setQ(e.target.value)}
             placeholder="Имя, телефон, метро…"
-            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12.5, minWidth: 190 }}
+            style={{ height: 30, padding: '0 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 13, minWidth: 200 }}
           />
           <button
             onClick={exportCsv}
-            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg-elev)', color: 'var(--ink-2)', fontSize: 12.5, cursor: 'pointer' }}
+            className="jt-icon-btn" style={{ width: 'auto', padding: '0 12px', height: 30 }}
           >
-            CSV
+            Скачать CSV
           </button>
         </div>
 
         {/* Таблица */}
         <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden', background: 'var(--bg-elev)' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <table className="jt-table">
               <thead>
-                <tr style={{ background: 'var(--bg-sunken)' }}>
+                <tr>
                   {['Пользователь', 'Роль', 'Метро', 'Последний вход', 'Когда', 'Регистрация'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontWeight: 600, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--ink-4)' }}>Загрузка…</td></tr>
+                  <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>Загрузка…</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--ink-4)' }}>Никого не нашлось</td></tr>
+                  <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>Никого не нашлось</td></tr>
                 ) : filtered.map(r => {
                   const b = bucketOf(r.last_seen_at, now)
                   const name = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.phone || '—'
                   return (
-                    <tr key={r.id} style={{ borderTop: '1px solid var(--line)' }}>
-                      <td style={{ padding: '10px 12px' }}>
-                        <div style={{ color: 'var(--ink)', fontWeight: 500 }}>
+                    <tr key={r.id}>
+                      <td>
+                        <div style={{ color: 'var(--ink)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
                           {name}
-                          {r.is_blocked ? <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--negative)' }}>заблокирован</span> : null}
+                          {r.is_blocked ? <Chip tone="negative"><IconBan size={11} />Заблокирован</Chip> : null}
                         </div>
-                        <div style={{ color: 'var(--ink-4)', fontSize: 11.5 }}>{r.phone ?? ''}{r.company ? ` · ${r.company}` : ''}</div>
+                        <div className="num" style={{ color: 'var(--ink-3)', fontSize: 12 }}>{r.phone ?? ''}{r.company ? ` · ${r.company}` : ''}</div>
                       </td>
-                      <td style={{ padding: '10px 12px', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
+                      <td style={{ color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>
                         {r.role === 'worker' ? 'Работник' : 'Работодатель'}
                       </td>
-                      <td style={{ padding: '10px 12px', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{r.metro_station ?? '—'}</td>
-                      <td style={{ padding: '10px 12px', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{fullDate(r.last_seen_at)}</td>
-                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: TONE[b], fontWeight: b === 'online' ? 600 : 400 }}>
+                      <td style={{ color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>{r.metro_station ?? '—'}</td>
+                      <td className="num" style={{ color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{fullDate(r.last_seen_at)}</td>
+                      <td style={{ whiteSpace: 'nowrap', color: TONE[b], fontWeight: b === 'online' ? 600 : 400 }}>
                         {b === 'online' ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--positive)' }} />
@@ -266,7 +258,7 @@ alter table jm_users add column if not exists last_seen_at timestamptz;
                           </span>
                         ) : ago(r.last_seen_at, now)}
                       </td>
-                      <td style={{ padding: '10px 12px', color: 'var(--ink-4)', whiteSpace: 'nowrap' }}>{fullDate(r.created_at)}</td>
+                      <td className="num" style={{ color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{fullDate(r.created_at)}</td>
                     </tr>
                   )
                 })}

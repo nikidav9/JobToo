@@ -1317,8 +1317,8 @@ export async function fetchExecutiveSummary() {
     supabase.from('jm_users').select('id,role,created_at,push_token,telegram_id'),
     supabase.from('jm_vacancies').select('id,employer_id,status,created_at,workers_needed,workers_found'),
     supabase.from('jm_perm_vacancies').select('id,employer_id,status,created_at'),
-    supabase.from('jm_likes').select('id,vacancy_id,worker_id,worker_liked,is_match,shift_completed,created_at'),
-    supabase.from('jm_perm_applications').select('id,vacancy_id,worker_id,status,created_at'),
+    supabase.from('jm_likes').select('id,vacancy_id,worker_id,worker_liked,is_match,matched_at,shift_completed,created_at'),
+    supabase.from('jm_perm_applications').select('id,vacancy_id,worker_id,status,created_at,updated_at'),
     supabase.from('jm_chats').select('id,created_at'),
     supabase.from('jm_messages').select('id,chat_id,sender_id,created_at'),
     supabase.from('jm_ratings').select('id,rating'),
@@ -1399,7 +1399,9 @@ export async function fetchExecutiveSummary() {
   const respHours = Object.keys(firstResp).map(id =>
     (new Date(firstResp[id]).getTime() - new Date(vacCreated[id]).getTime()) / 3600e3
   ).filter(h => h >= 0)
-  const medianResponseH = Math.round(median(respHours) * 10) / 10
+  // null, а не 0: «никто ещё не откликался» и «откликаются мгновенно» —
+  // разные вещи, а показывались бы одинаково.
+  const medianResponseH = respHours.length > 0 ? Math.round(median(respHours) * 10) / 10 : null
   const respWithin24hPct = respHours.length > 0
     ? Math.round((respHours.filter(h => h <= 24).length / respHours.length) * 100) : 0
 
@@ -1459,12 +1461,18 @@ export async function fetchExecutiveSummary() {
   const d14 = new Date(now - 14 * 864e5).toISOString()
   const inRange = (iso: string | undefined, from: string, to?: string) =>
     !!iso && iso > from && (!to || iso <= to)
+  // Мэтч датируется моментом совпадения, а не моментом лайка. Раньше здесь
+  // стоял created_at: лайк, поставленный три недели назад и совпавший вчера,
+  // в недельный счёт не попадал. Это главная цифра сезона — её сравнивают с
+  // целью 15 в неделю, и занижала она именно её.
+  const matchAt = (x: any) => x.matched_at ?? x.created_at
+  const appAt = (x: any) => x.updated_at ?? x.created_at
   const matches7 =
-    lk.filter(x => x.is_match && inRange(x.created_at, d7)).length +
-    ap.filter(x => x.status === 'approved' && inRange(x.created_at, d7)).length
+    lk.filter(x => x.is_match && inRange(matchAt(x), d7)).length +
+    ap.filter((x: any) => x.status === 'approved' && inRange(appAt(x), d7)).length
   const matchesPrev7 =
-    lk.filter(x => x.is_match && inRange(x.created_at, d14, d7)).length +
-    ap.filter(x => x.status === 'approved' && inRange(x.created_at, d14, d7)).length
+    lk.filter(x => x.is_match && inRange(matchAt(x), d14, d7)).length +
+    ap.filter((x: any) => x.status === 'approved' && inRange(appAt(x), d14, d7)).length
   const pubs7 = new Set([
     ...(t as any[]).filter(x => inRange(x.created_at, d7)).map(x => x.employer_id),
     ...(p as any[]).filter(x => inRange(x.created_at, d7)).map(x => x.employer_id),
