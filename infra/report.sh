@@ -144,7 +144,15 @@ TMP=/tmp/jt-status.$$
   echo "  \"сертификаты\": \"$(ls /etc/letsencrypt/live 2>/dev/null | grep -v README | tr '\n' ' ')\","
   # Дашборд: приехала ли сборка и отвечает ли она. Пока записи в DNS нет,
   # обе строки пустые — это и значит «готово, но не включено».
+  #
+  # И отдельно — есть ли у него пропуск приложения. Без него ответы в
+  # поддержку, рассылки и сброс пароля отваливаются с «EXPO_PUBLIC_APP_SECRET
+  # не задан на сервере», причём видно это только тому, кто в этот момент
+  # нажал кнопку. Значение живёт в app_secrets.php, а контейнеру достаётся
+  # через файл переменных — то есть между ними два шага, и любой может
+  # отвалиться молча.
   echo "  \"дашборд\": \"сборка $([ -s /opt/jobtoo-dashboard/server.js ] && echo есть || echo нет), отвечает $(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3002/ 2>/dev/null || echo нет)\","
+  echo "  \"дашборд_пропуск\": \"$(grep -c '^EXPO_PUBLIC_APP_SECRET=.\+' /opt/jobtoo-secrets/env 2>/dev/null | tr -d '\n')\","
   echo "  \"сайт\": \"файлов $(find /var/www/jobtoo -type f 2>/dev/null | wc -l), оболочка $([ -s /var/www/jobtoo/index.html ] && echo есть || echo нет), страница ключей $([ -s /var/www/private/token.txt ] && echo есть || echo нет)\","
   # Что будет, когда репозиторий закроют.
   #
