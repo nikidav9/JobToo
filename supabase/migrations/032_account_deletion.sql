@@ -68,6 +68,17 @@ begin
     delete from jm_support_messages       where user_id   = uid;
     delete from jm_support_threads        where user_id   = uid;
 
+    -- Запись о согласии уходит вместе с человеком: согласие отозвано, и
+    -- хранить его дальше не на что.
+    --
+    -- Через to_regclass, потому что таблицу заводит следующая миграция, 033.
+    -- Тело функции проверяется не при создании, а при вызове, так что прямая
+    -- ссылка прошла бы молча — и сломалась бы ровно в тот момент, когда 033
+    -- почему-либо не докатилась, а человек нажал «удалить».
+    if to_regclass('public.jm_consents') is not null then
+        execute 'delete from jm_consents where user_id = $1' using uid;
+    end if;
+
     -- Свободные слоты — предложение выйти на смену, которого больше нет.
     -- Имя работника скопировано прямо в строку, так что стираем целиком.
     delete from jm_worker_slots           where worker_id = uid;

@@ -267,6 +267,38 @@ export async function dbDeleteAccount(id: string, password: string): Promise<voi
   if (!res?.['удалён']) throw new Error('Не удалось удалить аккаунт');
 }
 
+/**
+ * Записать, с какими редакциями документов человек согласился.
+ *
+ * Отпечаток берётся из сборки приложения, а не с сервера: человек принимал
+ * то, что видел на своём экране. Если у него старая версия приложения со
+ * старым текстом — запишется старая редакция, и это правда, а не досадная
+ * неточность.
+ *
+ * Не бросает: регистрация уже прошла, и валить её из-за неудачной записи
+ * нельзя — человек останется без аккаунта на ровном месте. Неудача попадёт
+ * в журнал, а спросить согласие заново мы всё равно умеем.
+ */
+export async function dbRecordConsent(
+  userId: string,
+  stamp: string,
+  docs: Record<string, string>,
+  source: 'registration' | 'reconsent' = 'registration',
+): Promise<void> {
+  try {
+    await proxy('dbRecordConsent', [userId, stamp, docs, source]);
+  } catch (e) {
+    console.warn('[consent] не записалось', e);
+  }
+}
+
+/** Последнее принятое: что показать в профиле и спрашивать ли заново. */
+export async function dbGetConsent(userId: string): Promise<{
+  stamp: string; docs: Record<string, string>; source: string; accepted_at: string;
+} | null> {
+  return proxy('dbGetConsent', [userId]);
+}
+
 /** Удаление администратором из дашборда — там пароля человека нет. */
 export async function dbDeleteUser(id: string): Promise<void> {
   await proxy('dbDeleteUser', [id]);

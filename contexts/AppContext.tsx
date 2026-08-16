@@ -47,7 +47,9 @@ import {
   dbTelegramAuth,
   dbBindTelegram,
   dbAutoClosePastVacancies,
+  dbRecordConsent,
 } from '@/services/db';
+import { LEGAL_STAMP, legalVersions } from '@/constants/legal';
 import { registerForPushNotifications, releasePushTokenIfSignedOut } from '@/services/notifications';
 import { isTelegramMiniApp, getTelegramInitData } from '@/lib/telegram';
 
@@ -583,6 +585,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const registerUser = async (u: User) => {
     await dbUpsertUser(u);
+    // Галочка на экране регистрации была переменной в памяти, и дальше
+    // кнопки «Продолжить» о ней не знал никто. Теперь принятое остаётся
+    // в базе — здесь, а не в двух экранах регистрации по отдельности:
+    // забыть одно из двух мест куда проще, чем это одно.
+    void dbRecordConsent(u.id, LEGAL_STAMP, legalVersions(), 'registration');
     _setCurrentUser(u);
     await saveSessionUser(u);
     // Inside the Telegram Mini App: link this Telegram account for auto-login

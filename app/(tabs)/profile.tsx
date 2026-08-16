@@ -14,7 +14,8 @@ import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { uploadAvatar } from '@/services/avatarUpload';
 import { getInitials, nameColorFromString } from '@/services/storage';
-import { dbGetRatingsForUser, dbChangePassword, dbDeleteAccount, UserRating } from '@/services/db';
+import { dbGetRatingsForUser, dbChangePassword, dbDeleteAccount, dbGetConsent, UserRating } from '@/services/db';
+import { LEGAL_DOCS, formatLegalDate } from '@/constants/legal';
 import { getSupabaseClient } from '@/template';
 import { resetOnboarding } from '@/components/OnboardingOverlay';
 import { TabHeader } from '@/components/ui/TabHeader';
@@ -251,6 +252,30 @@ export default function ProfileScreen() {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
+
+  // Что человек принял и когда. Показываем прямо в профиле: запись о
+  // согласии нужна не только нам для доказательства — человеку тоже
+  // полезно видеть, под чем он подписался и какой редакцией.
+  const [consent, setConsent] = useState<{
+    stamp: string; docs: Record<string, string>; accepted_at: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let alive = true;
+    dbGetConsent(currentUser.id)
+      .then(c => { if (alive) setConsent(c); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [currentUser?.id]);
+
+  const consentLine = !consent
+    ? 'Соглашения и обучение'
+    : consent.stamp === ''
+    // Так у тех, кто регистрировался до 25 июня 2026: экрана с документами
+    // тогда не было, и записывать им согласие задним числом мы не стали.
+    ? 'Согласие ещё не давали'
+    : `Приняты ${formatLegalDate(consent.accepted_at.slice(0, 10))}`;
   const [metroPicker, setMetroPicker] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -588,14 +613,14 @@ export default function ProfileScreen() {
           iconName="document-text"
           iconBg="#6B7280"
           title="Документы"
-          summary="Соглашения и обучение"
+          summary={consentLine}
           open={openSection === 'docs'}
           onToggle={() => toggleSection('docs')}
         >
           {[
-            { label: 'Пользовательское соглашение', doc: 'terms' },
-            { label: 'Политика конфиденциальности', doc: 'privacy' },
-            { label: 'Согласие на обработку данных', doc: 'consent' },
+            { label: 'Пользовательское соглашение', doc: 'terms' as const },
+            { label: 'Политика конфиденциальности', doc: 'privacy' as const },
+            { label: 'Согласие на обработку данных', doc: 'consent' as const },
           ].map((item) => (
             <TouchableOpacity
               key={item.doc}
@@ -603,7 +628,15 @@ export default function ProfileScreen() {
               onPress={() => router.push({ pathname: '/legal', params: { doc: item.doc } })}
               activeOpacity={0.7}
             >
-              <Text style={[sS.actionLabel, { flex: 1 }]}>{item.label}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={sS.actionLabel}>{item.label}</Text>
+                {/* Редакция у каждого документа своя: человек должен видеть,
+                    ту ли версию он принимал, а не верить на слово. */}
+                <Text style={sS.docVersion}>
+                  Редакция от {formatLegalDate(LEGAL_DOCS[item.doc].version)}
+                  {consent?.docs?.[item.doc] === LEGAL_DOCS[item.doc].version ? ' · принята' : ''}
+                </Text>
+              </View>
               <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
             </TouchableOpacity>
           ))}
@@ -1052,6 +1085,7 @@ const sS = StyleSheet.create({
     paddingVertical: rs(13), borderTopWidth: 1, borderTopColor: Colors.divider,
   },
   actionLabel: { fontSize: rf(14), color: Colors.textPrimary, fontWeight: '500' },
+  docVersion: { fontSize: rf(11.5), color: Colors.textMuted, marginTop: rs(2) },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: rs(10), borderTopWidth: 1, borderTopColor: Colors.divider },
   label: { fontSize: rf(13), color: Colors.textMuted },
   value: { fontSize: rf(14), fontWeight: '500', color: Colors.textPrimary },
