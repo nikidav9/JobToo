@@ -24,12 +24,21 @@ const DAY = 86_400_000
 
 type Bucket = 'all' | 'online' | 'today' | 'week' | 'month' | 'stale' | 'never'
 
+// Подписи — диапазонами, а не «сегодня» и «за неделю».
+//
+// Срезы не пересекаются: человек попадает ровно в один. А подписи читались
+// накопительно — и «Сегодня» показывало число, из которого вычтены те, кто в
+// сети прямо сейчас. Рядом карточка сверху показывала за то же «сегодня»
+// другое число, потому что складывала два среза. Одно слово, два разных
+// числа на одном экране — отсюда и ощущение, что считает неверно.
+//
+// Считало верно. Врали подписи.
 const BUCKETS: { key: Bucket; label: string }[] = [
   { key: 'all', label: 'Все' },
   { key: 'online', label: 'Сейчас в сети' },
-  { key: 'today', label: 'Сегодня' },
-  { key: 'week', label: 'За неделю' },
-  { key: 'month', label: 'За месяц' },
+  { key: 'today', label: 'До суток назад' },
+  { key: 'week', label: '1–7 дней назад' },
+  { key: 'month', label: '7–30 дней назад' },
   { key: 'stale', label: 'Больше 30 дней' },
   { key: 'never', label: 'Ни разу' },
 ]
@@ -164,15 +173,18 @@ alter table jm_users add column if not exists last_seen_at timestamptz;
 
       <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
-          <KpiCard label="Сейчас в сети" value={counts.online} color="var(--positive)" />
-          <KpiCard label="Заходили сегодня" value={counts.online + counts.today} />
-          <KpiCard label="За неделю" value={counts.online + counts.today + counts.week} />
-          <KpiCard label="Не заходили 30+ дней" value={counts.stale} color="var(--negative)" />
-          <KpiCard label="Ни разу не заходили" value={counts.never} sub="с момента регистрации" />
+          <KpiCard label="Сейчас в сети" value={counts.online} sub="за последние 3 минуты" color="var(--positive)" />
+          <KpiCard label="Заходили за сутки" value={counts.online + counts.today} sub="включая тех, кто в сети" />
+          <KpiCard label="Заходили за неделю" value={counts.online + counts.today + counts.week} sub="включая сутки" />
+          <KpiCard label="Не заходили 30+ дней" value={counts.stale} sub="но хоть раз заходили" color="var(--negative)" />
+          <KpiCard label="Ни разу не заходили" value={counts.never} sub="с момента регистрации" color="var(--ink-3)" />
         </div>
 
         {/* Фильтры */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+        {/* Два ряда, а не один с распоркой посередине. Прежде срезы, роль и
+            поиск стояли в одной строке, и на узком экране распорка flex:1
+            выталкивала поле поиска на соседние кнопки. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', minWidth: 0 }}>
           {BUCKETS.map(b => (
             <button
               key={b.key}
@@ -187,7 +199,9 @@ alter table jm_users add column if not exists last_seen_at timestamptz;
               {b.label} <span style={{ opacity: 0.7 }}>{counts[b.key]}</span>
             </button>
           ))}
-          <div style={{ flex: 1 }} />
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', minWidth: 0 }}>
           <select
             value={role}
             onChange={e => setRole(e.target.value as any)}
