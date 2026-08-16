@@ -178,6 +178,14 @@ EOF
     systemctl enable --now jt-tgpoll.service >/dev/null 2>&1 || true
     say "бот" "включён забор сообщений своими силами"
   fi
+  # Перезапуск при смене самого скрипта: служба держит соединение сутками и
+  # сама новую версию не подхватит. Без этого правка здесь выглядела бы
+  # применённой, а работал бы прежний код.
+  if ! cmp -s "$REPO/infra/tg-poll.py" /var/lib/jt-tg-poll.deployed 2>/dev/null; then
+    cp -f "$REPO/infra/tg-poll.py" /var/lib/jt-tg-poll.deployed
+    systemctl restart jt-tgpoll.service 2>/dev/null || true
+    say "бот" "забор перезапущен на новой версии"
+  fi
   systemctl is-active --quiet jt-tgpoll.service || systemctl start jt-tgpoll.service 2>/dev/null || true
 fi
 

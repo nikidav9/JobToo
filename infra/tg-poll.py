@@ -62,6 +62,17 @@ def api(token: str, method: str, params: dict, timeout: int) -> dict:
         cmd += ["-d", f"{k}={v}"]
     try:
         out = subprocess.run(cmd, capture_output=True, timeout=timeout + 20)
+        r = json.loads(out.stdout.decode("utf-8", "replace") or "null") or {}
+        if r:
+            return r
+    except Exception:
+        pass
+    # Запасной заход без указания стека. IPv6 в замерах даёт то 4 из 4, то
+    # 3 из 4, и на четвёртом цикл засыпал бы впустую — а это и есть те самые
+    # секунды, которые человек ждёт ответа.
+    try:
+        out = subprocess.run([c for c in cmd if c != "-6"], capture_output=True,
+                             timeout=timeout + 20)
         return json.loads(out.stdout.decode("utf-8", "replace") or "null") or {}
     except Exception:
         return {}
@@ -127,7 +138,14 @@ def main() -> int:
             continue
 
         for upd in r.get("result", []):
+            # Со временем обработки. Жалоба «бот отвечает через двадцать
+            # секунд» без замера неотличима от «связь медленная», а это
+            # разные починки: одно лечится здесь, другое — в обработчике.
+            t0 = time.time()
             deliver(upd, app_secret)
+            dt = time.time() - t0
+            kind = "сообщение" if "message" in upd else "кнопка" if "callback_query" in upd else "прочее"
+            print(f"{time.strftime('%H:%M:%S')} {kind} обработано за {dt:.1f}с", flush=True)
             offset = max(offset, int(upd.get("update_id", 0)) + 1)
             try:
                 open(OFFSET_FILE, "w").write(str(offset))

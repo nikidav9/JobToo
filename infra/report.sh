@@ -158,6 +158,9 @@ TMP=/tmp/jt-status.$$
   echo "  \"забор_бота\": \"$(systemctl is-active jt-tgpoll.service 2>/dev/null) отметка=$(
     b=$(stat -c %Y /var/lib/jt-tg-beat 2>/dev/null || echo 0)
     [ "${b:-0}" -gt 0 ] && echo "$(( ($(date +%s) - b) ))с назад" || echo нет)\","
+  # Хвост журнала забора: там время обработки каждого сообщения. Без него
+  # «бот медленный» — это ощущение, а не число.
+  echo "  \"забор_журнал\": \"$(tail -4 /var/log/jt-tgpoll.log 2>/dev/null | tr -d '"\\\r' | tr '\n' ' ' | cut -c1-300)\","
   echo "  \"дашборд_пропуск\": \"$(grep -c '^EXPO_PUBLIC_APP_SECRET=.\+' /opt/jobtoo-secrets/env 2>/dev/null | tr -d '\n')\","
   echo "  \"сайт\": \"файлов $(find /var/www/jobtoo -type f 2>/dev/null | wc -l), оболочка $([ -s /var/www/jobtoo/index.html ] && echo есть || echo нет), страница ключей $([ -s /var/www/private/token.txt ] && echo есть || echo нет)\","
   # Что будет, когда репозиторий закроют.
