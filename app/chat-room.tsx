@@ -21,7 +21,7 @@ import { ReadTicks, isSeenByOther } from '@/components/ReadTicks';
 import { useApp } from '@/hooks/useApp';
 import { Message, Chat } from '@/constants/types';
 import { nameColorFromString, getInitials, formatDate, uid, nowISO } from '@/services/storage';
-import { dbGetMessages, dbInsertMessage, dbMarkRead, dbIncrementUnread, dbGetLikeByVacancyWorker, dbUpsertLike, dbCheckAndCreateMatch, dbGetLikes, dbGetChatById, dbGetUserById, dbSetPermApplicationStatus, dbUploadFile } from '@/services/db';
+import { dbGetMessages, dbInsertMessage, dbMarkRead, dbIncrementUnread, dbGetLikeByVacancyWorker, dbUpsertLike, dbCheckAndCreateMatch, dbGetLikes, dbGetChatById, dbGetUserById, dbSetPermApplicationStatus, dbUploadChatMedia } from '@/services/db';
 import { notifyWorkerGotMatch, notifyWorkerNewMessage, notifyEmployerNewMessage,
   notifyWorkerPermApplicationApproved, notifyWorkerPermApplicationRejected,
   setActiveChat } from '@/services/notifications';
@@ -31,6 +31,7 @@ import { getChatSuggestions } from '@/constants/chatSuggestions';
 import { isOnline, lastSeenLabel } from '@/services/presence';
 import { IMG_PREFIX, VOICE_PREFIX, isImageMessage, imageUrlOf,
   isVoiceMessage, voiceOf } from '@/services/messagePreview';
+import { useSignedMedia } from '@/hooks/useSignedMedia';
 import { WebVoiceRecording, webVoiceSupported, type VoiceClip } from '@/services/webVoice';
 
 import { rs, rf } from '@/constants/scale';
@@ -45,6 +46,21 @@ const POLL_INTERVAL = 8000;
 const BAR_PAD_BOTTOM = Math.max(initialWindowMetrics?.insets.bottom ?? 0, 16);
 
 /** Пузырь голосового: кнопка воспроизведения, дорожка и длительность. */
+/**
+ * Фотография из переписки.
+ *
+ * Ссылку получаем перед показом: файлы чатов лежат в закрытом бакете, и
+ * прямого адреса у них нет. Пока подпись не пришла — пустой прямоугольник
+ * того же размера, чтобы список не дёргался, когда картинка появится.
+ */
+function ChatImage({ path }: { path: string }) {
+  const uri = useSignedMedia(path);
+  if (!uri) return <View style={[styles.msgImage, { backgroundColor: Colors.divider }]} />;
+  return (
+    <Image source={{ uri }} style={styles.msgImage} contentFit="cover" transition={150} />
+  );
+}
+
 function VoiceBubble({ url, sec, isMe }: { url: string; sec: number; isMe: boolean }) {
   const player = useAudioPlayer({ uri: url });
   const [playing, setPlaying] = useState(false);
@@ -605,13 +621,17 @@ export default function ChatRoom() {
         { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
       );
       const bytes = await uriToBytes(processed.uri);
+      // Имя без косых внутри: закрытый бакет принимает только chat/<файл>.
       const fileName = `chat/${chat.id}_${Date.now()}.jpg`;
-      // Через прокси, а не ключом из сборки: см. dbUploadFile в services/db.ts.
+      // Через прокси, а не ключом из сборки: см. dbUploadChatMedia в services/db.ts.
       // Не залилось — бросает, и сообщение не уходит: иначе собеседник получит
       // ссылку в никуда, и оба будут думать, что фото отправлено.
-      const publicUrl = await dbUploadFile(fileName, bytes, 'image/jpeg');
+      // В закрытый бакет, и в сообщение кладём путь, а не ссылку: ссылка
+      // теперь временная и выдаётся перед показом. Раньше сюда попадал
+      // вечный публичный адрес, открытый кому угодно.
+      const path = await dbUploadChatMedia(fileName, bytes, 'image/jpeg');
 
-      const msg = await dbInsertMessage(chat.id, currentUser.id, IMG_PREFIX + publicUrl);
+      const msg = await dbInsertMessage(chat.id, currentUser.id, IMG_PREFIX + path);
       setMessages(prev => {
         const next = [...prev, msg];
         msgCache.set(chat.id, next);
@@ -728,16 +748,16 @@ export default function ChatRoom() {
     setUploadingVoice(true);
     try {
       const fileName = `chat/voice_${chat.id}_${Date.now()}.${clip.ext}`;
-      // Через прокси, а не ключом из сборки: см. dbUploadFile в services/db.ts.
+      // Через прокси, а не ключом из сборки: см. dbUploadChatMedia в services/db.ts.
       //
       // Раньше при неудаче здесь стоял console.warn и отправка шла дальше.
       // Ссылку на несуществующий файл собеседник увидит обычным голосовым —
       // нажмёт, а там тишина, и ни он, ни отправитель не поймут, что запись
       // не дошла. Теперь неудача бросает, и сообщение не уходит.
-      const publicUrl = await dbUploadFile(fileName, clip.bytes, clip.contentType);
+      const path = await dbUploadChatMedia(fileName, clip.bytes, clip.contentType);
 
       const msg = await dbInsertMessage(
-        chat.id, currentUser.id, `${VOICE_PREFIX}${publicUrl}|${seconds}`,
+        chat.id, currentUser.id, `${VOICE_PREFIX}${path}|${seconds}`,
       );
       setMessages(prev => {
         const next = [...prev, msg];
@@ -915,12 +935,7 @@ export default function ChatRoom() {
           {isVoiceMessage(item.text) ? (
             <VoiceBubble {...voiceOf(item.text)} isMe={isMe} />
           ) : isImageMessage(item.text) ? (
-            <Image
-              source={{ uri: imageUrlOf(item.text) }}
-              style={styles.msgImage}
-              contentFit="cover"
-              transition={150}
-            />
+            <ChatImage path={imageUrlOf(item.text)} />
           ) : (
             <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>{item.text}</Text>
           )}

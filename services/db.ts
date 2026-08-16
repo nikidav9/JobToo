@@ -268,6 +268,39 @@ export async function dbDeleteAccount(id: string, password: string): Promise<voi
 }
 
 /**
+ * Загрузить фото или голосовое из переписки.
+ *
+ * Возвращает путь, а не ссылку: файл лежит в закрытом бакете, и ссылку на
+ * него надо просить отдельно, перед самым показом. Раньше эти файлы шли в
+ * публичный бакет `avatars`, откуда ссылка открывалась кем угодно, без
+ * авторизации и навсегда.
+ */
+export async function dbUploadChatMedia(
+  fileName: string, bytes: Uint8Array, contentType: string,
+): Promise<string> {
+  const res = await proxy<{ path?: string; error?: string }>(
+    'dbUploadChatMedia', [fileName, bytesToBase64(bytes), contentType],
+  );
+  if (res?.error || !res?.path) throw new Error(res?.error ?? 'Не удалось загрузить файл');
+  return res.path;
+}
+
+/**
+ * Ссылка на файл переписки — подписанная, на час.
+ *
+ * Принимает и путь, и старую публичную ссылку целиком: в сообщениях,
+ * отправленных до перехода на закрытый бакет, лежит именно она.
+ */
+export async function dbSignMedia(pathOrUrl: string): Promise<string | null> {
+  try {
+    const res = await proxy<{ url?: string }>('dbSignMedia', [pathOrUrl]);
+    return res?.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Записать, с какими редакциями документов человек согласился.
  *
  * Отпечаток берётся из сборки приложения, а не с сервера: человек принимал

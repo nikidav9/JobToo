@@ -1493,6 +1493,161 @@ try {
             break;
         }
 
+        // ── Медиа переписки ─────────────────────────────────────────────
+        //
+        // Фото и голосовые из чатов уходят в закрытый бакет chat-media
+        // (миграция 034), а не в публичный avatars, где они лежали раньше:
+        // оттуда ссылка открывалась кем угодно, без авторизации и навсегда.
+        //
+        // Возвращаем путь, а не ссылку. Ссылку приложение просит отдельно,
+        // перед показом, и живёт она недолго — см. dbSignMedia ниже.
+        case 'dbUploadChatMedia': {
+            $name = (string)($args[0] ?? '');
+            $b64  = (string)($args[1] ?? '');
+            $type = (string)($args[2] ?? 'application/octet-stream');
+            if (!preg_match('#^chat/[A-Za-z0-9._-]{1,180}$#', $name) || str_contains($name, '..')) {
+                $data = ['error' => 'плохое имя файла']; break;
+            }
+            $bytes = base64_decode($b64, true);
+            if ($bytes === false || $bytes === '') { $data = ['error' => 'пустой файл']; break; }
+            if (strlen($bytes) > 25 * 1024 * 1024) { $data = ['error' => 'файл больше 25 МБ']; break; }
+
+            $ch = curl_init(SB_URL . '/storage/v1/object/chat-media/' . $name);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CUSTOMREQUEST => 'POST',
+                CURLOPT_POSTFIELDS => $bytes,
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_HTTPHEADER => [
+                    'apikey: ' . SB_KEY,
+                    'Authorization: Bearer ' . SB_KEY,
+                    'Content-Type: ' . $type,
+                    'x-upsert: true',
+                ],
+            ]);
+            $resp = curl_exec($ch);
+            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err  = curl_error($ch);
+            curl_close($ch);
+            if ($code < 200 || $code >= 300) {
+                $data = ['error' => $err ?: ('хранилище ответило ' . $code . ': ' . substr((string)$resp, 0, 200))];
+                break;
+            }
+            $data = ['path' => $name];
+            break;
+        }
+
+        // Подписанная ссылка на файл переписки: живёт час и после этого
+        // перестаёт работать. Утёкшая ссылка протухает сама — в этом вся
+        // разница с публичным бакетом, где она не протухала никогда.
+        //
+        // Принимаем и путь, и старую публичную ссылку целиком: в сообщениях,
+        // отправленных до этой правки, лежит именно она, и переписывать их
+        // задним числом не нужно.
+        case 'dbSignMedia': {
+            $raw = (string)($args[0] ?? '');
+            if ($raw === '') { $data = ['error' => 'нужен путь']; break; }
+
+            // Из старой ссылки достаём путь после имени бакета.
+            $path = $raw;
+            if (str_starts_with($raw, 'http')) {
+                if (preg_match('#/avatars/(chat/[^?\s]+)#', $raw, $m)) {
+                    $path = $m[1];
+                } else {
+                    // Не наш адрес и не наш бакет — отдаём как есть, пусть
+                    // показывает. Ломать старые сообщения хуже, чем оставить
+                    // ссылку прежней.
+                    $data = ['url' => $raw]; break;
+                }
+            }
+            if (!preg_match('#^chat/[A-Za-z0-9._-]{1,180}$#', $path) || str_contains($path, '..')) {
+                $data = ['error' => 'плохой путь']; break;
+            }
+
+            $ch = curl_init(SB_URL . '/storage/v1/object/sign/chat-media/' . $path);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode(['expiresIn' => 3600]),
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_HTTPHEADER => [
+                    'apikey: ' . SB_KEY,
+                    'Authorization: Bearer ' . SB_KEY,
+                    'Content-Type: application/json',
+                ],
+            ]);
+            $resp = curl_exec($ch);
+            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            $dec = json_decode($resp ?: 'null', true);
+
+            if ($code >= 200 && $code < 300 && !empty($dec['signedURL'])) {
+                $data = ['url' => SB_URL . '/storage/v1' . $dec['signedURL']];
+                break;
+            }
+            // Файла в закрытом бакете нет — значит он ещё лежит в публичном,
+            // с тех времён. Возвращаем прежнюю ссылку: старые сообщения
+            // должны показываться, пока файлы не переехали.
+            $data = ['url' => SB_URL . '/storage/v1/object/public/avatars/' . $path];
+            break;
+        }
+
+        // Перевозка уже загруженных файлов переписки из публичного бакета
+        // в закрытый. Пачками, потому что запрос не должен упираться в
+        // время ожидания: сколько там файлов, заранее никто не знает.
+        //
+        // Порядок важен: сначала копия, только потом удаление оригинала.
+        // Если оборвётся посередине — часть файлов окажется в обоих
+        // бакетах, и это безобидно: dbSignMedia отдаст подписанную ссылку
+        // на закрытый, а не найдёт — вернёт прежнюю публичную. Ни одно
+        // сообщение не сломается ни в какой момент перевозки.
+        case 'dbMigrateChatMedia': {
+            $moved = 0; $failed = 0;
+            $ch = curl_init(SB_URL . '/storage/v1/object/list/avatars');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_HTTPHEADER => ['apikey: ' . SB_KEY, 'Authorization: Bearer ' . SB_KEY,
+                                       'Content-Type: application/json'],
+                CURLOPT_POSTFIELDS => json_encode(['prefix' => 'chat', 'limit' => 100]),
+            ]);
+            $list = json_decode((string)curl_exec($ch), true);
+            curl_close($ch);
+            if (!is_array($list)) { $data = ['error' => 'не удалось прочитать список']; break; }
+
+            foreach ($list as $obj) {
+                $name = (string)($obj['name'] ?? '');
+                if ($name === '' || !preg_match('#^[A-Za-z0-9._-]{1,180}$#', $name)) continue;
+                $src = 'chat/' . $name;
+
+                $c = curl_init(SB_URL . '/storage/v1/object/copy');
+                curl_setopt_array($c, [
+                    CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_TIMEOUT => 30,
+                    CURLOPT_HTTPHEADER => ['apikey: ' . SB_KEY, 'Authorization: Bearer ' . SB_KEY,
+                                           'Content-Type: application/json'],
+                    CURLOPT_POSTFIELDS => json_encode([
+                        'bucketId' => 'avatars', 'sourceKey' => $src,
+                        'destinationBucket' => 'chat-media', 'destinationKey' => $src,
+                    ]),
+                ]);
+                curl_exec($c);
+                $code = (int) curl_getinfo($c, CURLINFO_HTTP_CODE);
+                curl_close($c);
+                if ($code < 200 || $code >= 300) { $failed++; continue; }
+
+                $d = curl_init(SB_URL . '/storage/v1/object/avatars/' . $src);
+                curl_setopt_array($d, [
+                    CURLOPT_RETURNTRANSFER => true, CURLOPT_CUSTOMREQUEST => 'DELETE',
+                    CURLOPT_TIMEOUT => 20,
+                    CURLOPT_HTTPHEADER => ['apikey: ' . SB_KEY, 'Authorization: Bearer ' . SB_KEY],
+                ]);
+                curl_exec($d); curl_close($d);
+                $moved++;
+            }
+            $data = ['перевезено' => $moved, 'не вышло' => $failed, 'ещё_есть' => count($list) >= 100];
+            break;
+        }
+
         // ── Согласие с документами ──────────────────────────────────────
         //
         // Пишем отпечаток принятого набора редакций. Раньше галочка при
