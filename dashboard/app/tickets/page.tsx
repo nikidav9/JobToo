@@ -5,6 +5,11 @@ import { useRealtime } from '@/lib/useRealtime'
 import PageHeader from '@/components/PageHeader'
 import { blockUser, setComplaintStatus, addComplaintNote } from '@/lib/admin-actions'
 import { sendPushToUser } from '@/lib/admin-actions'
+import KpiCard from '@/components/KpiCard'
+import Button from '@/components/Button'
+import Chip, { type Tone } from '@/components/Chip'
+import FilterChips from '@/components/FilterChips'
+import { IconUser, IconBan, IconCheck, IconX, IconApp, IconChevron } from '@/components/icons'
 
 async function fetchTickets() {
   const [{ data: complaints }, { data: users }] = await Promise.all([
@@ -48,11 +53,14 @@ const STATUS_LABEL: Record<string, string> = {
   resolved: 'Решена',
   dismissed: 'Отклонена',
 }
-const STATUS_COLOR: Record<string, string> = {
-  pending: '#A87020',
-  in_review: '#3B5BB5',
-  resolved: '#2E7D54',
-  dismissed: '#8B94A1',
+/** Тон вместо своего hex у каждого статуса: раньше здесь стояли цвета
+ *  прошлой палитры, и подложка складывалась из того же значения с суффиксом
+ *  прозрачности — «#A87020» плюс «18». К токенам такое не приводится. */
+const STATUS_TONE: Record<string, Tone> = {
+  pending: 'accent',
+  in_review: 'info',
+  resolved: 'positive',
+  dismissed: 'neutral',
 }
 
 type ActionSt = 'idle' | 'loading' | 'ok' | 'err'
@@ -82,11 +90,14 @@ export default function TicketsPage() {
     return true
   })
 
-  const pending = d.list.filter((c: any) => c.status === 'pending').length
-  const inReview = d.list.filter((c: any) => c.status === 'in_review').length
-  const resolved = d.list.filter((c: any) => c.status === 'resolved').length
+  const byStatus = (st: string) => d.list.filter((c: any) => c.status === st).length
+  const pending = byStatus('pending')
+  const inReview = byStatus('in_review')
+  const resolved = byStatus('resolved')
+  const dismissed = byStatus('dismissed')
 
   const types = Array.from(new Set(d.list.map((c: any) => c.type))) as string[]
+  const typeCount = (t: string) => d.list.filter((c: any) => c.type === t).length
 
   async function handleBlock(c: any) {
     if (!c.targetId) return
@@ -122,7 +133,7 @@ export default function TicketsPage() {
     if (!c.targetId) return
     setA(c.id + '_push', 'loading')
     try {
-      await sendPushToUser(c.targetId, '⚠️ Жалоба', 'Ваш аккаунт рассматривается администрацией. Пожалуйста, соблюдайте правила сервиса.')
+      await sendPushToUser(c.targetId, 'Жалоба на ваш аккаунт', 'Ваш аккаунт рассматривается администрацией. Пожалуйста, соблюдайте правила сервиса.')
       setA(c.id + '_push', 'ok', 'Пуш отправлен')
     } catch (e: any) { setA(c.id + '_push', 'err', e.message) }
   }
@@ -132,96 +143,75 @@ export default function TicketsPage() {
       <PageHeader title="Тикеты / Жалобы" intervalSec={30} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
       <div className="page-content">
 
-        {/* KPI strip */}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {[
-            { label: 'Всего', value: d.list.length, color: 'var(--ink)' },
-            { label: 'Новых', value: pending, color: '#A87020' },
-            { label: 'В работе', value: inReview, color: '#3B5BB5' },
-            { label: 'Решено', value: resolved, color: '#2E7D54' },
-          ].map(s => (
-            <div key={s.label} style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 16px', boxShadow: 'var(--shadow-sm)', minWidth: 100 }}>
-              <div style={{ fontSize: 22, fontWeight: 600, color: s.color, lineHeight: 1 }}>{s.value}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3 }}>{s.label}</div>
-            </div>
-          ))}
+        {/* «Всего» раньше не сходилось с суммой соседей: отклонённые не
+            показывались вовсе, и четыре числа в ряду не складывались в
+            первое. */}
+        <div className="g-5">
+          <KpiCard label="Всего" value={d.list.length} sub="за всё время" />
+          <KpiCard label="Новых" value={pending} sub="ещё не смотрели" />
+          <KpiCard label="В работе" value={inReview} sub="разбираемся" />
+          <KpiCard label="Решено" value={resolved}
+            sub={d.list.length ? `${Math.round(resolved / d.list.length * 100)}% всех` : '—'} />
+          <KpiCard label="Отклонено" value={dismissed} sub="без последствий" />
         </div>
 
         {/* Filters */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 500 }}>Статус:</div>
-          {['all', 'pending', 'in_review', 'resolved', 'dismissed'].map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)} style={{
-              padding: '4px 12px', borderRadius: 20, border: '1px solid var(--line)', cursor: 'pointer', fontSize: 12, fontWeight: 500,
-              background: statusFilter === s ? 'var(--ink)' : 'var(--bg-sunken)',
-              color: statusFilter === s ? '#fff' : 'var(--ink-2)',
-            }}>
-              {s === 'all' ? 'Все' : STATUS_LABEL[s]}
-            </button>
-          ))}
-          {types.length > 0 && (
-            <>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 500, marginLeft: 8 }}>Тип:</div>
-              {['all', ...types].map(t => (
-                <button key={t} onClick={() => setTypeFilter(t)} style={{
-                  padding: '4px 12px', borderRadius: 20, border: '1px solid var(--line)', cursor: 'pointer', fontSize: 12, fontWeight: 500,
-                  background: typeFilter === t ? 'var(--ink)' : 'var(--bg-sunken)',
-                  color: typeFilter === t ? '#fff' : 'var(--ink-2)',
-                }}>
-                  {t === 'all' ? 'Все' : t}
-                </button>
-              ))}
-            </>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <FilterChips
+            options={[
+              { key: 'all', label: 'Любой статус', count: d.list.length },
+              ...['pending', 'in_review', 'resolved', 'dismissed'].map(st => ({
+                key: st, label: STATUS_LABEL[st], count: byStatus(st),
+              })),
+            ]}
+            value={statusFilter}
+            onChange={setStatusFilter}
+          />
+          {types.length > 1 && (
+            <FilterChips
+              options={[
+                { key: 'all', label: 'Любой тип', count: d.list.length },
+                ...types.map(t => ({ key: t, label: t, count: typeCount(t) })),
+              ]}
+              value={typeFilter}
+              onChange={setTypeFilter}
+            />
           )}
         </div>
 
         {/* Ticket list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {list.length === 0 && (
-            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-              Тикеты не найдены
+            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+              {d.list.length === 0 ? 'Жалоб не поступало' : 'Под выбранные фильтры ничего не подошло'}
             </div>
           )}
           {list.map((c: any) => {
             const expanded = expandedId === c.id
-            const statusColor = STATUS_COLOR[c.status] ?? '#5E6875'
+            const tone = STATUS_TONE[c.status] ?? 'neutral'
             const aBlock = actions[c.id + '_block']
             const aSt = actions[c.id + '_st']
             const aNote = actions[c.id + '_note']
             const aPush = actions[c.id + '_push']
 
             return (
-              <div key={c.id} style={{
-                background: 'var(--bg-elev)', border: `1px solid ${c.status === 'pending' ? 'rgba(168,112,32,.35)' : 'var(--line)'}`,
-                borderRadius: 10, overflow: 'hidden', boxShadow: 'var(--shadow-sm)',
+              <div key={c.id} className="jt-card" style={{
+                overflow: 'hidden',
+                borderColor: c.status === 'pending' ? 'var(--accent-line)' : 'var(--line)',
               }}>
                 {/* Card header */}
                 <div
                   style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12 }}
                   onClick={() => setExpandedId(expanded ? null : c.id)}
                 >
-                  {/* Status indicator */}
-                  <div style={{
-                    width: 8, height: 8, borderRadius: '50%', background: statusColor,
-                    flexShrink: 0, marginTop: 5,
-                    boxShadow: c.status === 'pending' ? `0 0 0 3px ${statusColor}25` : 'none',
-                  }} />
-
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {/* Top row */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-                      <span style={{
-                        fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em',
-                        padding: '1px 7px', borderRadius: 4,
-                        background: statusColor + '18', color: statusColor,
-                        border: '1px solid ' + statusColor + '30',
-                      }}>
+                      <Chip tone={tone} dot={c.status === 'pending'}>
                         {STATUS_LABEL[c.status] ?? c.status}
-                      </span>
-                      <span style={{ fontSize: 11.5, color: 'var(--ink-4)', background: 'var(--bg-sunken)', padding: '1px 7px', borderRadius: 4 }}>
-                        {c.type}
-                      </span>
-                      <span style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'Geist Mono, monospace', marginLeft: 'auto' }}>
+                      </Chip>
+                      <Chip tone="neutral">{c.type}</Chip>
+                      <span className="num" style={{ fontSize: 12, color: 'var(--ink-3)', marginLeft: 'auto' }}>
                         {c.date} {c.time}
                       </span>
                     </div>
@@ -232,28 +222,26 @@ export default function TicketsPage() {
                     </div>
 
                     {/* Parties */}
-                    <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--ink-3)', flexWrap: 'wrap' }}>
-                      <span>
-                        👤 От: <strong style={{ color: 'var(--ink)' }}>{c.reporterName}</strong>
-                        <span style={{ fontFamily: 'Geist Mono, monospace', marginLeft: 4 }}>{c.reporterPhone}</span>
+                    <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--ink-3)', flexWrap: 'wrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        <IconUser size={12} />От:&nbsp;<strong style={{ color: 'var(--ink)' }}>{c.reporterName}</strong>
+                        <span className="num">{c.reporterPhone}</span>
                       </span>
-                      <span>
-                        🎯 На: <strong style={{ color: c.targetBlocked ? 'var(--negative)' : 'var(--ink)' }}>{c.targetName}</strong>
-                        <span style={{ fontFamily: 'Geist Mono, monospace', marginLeft: 4 }}>{c.targetPhone}</span>
-                        {c.targetBlocked && <span style={{ marginLeft: 4, fontSize: 10.5, color: 'var(--negative)', fontWeight: 600 }}>БЛОК</span>}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        <IconUser size={12} />На:&nbsp;<strong style={{ color: c.targetBlocked ? 'var(--negative)' : 'var(--ink)' }}>{c.targetName}</strong>
+                        <span className="num">{c.targetPhone}</span>
+                        {c.targetBlocked && <Chip tone="negative"><IconBan size={11} />Заблокирован</Chip>}
                       </span>
                     </div>
 
                     {c.adminNote && (
-                      <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: 'rgba(59,91,181,.06)', border: '1px solid rgba(59,91,181,.15)', fontSize: 12, color: '#3B5BB5' }}>
-                        📝 {c.adminNote}
+                      <div style={{ marginTop: 8, padding: '7px 10px', borderRadius: 'var(--radius-sm)', background: 'var(--info-soft)', border: '1px solid var(--info-line)', fontSize: 13, color: 'var(--info)' }}>
+                        Заметка: {c.adminNote}
                       </div>
                     )}
                   </div>
 
-                  <span style={{ fontSize: 11, color: 'var(--ink-4)', flexShrink: 0, marginTop: 2 }}>
-                    {expanded ? '▲' : '▼'}
-                  </span>
+                  <IconChevron size={14} open={expanded} style={{ color: 'var(--ink-3)', marginTop: 2 }} />
                 </div>
 
                 {/* Expanded actions */}
@@ -262,42 +250,40 @@ export default function TicketsPage() {
 
                     {/* Status actions */}
                     <div>
-                      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-3)', marginBottom: 8 }}>Изменить статус</div>
+                      <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', marginBottom: 8, fontFamily: 'Geist Mono, monospace' }}>Изменить статус</div>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {(['pending', 'in_review', 'resolved', 'dismissed'] as const).filter(s => s !== c.status).map(s => (
-                          <button key={s} onClick={() => handleStatus(c, s)} disabled={aSt?.s === 'loading'}
-                            style={{
-                              padding: '5px 12px', borderRadius: 7, border: '1px solid ' + (STATUS_COLOR[s] + '40'), cursor: 'pointer',
-                              background: STATUS_COLOR[s] + '10', color: STATUS_COLOR[s], fontSize: 12, fontWeight: 500,
-                            }}>
+                          <Button key={s} onClick={() => handleStatus(c, s)} disabled={aSt?.s === 'loading'}
+                            style={{ height: 30 }}>
                             {aSt?.s === 'loading' ? '…' : STATUS_LABEL[s]}
-                          </button>
+                          </Button>
                         ))}
-                        {aSt?.s === 'ok' && <span style={{ fontSize: 12, color: 'var(--positive)', fontWeight: 500 }}>✓ {aSt.msg}</span>}
+                        {aSt?.s === 'ok' && <span style={{ fontSize: 13, color: 'var(--positive)', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconCheck size={13} />{aSt.msg}</span>}
+                        {aSt?.s === 'err' && <span style={{ fontSize: 13, color: 'var(--negative)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconX size={13} />{aSt.msg}</span>}
                       </div>
                     </div>
 
                     {/* Target actions */}
                     {c.targetId && (
                       <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-3)', marginBottom: 8 }}>Действия с обвиняемым</div>
+                        <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', marginBottom: 8, fontFamily: 'Geist Mono, monospace' }}>Действия с обвиняемым</div>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                           {aBlock?.s === 'ok'
-                            ? <span style={{ fontSize: 12, color: 'var(--positive)', fontWeight: 500 }}>✓ {aBlock.msg}</span>
-                            : <button onClick={() => handleBlock(c)} disabled={aBlock?.s === 'loading'}
-                                style={{ padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500,
-                                  background: c.targetBlocked ? 'rgba(46,125,84,.1)' : 'rgba(179,60,42,.1)',
-                                  color: c.targetBlocked ? 'var(--positive)' : 'var(--negative)' }}>
+                            ? <span style={{ fontSize: 13, color: 'var(--positive)', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconCheck size={13} />{aBlock.msg}</span>
+                            : aBlock?.s === 'err'
+                            ? <span style={{ fontSize: 13, color: 'var(--negative)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconX size={13} />{aBlock.msg}</span>
+                            : <Button variant={c.targetBlocked ? 'secondary' : 'danger'} style={{ height: 30 }}
+                                onClick={() => handleBlock(c)} disabled={aBlock?.s === 'loading'}>
                                 {aBlock?.s === 'loading' ? '…' : c.targetBlocked ? 'Разблокировать' : 'Заблокировать'}
-                              </button>}
+                              </Button>}
 
                           {c.targetHasPush && (
                             aPush?.s === 'ok'
-                              ? <span style={{ fontSize: 12, color: 'var(--positive)', fontWeight: 500 }}>✓ Пуш отправлен</span>
-                              : <button onClick={() => handlePushTarget(c)} disabled={aPush?.s === 'loading'}
-                                  style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid var(--line)', cursor: 'pointer', fontSize: 12, fontWeight: 500, background: 'var(--bg-elev)', color: 'var(--ink-2)' }}>
-                                  {aPush?.s === 'loading' ? '…' : '📲 Предупредить пушем'}
-                                </button>
+                              ? <span style={{ fontSize: 13, color: 'var(--positive)', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconCheck size={13} />Пуш отправлен</span>
+                              : <Button style={{ height: 30 }} icon={<IconApp size={13} />}
+                                  onClick={() => handlePushTarget(c)} disabled={aPush?.s === 'loading'}>
+                                  {aPush?.s === 'loading' ? '…' : 'Предупредить пушем'}
+                                </Button>
                           )}
                         </div>
                       </div>
@@ -305,18 +291,18 @@ export default function TicketsPage() {
 
                     {/* Admin note */}
                     <div>
-                      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-3)', marginBottom: 8 }}>Заметка администратора</div>
+                      <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', marginBottom: 8, fontFamily: 'Geist Mono, monospace' }}>Заметка администратора</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <input
                           placeholder="Добавить заметку к тикету..."
                           value={noteText[c.id] ?? c.adminNote ?? ''}
                           onChange={e => setNoteText(prev => ({ ...prev, [c.id]: e.target.value }))}
-                          style={{ flex: 1, height: 32, padding: '0 10px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--bg-elev)', color: 'var(--ink)', fontSize: 12.5, outline: 'none' }}
+                          className="jt-input" style={{ flex: 1, height: 32 }}
                         />
-                        <button onClick={() => handleNote(c)} disabled={!noteText[c.id]?.trim() || aNote?.s === 'loading'}
-                          style={{ padding: '0 12px', height: 32, borderRadius: 6, border: 'none', background: 'var(--ink)', color: '#fff', fontSize: 12.5, fontWeight: 500, cursor: 'pointer' }}>
-                          {aNote?.s === 'loading' ? '…' : aNote?.s === 'ok' ? '✓' : 'Сохранить'}
-                        </button>
+                        <Button variant="primary" style={{ height: 32 }}
+                          onClick={() => handleNote(c)} disabled={!noteText[c.id]?.trim() || aNote?.s === 'loading'}>
+                          {aNote?.s === 'loading' ? '…' : aNote?.s === 'ok' ? 'Сохранено' : 'Сохранить'}
+                        </Button>
                       </div>
                     </div>
                   </div>

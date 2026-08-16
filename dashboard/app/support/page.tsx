@@ -3,6 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getToken } from '@/lib/adminApi'
 import PageHeader from '@/components/PageHeader'
+import KpiCard from '@/components/KpiCard'
+import Button from '@/components/Button'
+import Chip from '@/components/Chip'
+import FilterChips from '@/components/FilterChips'
+import { IconCheck, IconUser, IconSend } from '@/components/icons'
 
 /**
  * Поддержка.
@@ -257,35 +262,26 @@ export default function SupportPage() {
     <div>
       <PageHeader title="Поддержка" intervalSec={30} lastUpdated={updated} onRefresh={load} />
 
-      <div style={{ padding: '14px 24px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        {tabs.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setFilter(t.key)}
-            style={{
-              padding: '7px 14px', borderRadius: 100, cursor: 'pointer',
-              border: '1px solid var(--line)', fontSize: 13, fontWeight: 600,
-              background: filter === t.key ? 'var(--ink)' : 'transparent',
-              color: filter === t.key ? '#fff' : 'var(--ink-3)',
-            }}
-          >
-            {t.label} · {t.count}
-          </button>
-        ))}
-        <span style={{ fontSize: 13, color: 'var(--ink-4)', marginLeft: 4 }}>
-          {loading ? 'Загружаю…' : `ждут ответа: ${counts.waiting}`}
-        </span>
-        <span style={{
-          marginLeft: 'auto', fontSize: 12.5, fontWeight: 600,
-          color: openNow ? '#2E7D54' : '#A87020',
-        }}>
-          {openNow ? `Рабочее время · до ${TO_HOUR}:00` : `Нерабочее время · с ${FROM_HOUR}:00 до ${TO_HOUR}:00`}
-        </span>
-      </div>
+      <div className="page-content">
+        <div className="g-4">
+          <KpiCard label="Открытых обращений" value={counts.open}
+            sub={counts.total ? `из ${counts.total} за всё время` : 'обращений не было'} />
+          <KpiCard label="Ждут ответа" value={counts.waiting}
+            sub="последнее слово за человеком" />
+          <KpiCard label="Закрыто" value={counts.closed}
+            sub="напишет снова — откроется само" />
+          <KpiCard label="Сейчас" value={openNow ? 'Рабочее время' : 'Нерабочее'}
+            sub={`приём с ${FROM_HOUR}:00 до ${TO_HOUR}:00 по Москве`} />
+        </div>
 
-      <div style={{ padding: '0 24px 40px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <FilterChips
+          options={tabs.map(t => ({ key: t.key, label: t.label, count: t.count }))}
+          value={filter}
+          onChange={setFilter}
+        />
+
         {!loading && threads.length === 0 ? (
-          <div style={{ color: 'var(--ink-4)', fontSize: 14 }}>
+          <div style={{ color: 'var(--ink-3)', fontSize: 14 }}>
             {filter === 'open' ? 'Открытых обращений нет.'
               : filter === 'closed' ? 'Закрытых обращений пока нет.'
               : 'Обращений пока нет.'}
@@ -296,40 +292,29 @@ export default function SupportPage() {
           const name = [t.user?.first_name, t.user?.last_name].filter(Boolean).join(' ') || 'Без имени'
           const late = t.waiting && t.hours >= 12
           return (
-            <div key={t.uid} style={{
-              border: `1px solid ${late ? '#B33C2A55' : 'var(--line)'}`,
-              borderRadius: 14, padding: 14, background: '#fff',
-              opacity: t.closed ? 0.72 : 1,
+            <div key={t.uid} className="jt-card" style={{
+              padding: 14,
+              borderColor: late ? 'var(--negative-line)' : 'var(--line)',
+              // Закрытое обращение приглушается фоном, а не прозрачностью:
+              // его перечитывают, когда человек возвращается с тем же вопросом.
+              background: t.closed ? 'var(--bg-sunken)' : 'var(--bg-elev)',
             }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
                 <strong style={{ fontSize: 15 }}>{name}</strong>
                 {t.closed ? (
-                  <span style={{
-                    fontSize: 12, fontWeight: 700, color: 'var(--ink-3)',
-                    border: '1px solid var(--line)', background: 'transparent',
-                    borderRadius: 100, padding: '2px 9px',
-                  }}>закрыто</span>
+                  <Chip tone="neutral">Закрыто</Chip>
                 ) : t.waiting ? (
-                  <span style={{
-                    fontSize: 12, fontWeight: 700,
-                    color: late ? '#B33C2A' : '#A87020',
-                    border: `1px solid ${late ? '#B33C2A33' : '#A8702033'}`,
-                    background: late ? '#B33C2A14' : '#A8702014',
-                    borderRadius: 100, padding: '2px 9px',
-                  }}>
-                    {t.hours < 1 ? '❗ ждёт ответа' : `❗ ждёт ${t.hours} ч`}
-                  </span>
+                  <Chip tone={late ? 'negative' : 'accent'} dot>
+                    {t.hours < 1 ? 'Ждёт ответа' : `Ждёт ${t.hours} ч`}
+                  </Chip>
                 ) : (
-                  <span style={{
-                    fontSize: 12, fontWeight: 700, color: '#2E7D54',
-                    border: '1px solid #2E7D5433', background: '#2E7D5414',
-                    borderRadius: 100, padding: '2px 9px',
-                  }}>отвечено</span>
+                  <Chip tone="positive"><IconCheck size={11} />Отвечено</Chip>
                 )}
-                <span style={{ fontSize: 12.5, color: 'var(--ink-4)' }}>
-                  {[t.user?.role, t.user?.phone, t.user?.metro_station].filter(Boolean).join(' · ') || '—'}
+                <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+                  {[t.user?.role === 'worker' ? 'работник' : t.user?.role === 'employer' ? 'работодатель' : null,
+                    t.user?.phone, t.user?.metro_station].filter(Boolean).join(' · ') || '—'}
                 </span>
-                <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'var(--ink-4)' }}>
+                <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--ink-3)' }}>
                   {ago(t.last.created_at)}
                 </span>
               </div>
@@ -337,13 +322,15 @@ export default function SupportPage() {
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {t.msgs.slice(-12).map(m => (
                   <div key={m.id} style={{ display: 'flex', gap: 8, fontSize: 13.5, lineHeight: 1.45 }}>
-                    <span style={{ flexShrink: 0, width: 46, color: 'var(--ink-4)', fontSize: 12 }}>
+                    <span className="num" style={{ flexShrink: 0, width: 52, color: 'var(--ink-3)', fontSize: 12 }}>
                       {ago(m.created_at)}
                     </span>
-                    <span style={{ flexShrink: 0 }}>{m.direction === 'out' ? '🎧' : '👤'}</span>
+                    <span style={{ flexShrink: 0, color: m.direction === 'out' ? 'var(--accent)' : 'var(--ink-3)' }}>
+                      {m.direction === 'out' ? <IconSend size={13} /> : <IconUser size={13} />}
+                    </span>
                     <span style={{
                       whiteSpace: 'pre-wrap', minWidth: 0,
-                      color: m.direction === 'out' ? 'var(--ink-3)' : 'var(--ink)',
+                      color: m.direction === 'out' ? 'var(--ink-2)' : 'var(--ink)',
                     }}>{m.text}</span>
                   </div>
                 ))}
@@ -351,57 +338,31 @@ export default function SupportPage() {
 
               {t.closed ? (
                 <div style={{ marginTop: 12, display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12.5, color: 'var(--ink-4)' }}>
+                  <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                     Закрыто {t.closedStamp ? ago(t.closedStamp) : ''}. Напишет снова — откроется само.
                   </span>
-                  <button
-                    onClick={() => reopen(t.uid)}
-                    disabled={closing === t.uid}
-                    style={{
-                      marginLeft: 'auto', padding: '7px 13px', borderRadius: 10,
-                      border: '1px solid var(--line)', background: 'transparent',
-                      cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ink-3)',
-                    }}
-                  >
+                  <Button onClick={() => reopen(t.uid)} disabled={closing === t.uid} style={{ marginLeft: 'auto' }}>
                     {closing === t.uid ? '…' : 'Открыть снова'}
-                  </button>
+                  </Button>
                 </div>
               ) : closingFor === t.uid ? (
                 <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 12.5, color: 'var(--ink-4)', marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 6 }}>
                     Это уйдёт человеку — можно дописать под случай.
                   </div>
                   <textarea
                     value={closeDrafts[t.uid] ?? CLOSING_TEXT}
                     onChange={e => setCloseDrafts(d => ({ ...d, [t.uid]: e.target.value }))}
                     rows={3}
-                    style={{
-                      width: '100%', resize: 'vertical', minHeight: 60, padding: '9px 11px',
-                      border: '1px solid var(--line)', borderRadius: 10, fontSize: 13.5,
-                      fontFamily: 'inherit', lineHeight: 1.4,
-                    }}
+                    className="jt-input" style={{ width: '100%', minHeight: 60 }}
                   />
                   <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                    <button
+                    <Button variant="primary"
                       onClick={() => close(t.uid)}
-                      disabled={closing === t.uid || !(closeDrafts[t.uid] ?? CLOSING_TEXT).trim()}
-                      style={{
-                        padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                        fontSize: 13.5, fontWeight: 700, color: '#fff', background: '#2E7D54',
-                      }}
-                    >
+                      disabled={closing === t.uid || !(closeDrafts[t.uid] ?? CLOSING_TEXT).trim()}>
                       {closing === t.uid ? '…' : 'Отправить и закрыть'}
-                    </button>
-                    <button
-                      onClick={() => setClosingFor(null)}
-                      style={{
-                        padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
-                        border: '1px solid var(--line)', background: 'transparent',
-                        fontSize: 13.5, fontWeight: 600, color: 'var(--ink-3)',
-                      }}
-                    >
-                      Отмена
-                    </button>
+                    </Button>
+                    <Button onClick={() => setClosingFor(null)}>Отмена</Button>
                   </div>
                 </div>
               ) : (
@@ -412,42 +373,25 @@ export default function SupportPage() {
                       onChange={e => setDrafts(d => ({ ...d, [t.uid]: e.target.value }))}
                       placeholder="Ответ уйдёт в приложение, а также в телеграм и пушем"
                       rows={2}
-                      style={{
-                        flex: 1, resize: 'vertical', minHeight: 44, padding: '9px 11px',
-                        border: '1px solid var(--line)', borderRadius: 10, fontSize: 13.5,
-                        fontFamily: 'inherit', lineHeight: 1.4,
-                      }}
+                      className="jt-input" style={{ flex: 1, minHeight: 44 }}
                     />
-                    <button
+                    <Button variant="primary"
                       onClick={() => send(t.uid)}
-                      disabled={sending === t.uid || !(drafts[t.uid] ?? '').trim()}
-                      style={{
-                        padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                        fontSize: 13.5, fontWeight: 700, color: '#fff',
-                        background: (drafts[t.uid] ?? '').trim() ? '#C8501E' : '#C9C5BF',
-                      }}
-                    >
+                      disabled={sending === t.uid || !(drafts[t.uid] ?? '').trim()}>
                       {sending === t.uid ? '…' : 'Ответить'}
-                    </button>
+                    </Button>
                   </div>
-                  <button
-                    onClick={() => setClosingFor(t.uid)}
-                    style={{
-                      marginTop: 8, padding: '7px 13px', borderRadius: 10,
-                      border: '1px solid var(--line)', background: 'transparent',
-                      cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ink-3)',
-                    }}
-                  >
+                  <Button onClick={() => setClosingFor(t.uid)} style={{ marginTop: 8 }}>
                     Закрыть обращение
-                  </button>
+                  </Button>
                 </>
               )}
 
               {notice[t.uid] ? (
                 <div style={{
-                  marginTop: 6, fontSize: 12.5,
+                  marginTop: 6, fontSize: 13,
                   color: notice[t.uid] === 'Отправлено' || notice[t.uid] === 'Обращение закрыто'
-                    ? '#2E7D54' : '#B33C2A',
+                    ? 'var(--positive)' : 'var(--negative)',
                 }}>{notice[t.uid]}</div>
               ) : null}
             </div>
