@@ -37,8 +37,22 @@ else
   exit 1
 fi
 
-# Файлы: их немного, поэтому просто целиком.
-tar czf "$DIR/files-$stamp.tar.gz" -C /var/lib/docker/volumes/jobtoo_storage-data/_data . 2>/dev/null || true
+# Файлы — раз в неделю, а не каждую ночь.
+#
+# Фотографии и голосовые почти не меняются: за сутки прибавляется несколько
+# штук, а архив пересобирается целиком. При ежедневной копии одни и те же
+# снимки лежали в четырнадцати экземплярах — и на диске, и в хранилище,
+# куда их пришлось бы ещё и заливать каждую ночь.
+#
+# Раз в неделю плюс срок хранения 14 дней даёт две копии файлов в запасе.
+# Потерять получится не больше недели вложений, а база — то, где важна
+# каждая минута, — по-прежнему копируется ежедневно.
+FILES="$DIR/files-$stamp.tar.gz"
+if [ "$(date +%u)" = "7" ] || [ -z "$(ls "$DIR"/files-*.tar.gz 2>/dev/null)" ]; then
+  tar czf "$FILES" -C /var/lib/docker/volumes/jobtoo_storage-data/_data . 2>/dev/null || true
+else
+  FILES=""
+fi
 
 # Старое чистим, иначе через месяц кончится диск и упадёт вся машина.
 find "$DIR" -name 'db-*.sql.gz'    -mtime +$KEEP -delete 2>/dev/null || true
@@ -70,7 +84,7 @@ fi
 if [ -n "${BACKUP_S3_BUCKET:-}" ] && [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
   if command -v aws >/dev/null 2>&1; then
     up=0
-    for out in "$f" "$DIR/files-$stamp.tar.gz"; do
+    for out in "$f" ${FILES:+"$FILES"}; do
       [ -s "$out" ] || continue
       if aws --endpoint-url "$BACKUP_S3_ENDPOINT" s3 cp "$out" \
            "s3://$BACKUP_S3_BUCKET/$(basename "$out")" --only-show-errors 2>>/tmp/jt-s3.log; then
