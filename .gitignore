@@ -47,6 +47,11 @@ supabase/.temp/
 # Локальная веб-сборка для снимков экранов (scripts/shoot-screens.mjs)
 .figma-export/
 
+# Питон складывает разобранные модули рядом с исходником — появляется, как
+# только что-нибудь из infra/ загружают модулем
+__pycache__/
+*.pyc
+
 # Секреты — живут только на хостинге, в репозиторий не попадают
 php-proxy/sb_service_key.php
 php-proxy/admin_credentials.php
