@@ -479,6 +479,32 @@ if [ -n "${GH_TOKEN+x}" ]; then
   fi
 fi
 
+# Ключи к объектному хранилищу — туда же, в файл переменных: скрипт копий
+# читает именно его. Приезжают они тем же каналом, что и остальные секреты
+# (deploy.php), и лежат в backup_s3.php рядом с прочими.
+S3_CONF=$( (cd "$REPO/infra" && docker compose exec -T php php -r '
+  $s = @include "/var/www/api/backup_s3.php";
+  if (!is_array($s)) exit;
+  printf("%s\n%s\n%s\n%s\n", $s["endpoint"] ?? "", $s["bucket"] ?? "",
+                                 $s["key"] ?? "", $s["secret"] ?? "");') 2>/dev/null || true)
+if [ -n "$S3_CONF" ]; then
+  S3_END=$(printf '%s' "$S3_CONF" | sed -n 1p)
+  S3_BKT=$(printf '%s' "$S3_CONF" | sed -n 2p)
+  S3_KEY=$(printf '%s' "$S3_CONF" | sed -n 3p)
+  S3_SEC=$(printf '%s' "$S3_CONF" | sed -n 4p)
+  if [ -n "$S3_BKT" ] && [ -n "$S3_KEY" ] \
+     && ! grep -qx "BACKUP_S3_BUCKET=$S3_BKT" "$SECRETS" 2>/dev/null; then
+    sed -i '/^BACKUP_S3_ENDPOINT=/d;/^BACKUP_S3_BUCKET=/d;/^AWS_ACCESS_KEY_ID=/d;/^AWS_SECRET_ACCESS_KEY=/d' "$SECRETS"
+    {
+      echo "BACKUP_S3_ENDPOINT=${S3_END:-https://s3.twcstorage.ru}"
+      echo "BACKUP_S3_BUCKET=$S3_BKT"
+      echo "AWS_ACCESS_KEY_ID=$S3_KEY"
+      echo "AWS_SECRET_ACCESS_KEY=$S3_SEC"
+    } >> "$SECRETS"
+    say "копии" "ключи хранилища приняты, бакет $S3_BKT"
+  fi
+fi
+
 # Скачать файл из выпуска.
 #
 # Тонкость, из-за которой дашборд когда-то и перестал обновляться, когда

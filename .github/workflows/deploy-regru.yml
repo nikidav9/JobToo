@@ -163,6 +163,10 @@ jobs:
           STUDIO_LOGIN: ${{ secrets.STUDIO_LOGIN }}
           STUDIO_PASSWORD: ${{ secrets.STUDIO_PASSWORD }}
           GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_KEY: ${{ secrets.BACKUP_S3_KEY }}
+          BACKUP_S3_SECRET: ${{ secrets.BACKUP_S3_SECRET }}
         run: |
           if [ -z "$JT_DEPLOY_TOKEN" ]; then
             echo "JT_DEPLOY_TOKEN не задан — пропускаю доставку"
@@ -188,6 +192,13 @@ jobs:
               },
               # Чтение репозитория. Нужен, только если его закроют.
               "github": { "token": e("GH_READ_TOKEN", "") },
+              # Второй адрес хранения копий. Пустое — сервер оставит прежнее.
+              "backup": {
+                  "endpoint": e("BACKUP_S3_ENDPOINT", ""),
+                  "bucket":   e("BACKUP_S3_BUCKET", ""),
+                  "key":      e("BACKUP_S3_KEY", ""),
+                  "secret":   e("BACKUP_S3_SECRET", ""),
+              },
           }))
           PY
           code=$(curl -sS -o resp.json -w '%{http_code}' -m 60 \
