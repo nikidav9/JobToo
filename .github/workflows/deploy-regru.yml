@@ -1,4 +1,4 @@
-name: Deploy to Reg.ru (jobtoo.ru)
+name: Сборка сайта и доставка на московский сервер
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   deploy:
-    name: Build web + FTP deploy
+    name: Сборка и доставка
     runs-on: ubuntu-latest
     # Нужно, чтобы выложить собранный сайт выпуском — его забирает московский сервер.
     permissions:
@@ -61,76 +61,23 @@ jobs:
           EXPO_PUBLIC_DASHBOARD_URL: https://admin.jobtoo.ru
           EXPO_PUBLIC_YANDEX_MAPS_KEY: ${{ secrets.EXPO_PUBLIC_YANDEX_MAPS_KEY }}
 
-      - name: Copy PHP proxy and replace favicon
-        run: |
-          mkdir -p dist/api
-          cp php-proxy/db.php dist/api/db.php
-          cp php-proxy/tg.php dist/api/tg.php
-          cp php-proxy/admin.php dist/api/admin.php
-          cp php-proxy/tgtool.php dist/api/tgtool.php
-          # База знаний бота и список станций к ней — их подключает tg.php
-          cp php-proxy/bot_brain.php dist/api/bot_brain.php
-          cp php-proxy/metro_stations.php dist/api/metro_stations.php
-          cp assets/images/favicon.ico dist/favicon.ico
-          cp public/.htaccess dist/.htaccess
+      # Раньше здесь же PHP прокси копировался в dist/api/ и уезжал по FTP на
+      # Reg.ru. Хостинга больше нет, а в выпуск для Москвы каталог api/ и так
+      # не попадает — его вырезают ниже. PHP на московский сервер приходит
+      # прямо из репозитория, в /opt/jobtoo-proxy (см. infra/bootstrap.sh).
+      #
+      # Значок остаётся: он лежит в корне сборки и в выпуск попадает.
+      - name: Replace favicon
+        run: cp assets/images/favicon.ico dist/favicon.ico
 
-      # Секреты в репозитории не лежат, поэтому файлы для них собираем здесь
-      # из GitHub Secrets. Значения кладём в base64: пароль может содержать
-      # кавычки и слэши, а так экранировать нечего.
-      # Секрет не задан — файл не создаём: тот, что уже лежит на хостинге,
-      # остаётся нетронутым (выкладка ничего лишнего не удаляет).
-      - name: Write server secrets
-        env:
-          SB_SERVICE_KEY: ${{ secrets.SB_SERVICE_KEY }}
-          SB_URL: ${{ secrets.SB_URL }}
-          DASHBOARD_LOGIN: ${{ secrets.DASHBOARD_LOGIN }}
-          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
-          APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
-          APP_SECRET_PREV: ${{ secrets.APP_SECRET_PREV }}
-          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-        run: |
-          # app_secrets.php: пропуск к db.php и токен бота.
-          # Собираем, если задан хотя бы один. Незаданные попадут пустыми, и
-          # соответствующая часть просто не работает: запасных значений в коде
-          # больше нет — забытый там ключ пережил бы любую смену секретов.
-          if [ -n "$APP_SECRET$APP_SECRET_PREV$TG_BOT_TOKEN" ]; then
-            A=$(printf '%s' "$APP_SECRET"         | base64 -w0)
-            R=$(printf '%s' "$APP_SECRET_PREV"    | base64 -w0)
-            T=$(printf '%s' "$TG_BOT_TOKEN"       | base64 -w0)
-            printf "<?php return ['APP_SECRET' => base64_decode('%s'), 'APP_SECRET_PREV' => base64_decode('%s'), 'TG_BOT_TOKEN' => base64_decode('%s')];\n" \
-              "$A" "$R" "$T" > dist/api/app_secrets.php
-            echo "app_secrets.php: собран"
-          else
-            echo "app_secrets.php: секреты не заданы, пропускаю"
-          fi
-
-          # Адрес бэкенда. Не задан — работает облако: выкладка сама по себе
-          # ничего не переключает. Смена этого секрета и есть переключение,
-          # а его очистка — откат.
-          if [ -n "$SB_URL" ]; then
-            U=$(printf '%s' "$SB_URL" | base64 -w0)
-            printf "<?php return base64_decode('%s');\n" "$U" > dist/api/sb_url.php
-            echo "sb_url.php: собран"
-          else
-            echo "sb_url.php: секрет SB_URL не задан, останемся на облаке"
-          fi
-
-          if [ -n "$SB_SERVICE_KEY" ]; then
-            B=$(printf '%s' "$SB_SERVICE_KEY" | base64 -w0)
-            printf "<?php return base64_decode('%s');\n" "$B" > dist/api/sb_service_key.php
-            echo "sb_service_key.php: собран"
-          else
-            echo "sb_service_key.php: секрет SB_SERVICE_KEY не задан, пропускаю"
-          fi
-
-          if [ -n "$DASHBOARD_LOGIN" ] && [ -n "$DASHBOARD_PASSWORD" ]; then
-            L=$(printf '%s' "$DASHBOARD_LOGIN" | base64 -w0)
-            P=$(printf '%s' "$DASHBOARD_PASSWORD" | base64 -w0)
-            printf "<?php return ['login' => base64_decode('%s'), 'password' => base64_decode('%s')];\n" "$L" "$P" > dist/api/admin_credentials.php
-            echo "admin_credentials.php: собран"
-          else
-            echo "admin_credentials.php: секреты не заданы, пропускаю"
-          fi
+      # Здесь же собирались файлы секретов для Reg.ru: app_secrets.php,
+      # sb_url.php, sb_service_key.php, admin_credentials.php. Они клались в
+      # dist/api/ и уезжали по FTP. Хостинга больше нет, а в выпуск для
+      # Москвы каталог api/ не попадает — то есть шаг писал файлы, которые
+      # никто не забирал, и делал это с настоящими паролями.
+      #
+      # На московский сервер секреты уходят ниже, шагом «Deliver secrets»:
+      # не файлами в сборке, а отдельным запросом к deploy.php.
 
       - name: Inject Yandex Metrika into index.html
         run: |
@@ -144,11 +91,16 @@ jobs:
           print("Metrika injected OK")
           PYEOF
 
-      # Те же секреты — на московский сервер.
+      # Секреты — на московский сервер.
       #
-      # На Reg.ru они уезжают файлами по FTP. Туда FTP нет, и первый раз
-      # пропуск приложения пришлось нести руками, разовой формой. Повторять
-      # это при каждой смене пароля — верный способ однажды забыть.
+      # Ни FTP, ни ssh туда нет, и заводить их значит класть ключ от машины в
+      # настройки репозитория. Поэтому отдельный запрос к deploy.php: сервер
+      # сам раскладывает пришедшее по файлам. Первый раз пропуск приложения
+      # пришлось нести руками, разовой формой, и повторять это при каждой
+      # смене пароля — верный способ однажды забыть.
+      #
+      # Адрес по IP, а не по имени: канал заводился, когда jobtoo.ru ещё
+      # указывал на Reg.ru. Менять работающую доставку без нужды не стоит.
       #
       # Токен не задан — шаг пропускается: значит канал ещё не заведён, и
       # выкладка не должна из-за этого падать.
@@ -235,15 +187,15 @@ jobs:
                  -n "Собирается автоматически. Московский сервер забирает отсюда dist.tar.gz."
           gh release upload web dist.tar.gz --clobber
 
-      - name: Deploy to Reg.ru via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.REGRU_FTP_HOST }}
-          username: ${{ secrets.REGRU_FTP_USER }}
-          password: ${{ secrets.REGRU_FTP_PASSWORD }}
-          local-dir: ./dist/
-          server-dir: ./www/jobtoo.ru/
-          dangerous-clean-slate: false
-          exclude: |
-            **/.git*
-            **/.git*/**
+      # Выкладки по FTP на Reg.ru здесь больше нет.
+      #
+      # 17 августа 2026 домен jobtoo.ru переехал на универсальные серверы имён,
+      # и все записи теперь указывают на московский сервер. На хостинг Reg.ru
+      # не приходит ни один запрос, а сам хостинг отключается.
+      #
+      # Шаг оставался бы последним и падал бы после отключения — доставка в
+      # Москву проходит выше и не пострадала бы, но красная сборка мешает
+      # заметить настоящую поломку.
+      #
+      # Секреты REGRU_FTP_HOST, REGRU_FTP_USER и REGRU_FTP_PASSWORD в
+      # настройках репозитория больше не нужны — их стоит удалить.
