@@ -25,7 +25,7 @@ import { rs, rf } from '@/constants/scale';
 
 // Steps: 1-Phone, 2-Password, 3-Name, 4-Legal, 5-Metro, 6-WorkType
 const TOTAL = 7;
-const SUPPORT_EMAIL = 'zpouches@yandex.ru';
+const SUPPORT_EMAIL = 'support@jobtoo.ru';
 
 export default function RegisterWorker() {
   const router = useRouter();

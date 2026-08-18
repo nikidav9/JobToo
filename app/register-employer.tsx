@@ -21,7 +21,7 @@ import { rs, rf } from '@/constants/scale';
 
 // Steps: 1-Phone, 2-Password, 3-Name+Company, 4-Legal
 const TOTAL = 5;
-const SUPPORT_EMAIL = 'zpouches@yandex.ru';
+const SUPPORT_EMAIL = 'support@jobtoo.ru';
 const COMPANY_OPTIONS = ['Лавка'] as const;
 type CompanyOption = typeof COMPANY_OPTIONS[number];
 

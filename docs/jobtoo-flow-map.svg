@@ -201,7 +201,7 @@
 <text data-name="Пароль" x="24.0" y="563.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(156, 163, 175)">Пароль</text>
 <text data-name="Забыли пароль?" x="37.0" y="658.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="rgb(107, 114, 128)">Забыли пароль?</text>
 <text data-name="Обращайтесь на" x="141.0" y="658.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="rgb(255, 107, 26)">Обращайтесь на</text>
-<text data-name="zpouches@yandex.ru" x="37.0" y="676.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="rgb(255, 107, 26)">zpouches@yandex.ru</text>
+<text data-name="support@jobtoo.ru" x="37.0" y="676.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="rgb(255, 107, 26)">support@jobtoo.ru</text>
 <text data-name="Войти →" x="162.5" y="747.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="rgb(255, 255, 255)">Войти →</text>
 <text data-name="Отмена" x="168.1" y="799.5" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="500" fill="rgb(156, 163, 175)">Отмена</text>
 </g>
@@ -263,7 +263,7 @@
 <text data-name="Пароль" x="24.0" y="194.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(156, 163, 175)">Пароль</text>
 <text data-name="Повторите пароль" x="24.0" y="281.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(156, 163, 175)">Повторите пароль</text>
 <text data-name="Забыли пароль? Обращайтесь н" x="37.0" y="381.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgb(107, 114, 128)">Забыли пароль? Обращайтесь на</text>
-<text data-name="zpouches@yandex.ru" x="37.0" y="398.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="rgb(255, 107, 26)">zpouches@yandex.ru</text>
+<text data-name="support@jobtoo.ru" x="37.0" y="398.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="rgb(255, 107, 26)">support@jobtoo.ru</text>
 <text data-name="Продолжить →" x="138.8" y="463.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="rgb(255, 255, 255)">Продолжить →</text>
 </g>
 <rect x="660" y="1450" width="390" height="844" rx="34" fill="none" stroke="#8B5CF6" stroke-width="2.5"/>
@@ -613,7 +613,7 @@
 <text data-name="Пароль" x="24.0" y="194.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(156, 163, 175)">Пароль</text>
 <text data-name="Повторите пароль" x="24.0" y="281.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" fill="rgb(156, 163, 175)">Повторите пароль</text>
 <text data-name="Забыли пароль? Обращайтесь н" x="37.0" y="381.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgb(107, 114, 128)">Забыли пароль? Обращайтесь на</text>
-<text data-name="zpouches@yandex.ru" x="37.0" y="398.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="rgb(255, 107, 26)">zpouches@yandex.ru</text>
+<text data-name="support@jobtoo.ru" x="37.0" y="398.2" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="rgb(255, 107, 26)">support@jobtoo.ru</text>
 <text data-name="Продолжить →" x="138.8" y="463.0" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="rgb(255, 255, 255)">Продолжить →</text>
 </g>
 <rect x="660" y="3870" width="390" height="844" rx="34" fill="none" stroke="#0EA5E9" stroke-width="2.5"/>
@@ -1269,7 +1269,7 @@
 <text data-name="Пользовательское соглашение " x="20.0" y="123.6" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="rgb(55, 65, 81)">Пользовательское соглашение сервиса JobToo</text>
 <text data-name="Оператор: Давыдов Никита Сер" x="20.0" y="171.6" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="rgb(55, 65, 81)">Оператор: Давыдов Никита Сергеевич</text>
 <text data-name="ИНН: 773423983287" x="20.0" y="195.6" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="rgb(55, 65, 81)">ИНН: 773423983287</text>
-<text data-name="Email: zpouches@yandex.ru" x="20.0" y="219.6" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="rgb(55, 65, 81)">Email: zpouches@yandex.ru</text>
+<text data-name="Email: support@jobtoo.ru" x="20.0" y="219.6" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="rgb(55, 65, 81)">Email: support@jobtoo.ru</text>
 <text data-name="1. Общие положения" x="20.0" y="256.5" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="rgb(17, 24, 39)">1. Общие положения</text>
 <text data-name="1.1. Настоящее соглашение ре" x="20.0" y="282.5" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="rgb(55, 65, 81)">1.1. Настоящее соглашение регулирует</text>
 <text data-name="отношения между пользователе" x="20.0" y="306.5" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="rgb(55, 65, 81)">отношения между пользователем и оператором</text>

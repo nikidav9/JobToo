@@ -14,7 +14,7 @@ import { isPhoneComplete, extractPhoneDigits } from '@/services/storage';
 
 import { rs, rf } from '@/constants/scale';
 
-const SUPPORT_EMAIL = 'zpouches@yandex.ru';
+const SUPPORT_EMAIL = 'support@jobtoo.ru';
 
 export default function Login() {
   const router = useRouter();

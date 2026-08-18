@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Зона jobtoo.ru в Timeweb Cloud — запасная, один в один с той, что у Рег.ру.
+"""Зона jobtoo.ru в Timeweb Cloud — теперь боевая.
 
-── Зачем она нужна ────────────────────────────────────────────────────────
+── Как она такой стала ────────────────────────────────────────────────────
 
-Сейчас домен обслуживают серверы имён Рег.ру. Это работает, и менять это
-прямо сейчас незачем. Но у связки есть свойство, которое мы уже проходили:
-`ns1.reg.ru` обслуживают зону, пока домен зарегистрирован в Рег.ру — ровно
-как `ns1.hosting.reg.ru` работали, пока был хостинг. Захочется однажды
-перенести регистрацию в Timeweb — и зона на серверах Рег.ру погаснет вместе
-с уходом домена.
+Заводилась про запас. У связки с Рег.ру было свойство, которое мы уже
+проходили с хостингом: `ns1.reg.ru` держат зону, пока домен зарегистрирован
+в Рег.ру. Уйдёт регистрация — погаснет зона. Поэтому зона здесь появилась
+заранее, чтобы перенос не был прыжком.
 
-Поэтому зона здесь заводится заранее и держится в том же виде. Тогда перенос
-перестаёт быть прыжком: сначала переключаем серверы имён на Timeweb, где всё
-уже готово, проверяем, и только потом трогаем регистрацию.
+18 августа серверы имён домена переключены на Timeweb, и заодно выяснилось,
+что запас был не лишним: как только у домена в Рег.ру прописались чужие
+серверы, их API перестал показывать зону вовсе — «домен не использует
+серверы Рег.ру». То есть править там больше нечего, даже пока они ещё
+отвечают. Единственное живое место — здесь.
 
-Ничего живого этот файл не переключает. Пока у регистратора стоят серверы
-Рег.ру, зона в Timeweb просто лежит и никем не спрашивается.
+Откат на Рег.ру всё ещё возможен (`infra/regru-dns.py серверы`): записи там
+остались с прошлой жизни. Но редактировать их до возврата не получится.
 
 ── Как устроено у Timeweb, и почему это неочевидно ────────────────────────
 
@@ -43,8 +43,8 @@ DMARC, — и делает это заново каждому новому по�
 
     ns1.timeweb.ru   ns2.timeweb.ru   ns3.timeweb.org   ns4.timeweb.org
 
-Прописываются у регистратора, то есть в Рег.ру. Отсюда это не делается —
-и не должно: это как раз тот шаг, который меняет живое.
+Прописаны у регистратора 18 августа. Отсюда это не делается и не должно:
+переключение — шаг, меняющий живое, и живёт он в infra/regru-dns.py.
 
 ── Что нужно ──────────────────────────────────────────────────────────────
 
@@ -78,12 +78,27 @@ IPV6 = '2a03:6f00:a::1:ba1f'
 # `tg` с IPv4 — из-за его отсутствия в своё время не поднялся вебхук Telegram:
 # Telegram не ходит на адреса без IPv4.
 #
-# `v=spf1 -all` — «писем с этого домена не бывает». Почты у домена нет, и без
-# такой записи он становится удобным обратным адресом для чужого спама.
+# Почта. 18 августа завели ящик support@jobtoo.ru на почтовых серверах
+# Timeweb — до этого поддержка отвечала с чужого адреса на яндексе.
+#
+# Поэтому MX и SPF вернулись. Раньше здесь стоял `v=spf1 -all` — «писем с
+# этого домена не бывает»: домен без почты и без такой записи это удобный
+# обратный адрес для чужого спама. Теперь письма бывают, и запрет надо
+# заменить разрешением ровно для тех, кто их отправляет.
+#
+# `~all` вместо `-all` — намеренно мягче: жёсткий запрет на первых порах
+# отправляет в никуда собственные же письма, если что-то не так настроено,
+# и узнаёшь об этом от человека, который не дождался ответа.
 #
 # Ключ — имя поддомена, пустое значит сам домен.
+# Значение — (тип, значение) или (тип, значение, приоритет) для MX.
 WANT = {
-    '':      [('A', IPV4), ('AAAA', IPV6), ('TXT', 'v=spf1 -all')],
+    '': [
+        ('A', IPV4), ('AAAA', IPV6),
+        ('TXT', 'v=spf1 include:_spf.timeweb.ru ~all'),
+        ('MX', 'mx1.timeweb.ru', 10),
+        ('MX', 'mx2.timeweb.ru', 20),
+    ],
     'www':   [('A', IPV4), ('AAAA', IPV6)],
     'admin': [('A', IPV4), ('AAAA', IPV6)],
     'tg':    [('A', IPV4), ('AAAA', IPV6)],
@@ -127,37 +142,89 @@ def call(method: str, path: str, body=None, ok_codes=(), ver='v1'):
     return json.loads(raw) if raw.strip() else {}
 
 
+def значение(value, priority=None) -> str:
+    """Как показать запись человеку. У MX приоритет — часть смысла."""
+    return f'{priority} {value}' if priority is not None else str(value)
+
+
 def zone(sub: str) -> str:
     """Адрес зоны. У поддомена она своя, отдельная от родительской."""
     return DOMAIN if not sub else f'{sub}.{DOMAIN}'
 
 
-def normalize(rectype, value):
-    value = str(value).strip().strip('"')
-    if rectype.upper() in ('A', 'AAAA'):
+def normalize(rectype, value, priority=None):
+    """Приводим к сравнимому виду.
+
+    Приоритет входит в отпечаток только у MX: у остальных типов его нет, и
+    если тащить его в ключ, запись «с приоритетом None» перестанет совпадать
+    сама с собой при следующем чтении.
+    """
+    value = str(value).strip().strip('"').rstrip('.')
+    rectype = rectype.upper()
+    if rectype in ('A', 'AAAA'):
         value = value.lower()
-    return (rectype.upper(), value)
+    if rectype == 'MX':
+        return (rectype, value.lower(), int(priority) if priority is not None else None)
+    return (rectype, value)
 
 
 def records(sub: str):
-    """Что лежит в зоне поддомена: (тип, значение, идентификатор)."""
+    """Записи зоны: (тип, значение, идентификатор, приоритет, имя внутри зоны).
+
+    Последнее поле важнее, чем кажется. В зоне домена лежат не только записи
+    самого домена: там же `_dmarc` и `dkim._domainkey` — DMARC и ключ подписи
+    писем, которые Timeweb заводит при создании почтового ящика. Оба выглядят
+    как обычные TXT, и скрипт, различающий записи только по типу и значению,
+    снёс бы их как незнакомые. Почта после этого продолжает ходить, но письма
+    начинают падать в спам, и понять почему — отдельное приключение.
+    """
     got = call('GET', f'/domains/{zone(sub)}/dns-records', ok_codes=(404,))
     if got is None:
         return []
-    return [(str(r.get('type', '')).upper(),
-             str((r.get('data') or {}).get('value') or '').strip().strip('"'),
-             r.get('id'))
-            for r in got.get('dns_records', [])]
+    out = []
+    for r in got.get('dns_records', []):
+        d = r.get('data') or {}
+        out.append((str(r.get('type', '')).upper(),
+                    str(d.get('value') or '').strip().strip('"'),
+                    r.get('id'),
+                    d.get('priority'),
+                    d.get('subdomain')))
+    return out
+
+
+def спорит(rec, want, наши_типы) -> bool:
+    """Мешает ли чужая запись нашей.
+
+    Правило узкое нарочно. Убираем только то, что занимает место нашего:
+    тот же тип на самом домене, но другое значение. Всё прочее — чужое, и
+    удалять его мы не подряжались.
+
+    Записи с именем внутри зоны (`_dmarc`, `dkim._domainkey`) не трогаем
+    вовсе: это почтовые служебные, и наших там нет.
+
+    Из TXT спорит только SPF: их у имени бывает много и они мирно уживаются,
+    а вот SPF должен быть ровно один, иначе не работает ни один.
+    """
+    rectype, value, _, prio, поддомен = rec
+    if rectype in UNTOUCHED or поддомен:
+        return False
+    if rectype not in наши_типы:
+        return False
+    if normalize(rectype, value, prio) in want:
+        return False
+    if rectype == 'TXT':
+        return value.lower().startswith('v=spf1')
+    return True
 
 
 def diff(sub: str):
     """Чего не хватает и что лишнее в одной зоне."""
     have = records(sub)
     want = {normalize(*r) for r in WANT[sub]}
-    seen = {normalize(t, v) for t, v, _ in have}
+    наши_типы = {r[0].upper() for r in WANT[sub]}
+    seen = {normalize(t, v, p) for t, v, _, p, поддомен in have if not поддомен}
     absent = [r for r in WANT[sub] if normalize(*r) not in seen]
-    unwanted = [r for r in have
-                if r[0] not in UNTOUCHED and normalize(r[0], r[1]) not in want]
+    unwanted = [r for r in have if спорит(r, want, наши_типы)]
     return have, absent, unwanted
 
 
@@ -167,12 +234,14 @@ def cmd_показать():
     for sub in WANT:
         have, absent, unwanted = diff(sub)
         print(f'\n{zone(sub)} — записей {len(have)}:')
-        for rectype, value, _ in sorted(have):
-            mark = '  ' if normalize(rectype, value) in {normalize(*r) for r in WANT[sub]} \
-                   else ('  ' if rectype in UNTOUCHED else '✗ ')
-            print(f'    {mark}{rectype:5} {value}')
-        for rectype, value in absent:
-            print(f'    + {rectype:5} {value}   (не хватает)')
+        хочется = {normalize(*r) for r in WANT[sub]}
+        for rectype, value, _, prio, поддомен in sorted(have, key=lambda r: (r[0], str(r[4]), r[1])):
+            свой = (not поддомен) and normalize(rectype, value, prio) in хочется
+            mark = '  ' if (свой or поддомен or rectype in UNTOUCHED) else '✗ '
+            имя = f'{поддомен}.' if поддомен else ''
+            print(f'    {mark}{rectype:5} {имя}{значение(value, prio)}')
+        for r in absent:
+            print(f'    + {r[0]:5} {значение(r[1], r[2] if len(r) > 2 else None)}   (не хватает)')
         total_absent += len(absent)
         total_extra += len(unwanted)
 
@@ -194,13 +263,17 @@ def cmd_записи():
 
     for sub in WANT:
         _, absent, unwanted = diff(sub)
-        for rectype, value, rid in unwanted:
+        for rectype, value, rid, prio, _ in unwanted:
             call('DELETE', f'/domains/{zone(sub)}/dns-records/{rid}', ver='v2')
-            print(f'    убрано   {zone(sub):18} {rectype:5} {value}')
-        for rectype, value in absent:
-            call('POST', f'/domains/{zone(sub)}/dns-records',
-                 {'type': rectype, 'value': value}, ver='v2')
-            print(f'    заведено {zone(sub):18} {rectype:5} {value}')
+            print(f'    убрано   {zone(sub):18} {rectype:5} {значение(value, prio)}')
+        for r in absent:
+            rectype, value = r[0], r[1]
+            тело = {'type': rectype, 'value': value}
+            if rectype == 'MX':
+                тело['priority'] = r[2]
+            call('POST', f'/domains/{zone(sub)}/dns-records', тело, ver='v2')
+            print(f'    заведено {zone(sub):18} {rectype:5} '
+                  f'{значение(value, r[2] if len(r) > 2 else None)}')
 
     # Перечитываем, а не верим своим же вызовам: этот API отвечает «создано»
     # и на запросы, которые кладут запись не туда, куда просили.
@@ -209,22 +282,22 @@ def cmd_записи():
     for sub in WANT:
         have, absent, unwanted = diff(sub)
         print(f'{zone(sub)}:')
-        for rectype, value, _ in sorted(have):
-            print(f'    {rectype:5} {value}')
-        for rectype, value in absent:
-            print(f'    НЕ ХВАТАЕТ {rectype:5} {value}'); bad = True
-        for rectype, value, _ in unwanted:
-            print(f'    ЛИШНЕЕ     {rectype:5} {value}'); bad = True
+        for rectype, value, _, prio, поддомен in sorted(have, key=lambda r: (r[0], str(r[4]), r[1])):
+            print(f'    {rectype:5} {(поддомен + ".") if поддомен else ""}{значение(value, prio)}')
+        for r in absent:
+            print(f'    НЕ ХВАТАЕТ {r[0]:5} {значение(r[1], r[2] if len(r) > 2 else None)}'); bad = True
+        for rectype, value, _, prio, _п in unwanted:
+            print(f'    ЛИШНЕЕ     {rectype:5} {значение(value, prio)}'); bad = True
 
     if bad:
         sys.exit('\nЗона не сошлась — разберитесь до того, как переключать серверы имён.')
 
     print(
-        '\nЗона готова и совпадает с той, что у Рег.ру.\n'
-        '\nОна ничего не обслуживает, пока у регистратора стоят серверы Рег.ру.\n'
-        'Чтобы переключить, в кабинете Рег.ру надо прописать серверы Timeweb:\n'
-        '    ns1.timeweb.ru  ns2.timeweb.ru  ns3.timeweb.org  ns4.timeweb.org\n'
-        'Отсюда это не делается намеренно: это шаг, меняющий живое.'
+        '\nЗона в нужном виде.\n'
+        '\nПроверить снаружи, что её отдают:\n'
+        '    https://www.whatsmydns.net/#A/jobtoo.ru\n'
+        'Почта заработает не раньше, чем реестр .ru начнёт отдавать серверы\n'
+        'Timeweb: до этого запросы уходят на прежнюю зону, где MX нет.'
     )
 
 
