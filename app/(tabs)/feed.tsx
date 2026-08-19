@@ -50,6 +50,7 @@ import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/web
 
 import { rs, rf } from '@/constants/scale';
 import { ApplySheet } from '@/components/feature/ApplySheet';
+import { SearchMode } from '@/components/feature/SearchMode';
 import { getChatSuggestions } from '@/constants/chatSuggestions';
 import { payShort } from '@/services/pay';
 import { vacancyInfoLines, permVacancyInfoLines } from '@/services/vacancyCard';
@@ -247,9 +248,22 @@ const metroPickerSt = StyleSheet.create({
 // ─────────────────────────────────────────────────
 // Mode switcher
 // ─────────────────────────────────────────────────
-type AppMode = 'shift' | 'perm';
+type AppMode = 'shift' | 'perm' | 'search';
 
-function ModeSwitcher({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode) => void }) {
+// Какие кнопки показывать. У работника их три — третья, «Поиск», это единое
+// окно со своими и чужими вакансиями. У работодателя её нет: искать ему
+// нечего, он размещает.
+const MODE_LABELS: Record<AppMode, { label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = {
+  shift:  { label: 'Смены',  icon: 'flash' },
+  perm:   { label: 'Работа', icon: 'briefcase' },
+  search: { label: 'Поиск',  icon: 'search' },
+};
+
+function ModeSwitcher({ mode, onChange, modes = ['shift', 'perm'] }: {
+  mode: AppMode;
+  onChange: (m: AppMode) => void;
+  modes?: AppMode[];
+}) {
   const ref = useRef<View>(null);
   const measure = useCallback(() => {
     ref.current?.measureInWindow((x, y, w, h) => {
@@ -259,22 +273,21 @@ function ModeSwitcher({ mode, onChange }: { mode: AppMode; onChange: (m: AppMode
   useEffect(() => registerOnboardingMeasurer('switcher', measure), [measure]);
   return (
     <View ref={ref} onLayout={measure} style={ms.container}>
-      <TouchableOpacity
-        style={[ms.btn, mode === 'shift' && ms.btnActive]}
-        onPress={() => onChange('shift')}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="flash" size={14} color={mode === 'shift' ? '#fff' : Colors.textMuted} style={ms.btnIcon} />
-        <Text style={[ms.btnTxt, mode === 'shift' && ms.btnTxtActive]}>Смены</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[ms.btn, mode === 'perm' && ms.btnActive]}
-        onPress={() => onChange('perm')}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="briefcase" size={14} color={mode === 'perm' ? '#fff' : Colors.textMuted} style={ms.btnIcon} />
-        <Text style={[ms.btnTxt, mode === 'perm' && ms.btnTxtActive]}>Работа</Text>
-      </TouchableOpacity>
+      {modes.map(m => {
+        const { label, icon } = MODE_LABELS[m];
+        const active = mode === m;
+        return (
+          <TouchableOpacity
+            key={m}
+            style={[ms.btn, active && ms.btnActive]}
+            onPress={() => onChange(m)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name={icon} size={14} color={active ? '#fff' : Colors.textMuted} style={ms.btnIcon} />
+            <Text style={[ms.btnTxt, active && ms.btnTxtActive]}>{label}</Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
@@ -2312,9 +2325,9 @@ function WorkerHome() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <TabHeader tgAnchor />
       <View style={styles.modeSwitcherRow}>
-        <ModeSwitcher mode={mode} onChange={setMode} />
+        <ModeSwitcher mode={mode} onChange={setMode} modes={['shift', 'perm', 'search']} />
       </View>
-      {mode === 'shift' ? <WorkerFeed /> : <WorkerPermMode />}
+      {mode === 'shift' ? <WorkerFeed /> : mode === 'perm' ? <WorkerPermMode /> : <SearchMode />}
     </SafeAreaView>
   );
 }

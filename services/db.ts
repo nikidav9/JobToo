@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus, ReportableOutcome } from '@/constants/types';
+import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus, ReportableOutcome, ExternalVacancy } from '@/constants/types';
 import { uid, nowISO } from '@/services/storage';
 
 const DB_TIMEOUT = 12_000;
@@ -1261,6 +1261,46 @@ export async function dbSubmitRatingAndMaybeDelete(params: {
   );
 
   return { bothRated: !!(likeRow?.worker_rated && likeRow?.employer_rated) };
+}
+
+// ─── Чужие вакансии ───────────────────────────────────────────────────────────
+
+/**
+ * Всё живое из чужих источников. Сборщик (php-proxy/ingest.php) гасит
+ * `active` у пропавших, поэтому фильтровать по свежести здесь не нужно.
+ */
+export async function dbGetExternalVacancies(): Promise<ExternalVacancy[]> {
+  const rows = await proxy<any[]>('extVacancies');
+  return (rows ?? []).map(r => ({
+    id: r.id,
+    sourceId: r.source_id,
+    sourceName: r.source_name ?? undefined,
+    title: r.title,
+    company: r.company ?? undefined,
+    metroStation: r.metro_station ?? undefined,
+    address: r.address ?? undefined,
+    lat: r.lat ?? undefined,
+    lng: r.lng ?? undefined,
+    kind: r.kind === 'permanent' ? 'permanent' : 'shift',
+    date: r.date ?? undefined,
+    timeStart: r.time_start ?? undefined,
+    timeEnd: r.time_end ?? undefined,
+    salary: r.salary != null ? Number(r.salary) : undefined,
+    payPeriod: r.pay_period ?? undefined,
+    schedule: r.schedule ?? undefined,
+    description: r.description ?? undefined,
+    url: r.url,
+    lastSeenAt: r.last_seen_at ?? undefined,
+  }));
+}
+
+/**
+ * Человек ушёл к источнику. Молча и не мешая: ошибку глотаем и переход не
+ * задерживаем — потерянная строка статистики не стоит того, чтобы у человека
+ * не открылась вакансия.
+ */
+export async function dbRecordExternalClick(extId: string, sourceId: string, userId?: string): Promise<void> {
+  try { await proxy('extClick', [extId, sourceId, userId ?? null]); } catch { /* не мешаем переходу */ }
 }
 
 // ─── Push tokens ──────────────────────────────────────────────────────────────

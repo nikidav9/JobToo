@@ -155,6 +155,43 @@ export interface PermVacancy {
   createdAt: string;
 }
 
+/**
+ * Вакансия из чужого сервиса.
+ *
+ * Отдельный тип, а не `Vacancy` с флажком, ровно по той же причине, по какой
+ * они лежат в отдельной таблице (см. миграцию 031): на неё нельзя
+ * откликнуться, у неё нет работодателя в нашей базе, нет переписки и нет
+ * счётчика набранных. Если бы она приходила под видом обычной вакансии,
+ * любой забытый фильтр давал бы человеку кнопку «Откликнуться», за которой
+ * ничего нет.
+ */
+export interface ExternalVacancy {
+  id: string;
+  sourceId: string;
+  /** Как называется источник — это видно на карточке. */
+  sourceName?: string;
+  title: string;
+  company?: string;
+  metroStation?: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
+  /** shift — смена на дату, permanent — постоянная работа. */
+  kind: 'shift' | 'permanent';
+  date?: string;
+  timeStart?: string;
+  timeEnd?: string;
+  salary?: number;
+  /** За что платят: shift | hour | month. */
+  payPeriod?: string;
+  schedule?: string;
+  description?: string;
+  /** Куда уводим. Без него карточка бессмысленна. */
+  url: string;
+  /** Когда источник в последний раз показывал её живой. */
+  lastSeenAt?: string;
+}
+
 // hired — работодатель нажал «Завершить»: кандидат закрыт, карточка ушла из
 // «Мэтчей» в «Завершённые». Сама вакансия при этом остаётся в поиске, закрыть
 // её можно во вкладке «Активные».

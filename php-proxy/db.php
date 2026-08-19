@@ -2153,6 +2153,40 @@ try {
             $data = ['ok' => true]; break;
         }
 
+        // Чужие вакансии — приложению. Возвращаем вместе с названием
+        // источника: на карточке обязана быть надпись, откуда она, иначе это
+        // не агрегатор, а перепечатка чужого под своим именем.
+        case 'extVacancies': {
+            $rows = sb_select('jm_ext_vacancies', ['active' => 'is.true', 'limit' => '1000'],
+                '*', 'last_seen_at.desc');
+            $names = [];
+            foreach (sb_select('jm_ext_sources', [], 'id,name') as $s) {
+                $names[(string)$s['id']] = $s['name'];
+            }
+            foreach ($rows as &$r) {
+                $r['source_name'] = $names[(string)$r['source_id']] ?? null;
+                // Заголовок доступа к чужому фиду в этой таблице не лежит,
+                // но на всякий случай: наружу уходит только то, что нужно
+                // карточке.
+                unset($r['dedupe_key'], $r['external_id']);
+            }
+            unset($r);
+            $data = $rows; break;
+        }
+
+        // Переход на чужую вакансию. Ничего не проверяем и ничего не отдаём:
+        // это отметка в журнале, и задерживать из-за неё человека нельзя.
+        case 'extClick': {
+            sb_insert('jm_ext_clicks', [
+                'id'         => uid(),
+                'ext_id'     => (string)($args[0] ?? ''),
+                'source_id'  => (string)($args[1] ?? ''),
+                'user_id'    => ($args[2] ?? null) ?: null,
+                'clicked_at' => now_iso(),
+            ]);
+            $data = true; break;
+        }
+
         // Сводка по чужим вакансиям — для панели и для проверки, что фид жив.
         case 'extStats': {
             $rows = sb_select('jm_ext_vacancies', ['active' => 'is.true', 'select' => 'source_id,kind', 'limit' => '5000']);
