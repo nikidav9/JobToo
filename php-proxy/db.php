@@ -3318,6 +3318,39 @@ try {
             $data = true; break;
         }
 
+        // Старые имена — для приложений, до которых обновление ещё не дошло.
+        //
+        // Сервер выкладывается сразу, а установленное приложение обновляется
+        // при следующем запуске, и между этими двумя моментами у человека на
+        // телефоне живёт прежний код. Убери эти два случая — и у него просто
+        // перестала бы работать кнопка «подтвердить смену», без единого
+        // слова о причине.
+        //
+        // Причины у такой отметки нет и быть не может: старое приложение её
+        // не спрашивало. Поэтому подтверждение пишем как выход с неизвестной
+        // пунктуальностью, а отмену — как cancelled_legacy, то есть «отменено,
+        // виноватого не знаем». Приписать сюда невыход значило бы испортить
+        // человеку рейтинг за то, о чём его не спросили.
+        case 'dbConfirmShift': {
+            sb_update('jm_likes', ['id' => 'eq.' . $args[0]], [
+                'outcome' => 'worked', 'late_minutes' => null, 'outcome_at' => now_iso(),
+                'employer_confirmed' => true, 'worker_confirmed' => true,
+                'shift_completed' => true, 'cancelled' => false,
+            ]);
+            $lk = sb_single('jm_likes', ['id' => 'eq.' . $args[0]], 'worker_id,employer_id');
+            if (!empty($lk['worker_id'])) jt_recalc_score((string)$lk['worker_id']);
+            if (!empty($lk['employer_id'])) jt_recalc_employer_score((string)$lk['employer_id']);
+            $data = ['bothConfirmed' => true]; break;
+        }
+
+        case 'dbCancelShift': {
+            sb_update('jm_likes', ['id' => 'eq.' . $args[0]], [
+                'outcome' => 'cancelled_legacy', 'outcome_at' => now_iso(),
+                'cancelled' => true, 'shift_completed' => false,
+            ]);
+            $data = true; break;
+        }
+
         // ── Rating + match cleanup ─────────────────────────────────────────────
         case 'dbSubmitRatingAndMaybeDelete': {
             $p = $args[0];
