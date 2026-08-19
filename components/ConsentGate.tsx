@@ -1,0 +1,274 @@
+import React, { useEffect, useState } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+
+import { useApp } from '@/hooks/useApp';
+import { Colors, Radius } from '@/constants/theme';
+import { rs, rf } from '@/constants/scale';
+import { dbGetConsent, dbRecordConsent } from '@/services/db';
+import {
+  LEGAL_DOCS, LEGAL_KEYS, LEGAL_STAMP, legalVersions, needsReconsent, formatLegalDate,
+  type LegalDocKey,
+} from '@/constants/legal';
+
+/**
+ * Окно, без которого дальше нельзя: документы приняты или выход.
+ *
+ * ── Кому оно показывается ─────────────────────────────────────────────────
+ *
+ * Тем, у кого записанное согласие не совпадает с нынешним набором редакций.
+ * Сегодня это только те, кто регистрировался до 25 июня 2026: экрана с
+ * документами тогда не существовало, и согласия у них нет вовсе — в базе так
+ * и записано, пустым отпечатком. Раньше профиль честно сообщал им «Согласие
+ * ещё не давали» и не предлагал ничего сделать. Тупик закрыт.
+ *
+ * Сравнение идёт по `consentVersion`, а не по дате редакции. Разница не
+ * формальная: 18 августа в документах поменялся адрес поддержки, редакция
+ * поднялась — и по датам окно выскочило бы у всех четырёхсот двадцати из-за
+ * смены почты. См. пояснение в constants/legal.ts.
+ *
+ * ── Почему «Выйти», а не «Закрыть приложение» ─────────────────────────────
+ *
+ * Закрыть приложение программно нельзя на iOS: Apple это прямо запрещает и
+ * заворачивает такие сборки. В вебе вкладку тоже не закроешь. Кнопка, которая
+ * работает на одной платформе из трёх, — это не кнопка. Выход из аккаунта
+ * работает везде и означает ровно то же самое: пользоваться без согласия
+ * нельзя, но человек не заперт.
+ *
+ * ── Чего здесь намеренно нет ──────────────────────────────────────────────
+ *
+ * Крестика, свайпа вниз и закрытия по кнопке «назад». Окно, которое можно
+ * смахнуть, — это не согласие, а уведомление, и доказательной силы у него
+ * столько же.
+ */
+
+export default function ConsentGate() {
+  const app = useApp();
+  const insets = useSafeAreaInsets();
+
+  const user = app?.currentUser ?? null;
+  const [checked, setChecked] = useState(false);   // ответ базы получен
+  const [needed, setNeeded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  // Раскрытый документ. Тексты показываем прямо здесь, а не отправляем на
+  // экран /legal: окно перекрывает всё, что под ним, — человек ушёл бы читать
+  // и упёрся в него же поверх документа.
+  const [open, setOpen] = useState<LegalDocKey | null>(null);
+
+  useEffect(() => {
+    if (!user) { setChecked(false); setNeeded(false); return; }
+    let alive = true;
+    setChecked(false);
+    dbGetConsent(user.id)
+      .then(c => {
+        if (!alive) return;
+        setNeeded(needsReconsent(c?.stamp));
+        setChecked(true);
+      })
+      .catch(() => {
+        // Не достучались до базы — молчим и пропускаем. Показать окно из-за
+        // сорвавшегося запроса значит запереть человека на ровном месте:
+        // он нажмёт «Принять», согласие снова не запишется, и так по кругу.
+        if (alive) { setNeeded(false); setChecked(true); }
+      });
+    return () => { alive = false; };
+  }, [user?.id]);
+
+  async function accept() {
+    if (!user || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await dbRecordConsent(user.id, LEGAL_STAMP, legalVersions(), 'reconsent');
+      // Перечитываем, а не верим своей же отправке: dbRecordConsent глушит
+      // ошибки внутри, и «принято» без проверки означало бы, что человек
+      // прошёл дальше, а в базе пусто.
+      const c = await dbGetConsent(user.id);
+      if (needsReconsent(c?.stamp)) {
+        setError('Согласие не сохранилось. Проверьте связь и попробуйте ещё раз.');
+      } else {
+        setNeeded(false);
+      }
+    } catch {
+      setError('Не удалось сохранить. Проверьте связь и попробуйте ещё раз.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!user || !checked || !needed) return null;
+
+  const дата = formatLegalDate(LEGAL_DOCS.terms.version);
+
+  return (
+    <View style={[styles.overlay, { paddingTop: insets.top + rs(24) }]}>
+      <View style={styles.card}>
+        <View style={styles.iconWrap}>
+          <Ionicons name="document-text-outline" size={rf(26)} color={Colors.primary} />
+        </View>
+
+        <Text style={styles.title}>Примите документы</Text>
+        <Text style={styles.lead}>
+          Вы зарегистрировались раньше, чем в приложении появился экран с документами,
+          поэтому согласия у нас не записано. Чтобы пользоваться JobToo дальше,
+          его нужно дать.
+        </Text>
+
+        <ScrollView style={styles.docs} contentContainerStyle={{ paddingVertical: rs(4) }}>
+          {LEGAL_KEYS.map(key => {
+            const раскрыт = open === key;
+            return (
+              <View key={key} style={styles.docWrap}>
+                <TouchableOpacity
+                  style={styles.doc}
+                  activeOpacity={0.7}
+                  onPress={() => setOpen(раскрыт ? null : key)}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.docTitle}>{LEGAL_DOCS[key].title}</Text>
+                    <Text style={styles.docVersion}>
+                      Редакция от {formatLegalDate(LEGAL_DOCS[key].version)}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name={раскрыт ? 'chevron-up' : 'chevron-down'}
+                    size={rf(18)}
+                    color={Colors.textMuted}
+                  />
+                </TouchableOpacity>
+
+                {раскрыт ? (
+                  <View style={styles.docBody}>
+                    {LEGAL_DOCS[key].sections.map((sec, i) => (
+                      <View key={i} style={i > 0 ? { marginTop: rs(12) } : undefined}>
+                        {sec.heading ? (
+                          <Text style={styles.secHeading}>{sec.heading}</Text>
+                        ) : null}
+                        <Text style={styles.secBody}>{sec.body}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </ScrollView>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <TouchableOpacity
+          style={[styles.accept, busy && styles.acceptBusy]}
+          activeOpacity={0.85}
+          onPress={accept}
+          disabled={busy}
+        >
+          {busy
+            ? <ActivityIndicator color="#FFFFFF" />
+            : <Text style={styles.acceptText}>Принять</Text>}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.leave}
+          activeOpacity={0.7}
+          onPress={() => app?.logout()}
+          disabled={busy}
+        >
+          <Text style={styles.leaveText}>Выйти</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.note}>
+          Нажимая «Принять», вы соглашаетесь с документами в редакции от {дата}.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(17,17,17,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: rs(20),
+    // Выше вкладок и всего прочего: окно не должно оказаться под чем-нибудь
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  card: {
+    width: '100%',
+    maxWidth: rs(420),
+    maxHeight: '86%',
+    backgroundColor: Colors.card,
+    borderRadius: rs(Radius.xl),
+    padding: rs(22),
+  },
+  iconWrap: {
+    width: rs(52), height: rs(52), borderRadius: rs(26),
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: rs(14),
+  },
+  title: { fontSize: rf(21), fontWeight: '800', color: Colors.textPrimary },
+  lead: {
+    marginTop: rs(8),
+    fontSize: rf(14.5),
+    lineHeight: rf(21),
+    color: Colors.textSecondary,
+  },
+  docs: { marginTop: rs(16), flexGrow: 0 },
+  docWrap: { marginBottom: rs(8) },
+  doc: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: rs(12),
+    paddingHorizontal: rs(14),
+    backgroundColor: Colors.surface,
+    borderRadius: rs(12),
+  },
+  docTitle: { fontSize: rf(15), fontWeight: '700', color: Colors.textPrimary },
+  docVersion: { marginTop: rs(2), fontSize: rf(12.5), color: Colors.textMuted },
+  docBody: {
+    paddingHorizontal: rs(14),
+    paddingTop: rs(12),
+    paddingBottom: rs(4),
+  },
+  secHeading: {
+    fontSize: rf(13.5), fontWeight: '700',
+    color: Colors.textPrimary, marginBottom: rs(4),
+  },
+  secBody: { fontSize: rf(13.5), lineHeight: rf(20), color: Colors.textSecondary },
+  error: {
+    marginTop: rs(10),
+    fontSize: rf(13.5),
+    color: Colors.red,
+  },
+  accept: {
+    marginTop: rs(16),
+    height: rs(52),
+    borderRadius: rs(14),
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  acceptBusy: { opacity: 0.7 },
+  acceptText: { fontSize: rf(16), fontWeight: '800', color: '#FFFFFF' },
+  leave: {
+    marginTop: rs(6),
+    height: rs(46),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaveText: { fontSize: rf(15), fontWeight: '600', color: Colors.textSecondary },
+  note: {
+    marginTop: rs(4),
+    fontSize: rf(12),
+    lineHeight: rf(17),
+    color: Colors.textMuted,
+    textAlign: 'center',
+  },
+});

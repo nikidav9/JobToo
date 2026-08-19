@@ -11,6 +11,7 @@ import { useFonts } from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
 import { AlertProvider } from '@/template';
 import { AppProvider, AppContext } from '@/contexts/AppContext';
+import ConsentGate from '@/components/ConsentGate';
 import { ToastLayer } from '@/components/ui/ToastLayer';
 import { setupAndroidChannels } from '@/services/notifications';
 import { routeForNotification } from '@/services/notificationRoute';
@@ -203,6 +204,10 @@ export default function RootLayout() {
             <Stack.Screen name="create-perm-vacancy" />
             <Stack.Screen name="perm-vacancy-detail" />
           </Stack>
+          {/* Поверх всего, но под всплывающими сообщениями: окно закрывает
+              приложение до принятия документов, а сообщения о неудачной
+              записи должны быть видны и над ним. */}
+          <ConsentGate />
           <ToastLayer />
         </AppProvider>
       </SafeAreaProvider>
