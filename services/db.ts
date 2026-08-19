@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus } from '@/constants/types';
+import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus, ReportableOutcome } from '@/constants/types';
 import { uid, nowISO } from '@/services/storage';
 
 const DB_TIMEOUT = 12_000;
@@ -488,6 +488,9 @@ function rowToLike(r: any): Like {
     employerRated: r.employer_rated ?? false,
     shiftCompleted: r.shift_completed ?? false,
     cancelled: r.cancelled ?? false,
+    outcome: r.outcome ?? undefined,
+    lateMinutes: r.late_minutes ?? undefined,
+    outcomeAt: r.outcome_at ?? undefined,
   };
 }
 
@@ -1177,26 +1180,35 @@ export async function dbGetRatingsForUser(toUserId: string): Promise<UserRating[
   }));
 }
 
-// ─── Shift confirmation ───────────────────────────────────────────────────────
+// ─── Итог смены ───────────────────────────────────────────────────────────────
 
-export async function dbConfirmShift(likeId: string, _role: 'employer'): Promise<{ bothConfirmed: boolean }> {
-  if (IS_NATIVE) { return proxy<{ bothConfirmed: boolean }>('dbConfirmShift', [likeId]); }
+/**
+ * Отметить, чем кончилась смена. Заменяет прежнюю пару «подтвердить /
+ * отменить»: подтверждение теперь несёт ещё и опоздание, а отмена — причину.
+ *
+ * Старые колонки заполняем здесь же. Весь экран «Мэтчи» читает
+ * `shiftCompleted` и `cancelled`, и если бы источником правды стал только
+ * `outcome`, смена после отметки просто осталась бы висеть активной.
+ */
+export async function dbSetShiftOutcome(
+  likeId: string,
+  outcome: ReportableOutcome,
+  opts: { lateMinutes?: number; by?: string } = {}
+): Promise<void> {
+  if (IS_NATIVE) { await proxy('dbSetShiftOutcome', [likeId, outcome, opts]); return; }
+  const worked = outcome === 'worked';
   await withTimeout(
     supabase.from('jm_likes').update({
-      employer_confirmed: true,
-      worker_confirmed: true,
-      shift_completed: true,
+      outcome,
+      late_minutes: worked ? (opts.lateMinutes ?? 0) : null,
+      outcome_at: nowISO(),
+      outcome_by: opts.by ?? null,
+      // проекция для существующих экранов
+      employer_confirmed: worked,
+      worker_confirmed: worked,
+      shift_completed: worked,
+      cancelled: !worked,
     }).eq('id', likeId)
-  );
-  return { bothConfirmed: true };
-}
-
-// Директор отменяет смену (работник пропал и т.п.). Мэтч уходит в «Завершённые»
-// со статусом «Отменена», но НЕ помечается как завершённая смена.
-export async function dbCancelShift(likeId: string): Promise<void> {
-  if (IS_NATIVE) { await proxy('dbCancelShift', [likeId]); return; }
-  await withTimeout(
-    supabase.from('jm_likes').update({ cancelled: true }).eq('id', likeId)
   );
 }
 

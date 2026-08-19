@@ -409,18 +409,32 @@ export async function notifyWorkerShiftConfirmedByEmployer(
   );
 }
 
+/**
+ * Смена не состоялась. Текст зависит от того, из-за чего.
+ *
+ * Прежде он был один на все случаи: «компания отменила смену». Работнику,
+ * которого только что отметили не вышедшим, приходило письмо о том, что смену
+ * отменил работодатель, — неправда, и вдобавок отметку, которая пойдёт ему в
+ * рейтинг, он бы так и не увидел. Пусть видит: если это ошибка, он успеет
+ * написать в поддержку, пока помнит, как всё было.
+ */
 export async function notifyWorkerShiftCancelled(
   workerId: string,
   companyName: string,
   vacancyTitle: string,
+  outcome?: 'no_show' | 'worker_cancelled' | 'employer_cancelled',
 ): Promise<void> {
-  await pushTo(
-    workerId,
-    '❌ Смена отменена',
-    `${companyName} отменил смену «${vacancyTitle}». Загляните в приложение — там много других подработок!`,
-    'shift_cancelled',
-    'matches',
-  );
+  const [title, body] =
+    outcome === 'no_show'
+      ? ['⚠️ Отмечен невыход',
+         `${companyName} отметил, что вы не вышли на смену «${vacancyTitle}». Это влияет на рейтинг. Если это ошибка — напишите в поддержку.`]
+      : outcome === 'worker_cancelled'
+      ? ['Смена отменена',
+         `Ваш отказ от смены «${vacancyTitle}» (${companyName}) записан. На рейтинг он не влияет.`]
+      : ['❌ Смена отменена',
+         `${companyName} отменил смену «${vacancyTitle}». Загляните в приложение — там много других подработок!`];
+
+  await pushTo(workerId, title, body, 'shift_cancelled', 'matches');
 }
 
 export async function notifyWorkerNewMessage(

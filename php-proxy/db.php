@@ -2889,16 +2889,30 @@ try {
         case 'dbGetRatingsForUser':
             $data = sb_select('jm_ratings', ['to_user_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;
 
-        // ── Shift confirmation ─────────────────────────────────────────────────
-        case 'dbConfirmShift':
-            sb_update('jm_likes', ['id' => 'eq.' . $args[0]],
-                ['employer_confirmed' => true, 'worker_confirmed' => true, 'shift_completed' => true]);
-            $data = ['bothConfirmed' => true]; break;
-
-        case 'dbCancelShift':
-            // Отмена смены директором — мэтч уходит в «Завершённые» как отменённый
-            sb_update('jm_likes', ['id' => 'eq.' . $args[0]], ['cancelled' => true]);
+        // ── Итог смены ─────────────────────────────────────────────────────────
+        // Раньше здесь было двое ворот: «подтвердить» и «отменить». Отмена
+        // означала и невыход, и предупредивший отказ, и отмену самим
+        // работодателем — то есть ровно то, что нужно рейтингу, и терялось.
+        // Старые колонки заполняем по-прежнему: по ним написан экран «Мэтчи».
+        case 'dbSetShiftOutcome': {
+            $lid = $args[0];
+            $out = $args[1];
+            $opts = $args[2] ?? [];
+            $ok = ['worked', 'no_show', 'worker_cancelled', 'employer_cancelled'];
+            if (!in_array($out, $ok, true)) throw new Exception('неизвестный итог смены');
+            $worked = $out === 'worked';
+            sb_update('jm_likes', ['id' => 'eq.' . $lid], [
+                'outcome'      => $out,
+                'late_minutes' => $worked ? (int)($opts['lateMinutes'] ?? 0) : null,
+                'outcome_at'   => now_iso(),
+                'outcome_by'   => $opts['by'] ?? null,
+                'employer_confirmed' => $worked,
+                'worker_confirmed'   => $worked,
+                'shift_completed'    => $worked,
+                'cancelled'          => !$worked,
+            ]);
             $data = true; break;
+        }
 
         // ── Rating + match cleanup ─────────────────────────────────────────────
         case 'dbSubmitRatingAndMaybeDelete': {

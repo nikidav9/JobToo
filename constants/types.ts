@@ -65,7 +65,32 @@ export interface Like {
   employerRated?: boolean;
   shiftCompleted?: boolean;
   cancelled?: boolean;
+  // Чем смена кончилась на самом деле. `shiftCompleted`/`cancelled` — то же
+  // самое, но грубее: по ним не отличить невыход от отмены работодателем.
+  outcome?: ShiftOutcome;
+  // Минуты опоздания. 0 — пришёл вовремя, не задано — не спрашивали
+  // (все смены до августа 2026).
+  lateMinutes?: number;
+  outcomeAt?: string;
 }
+
+/**
+ * Исход смены. Отдельные значения вместо одной галочки «отменена» нужны
+ * рейтингу: невыход — это про работника, отмена работодателем — про
+ * работодателя, а предупредивший отказ не позорит никого.
+ *
+ * `cancelled_legacy` — то, что отменили до появления причин. Причину тогда
+ * не спрашивали, поэтому в статистику такие смены не идут вовсе.
+ */
+export type ShiftOutcome =
+  | 'worked'
+  | 'no_show'
+  | 'worker_cancelled'
+  | 'employer_cancelled'
+  | 'cancelled_legacy';
+
+/** Что работодатель может отметить руками. `cancelled_legacy` только читается. */
+export type ReportableOutcome = Exclude<ShiftOutcome, 'cancelled_legacy'>;
 
 export interface Message {
   id: string;

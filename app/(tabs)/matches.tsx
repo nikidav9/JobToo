@@ -10,10 +10,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { Like, Vacancy, PermApplication, PermVacancy, Chat } from '@/constants/types';
+import { Like, Vacancy, PermApplication, PermVacancy, Chat, ReportableOutcome } from '@/constants/types';
 import { formatDate, getInitials, nameColorFromString } from '@/services/storage';
 import {
-  dbUpsertLike, dbCheckAndCreateMatch, dbConfirmShift, dbCancelShift,
+  dbUpsertLike, dbCheckAndCreateMatch, dbSetShiftOutcome,
   dbSetPermApplicationStatus, dbCreateChat,
 } from '@/services/db';
 import { TabHeader } from '@/components/ui/TabHeader';
@@ -38,18 +38,35 @@ import { rs, rf } from '@/constants/scale';
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function MatchStatus({ like, isWorker }: { like: Like; isWorker: boolean }) {
   if (like.cancelled) {
+    // Смены до августа 2026 (`cancelled_legacy`) и те, где исход почему-то не
+    // записался, показываем прежней общей надписью: причины у них нет, и
+    // выдумывать её задним числом нельзя.
+    const почему =
+      like.outcome === 'no_show' ? 'Работник не вышел'
+      : like.outcome === 'worker_cancelled' ? 'Работник отказался'
+      : like.outcome === 'employer_cancelled' ? 'Смену отменил работодатель'
+      : 'Смена отменена';
     return (
       <View style={[s.statusBadge, { backgroundColor: '#FEE2E2' }]}>
         <Ionicons name="close-circle" size={14} color={Colors.red} />
-        <Text style={[s.statusTxt, { color: Colors.red }]}>Смена отменена</Text>
+        <Text style={[s.statusTxt, { color: Colors.red }]}>{почему}</Text>
       </View>
     );
   }
   if (like.shiftCompleted) {
+    // Опоздание не прячем: оно и так уже в рейтинге, а увидеть его на карточке
+    // честнее, чем узнать о нём только из цифры в профиле.
+    const опоздал = (like.lateMinutes ?? 0) > 0;
     return (
-      <View style={[s.statusBadge, { backgroundColor: '#D1FAE5' }]}>
-        <Ionicons name="checkmark-circle" size={14} color={Colors.green} />
-        <Text style={[s.statusTxt, { color: Colors.green }]}>Смена завершена</Text>
+      <View style={[s.statusBadge, { backgroundColor: опоздал ? '#FEF3C7' : '#D1FAE5' }]}>
+        <Ionicons
+          name={опоздал ? 'alert-circle' : 'checkmark-circle'}
+          size={14}
+          color={опоздал ? '#B45309' : Colors.green}
+        />
+        <Text style={[s.statusTxt, { color: опоздал ? '#B45309' : Colors.green }]}>
+          {опоздал ? 'Завершена, с опозданием' : 'Смена завершена'}
+        </Text>
       </View>
     );
   }
@@ -101,34 +118,68 @@ function MatchStatus({ like, isWorker }: { like: Like; isWorker: boolean }) {
   );
 }
 
-// ─── Confirm shift banner (employer only) with confirmation dialog ─────────────
-function ConfirmBanner({ onConfirm, onCancelShift, loading }: {
-  onConfirm: () => void;
-  onCancelShift: () => void;
+// ─── Отметка исхода смены (у работодателя) ────────────────────────────────────
+//
+// Раньше здесь была галочка и крестик: смена либо «завершена», либо
+// «отменена». Отменённой оказывалась и та, где работник не вышел, и та, где
+// он честно предупредил накануне, и та, которую отменил сам работодатель.
+// Три разных факта, из которых для рейтинга годится только первый, лежали в
+// базе одной строкой и были неразличимы.
+//
+// Спрашиваем в два касания, не больше: чем длиннее опрос, тем чаще его
+// пропускают, а пропущенная отметка — это дыра в истории работника.
+
+// Опоздание спрашиваем корзинами, а не минутами: точную цифру никто не
+// помнит, а «до пятнадцати» помнят все. Пишем середину корзины — на проценте
+// пунктуальности разница неощутима, а в споре видно, о каком порядке речь.
+const LATE_BUCKETS: { label: string; minutes: number }[] = [
+  { label: 'до 15 минут',   minutes: 10 },
+  { label: '15–30 минут',   minutes: 22 },
+  { label: '30–60 минут',   minutes: 45 },
+  { label: 'больше часа',   minutes: 90 },
+];
+
+function DialogRow({ title, sub, tone = 'plain', onPress }: {
+  title: string;
+  sub?: string;
+  tone?: 'plain' | 'good' | 'bad';
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={s.choiceRow} onPress={onPress} activeOpacity={0.75}>
+      <View style={{ flex: 1 }}>
+        <Text style={[
+          s.choiceTitle,
+          tone === 'good' ? { color: Colors.green } : null,
+          tone === 'bad' ? { color: Colors.red } : null,
+        ]}>{title}</Text>
+        {sub ? <Text style={s.choiceSub}>{sub}</Text> : null}
+      </View>
+      <Ionicons name="chevron-forward" size={rf(16)} color={Colors.textMuted} />
+    </TouchableOpacity>
+  );
+}
+
+function ConfirmBanner({ onOutcome, loading }: {
+  onOutcome: (outcome: ReportableOutcome, lateMinutes?: number) => void;
   loading: boolean;
 }) {
-  const [showDialog, setShowDialog] = useState(false);
-  const [showCancel, setShowCancel] = useState(false);
+  // null — окно закрыто; 'came' — вышел ли; 'late' — насколько опоздал;
+  // 'failed' — почему не состоялась.
+  const [step, setStep] = useState<null | 'came' | 'late' | 'failed'>(null);
+  const close = () => setStep(null);
 
   return (
     <>
       <View style={s.confirmBanner}>
         <Ionicons name="time-outline" size={22} color="#92400E" />
         <View style={{ flex: 1 }}>
-          <Text style={s.confirmBannerTitle}>Подтвердите смену</Text>
-          <Text style={s.confirmBannerSub}>Смена состоялась — подтвердите, или отмените, если сорвалась</Text>
+          <Text style={s.confirmBannerTitle}>Отметьте смену</Text>
+          <Text style={s.confirmBannerSub}>Вышел ли работник — и вовремя ли</Text>
         </View>
         <TouchableOpacity
-          style={s.cancelBannerBtn}
-          onPress={() => setShowCancel(true)}
-          disabled={loading}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="close" size={18} color={Colors.red} />
-        </TouchableOpacity>
-        <TouchableOpacity
           style={s.confirmBannerBtn}
-          onPress={() => setShowDialog(true)}
+          onPress={() => setStep('came')}
           disabled={loading}
           activeOpacity={0.8}
         >
@@ -139,57 +190,84 @@ function ConfirmBanner({ onConfirm, onCancelShift, loading }: {
         </TouchableOpacity>
       </View>
 
-      {showDialog ? (
+      {step === 'came' ? (
         <View style={s.dialogOverlay}>
           <View style={s.dialogCard}>
-            <Text style={s.dialogTitle}>Подтвердить завершение смены?</Text>
+            <Text style={s.dialogTitle}>Как прошла смена?</Text>
             <Text style={s.dialogBody}>
-              Смена будет отмечена как завершённая. Вам предложат оценить работника.
+              Ответ попадёт в рейтинг работника — его видят другие работодатели.
             </Text>
-            <View style={s.dialogBtns}>
-              <TouchableOpacity
-                style={s.dialogCancelBtn}
-                onPress={() => setShowDialog(false)}
-                activeOpacity={0.8}
-              >
-                <Text style={s.dialogCancelTxt} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Отмена</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={s.dialogConfirmBtn}
-                onPress={() => { setShowDialog(false); onConfirm(); }}
-                activeOpacity={0.8}
-              >
-                <Text style={s.dialogConfirmTxt} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Подтвердить</Text>
-              </TouchableOpacity>
+            <View style={s.choices}>
+              <DialogRow
+                title="Вышел вовремя"
+                tone="good"
+                onPress={() => { close(); onOutcome('worked', 0); }}
+              />
+              <DialogRow
+                title="Вышел, но опоздал"
+                onPress={() => setStep('late')}
+              />
+              <DialogRow
+                title="Смена не состоялась"
+                tone="bad"
+                onPress={() => setStep('failed')}
+              />
             </View>
+            <TouchableOpacity style={s.dialogCancelBtn} onPress={close} activeOpacity={0.8}>
+              <Text style={s.dialogCancelTxt}>Позже</Text>
+            </TouchableOpacity>
           </View>
         </View>
       ) : null}
 
-      {showCancel ? (
+      {step === 'late' ? (
         <View style={s.dialogOverlay}>
           <View style={s.dialogCard}>
-            <Text style={s.dialogTitle}>Отменить смену?</Text>
-            <Text style={s.dialogBody}>
-              Смена уйдёт в «Завершённые» со статусом «Отменена». Работник получит
-              уведомление об отмене. Оценивать никого не нужно.
-            </Text>
-            <View style={s.dialogBtns}>
-              <TouchableOpacity
-                style={s.dialogCancelBtn}
-                onPress={() => setShowCancel(false)}
-                activeOpacity={0.8}
-              >
-                <Text style={s.dialogCancelTxt} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Назад</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={s.dialogDangerBtn}
-                onPress={() => { setShowCancel(false); onCancelShift(); }}
-                activeOpacity={0.8}
-              >
-                <Text style={s.dialogConfirmTxt} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Отменить</Text>
-              </TouchableOpacity>
+            <Text style={s.dialogTitle}>Насколько опоздал?</Text>
+            <View style={s.choices}>
+              {LATE_BUCKETS.map(b => (
+                <DialogRow
+                  key={b.minutes}
+                  title={b.label}
+                  onPress={() => { close(); onOutcome('worked', b.minutes); }}
+                />
+              ))}
             </View>
+            <TouchableOpacity style={s.dialogCancelBtn} onPress={() => setStep('came')} activeOpacity={0.8}>
+              <Text style={s.dialogCancelTxt}>Назад</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      {step === 'failed' ? (
+        <View style={s.dialogOverlay}>
+          <View style={s.dialogCard}>
+            <Text style={s.dialogTitle}>Что произошло?</Text>
+            <Text style={s.dialogBody}>
+              Смена уйдёт в «Завершённые». Оценивать никого не нужно.
+            </Text>
+            <View style={s.choices}>
+              <DialogRow
+                title="Не вышел"
+                sub="Не пришёл и не предупредил — это снизит его рейтинг"
+                tone="bad"
+                onPress={() => { close(); onOutcome('no_show'); }}
+              />
+              <DialogRow
+                title="Отказался заранее"
+                sub="Предупредил до начала смены"
+                onPress={() => { close(); onOutcome('worker_cancelled'); }}
+              />
+              <DialogRow
+                title="Отменили мы"
+                sub="Смена не понадобилась — на рейтинг работника не влияет"
+                onPress={() => { close(); onOutcome('employer_cancelled'); }}
+              />
+            </View>
+            <TouchableOpacity style={s.dialogCancelBtn} onPress={() => setStep('came')} activeOpacity={0.8}>
+              <Text style={s.dialogCancelTxt}>Назад</Text>
+            </TouchableOpacity>
           </View>
         </View>
       ) : null}
@@ -573,22 +651,37 @@ function EmployerMatches() {
     }
   };
 
-  const confirmShift = async (like: Like) => {
+  /**
+   * Одна отметка на все исходы. Вышел — дальше по-старому: уведомление и
+   * экран оценки. Не вышел или сорвалось — уведомление об отмене и всё,
+   * оценивать некого.
+   */
+  const setOutcome = async (like: Like, outcome: ReportableOutcome, lateMinutes?: number) => {
     const key = like.id + '_shift';
     setLoading(key);
     try {
-      await dbConfirmShift(like.id, 'employer');
+      await dbSetShiftOutcome(like.id, outcome, { lateMinutes, by: currentUser.id });
       refreshAll().catch(() => {});
       const worker = getWorker(like.workerId);
       const vac = getVacancy(like.vacancyId);
       const workerName = worker ? `${worker.firstName} ${worker.lastName}` : 'Работник';
       const company = currentUser.company ?? `${currentUser.firstName} ${currentUser.lastName}`;
 
+      if (outcome !== 'worked') {
+        if (worker && vac) {
+          notifyWorkerShiftCancelled(worker.id, company, vac.title, outcome).catch(() => {});
+        }
+        showToast('Отмечено', 'success');
+        return;
+      }
+
       if (worker && vac) {
         notifyWorkerShiftConfirmedByEmployer(worker.id, company, vac.title).catch(() => {});
       }
-
-      showToast('Смена подтверждена! Оцените работника', 'success');
+      showToast(
+        lateMinutes ? 'Смена засчитана, опоздание отмечено' : 'Смена подтверждена! Оцените работника',
+        'success',
+      );
 
       if (worker && vac) {
         router.push({
@@ -602,26 +695,6 @@ function EmployerMatches() {
           },
         });
       }
-    } catch {
-      showToast('Ошибка', 'error');
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const cancelShift = async (like: Like) => {
-    const key = like.id + '_shift';
-    setLoading(key);
-    try {
-      await dbCancelShift(like.id);
-      refreshAll().catch(() => {});
-      const worker = getWorker(like.workerId);
-      const vac = getVacancy(like.vacancyId);
-      const company = currentUser.company ?? `${currentUser.firstName} ${currentUser.lastName}`;
-      if (worker && vac) {
-        notifyWorkerShiftCancelled(worker.id, company, vac.title).catch(() => {});
-      }
-      showToast('Смена отменена', 'success');
     } catch {
       showToast('Ошибка', 'error');
     } finally {
@@ -896,8 +969,7 @@ function EmployerMatches() {
 
           {!like.shiftCompleted && !like.cancelled && !like.employerConfirmed ? (
             <ConfirmBanner
-              onConfirm={() => confirmShift(like)}
-              onCancelShift={() => cancelShift(like)}
+              onOutcome={(outcome, lateMinutes) => setOutcome(like, outcome, lateMinutes)}
               loading={isShiftLoading}
             />
           ) : null}
@@ -1303,11 +1375,18 @@ const s = StyleSheet.create({
     width: rs(36), height: rs(36), borderRadius: rs(18),
     backgroundColor: Colors.green, alignItems: 'center', justifyContent: 'center',
   },
-  cancelBannerBtn: {
-    width: rs(36), height: rs(36), borderRadius: rs(18), marginRight: rs(8),
-    backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FECACA',
-    alignItems: 'center', justifyContent: 'center',
+  // Варианты ответа списком, а не двумя кнопками в ряд: их три-четыре, и в
+  // ряд они не помещаются, а подпись под каждым нужна — без неё «отказался»
+  // и «не вышел» на вид одно и то же.
+  choices: { gap: rs(8), marginTop: rs(4) },
+  choiceRow: {
+    flexDirection: 'row', alignItems: 'center', gap: rs(10),
+    backgroundColor: Colors.surface, borderRadius: rs(12),
+    paddingVertical: rs(12), paddingHorizontal: rs(14),
+    borderWidth: 1, borderColor: Colors.inputBorder,
   },
+  choiceTitle: { fontSize: rf(15), fontWeight: '700', color: Colors.textPrimary },
+  choiceSub: { fontSize: rf(12.5), color: Colors.textMuted, marginTop: rs(2), lineHeight: rf(17) },
   dialogOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100,
