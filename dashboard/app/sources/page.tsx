@@ -29,7 +29,30 @@ type Source = {
   last_count: number | null
 }
 
-type Stats = { всего: number; по_источникам: Record<string, number> }
+type Stats = {
+  всего: number
+  по_источникам: Record<string, number>
+  переходов_7дней?: number
+  переходы_по_источникам?: Record<string, number>
+  без_станции?: number
+  без_профессии?: number
+}
+
+type ExtVacancy = {
+  id: string
+  source_id: string
+  source_name: string | null
+  title: string
+  company: string | null
+  metro_station: string | null
+  metro_station_norm: string | null
+  work_type: string | null
+  kind: string
+  date: string | null
+  salary: number | null
+  pay_period: string | null
+  url: string
+}
 
 function when(v: string | null): string {
   if (!v) return 'ни разу'
@@ -43,6 +66,101 @@ function when(v: string | null): string {
 }
 
 const SAMPLE = 'https://jobtoo.ru/api/v1/sample-feed.json'
+
+/**
+ * Что именно лежит в базе.
+ *
+ * Понадобилось после простого вопроса, на который нечем было ответить:
+ * «у нас три чужих вакансии — что это за вакансии?». Сводка отвечала
+ * «три» и молчала о том, какие.
+ *
+ * Показываем и разобранное, и исходное: рядом с приведённой станцией —
+ * то, как её прислал источник. По одной приведённой не понять, почему
+ * разбор ошибся, а поправлять придётся именно исходное.
+ */
+function VacancyList() {
+  const [open, setOpen] = useState(false)
+  const [rows, setRows] = useState<ExtVacancy[] | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function load() {
+    setErr(null)
+    try {
+      const res = await fetch('/api/admin/ext-sources?vacancies=1', {
+        headers: { 'X-Admin-Token': getToken() },
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setRows((data.vacancies ?? []) as ExtVacancy[])
+    } catch (e: any) { setErr(e.message) }
+  }
+
+  function toggle() {
+    const next = !open
+    setOpen(next)
+    if (next && rows === null) load()
+  }
+
+  return (
+    <div className="jt-card" style={{ overflow: 'hidden' }}>
+      <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>Чужие вакансии в базе</div>
+        <Button onClick={toggle}>{open ? 'Свернуть' : 'Показать'}</Button>
+        {open && <Button onClick={load}>Обновить</Button>}
+      </div>
+
+      {err && <div style={{ padding: '0 16px 16px', color: 'var(--negative)', fontSize: 13.5 }}>{err}</div>}
+
+      {open ? (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="jt-table" style={{ minWidth: 900 }}>
+            <thead>
+              <tr>
+                {['Вакансия', 'Источник', 'Метро', 'Профессия', 'Когда', 'Оплата', ''].map(h => <th key={h}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {rows === null && <tr><td colSpan={7} style={{ padding: 16, color: 'var(--ink-3)' }}>Загружаю…</td></tr>}
+              {rows !== null && !rows.length && (
+                <tr><td colSpan={7} style={{ padding: 16, color: 'var(--ink-3)' }}>Пока пусто.</td></tr>
+              )}
+              {(rows ?? []).map(v => (
+                <tr key={v.id}>
+                  <td>
+                    <div style={{ fontWeight: 550, color: 'var(--ink)' }}>{v.title}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{v.company ?? '—'}</div>
+                  </td>
+                  <td style={{ color: 'var(--ink-2)' }}>{v.source_name ?? v.source_id}</td>
+                  <td>
+                    {v.metro_station_norm
+                      ? <span style={{ color: 'var(--ink-2)' }}>{v.metro_station_norm}</span>
+                      : <Chip tone="neutral">не узнали</Chip>}
+                    {v.metro_station && v.metro_station !== v.metro_station_norm ? (
+                      <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>прислали: {v.metro_station}</div>
+                    ) : null}
+                  </td>
+                  <td style={{ color: 'var(--ink-2)' }}>
+                    {v.work_type ?? <Chip tone="neutral">—</Chip>}
+                  </td>
+                  <td className="num" style={{ color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>
+                    {v.kind === 'permanent' ? 'постоянная' : (v.date ?? '—')}
+                  </td>
+                  <td className="num" style={{ color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>
+                    {v.salary ? `${v.salary.toLocaleString('ru-RU')} ₽` : '—'}
+                    {v.salary && v.pay_period ? <span style={{ color: 'var(--ink-3)' }}> / {v.pay_period}</span> : null}
+                  </td>
+                  <td>
+                    <a href={v.url} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>открыть</a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
 export default function SourcesPage() {
   const [items, setItems] = useState<Source[]>([])
@@ -142,7 +260,29 @@ export default function SourcesPage() {
           <KpiCard label="Источников с ошибкой"
             value={items.filter(s => s.last_status && !s.last_status.startsWith('ок')).length}
             sub="последний заход не удался" />
+          {/* Переходы — единственная цифра, по которой видно, нужен ли
+              источник людям. «В базе 400 вакансий» без неё не значит ничего. */}
+          <KpiCard label="Переходов за неделю" value={stats?.переходов_7дней ?? null}
+            sub="люди ушли к источнику" />
         </div>
+
+        {/* Качество разбора. Станция, которую мы не узнали, не попадает в
+            фильтр по метро — вакансия висит в поиске, но найти её по метро
+            нельзя. Молчать об этом нельзя: снаружи это выглядит как «поиск
+            не работает». */}
+        {stats && ((stats.без_станции ?? 0) > 0 || (stats.без_профессии ?? 0) > 0) ? (
+          <div className="jt-card" style={{ padding: 16 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Что не разобралось</div>
+            <div style={{ fontSize: 13.5, color: 'var(--ink-2)', maxWidth: '68ch' }}>
+              Станция не узнана: <b className="num">{stats.без_станции ?? 0}</b> — эти вакансии есть
+              в поиске, но не находятся по метро.{' '}
+              Профессия не определена: <b className="num">{stats.без_профессии ?? 0}</b> — не попадают
+              под фильтр по профессии.
+              {' '}Если доля велика, стоит попросить источник присылать станцию отдельным полем,
+              без приставок и пояснений.
+            </div>
+          </div>
+        ) : null}
 
         <div className="jt-card" style={{ padding: 16 }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Как это работает</div>
@@ -193,13 +333,13 @@ export default function SourcesPage() {
           <table className="jt-table" style={{ minWidth: 700 }}>
             <thead>
               <tr>
-                {['Источник', 'Последний заход', 'Что вышло', 'В базе', ''].map(h => <th key={h}>{h}</th>)}
+                {['Источник', 'Последний заход', 'Что вышло', 'В базе', 'Переходов', ''].map(h => <th key={h}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={5} style={{ padding: 16, color: 'var(--ink-3)' }}>Загружаю…</td></tr>}
+              {loading && <tr><td colSpan={6} style={{ padding: 16, color: 'var(--ink-3)' }}>Загружаю…</td></tr>}
               {!loading && !items.length && (
-                <tr><td colSpan={5} style={{ padding: 16, color: 'var(--ink-3)' }}>
+                <tr><td colSpan={6} style={{ padding: 16, color: 'var(--ink-3)' }}>
                   Источников пока нет. Нажмите «Подставить наш образец», чтобы посмотреть, как всё работает.
                 </td></tr>
               )}
@@ -229,6 +369,9 @@ export default function SourcesPage() {
                     <td className="num" style={{ color: 'var(--ink-2)' }}>
                       {stats?.по_источникам?.[s.id] ?? 0}
                     </td>
+                    <td className="num" style={{ color: 'var(--ink-2)' }}>
+                      {stats?.переходы_по_источникам?.[s.id] ?? 0}
+                    </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <Button style={{ height: 28, padding: '0 10px' }}
@@ -253,10 +396,12 @@ export default function SourcesPage() {
           </div>
         </div>
 
+        <VacancyList />
+
         <div style={{ fontSize: 12.5, color: 'var(--ink-3)', maxWidth: '68ch' }}>
-          Чужие вакансии пока копятся в базе, но в ленту приложения не выводятся. Это намеренно:
-          показывать людям записи из непроверенного фида нельзя. Включим, когда появится настоящий
-          источник — и сразу с пометкой, откуда вакансия и куда она ведёт.
+          Чужие вакансии видны людям во вкладке «Поиск» — с пометкой источника и кнопкой
+          «Открыть у источника». Откликнуться у нас на них нельзя, и карточка об этом говорит
+          прямо: отклик происходит на той стороне.
         </div>
       </div>
     </div>

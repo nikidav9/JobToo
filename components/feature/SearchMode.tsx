@@ -10,11 +10,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import { rs, rf } from '@/constants/scale';
 import { useApp } from '@/hooks/useApp';
-import { ExternalVacancy, PermVacancy, Vacancy } from '@/constants/types';
+import { ExternalVacancy, PermVacancy, Vacancy, WorkType } from '@/constants/types';
 import { dbGetExternalVacancies, dbRecordExternalClick } from '@/services/db';
 import { MetroMap, MapListItem } from '@/components/feature/MetroMap';
 import { payShort } from '@/services/pay';
 import { normalizeCompany } from '@/services/storage';
+import { WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
 
 /**
  * «Поиск» — единое окно: наши смены, наша постоянная работа и вакансии из
@@ -41,7 +42,13 @@ type SearchItem = {
   kind: Kind;
   title: string;
   company: string;
+  /** Станция из нашего справочника — по ней и фильтруем. */
   station?: string;
+  /** Что показать в карточке: у чужой вакансии станцию могли прислать так,
+   *  что мы её не узнали, — тогда покажем как прислали, а в фильтр она не
+   *  попадёт. Промолчать о станции хуже: она есть, просто незнакомая. */
+  stationLabel?: string;
+  workType?: WorkType;
   address?: string;
   lat?: number;
   lng?: number;
@@ -111,6 +118,7 @@ export function SearchMode() {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<KindFilter>('all');
   const [minSalary, setMinSalary] = useState(0);
+  const [profession, setProfession] = useState<WorkType | null>(null);
   const [station, setStation] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
 
@@ -135,7 +143,7 @@ export function SearchMode() {
     setRefreshing(false);
   };
 
-  // Смена филрта по виду сбрасывает порог оплаты: он задан в единицах
+  // Смена фильтра по виду сбрасывает порог оплаты: он задан в единицах
   // прежнего вида, и «от 50 000» в сменах не нашло бы ничего вообще.
   const changeKind = (k: KindFilter) => { setKind(k); setMinSalary(0); };
 
@@ -151,6 +159,8 @@ export function SearchMode() {
         title: v.title,
         company: normalizeCompany(v.company),
         station: v.metroStation,
+        stationLabel: v.metroStation,
+        workType: v.workType,
         address: v.address,
         lat: v.lat,
         lng: v.lng,
@@ -171,6 +181,8 @@ export function SearchMode() {
         title: p.title,
         company: normalizeCompany(p.company),
         station: p.metroStation,
+        stationLabel: p.metroStation,
+        workType: p.workType,
         address: p.address,
         lat: p.lat,
         lng: p.lng,
@@ -181,7 +193,17 @@ export function SearchMode() {
       });
     }
 
+    // Одна и та же смена приезжает из двух источников — показываем одну.
+    // Отпечаток считает сборщик (php-proxy/ingest.php) по компании,
+    // должности, станции, дате и началу; здесь остаётся только не положить
+    // вторую с тем же отпечатком.
+    const виденные = new Set<string>();
+
     for (const e of external) {
+      if (e.dedupeKey) {
+        if (виденные.has(e.dedupeKey)) continue;
+        виденные.add(e.dedupeKey);
+      }
       out.push({
         key: 'e:' + e.id,
         origin: 'external',
@@ -189,6 +211,8 @@ export function SearchMode() {
         title: e.title,
         company: e.company ? normalizeCompany(e.company) : (e.sourceName ?? 'Компания'),
         station: e.metroStation,
+        stationLabel: e.metroStation ?? e.metroStationRaw,
+        workType: e.workType,
         address: e.address,
         lat: e.lat,
         lng: e.lng,
@@ -212,12 +236,13 @@ export function SearchMode() {
     const q = query.trim().toLowerCase();
     return items.filter(i => {
       if (kind !== 'all' && i.kind !== kind) return false;
+      if (profession && i.workType !== profession) return false;
       if (station && i.station !== station) return false;
       if (minSalary > 0 && i.salary < minSalary) return false;
       if (q && !(i.title.toLowerCase().includes(q) || i.company.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [items, query, kind, station, minSalary]);
+  }, [items, query, kind, station, minSalary, profession]);
 
   const mapItems: MapListItem[] = useMemo(
     () => shown
@@ -281,10 +306,10 @@ export function SearchMode() {
         </View>
 
         <View style={s.rows}>
-          {item.station ? (
+          {item.stationLabel ? (
             <View style={s.row}>
               <Ionicons name="subway-outline" size={rf(13)} color={Colors.textMuted} />
-              <Text style={s.rowTxt} numberOfLines={1}>{item.station}</Text>
+              <Text style={s.rowTxt} numberOfLines={1}>{item.stationLabel}</Text>
             </View>
           ) : null}
           {item.meta ? (
@@ -377,6 +402,28 @@ export function SearchMode() {
                     <Text style={[s.chipTxt, kind === k && s.chipTxtActive]}>{label}</Text>
                   </TouchableOpacity>
                 ))}
+            </View>
+
+            <View style={s.chipRow}>
+              <TouchableOpacity
+                style={[s.chip, profession === null && s.chipActive]}
+                onPress={() => setProfession(null)}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.chipTxt, profession === null && s.chipTxtActive]}>Все профессии</Text>
+              </TouchableOpacity>
+              {(Object.keys(WORK_TYPE_META) as WorkType[]).map(wt => (
+                <TouchableOpacity
+                  key={wt}
+                  style={[s.chip, profession === wt && s.chipActive]}
+                  onPress={() => setProfession(profession === wt ? null : wt)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.chipTxt, profession === wt && s.chipTxtActive]}>
+                    {WORK_TYPE_META[wt].label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
             {salaryChips ? (

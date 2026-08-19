@@ -41,6 +41,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS })
   }
   try {
+    // Сами вакансии — отдельным запросом и только по нажатию: их бывает
+    // тысяча, и тянуть их на каждое открытие страницы незачем. Первый
+    // вопрос здесь всегда «жив ли фид», а не «что именно в нём лежит».
+    if (new URL(req.url).searchParams.get('vacancies')) {
+      return NextResponse.json({ vacancies: await call('extVacancies', []) }, { headers: CORS })
+    }
     const [items, stats] = await Promise.all([call('extSourcesList', []), call('extStats', [])])
     return NextResponse.json({ items, stats }, { headers: CORS })
   } catch (e: any) {

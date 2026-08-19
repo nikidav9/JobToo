@@ -188,7 +188,15 @@ export interface ExternalVacancy {
   sourceName?: string;
   title: string;
   company?: string;
+  /** Станция из нашего справочника. Пусто — источник прислал что-то,
+   *  чего мы не узнали; тогда для показа годится metroStationRaw. */
   metroStation?: string;
+  /** Как станцию назвал источник. Только для показа: фильтр сравнивает
+   *  точным равенством, и по этой строке он не совпал бы ни с чем. */
+  metroStationRaw?: string;
+  metroLineId?: string;
+  /** Профессия, если заголовок на неё похож. Пусто — не разобрали. */
+  workType?: WorkType;
   address?: string;
   lat?: number;
   lng?: number;
@@ -206,6 +214,9 @@ export interface ExternalVacancy {
   url: string;
   /** Когда источник в последний раз показывал её живой. */
   lastSeenAt?: string;
+  /** Отпечаток «та же самая работа»: по нему прячем дубли из разных
+   *  источников. Считает сборщик, см. php-proxy/ingest.php. */
+  dedupeKey?: string;
 }
 
 // hired — работодатель нажал «Завершить»: кандидат закрыт, карточка ушла из

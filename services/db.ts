@@ -1290,7 +1290,10 @@ export async function dbGetExternalVacancies(): Promise<ExternalVacancy[]> {
     sourceName: r.source_name ?? undefined,
     title: r.title,
     company: r.company ?? undefined,
-    metroStation: r.metro_station ?? undefined,
+    metroStation: r.metro_station_norm ?? undefined,
+    metroStationRaw: r.metro_station ?? undefined,
+    metroLineId: r.metro_line_id ?? undefined,
+    workType: r.work_type ?? undefined,
     address: r.address ?? undefined,
     lat: r.lat ?? undefined,
     lng: r.lng ?? undefined,
@@ -1304,6 +1307,7 @@ export async function dbGetExternalVacancies(): Promise<ExternalVacancy[]> {
     description: r.description ?? undefined,
     url: r.url,
     lastSeenAt: r.last_seen_at ?? undefined,
+    dedupeKey: r.dedupe_key ?? undefined,
   }));
 }
 

@@ -50,11 +50,131 @@ function ing_dedupe_key(array $v): string
     // считать разными вакансии, отличающиеся лишним пробелом в адресе, и
     // показывать человеку одно и то же дважды.
     $norm = fn($s) => preg_replace('/\s+/u', ' ', mb_strtolower(trim((string)$s)));
+    // Станцию берём приведённую: у двух источников одна и та же смена
+    // приходит как «м. Тёплый Стан» и «Теплый стан», и по исходным строкам
+    // отпечатки не совпали бы — то есть дедуп не сработал бы именно там,
+    // ради чего он и заведён.
     return substr(hash('sha256', implode('|', [
         $norm($v['company'] ?? ''), $norm($v['title'] ?? ''),
-        $norm($v['metro_station'] ?? ''), (string)($v['date'] ?? ''),
+        $norm($v['metro_station_norm'] ?? $v['metro_station'] ?? ''),
+        (string)($v['date'] ?? ''),
         (string)($v['time_start'] ?? ''),
     ])), 0, 32);
+}
+
+/**
+ * Станция метро из нашего справочника — по тому, что прислал источник.
+ *
+ * В фидах она бывает какой угодно: «м. Тёплый Стан», «Теплый стан»,
+ * «Тёплый Стан (Калужско-Рижская)», «Тёплый Стан, 7 минут пешком». А фильтр
+ * в приложении сравнивает станцию точным равенством с нашим написанием, и
+ * любое из этих написаний не совпадает ни с чем. Причём молча: человек
+ * выбирает станцию и видит пустой список.
+ *
+ * Возвращает [станция, ветка] или [null, null], если не узнали. Не узнали —
+ * значит не узнали: подставить похожую станцию хуже, чем оставить пусто,
+ * потому что человек поедет не туда.
+ */
+function ing_metro(?string $raw): array
+{
+    static $карта = null;
+    static $ключи = null;
+    if ($карта === null) {
+        $v = @include __DIR__ . '/metro.php';
+        $карта = is_array($v) ? $v : [];
+        // Длинные названия проверяем первыми: иначе «Площадь Ильича» нашлась
+        // бы как «Площадь…» чего-нибудь другого, а «Парк Победы» — внутри
+        // «Парк Победы (южный вход)» после более короткого «Парк».
+        $ключи = array_keys($карта);
+        usort($ключи, fn($a, $b) => mb_strlen($b) - mb_strlen($a));
+    }
+    if ($raw === null) return [null, null];
+
+    $норм = function (string $s): string {
+        $s = mb_strtolower(trim($s));
+        $s = str_replace(['ё', '–', '—', '−'], ['е', '-', '-', '-'], $s);
+        // Скобки с названием ветки, приставки «м.», «метро», «ст.».
+        $s = preg_replace('~\(.*?\)~u', ' ', $s);
+        $s = preg_replace('~^\s*(ст\.?\s*)?(м\.|метро|станция)\s*~u', '', $s);
+        $s = preg_replace('~[^\p{L}\p{N}\- ]+~u', ' ', $s);
+        return trim(preg_replace('~\s+~u', ' ', $s));
+    };
+
+    $s = $норм($raw);
+    if ($s === '') return [null, null];
+
+    foreach ($ключи as $ст) {
+        $n = $норм($ст);
+        // Точное совпадение либо станция целым словом внутри строки:
+        // «тёплый стан, 7 минут пешком» — это «Тёплый Стан».
+        if ($s === $n || preg_match('~(^|\s)' . preg_quote($n, '~') . '($|\s|,)~u', $s)) {
+            return [$ст, $карта[$ст]];
+        }
+    }
+    return [null, null];
+}
+
+/** За что платят: shift | hour | month. Всё непонятное — по виду вакансии. */
+function ing_pay_period(?string $raw, string $kind): string
+{
+    $s = mb_strtolower(trim((string)$raw));
+    if ($s === '') return $kind === 'permanent' ? 'month' : 'shift';
+    if (preg_match('~час|hour~u', $s)) return 'hour';
+    if (preg_match('~мес|month~u', $s)) return 'month';
+    if (preg_match('~смен|shift|день|day~u', $s)) return 'shift';
+    return $kind === 'permanent' ? 'month' : 'shift';
+}
+
+/**
+ * Профессия по заголовку. Наш справочник из четырёх, всё прочее — null.
+ *
+ * Именно null, а не «кладовщик по умолчанию»: чужая вакансия курьера,
+ * записанная кладовщиком, всплывёт у человека, который ищет склад, и это
+ * хуже, чем не всплыть нигде.
+ */
+function ing_work_type(?string $raw, string $title): ?string
+{
+    $известные = ['stocker', 'cook', 'shift_supervisor', 'picker'];
+    $wt = mb_strtolower(trim((string)$raw));
+    if (in_array($wt, $известные, true)) return $wt;
+    $t = mb_strtolower($title);
+    if (mb_strpos($t, 'повар') !== false) return 'cook';
+    if (mb_strpos($t, 'сборщик') !== false || mb_strpos($t, 'комплектов') !== false) return 'picker';
+    if (mb_strpos($t, 'старш') !== false || mb_strpos($t, 'бригадир') !== false) return 'shift_supervisor';
+    if (mb_strpos($t, 'кладовщик') !== false || mb_strpos($t, 'склад') !== false
+        || mb_strpos($t, 'грузчик') !== false) return 'stocker';
+    return null;
+}
+
+/** Дата в виде YYYY-MM-DD, иначе null. */
+function ing_date(?string $raw): ?string
+{
+    $s = trim((string)$raw);
+    if ($s === '') return null;
+    if (preg_match('~^(\d{4})-(\d{2})-(\d{2})~', $s, $m)) {
+        return checkdate((int)$m[2], (int)$m[3], (int)$m[1]) ? "$m[1]-$m[2]-$m[3]" : null;
+    }
+    // 31.12.2026 и 31/12/2026 — оба встречаются в выгрузках.
+    if (preg_match('~^(\d{2})[./](\d{2})[./](\d{4})$~', $s, $m)) {
+        return checkdate((int)$m[2], (int)$m[1], (int)$m[3]) ? "$m[3]-$m[2]-$m[1]" : null;
+    }
+    return null;
+}
+
+/** Время в виде HH:MM, иначе null. «9:00», «09.00» и «0900» тоже понимаем. */
+function ing_time(?string $raw): ?string
+{
+    $s = trim((string)$raw);
+    if ($s === '') return null;
+    if (preg_match('~^(\d{1,2})[:.](\d{2})~', $s, $m)) {
+        $h = (int)$m[1]; $i = (int)$m[2];
+    } elseif (preg_match('~^(\d{2})(\d{2})$~', $s, $m)) {
+        $h = (int)$m[1]; $i = (int)$m[2];
+    } else {
+        return null;
+    }
+    if ($h > 23 || $i > 59) return null;
+    return sprintf('%02d:%02d', $h, $i);
 }
 
 /** Привести запись фида к нашему виду. Возвращает null, если она бесполезна. */
@@ -70,6 +190,11 @@ function ing_normalize(array $it, string $sourceId): ?array
     $kind = ($it['kind'] ?? 'shift') === 'permanent' ? 'permanent' : 'shift';
     $loc = is_array($it['location'] ?? null) ? $it['location'] : [];
 
+    // Исходное написание оставляем в metro_station, приведённое кладём
+    // рядом. Разбор ошибётся — по исходному видно, что именно прислали, а не
+    // только то, во что мы это превратили.
+    [$станция, $ветка] = ing_metro(isset($it['metro']) ? (string)$it['metro'] : null);
+
     $row = [
         'id'            => substr(hash('sha256', $sourceId . '|' . $ext), 0, 24),
         'source_id'     => $sourceId,
@@ -80,12 +205,15 @@ function ing_normalize(array $it, string $sourceId): ?array
         'address'       => isset($it['address']) ? mb_substr((string)$it['address'], 0, 300) : null,
         'lat'           => isset($loc['lat']) ? (float)$loc['lat'] : null,
         'lng'           => isset($loc['lon']) ? (float)$loc['lon'] : null,
+        'metro_station_norm' => $станция,
+        'metro_line_id'      => $ветка,
+        'work_type'     => ing_work_type($it['work_type'] ?? null, $title),
         'kind'          => $kind,
-        'date'          => isset($it['date']) ? (string)$it['date'] : null,
-        'time_start'    => isset($it['time_start']) ? (string)$it['time_start'] : null,
-        'time_end'      => isset($it['time_end']) ? (string)$it['time_end'] : null,
+        'date'          => ing_date($it['date'] ?? null),
+        'time_start'    => ing_time($it['time_start'] ?? null),
+        'time_end'      => ing_time($it['time_end'] ?? null),
         'salary'        => isset($it['pay']) && $it['pay'] !== null ? (float)$it['pay'] : null,
-        'pay_period'    => ($it['pay_period'] ?? ($kind === 'permanent' ? 'month' : 'shift')),
+        'pay_period'    => ing_pay_period($it['pay_period'] ?? null, $kind),
         'schedule'      => isset($it['schedule']) ? mb_substr((string)$it['schedule'], 0, 100) : null,
         'description'   => isset($it['description']) ? mb_substr((string)$it['description'], 0, 2000) : null,
         'url'           => $url,
