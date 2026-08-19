@@ -530,12 +530,11 @@ export default function ProfileScreen() {
         </View>
 
         {/* Рейтинг сразу под шапкой: человеку важно видеть, что у него
-            накопилось, а не искать это в конце длинной анкеты. */}
-        {currentUser.role === 'worker' ? (
-          <View style={{ marginBottom: rs(12) }}>
-            <ScoreCard user={currentUser} own />
-          </View>
-        ) : null}
+            накопилось, а не искать это в конце длинной анкеты. У компании
+            он тоже есть — и по нему работники решают, идти ли к ней. */}
+        <View style={{ marginBottom: rs(12) }}>
+          <ScoreCard user={currentUser} own />
+        </View>
 
         <SectionCard
           iconName="person"

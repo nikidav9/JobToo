@@ -133,6 +133,12 @@ function rowToUser(r: any): User {
     scoreQuality: r.score_quality != null ? Number(r.score_quality) : undefined,
     scoreSpeed: r.score_speed != null ? Number(r.score_speed) : undefined,
     scoreEmployers: r.score_employers ?? 0,
+    empScore: r.emp_score ?? undefined,
+    empScoreShifts: r.emp_score_shifts ?? 0,
+    empScoreDesc: r.emp_score_desc != null ? Number(r.emp_score_desc) : undefined,
+    empScoreAttitude: r.emp_score_attitude != null ? Number(r.emp_score_attitude) : undefined,
+    empScorePay: r.emp_score_pay != null ? Number(r.emp_score_pay) : undefined,
+    empScoreKept: r.emp_score_kept != null ? Number(r.emp_score_kept) : undefined,
   };
 }
 // NB: telegram_id намеренно НЕ входит в userToRow — привязка живёт только
@@ -1232,9 +1238,13 @@ export async function dbSubmitRatingAndMaybeDelete(params: {
   rating: number;
   role: 'worker' | 'employer';
   reviewText?: string;
-  /** Только когда работодатель оценивает работника; 1–5, необязательно. */
+  /** Когда работодатель оценивает работника; 1–5, необязательно. */
   quality?: number;
   speed?: number;
+  /** Когда работник оценивает работодателя; 1–5, необязательно. */
+  matchedDesc?: number;
+  attitude?: number;
+  paidOnTime?: number;
 }): Promise<{ bothRated: boolean }> {
   if (IS_NATIVE) { return proxy<{ bothRated: boolean }>('dbSubmitRatingAndMaybeDelete', [params]); }
   const { likeId, fromUserId, toUserId, vacancyId, rating, role, reviewText } = params;

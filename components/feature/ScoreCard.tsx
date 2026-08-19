@@ -39,23 +39,32 @@ function Axis({ label, value, hint }: { label: string; value: number; hint?: str
 
 /** Компактная плашка для списков: только число. */
 export function ScoreBadge({ user }: { user: User | null | undefined }) {
-  if (!user || user.score == null) return null;
+  const n = user?.role === 'employer' ? user?.empScore : user?.score;
+  if (!user || n == null) return null;
   return (
-    <View style={[s.badge, { borderColor: цвет(user.score) }]}>
-      <Ionicons name="shield-checkmark" size={rf(11)} color={цвет(user.score)} />
-      <Text style={[s.badgeTxt, { color: цвет(user.score) }]}>{user.score}</Text>
+    <View style={[s.badge, { borderColor: цвет(n) }]}>
+      <Ionicons name="shield-checkmark" size={rf(11)} color={цвет(n)} />
+      <Text style={[s.badgeTxt, { color: цвет(n) }]}>{n}</Text>
     </View>
   );
 }
 
-export function ScoreCard({ user, own = false }: { user: User; own?: boolean }) {
-  if (user.role !== 'worker') return null;
+/** Склонение «смена/смены/смен». */
+function смены(n: number): string {
+  const d = n % 10, s = n % 100;
+  if (d === 1 && s !== 11) return 'смена';
+  if (d >= 2 && d <= 4 && (s < 12 || s > 14)) return 'смены';
+  return 'смен';
+}
 
-  const смен = user.scoreShifts ?? 0;
+export function ScoreCard({ user, own = false }: { user: User; own?: boolean }) {
+  const работодатель = user.role === 'employer';
+  const итог = работодатель ? user.empScore : user.score;
+  const смен = (работодатель ? user.empScoreShifts : user.scoreShifts) ?? 0;
 
   // Меньше трёх смен — числа нет. Объясняем, почему, и сколько осталось:
   // «нет рейтинга» без объяснения читается как «плохой рейтинг».
-  if (user.score == null) {
+  if (итог == null) {
     return (
       <View style={s.card}>
         <View style={s.header}>
@@ -65,7 +74,9 @@ export function ScoreCard({ user, own = false }: { user: User; own?: boolean }) 
           <View style={{ flex: 1 }}>
             <Text style={s.title}>Рейтинг ещё не считается</Text>
             <Text style={s.sub}>
-              {own
+              {работодатель
+                ? `Смен через JobToo: ${смен}. Рейтинг компании появится после трёх.`
+                : own
                 ? `Отработано смен: ${смен}. Рейтинг появится после трёх — так он не будет случайным.`
                 : `Отработано смен через JobToo: ${смен}. Для рейтинга нужно минимум три.`}
             </Text>
@@ -78,36 +89,60 @@ export function ScoreCard({ user, own = false }: { user: User; own?: boolean }) 
   return (
     <View style={s.card}>
       <View style={s.header}>
-        <View style={[s.circle, { borderColor: цвет(user.score) }]}>
-          <Text style={[s.circleNum, { color: цвет(user.score) }]}>{user.score}</Text>
+        <View style={[s.circle, { borderColor: цвет(итог) }]}>
+          <Text style={[s.circleNum, { color: цвет(итог) }]}>{итог}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={s.title}>JobToo Score</Text>
+          <Text style={s.title}>{работодатель ? 'Рейтинг компании' : 'JobToo Score'}</Text>
           <Text style={s.sub}>
-            {смен} {смен % 10 === 1 && смен % 100 !== 11 ? 'смена' :
-              [2, 3, 4].includes(смен % 10) && ![12, 13, 14].includes(смен % 100) ? 'смены' : 'смен'}
-            {(user.scoreEmployers ?? 0) > 0 ? ` · ${user.scoreEmployers} работодат.` : ''}
+            {смен} {смены(смен)}
+            {!работодатель && (user.scoreEmployers ?? 0) > 0
+              ? ` · ${user.scoreEmployers} работодат.` : ''}
           </Text>
         </View>
       </View>
 
       <View style={s.axes}>
-        {user.scoreReliability != null ? (
-          <Axis label="Выходит на смены" value={user.scoreReliability} />
-        ) : null}
-        {user.scorePunctuality != null ? (
-          <Axis label="Приходит вовремя" value={user.scorePunctuality} />
-        ) : null}
-        {(user.ratingCount ?? 0) > 0 ? (
-          <Axis label="Оценки работодателей" value={(user.avgRating ?? 0) / 5}
-            hint={`${(user.avgRating ?? 0).toFixed(1)} из 5 · отзывов: ${user.ratingCount}`} />
-        ) : null}
-        {user.scoreQuality != null ? (
-          <Axis label="Качество работы" value={user.scoreQuality} />
-        ) : null}
-        {user.scoreSpeed != null ? (
-          <Axis label="Скорость" value={user.scoreSpeed} />
-        ) : null}
+        {работодатель ? (
+          <>
+            {user.empScoreKept != null ? (
+              <Axis label="Не отменяет смены" value={user.empScoreKept}
+                hint="считается по самим сменам, а не по отзывам" />
+            ) : null}
+            {user.empScorePay != null ? (
+              <Axis label="Платит вовремя" value={user.empScorePay} />
+            ) : null}
+            {user.empScoreDesc != null ? (
+              <Axis label="Работа совпадает с описанием" value={user.empScoreDesc} />
+            ) : null}
+            {user.empScoreAttitude != null ? (
+              <Axis label="Отношение к людям" value={user.empScoreAttitude} />
+            ) : null}
+            {(user.ratingCount ?? 0) > 0 ? (
+              <Axis label="Общая оценка" value={(user.avgRating ?? 0) / 5}
+                hint={`${(user.avgRating ?? 0).toFixed(1)} из 5 · отзывов: ${user.ratingCount}`} />
+            ) : null}
+          </>
+        ) : (
+          <>
+            {user.scoreReliability != null ? (
+              <Axis label="Выходит на смены" value={user.scoreReliability} />
+            ) : null}
+            {user.scorePunctuality != null ? (
+              <Axis label="Приходит вовремя" value={user.scorePunctuality} />
+            ) : null}
+            {(user.ratingCount ?? 0) > 0 ? (
+              <Axis label="Оценки работодателей" value={(user.avgRating ?? 0) / 5}
+                hint={`${(user.avgRating ?? 0).toFixed(1)} из 5 · отзывов: ${user.ratingCount}`} />
+            ) : null}
+            {user.scoreQuality != null ? (
+              <Axis label="Качество работы" value={user.scoreQuality} />
+            ) : null}
+            {user.scoreSpeed != null ? (
+              <Axis label="Скорость" value={user.scoreSpeed} />
+            ) : null}
+          </>
+        )}
       </View>
     </View>
   );

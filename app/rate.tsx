@@ -30,7 +30,22 @@ export default function RateScreen() {
   // пятёрок, из которого ничего не посчитаешь.
   const [quality, setQuality] = useState(0);
   const [speed, setSpeed] = useState(0);
+  // Про работодателя спрашиваем три из четырёх осей презентации. Четвёртая,
+  // отмены смен, не спрашивается вовсе: она уже записана — с августа у
+  // каждой несостоявшейся смены есть причина. Спрашивать о том, что лежит в
+  // базе, значит получить ответ хуже и форму длиннее.
+  const [matchedDesc, setMatchedDesc] = useState(0);
+  const [attitude, setAttitude] = useState(0);
+  const [paidOnTime, setPaidOnTime] = useState(0);
   const оцениваетРаботника = role === 'employer';
+
+  const доп: [string, number, (n: number) => void][] = оцениваетРаботника
+    ? [['Качество работы', quality, setQuality], ['Скорость', speed, setSpeed]]
+    : [
+        ['Работа совпала с описанием', matchedDesc, setMatchedDesc],
+        ['Отношение к людям', attitude, setAttitude],
+        ['Заплатили вовремя', paidOnTime, setPaidOnTime],
+      ];
 
   const ratingLabel =
     rating === 0 ? 'Нажмите на звезду' :
@@ -53,6 +68,9 @@ export default function RateScreen() {
         reviewText: review.trim() || undefined,
         quality: оцениваетРаботника && quality > 0 ? quality : undefined,
         speed: оцениваетРаботника && speed > 0 ? speed : undefined,
+        matchedDesc: !оцениваетРаботника && matchedDesc > 0 ? matchedDesc : undefined,
+        attitude: !оцениваетРаботника && attitude > 0 ? attitude : undefined,
+        paidOnTime: !оцениваетРаботника && paidOnTime > 0 ? paidOnTime : undefined,
       });
 
       // Instant optimistic update: refresh all data from server immediately
@@ -102,17 +120,15 @@ export default function RateScreen() {
 
           <Text style={styles.ratingLabel}>{ratingLabel}</Text>
 
-          {rating > 0 && оцениваетРаботника ? (
+          {rating > 0 ? (
             <View style={styles.extraBlock}>
               <Text style={styles.extraTitle}>Подробнее — по желанию</Text>
               <Text style={styles.extraSub}>
-                Эти две оценки идут в рейтинг работника: по ним его находят
-                другие работодатели.
+                {оцениваетРаботника
+                  ? 'Эти оценки идут в рейтинг работника: по ним его находят другие работодатели.'
+                  : 'Эти оценки видят другие работники, когда решают, идти ли к этой компании.'}
               </Text>
-              {([
-                ['Качество работы', quality, setQuality],
-                ['Скорость', speed, setSpeed],
-              ] as [string, number, (n: number) => void][]).map(([label, value, set]) => (
+              {доп.map(([label, value, set]) => (
                 <View key={label} style={styles.extraRow}>
                   <Text style={styles.extraLabel}>{label}</Text>
                   <View style={styles.extraStars}>

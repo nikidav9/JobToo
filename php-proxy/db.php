@@ -1455,6 +1455,81 @@ function jt_recalc_score(string $uid): array {
     return $out;
 }
 
+// Репутация работодателя. Оси те же четыре, что в презентации: соответствие
+// описанию, отношение, выплаты и отмены смен.
+//
+// Отмены — единственная ось, которую не спрашивают, а считают: с августа у
+// каждой несостоявшейся смены записана причина. Спрашивать у человека то,
+// что уже лежит в базе, значит получить худшие данные и заодно удлинить
+// форму, которую и так половина пропускает.
+const EMP_WEIGHTS = [
+    'kept'     => 30,   // не отменяет смены
+    'pay'      => 30,   // платит вовремя
+    'desc'     => 20,   // работа совпала с описанием
+    'attitude' => 20,   // отношение к людям
+];
+const EMP_MIN_SHIFTS = 3;
+
+function jt_recalc_employer_score(string $uid): array {
+    $out = [
+        'emp_score' => null, 'emp_score_shifts' => 0,
+        'emp_score_desc' => null, 'emp_score_attitude' => null,
+        'emp_score_pay' => null, 'emp_score_kept' => null,
+        'emp_score_updated_at' => now_iso(),
+    ];
+    try {
+        $likes = sb_select_all('jm_likes', ['employer_id' => 'eq.' . $uid], 'outcome');
+        $всего = 0; $отменил = 0;
+        foreach ($likes as $l) {
+            $o = $l['outcome'] ?? null;
+            // Считаем только смены с записанным исходом. cancelled_legacy не
+            // берём: причины у них нет, и приписать её работодателю значило
+            // бы наказать за то, чего мы не знаем.
+            if (!in_array($o, ['worked', 'no_show', 'worker_cancelled', 'employer_cancelled'], true)) continue;
+            $всего++;
+            if ($o === 'employer_cancelled') $отменил++;
+        }
+        $out['emp_score_shifts'] = $всего;
+        $out['emp_score_kept'] = $всего > 0 ? round(1 - $отменил / $всего, 4) : null;
+
+        // role='worker' — это оценка, которую поставил работник, то есть
+        // оценка работодателя.
+        $rs = sb_select_all('jm_ratings',
+            ['to_user_id' => 'eq.' . $uid, 'role' => 'eq.worker'],
+            'emp_matched_desc,emp_attitude,emp_paid_on_time');
+        $ср = function (string $поле) use ($rs) {
+            $s = 0; $n = 0;
+            foreach ($rs as $r) {
+                if ($r[$поле] !== null) { $s += (float)$r[$поле]; $n++; }
+            }
+            return $n > 0 ? round(($s / $n) / 5, 4) : null;
+        };
+        $out['emp_score_desc']     = $ср('emp_matched_desc');
+        $out['emp_score_attitude'] = $ср('emp_attitude');
+        $out['emp_score_pay']      = $ср('emp_paid_on_time');
+
+        if ($всего >= EMP_MIN_SHIFTS) {
+            $оси = [
+                'kept'     => $out['emp_score_kept'],
+                'pay'      => $out['emp_score_pay'],
+                'desc'     => $out['emp_score_desc'],
+                'attitude' => $out['emp_score_attitude'],
+            ];
+            $вес = 0; $сумма = 0;
+            foreach (EMP_WEIGHTS as $ключ => $w) {
+                if ($оси[$ключ] === null) continue;
+                $вес += $w;
+                $сумма += $w * max(0.0, min(1.0, (float)$оси[$ключ]));
+            }
+            if ($вес > 0) $out['emp_score'] = (int)round(100 * $сумма / $вес);
+        }
+
+        sb_update('jm_users', ['id' => 'eq.' . $uid], $out);
+    } catch (Throwable $e) {
+    }
+    return $out;
+}
+
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 try {
     $data = null;
@@ -2248,9 +2323,13 @@ try {
         // сразу после выкладки, чтобы уже накопленные смены и оценки
         // превратились в числа, и если формулу поменяют.
         case 'scoreRecalcAll': {
-            $ws = sb_select_all('jm_users', ['role' => 'eq.worker'], 'id');
             $n = 0;
-            foreach ($ws as $w) { jt_recalc_score((string)$w['id']); $n++; }
+            foreach (sb_select_all('jm_users', ['role' => 'eq.worker'], 'id') as $w) {
+                jt_recalc_score((string)$w['id']); $n++;
+            }
+            foreach (sb_select_all('jm_users', ['role' => 'eq.employer'], 'id') as $e) {
+                jt_recalc_employer_score((string)$e['id']); $n++;
+            }
             $data = ['пересчитано' => $n]; break;
         }
 
@@ -3109,8 +3188,10 @@ try {
             ]);
             // Рейтинг работника меняется именно здесь: выход, невыход и
             // опоздание — это три четверти всего, из чего он складывается.
-            $lk = sb_single('jm_likes', ['id' => 'eq.' . $lid], 'worker_id');
+            $lk = sb_single('jm_likes', ['id' => 'eq.' . $lid], 'worker_id,employer_id');
             if (!empty($lk['worker_id'])) jt_recalc_score((string)$lk['worker_id']);
+            // И работодателя: отмена смены — это его ось, а не работника.
+            if (!empty($lk['employer_id'])) jt_recalc_employer_score((string)$lk['employer_id']);
             $data = true; break;
         }
 
@@ -3123,12 +3204,17 @@ try {
             // ставит только звёзды, как было раньше. Ноль здесь не годится —
             // «не ответили» и «работал на ноль» это разные вещи, и пустое
             // поле должно остаться пустым.
-            $q = isset($p['quality']) && $p['quality'] > 0 ? (float)$p['quality'] : null;
-            $sp = isset($p['speed']) && $p['speed'] > 0 ? (float)$p['speed'] : null;
+            $ш = fn(string $к) => isset($p[$к]) && $p[$к] > 0 ? (float)$p[$к] : null;
             sb_insert('jm_ratings', [
                 'id' => uid(), 'from_user_id' => $fuid, 'to_user_id' => $tuid,
                 'vacancy_id' => $vid, 'like_id' => $lid, 'rating' => $rat,
-                'quality' => $q, 'speed' => $sp,
+                // Про работника — качество и скорость; про работодателя —
+                // совпало ли с описанием, как относились, заплатили ли
+                // вовремя. Лишние поля просто останутся пустыми.
+                'quality' => $ш('quality'), 'speed' => $ш('speed'),
+                'emp_matched_desc' => $ш('matchedDesc'),
+                'emp_attitude'     => $ш('attitude'),
+                'emp_paid_on_time' => $ш('paidOnTime'),
                 'role' => $rol, 'review_text' => $p['reviewText'] ?? null, 'created_at' => now_iso(),
             ]);
             // Сигнал тому, кого оценили: у него открыт профиль — обновится сам.
@@ -3143,6 +3229,7 @@ try {
             // Оценка работодателя — четверть рейтинга работника, плюс
             // качество и скорость. Работника оценивают в role='employer'.
             if ($rol === 'employer') jt_recalc_score($tuid);
+            else jt_recalc_employer_score($tuid);
             $lr = sb_single('jm_likes', ['id' => 'eq.' . $lid], 'worker_rated,employer_rated');
             $data = ['bothRated' => !empty($lr['worker_rated']) && !empty($lr['employer_rated'])]; break;
         }

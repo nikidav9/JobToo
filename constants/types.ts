@@ -37,6 +37,21 @@ export interface User {
   scoreSpeed?: number;
   /** У скольких разных работодателей работал. */
   scoreEmployers?: number;
+
+  // ─── Репутация работодателя ─────────────────────────────────────────────
+  // Те же правила: считает сервер, пусто — смен ещё мало. Оси — четыре из
+  // презентации, причём «отмены смен» не спрашивается, а считается из
+  // записанных исходов (см. миграцию 039).
+  empScore?: number;
+  empScoreShifts?: number;
+  /** Работа совпала с описанием. */
+  empScoreDesc?: number;
+  /** Отношение к людям. */
+  empScoreAttitude?: number;
+  /** Платит вовремя. */
+  empScorePay?: number;
+  /** Доля смен, которые он НЕ отменил. */
+  empScoreKept?: number;
 }
 
 export interface Vacancy {

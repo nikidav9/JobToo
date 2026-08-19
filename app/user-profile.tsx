@@ -224,13 +224,12 @@ export default function UserProfileScreen() {
 
         {tab === 'info' ? (
           <>
-            {/* Рейтинг — первым, до анкеты: работодатель открывает профиль
-                ради него, а не ради станции метро. */}
-            {isWorker ? (
-              <View style={styles.scoreWrap}>
-                <ScoreCard user={user} />
-              </View>
-            ) : null}
+            {/* Рейтинг — первым, до анкеты: за ним сюда и заходят, а не за
+                станцией метро. У работодателя он свой: не отменяет ли смены,
+                платит ли вовремя, совпадает ли работа с описанием. */}
+            <View style={styles.scoreWrap}>
+              <ScoreCard user={user} />
+            </View>
 
             {/* Info block */}
             <View style={styles.infoCard}>
