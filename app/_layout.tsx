@@ -203,6 +203,10 @@ export default function RootLayout() {
             <Stack.Screen name="user-profile" />
             <Stack.Screen name="create-perm-vacancy" />
             <Stack.Screen name="perm-vacancy-detail" />
+            {/* Шторкой: тест — короткий заход из профиля, а не место, куда
+                уходят насовсем. Закрыть крестиком и вернуться на прежний
+                экран должно быть очевидно. */}
+            <Stack.Screen name="skill-test" options={{ presentation: 'modal' }} />
           </Stack>
           {/* Поверх всего, но под всплывающими сообщениями: окно закрывает
               приложение до принятия документов, а сообщения о неудачной

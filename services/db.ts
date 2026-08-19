@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus, ReportableOutcome, ExternalVacancy } from '@/constants/types';
+import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus, ReportableOutcome, ExternalVacancy, WorkType } from '@/constants/types';
 import { uid, nowISO } from '@/services/storage';
 
 const DB_TIMEOUT = 12_000;
@@ -1284,6 +1284,42 @@ export async function dbSubmitRatingAndMaybeDelete(params: {
   );
 
   return { bothRated: !!(likeRow?.worker_rated && likeRow?.employer_rated) };
+}
+
+// ─── Микро-тесты по профессиям ────────────────────────────────────────────────
+
+export interface SkillResult {
+  workType: WorkType;
+  correct: number;
+  total: number;
+  passed: boolean;
+  passedAt?: string;
+  attemptsToday: number;
+  attemptsDay?: string;
+}
+
+export async function dbGetSkillResults(userId: string): Promise<SkillResult[]> {
+  const rows = await proxy<any[]>('dbGetSkillResults', [userId]);
+  return (rows ?? []).map(r => ({
+    workType: r.work_type,
+    correct: r.correct ?? 0,
+    total: r.total ?? 0,
+    passed: !!r.passed,
+    passedAt: r.passed_at ?? undefined,
+    attemptsToday: r.attempts_today ?? 0,
+    attemptsDay: r.attempts_day ?? undefined,
+  }));
+}
+
+/**
+ * Отправить результат. Сервер проверить его не может — вопросы живут в
+ * приложении, — но считает попытки и не даёт перебирать наугад. Поэтому в
+ * ответе и приходит, сколько попыток осталось.
+ */
+export async function dbSubmitSkillTest(
+  userId: string, workType: WorkType, correct: number, total: number, passed: boolean,
+): Promise<{ passed: boolean; осталось: number; error_попытки?: boolean }> {
+  return proxy('dbSubmitSkillTest', [userId, workType, correct, total, passed]);
 }
 
 // ─── Чужие вакансии ───────────────────────────────────────────────────────────

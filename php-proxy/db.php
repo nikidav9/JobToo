@@ -2333,6 +2333,57 @@ try {
             $data = ['пересчитано' => $n]; break;
         }
 
+        // ── Микро-тесты по профессиям ──────────────────────────────────────
+        //
+        // Сами вопросы живут в приложении (constants/skillTests.ts) — их
+        // некому редактировать, редактора в панели нет. Сюда приходит только
+        // результат. Значит, проверять его сервер не может, и единственное,
+        // что он делает всерьёз, — считает попытки: без ограничения тест
+        // перебирается наугад, и подтверждение перестаёт что-либо значить.
+        case 'dbGetSkillResults':
+            $data = sb_select('jm_skill_results', ['user_id' => 'eq.' . $args[0]]); break;
+
+        // args: [userId, workType, correct, total, passed]
+        case 'dbSubmitSkillTest': {
+            [$uid, $wt, $correct, $total, $passed] = [
+                (string)$args[0], (string)$args[1],
+                (int)$args[2], (int)$args[3], (bool)$args[4],
+            ];
+            $известные = ['stocker', 'cook', 'shift_supervisor', 'picker'];
+            if (!in_array($wt, $известные, true)) throw new Exception('неизвестная профессия');
+
+            $было = sb_single('jm_skill_results',
+                ['user_id' => 'eq.' . $uid, 'work_type' => 'eq.' . $wt]);
+            $сегодня = gmdate('Y-m-d');
+            $попыток = ($было && ($было['attempts_day'] ?? null) === $сегодня)
+                ? (int)$было['attempts_today'] : 0;
+
+            if ($попыток >= 3) {
+                $data = ['error_попытки' => true, 'осталось' => 0];
+                break;
+            }
+
+            $row = [
+                'user_id'         => $uid,
+                'work_type'       => $wt,
+                'correct'         => $correct,
+                'total'           => $total,
+                // Подтверждение, однажды полученное, неудачной пересдачей не
+                // отнимается: человек пробовал улучшить результат, а не
+                // разучился за неделю.
+                'passed'          => $passed || !empty($было['passed']),
+                'passed_at'       => $passed
+                    ? ($было['passed_at'] ?? now_iso())
+                    : ($было['passed_at'] ?? null),
+                'attempts_today'  => $попыток + 1,
+                'attempts_day'    => $сегодня,
+                'last_attempt_at' => now_iso(),
+            ];
+            sb_upsert('jm_skill_results', $row, 'user_id,work_type');
+            $data = ['passed' => $row['passed'], 'осталось' => max(0, 3 - ($попыток + 1))];
+            break;
+        }
+
         // ── Источники чужих вакансий ───────────────────────────────────────
         case 'extSourcesList':
             $data = sb_select('jm_ext_sources', ['order' => 'created_at.desc']); break;
