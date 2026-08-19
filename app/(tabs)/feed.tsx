@@ -10,7 +10,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { Like, User, Vacancy, PermVacancy } from '@/constants/types';
-import { getTodayDates, formatDate, scoreVacancy } from '@/services/storage';
+import { getTodayDates, formatDate } from '@/services/storage';
+import { scoreVacancyForWorker } from '@/services/matching';
 import { METRO_LINES } from '@/constants/metro';
 import {
   dbUpsertLike,
@@ -951,6 +952,12 @@ function WorkerFeed() {
     return () => clearInterval(interval);
   }, []);
 
+  // Свои отклики — по ним видно, у кого человек уже работал.
+  const myLikes = useMemo(
+    () => (likes as Like[]).filter((l: Like) => l.workerId === currentUser?.id),
+    [likes, currentUser?.id],
+  );
+
   useEffect(() => {
     if (!currentUser) return;
     const filtered = vacancies
@@ -964,13 +971,24 @@ function WorkerFeed() {
         if (filterStation && v.metroStation !== filterStation) return false;
         return true;
       })
-      .sort((a, b) => scoreVacancy(b, currentUser) - scoreVacancy(a, currentUser));
+      .sort((a, b) => {
+        // Подбор, а не только метро: подтверждённый навык, срочность,
+        // знакомый работодатель и его рейтинг тоже двигают карточку вверх.
+        // Работодателя ищем среди уже загруженных — недостающий просто не
+        // добавит слагаемого, лишний запрос ради сортировки не нужен.
+        const ctx = (v: Vacancy) => ({
+          employer: users.find((u: User) => u.id === v.employerId) ?? null,
+          myLikes: myLikes,
+        });
+        return scoreVacancyForWorker(b, currentUser, ctx(b))
+             - scoreVacancyForWorker(a, currentUser, ctx(a));
+      });
     setCards(filtered);
     if (!swipingRef.current) {
       pan.flattenOffset();
       pan.setValue({ x: 0, y: 0 });
     }
-  }, [selectedDate, vacancies, likes, currentUser, filterStation]);
+  }, [selectedDate, vacancies, likes, myLikes, users, currentUser, filterStation]);
 
   const currentCard = cards[0];
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;

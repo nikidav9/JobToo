@@ -52,6 +52,13 @@ export interface User {
   empScorePay?: number;
   /** Доля смен, которые он НЕ отменил. */
   empScoreKept?: number;
+
+  /**
+   * Профессии, по которым пройден микро-тест. Копия из jm_skill_results:
+   * нужна там, где показывают список людей, а лезть за каждым отдельно
+   * значит сорок запросов на один экран.
+   */
+  confirmedSkills?: WorkType[];
 }
 
 export interface Vacancy {

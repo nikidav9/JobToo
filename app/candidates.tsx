@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ScoreBadge } from '@/components/feature/ScoreCard';
+import { rankCandidate } from '@/services/matching';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { notifyWorkerGotMatch } from '@/services/notifications';
@@ -22,10 +23,27 @@ export default function CandidatesScreen() {
   if (!vacancy || !currentUser) return null;
 
   const vacLikes = likes.filter(l => l.vacancyId === vacancyId);
-  const wantLikes = vacLikes.filter(l => l.workerLiked && !l.isMatch);
-  const matchedLikes = vacLikes.filter(l => l.isMatch);
-
   const getWorker = (workerId: string) => users.find(u => u.id === workerId);
+
+  /**
+   * Кандидаты по порядку, а не по времени отклика.
+   *
+   * Раньше первым шёл тот, кто раньше нажал. При двадцати откликах это
+   * значит, что смотрят первых пятерых, а лучший может быть двенадцатым.
+   * Теперь наверху те, у кого выше рейтинг, подтверждён навык, кто живёт
+   * рядом и кто уже работал у этой компании, — и под именем написано,
+   * почему он там: подбор, который молча меняет порядок, работодатель
+   * либо не заметит, либо не поверит.
+   */
+  const ranked = (ls: typeof vacLikes) => ls
+    .map(l => {
+      const w = getWorker(l.workerId);
+      return { like: l, rank: w ? rankCandidate(w, vacancy, likes) : { score: -1, reasons: [] } };
+    })
+    .sort((a, b) => b.rank.score - a.rank.score);
+
+  const wantLikes = ranked(vacLikes.filter(l => l.workerLiked && !l.isMatch));
+  const matchedLikes = ranked(vacLikes.filter(l => l.isMatch));
 
   const onDecide = async (workerId: string, decide: 'accept' | 'skip') => {
     const like = vacLikes.find(l => l.workerId === workerId);
@@ -79,7 +97,7 @@ export default function CandidatesScreen() {
 
       <FlatList
         data={shown}
-        keyExtractor={l => l.id}
+        keyExtractor={x => x.like.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -89,7 +107,9 @@ export default function CandidatesScreen() {
             <Text style={styles.emptySub}>{tab === 'want' ? 'Работники ещё не откликались' : 'Подтвердите кандидатов во вкладке Хотят'}</Text>
           </View>
         }
-        renderItem={({ item: like }) => {
+        renderItem={({ item }) => {
+          const like = item.like;
+          const reasons = item.rank.reasons;
           const worker = getWorker(like.workerId);
           if (!worker) return null;
           const isMatch = like.isMatch;
@@ -115,6 +135,9 @@ export default function CandidatesScreen() {
                     <Text style={styles.workerName} numberOfLines={1}>{worker.firstName} {worker.lastName}</Text>
                     <ScoreBadge user={worker} />
                   </View>
+                  {reasons.length ? (
+                    <Text style={styles.reasons} numberOfLines={1}>{reasons.join(' · ')}</Text>
+                  ) : null}
                   <Text style={styles.workerMeta}>
                     🚇 {worker.metroStation ?? '—'}
                     {worker.age ? `  ·  ${worker.age} лет` : ''}
@@ -189,6 +212,7 @@ const styles = StyleSheet.create({
   avatar: { width: rs(48), height: rs(48), borderRadius: rs(24), alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: rf(17), fontWeight: '700', color: '#fff' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: rs(6) },
+  reasons: { fontSize: rf(12), color: Colors.primary, marginTop: rs(2), fontWeight: '600' },
   workerName: { fontSize: rf(15), fontWeight: '700', color: Colors.textPrimary },
   workerMeta: { fontSize: rf(12), color: Colors.textMuted, marginTop: rs(2) },
   workerRating: { fontSize: rf(12), color: '#FBBF24', fontWeight: '600', marginTop: rs(2) },

@@ -2380,6 +2380,16 @@ try {
                 'last_attempt_at' => now_iso(),
             ];
             sb_upsert('jm_skill_results', $row, 'user_id,work_type');
+
+            // Короткий список подтверждённого переписываем в строку
+            // пользователя: подбор кандидатов должен отвечать «у кого из
+            // этих сорока подтверждён склад» без сорока запросов.
+            $все = sb_select('jm_skill_results',
+                ['user_id' => 'eq.' . $uid, 'passed' => 'is.true'], 'work_type');
+            $навыки = array_values(array_unique(array_column($все, 'work_type')));
+            sort($навыки);
+            sb_update('jm_users', ['id' => 'eq.' . $uid], ['confirmed_skills' => $навыки]);
+
             $data = ['passed' => $row['passed'], 'осталось' => max(0, 3 - ($попыток + 1))];
             break;
         }

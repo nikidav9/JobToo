@@ -122,17 +122,7 @@ export function getTodayDates(): string[] {
   return dates;
 }
 
-/**
- * Priority-based vacancy scoring:
- * 1. Same metro station → 100
- * 2. Same metro line   → 60
- * 3. Everything else   → 20
- */
-export function scoreVacancy(vacancy: Vacancy, user: User): number {
-  if (user.metroStation && user.metroStation === vacancy.metroStation) return 100;
-  if (user.metroLineId && user.metroLineId === vacancy.metroLineId) return 60;
-  return 20;
-}
+
 
 // ─── Phone helpers ────────────────────────────────────────────────────────────
 

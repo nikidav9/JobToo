@@ -139,6 +139,7 @@ function rowToUser(r: any): User {
     empScoreAttitude: r.emp_score_attitude != null ? Number(r.emp_score_attitude) : undefined,
     empScorePay: r.emp_score_pay != null ? Number(r.emp_score_pay) : undefined,
     empScoreKept: r.emp_score_kept != null ? Number(r.emp_score_kept) : undefined,
+    confirmedSkills: Array.isArray(r.confirmed_skills) ? r.confirmed_skills : [],
   };
 }
 // NB: telegram_id намеренно НЕ входит в userToRow — привязка живёт только

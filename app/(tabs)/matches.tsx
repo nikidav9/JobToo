@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { Like, Vacancy, PermApplication, PermVacancy, Chat, ReportableOutcome } from '@/constants/types';
+import { Like, User, Vacancy, PermApplication, PermVacancy, Chat, ReportableOutcome } from '@/constants/types';
 import { formatDate, getInitials, nameColorFromString } from '@/services/storage';
 import {
   dbUpsertLike, dbCheckAndCreateMatch, dbSetShiftOutcome,
@@ -18,6 +18,7 @@ import {
 } from '@/services/db';
 import { TabHeader } from '@/components/ui/TabHeader';
 import { ScoreBadge } from '@/components/feature/ScoreCard';
+import { rankCandidate } from '@/services/matching';
 import { useMissingUsers } from '@/hooks/useMissingUsers';
 import { workerLikes, workerActive, workerRejected, workerCompleted,
   employerLikes, employerPending, employerMatched, employerCompleted,
@@ -559,7 +560,20 @@ function EmployerMatches() {
   const myVacIds = vacancies.filter(v => v.employerId === currentUser.id).map(v => v.id);
   const allLikes = employerLikes(likes, vacancies, currentUser.id);
 
-  const pending = employerPending(allLikes);
+  // Ожидающие решения — по подбору, а не по времени отклика. При двадцати
+  // откликах смотрят первых пятерых, и лучший кандидат может оказаться
+  // двенадцатым просто потому, что нажал позже.
+  const byRank = (ls: Like[]) => [...ls].sort((a, b) => {
+    const va = vacancies.find((v: Vacancy) => v.id === a.vacancyId);
+    const vb = vacancies.find((v: Vacancy) => v.id === b.vacancyId);
+    const wa = users.find((u: User) => u.id === a.workerId);
+    const wb = users.find((u: User) => u.id === b.workerId);
+    const sa = va && wa ? rankCandidate(wa, va, likes).score : -1;
+    const sb = vb && wb ? rankCandidate(wb, vb, likes).score : -1;
+    return sb - sa;
+  });
+
+  const pending = byRank(employerPending(allLikes));
   const matched = employerMatched(allLikes);
   const completed = employerCompleted(allLikes);
 
