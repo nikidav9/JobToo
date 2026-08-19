@@ -1,20 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { rs, rf } from '@/constants/scale';
 
 import {
-  DRAW_MS, WORD, LETTER_RISE_MS, LETTER_RISE_EM, letterDelay, letterColor,
-  WAVE_START_MS, WAVE_PERIOD_MS, WAVE_STAGGER_MS, WAVE_LIFT_EM, WAVE_DIM,
-} from '@/constants/splashArt';
+  BASKET_STROKES, SPARK_STROKES, PRODUCTS, ART_VB_W, ART_VB_H,
+  BASKET_DRAW_MS, PROD_FIRST_MS, PROD_STAGGER_MS, PROD_FALL_MS,
+  SPARKS_AT_MS, SPARKS_MS,
+} from '@/constants/basketArt';
 
-// Загрузочный экран: на фирменном оранжевом стоит «JobTo», справа впрыгивает
-// коробка и приземляется на место недостающей «o». Снизу — счётчик процентов
-// реальной загрузки.
-//
-// Кадры прыжка лежат в constants/splashArt.ts, оттуда же их берёт статический
-// экран в вебе (app/+html.tsx). Раньше это были две рукописные копии одной
-// анимации — расходились они ровно до первой правки в одном из файлов.
+// Загрузочный экран: на фирменном оранжевом линией рисуется корзина, затем над
+// ней один за другим плавно опускаются продукты и разлетаются искорки. Снизу —
+// название и счётчик процентов реальной загрузки.
 //
 // Анимация на штатном RN Animated (не reanimated: babel-плагин в проекте не
 // подключён). Линии рисуются через strokeDashoffset, поэтому useNativeDriver
@@ -22,8 +19,17 @@ import {
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
+const { width: SW, height: SH } = Dimensions.get('window');
+// Арт занимает ~62 % ширины, но не вылезает по высоте на маленьких экранах
+const ART_W = Math.min(SW * 0.62, SH * 0.30);
+const ART_H = ART_W * (ART_VB_H / ART_VB_W);
+const K = ART_W / ART_VB_W; // из координат арта в пиксели
+
 const WHITE = '#FFFFFF';
 const ORANGE = '#FF6B1A';
+
+// Длительность полной прорисовки
+const DRAW_MS = 1280;
 
 // Штрихи арта. from/to — окно прорисовки внутри общего прогресса 0→1,
 // len — приблизительная длина пути (для strokeDasharray).
@@ -158,104 +164,130 @@ export function useLoadingPercent(ready: boolean, minMs = DRAW_MS): number {
   return percent;
 }
 
-/**
- * Буква названия.
- *
- * Два движения, и они разной природы. Первое — приход: буква один раз
- * поднимается снизу и проявляется, каждая со своей задержкой. Второе — волна:
- * когда слово собрано, буквы по очереди чуть приподнимаются и снова тускнеют,
- * и так по кругу, пока экран висит.
- *
- * Волна нужна не для красоты. Загрузочный экран без движения через три
- * секунды читается как зависший, и человек начинает жать кнопки. Достаточно
- * едва заметного дыхания, чтобы этого не происходило.
- */
-function WordLetter({ ch, index, progress, wave, size }: {
-  ch: string; index: number; progress: Animated.Value; wave: Animated.Value; size: number;
-}) {
-  const from = letterDelay(index) / DRAW_MS;
-  const to = (letterDelay(index) + LETTER_RISE_MS) / DRAW_MS;
-  const приход = { inputRange: [from, to], extrapolate: 'clamp' as const };
+/** Один товар: опускается сверху в корзину и проявляется. */
+function FallingProduct({ p, index }: { p: typeof PRODUCTS[number]; index: number }) {
+  const anim = useRef(new Animated.Value(0)).current;
 
-  // Волна идёт по слову, но сдвиг по фазе живёт не здесь: у каждой буквы своё
-  // значение анимации со своей задержкой запуска (см. ниже). Здесь только
-  // форма — куда буква уходит в середине цикла.
-  const волна = (outputRange: number[]) => wave.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange,
-  });
+  useEffect(() => {
+    const at = PROD_FIRST_MS + index * PROD_STAGGER_MS;
+    const elapsed = bootElapsed();
+    if (elapsed >= at + PROD_FALL_MS) { anim.setValue(1); return; }
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: PROD_FALL_MS,
+      delay: Math.max(0, at - elapsed),
+      easing: Easing.out(Easing.cubic), // мягко замедляется, будто кладут
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   return (
-    <Animated.Text
-      style={[
-        styles.letter,
-        { fontSize: size, color: letterColor(index) },
-        {
-          opacity: Animated.multiply(
-            progress.interpolate({ ...приход, outputRange: [0, 1] }),
-            волна([WAVE_DIM, 1, WAVE_DIM]),
-          ),
-          transform: [{
-            translateY: Animated.add(
-              progress.interpolate({ ...приход, outputRange: [size * LETTER_RISE_EM, 0] }),
-              волна([0, -size * WAVE_LIFT_EM, 0]),
-            ),
-          }],
-        },
-      ]}
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: p.left * K,
+        top: p.top * K,
+        width: p.w * K,
+        height: p.h * K,
+        opacity: anim,
+        transform: [{
+          translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-46 * K, 0] }),
+        }],
+      }}
     >
-      {ch}
-    </Animated.Text>
+      <Svg width={p.w * K} height={p.h * K} viewBox={`0 0 ${p.w} ${p.h}`}>
+        {p.paths.map((path, i) => (
+          <Path
+            key={i}
+            d={path.d}
+            transform={path.t}
+            stroke={WHITE}
+            strokeWidth={path.w ?? 3}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        ))}
+      </Svg>
+    </Animated.View>
   );
 }
 
 export default function SplashLoader({ percent = 1 }: { percent?: number }) {
   const progress = useRef(new Animated.Value(0)).current;
-  const waves = useRef(WORD.split('').map(() => new Animated.Value(0))).current;
-
-  const FONT = rf(40);
+  const sparks = useRef(new Animated.Value(0)).current;
+  const nameFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Продолжаем с того места, где остановился предыдущий показ, а не с нуля:
-    // экран показывается дважды подряд — в index.tsx и оверлеем при входе.
+    // Продолжаем с того места, где остановился предыдущий показ, а не с нуля
     const elapsed = bootElapsed();
-    const done = Math.min(1, elapsed / DRAW_MS);
+
+    const done = Math.min(1, elapsed / BASKET_DRAW_MS);
     progress.setValue(done);
     if (done < 1) {
       Animated.timing(progress, {
         toValue: 1,
-        duration: DRAW_MS * (1 - done),
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        duration: BASKET_DRAW_MS * (1 - done),
+        easing: Easing.linear,
+        useNativeDriver: false, // strokeDashoffset — не нативное свойство
       }).start();
     }
 
-    // Волна: у каждой буквы свой запуск, дальше крутится сама.
-    const петли = waves.map((v, i) =>
-      Animated.loop(
-        Animated.timing(v, {
-          toValue: 1,
-          duration: WAVE_PERIOD_MS,
-          delay: Math.max(0, WAVE_START_MS + i * WAVE_STAGGER_MS - elapsed),
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ),
-    );
-    петли.forEach(п => п.start());
-    return () => петли.forEach(п => п.stop());
+    // Искорки — после того, как продукты легли
+    const sDone = Math.min(1, Math.max(0, (elapsed - SPARKS_AT_MS) / SPARKS_MS));
+    sparks.setValue(sDone);
+    if (sDone < 1) {
+      Animated.timing(sparks, {
+        toValue: 1,
+        duration: SPARKS_MS * (1 - sDone),
+        delay: Math.max(0, SPARKS_AT_MS - elapsed),
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }).start();
+    }
+
+    // Название проявляется, когда корзина уже нарисована
+    const nameAt = BASKET_DRAW_MS + 120;
+    if (elapsed >= nameAt + 450) {
+      nameFade.setValue(1);
+    } else {
+      Animated.timing(nameFade, {
+        toValue: 1,
+        duration: 450,
+        delay: Math.max(0, nameAt - elapsed),
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start();
+    }
   }, []);
 
   return (
     <View style={styles.root}>
-      <View style={styles.word}>
-        {WORD.split('').map((ch, i) => (
-          <WordLetter key={i} ch={ch} index={i} progress={progress} wave={waves[i]} size={FONT} />
+      <View style={[styles.artWrap, { width: ART_W, height: ART_H }]}>
+        {/* товары рисуем первыми — корзина ложится поверх и «прячет» их низ */}
+        {PRODUCTS.map((p, i) => (
+          <FallingProduct key={i} p={p} index={i} />
         ))}
+        <Svg
+          width={ART_W}
+          height={ART_H}
+          viewBox={`0 0 ${ART_VB_W} ${ART_VB_H}`}
+          style={StyleSheet.absoluteFill}
+        >
+          {BASKET_STROKES.map((s, i) => (
+            <DrawnStroke key={i} stroke={s} progress={progress} />
+          ))}
+          {SPARK_STROKES.map((s, i) => (
+            <DrawnStroke key={`sp${i}`} stroke={s} progress={sparks} />
+          ))}
+        </Svg>
       </View>
 
-      {/* Счётчик виден с первого кадра — отсчёт начинается с единицы */}
-      <Text style={styles.percent}>{Math.round(percent)}%</Text>
+      <View style={styles.bottom}>
+        <Animated.Text style={[styles.name, { opacity: nameFade }]}>JobToo</Animated.Text>
+        {/* Счётчик виден с первого кадра — отсчёт начинается с единицы */}
+        <Text style={styles.percent}>{Math.round(percent)}%</Text>
+      </View>
     </View>
   );
 }
@@ -267,17 +299,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  word: { flexDirection: 'row', alignItems: 'baseline' },
-  letter: {
-    fontWeight: '800',
-    letterSpacing: -1,
-    includeFontPadding: false,
-  },
+  artWrap: { position: 'relative' },
+  bottom: { alignItems: 'center', marginTop: rs(24) },
+  name: { fontSize: rf(32), fontWeight: '800', letterSpacing: -0.8, color: WHITE },
   percent: {
-    marginTop: rs(24),
+    marginTop: rs(10),
     fontSize: rf(17),
     fontWeight: '700',
-    fontStyle: 'italic',
+    fontStyle: 'italic',      // намёк на рукописный счётчик из референса
     letterSpacing: 1.5,
     color: 'rgba(255,255,255,0.85)',
   },
