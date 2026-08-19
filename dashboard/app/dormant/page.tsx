@@ -101,6 +101,20 @@ const DRAFTS: { key: string; label: string; role: 'worker' | 'employer' | 'any';
 Ответьте одной строкой, как есть. Мне это нужно, чтобы починить.`,
   },
   {
+    key: 'install',
+    label: 'Как установить',
+    role: 'any',
+    text: `{name}, здравствуйте! Это JobToo.
+
+Вы у нас регистрировались, но так ни разу и не зашли. Возможно, просто не поставилось приложение — расскажу, как.
+
+Андроид: установите из RuStore — https://www.rustore.ru/catalog/app/com.nikidav23.onspaceapp
+
+Айфон: откройте jobtoo.ru в Safari, нажмите «Поделиться» → «На экран «Домой»». Появится иконка, дальше работает как обычное приложение — в App Store нас нет, туда российских разработчиков не пускают.
+
+Если не получится — напишите, помогу.`,
+  },
+  {
     key: 'employer',
     label: 'Работодателю',
     role: 'employer',
@@ -111,6 +125,33 @@ const DRAFTS: { key: string; label: string; role: 'worker' | 'employer' | 'any';
 Если что-то мешает, напишите — разберёмся.`,
   },
 ]
+
+/**
+ * Как поставить приложение — две разные дороги, и это надо помнить наизусть.
+ *
+ * На андроиде приложение лежит в RuStore: в Google Play его нет и не будет,
+ * пока российские разработчики туда не публикуются.
+ *
+ * На айфоне приложения нет вовсе. Не забыли выложить — App Store для
+ * российского разработчика закрыт. Вместо него jobtoo.ru, добавленный на
+ * рабочий стол: это то же самое приложение, с иконкой и уведомлениями, а не
+ * «сайт вместо приложения». Сказать это надо именно так, иначе человек
+ * слышит «нормального приложения у них нет» и закрывает разговор.
+ *
+ * Ссылка без хвоста ?ysclid=… намеренно: это метка поисковика, прицепившаяся
+ * к чужому переходу, и в наших сообщениях ей делать нечего.
+ */
+const RUSTORE_URL = 'https://www.rustore.ru/catalog/app/com.nikidav23.onspaceapp'
+const WEB_URL = 'https://jobtoo.ru'
+
+const INSTALL_ANDROID =
+  `Андроид: установите из RuStore — ${RUSTORE_URL}`
+
+const INSTALL_IPHONE =
+  `Айфон: откройте ${WEB_URL} в Safari, нажмите «Поделиться» → `
+  + '«На экран «Домой»». Появится иконка, дальше работает как обычное приложение.'
+
+const INSTALL_BOTH = `${INSTALL_ANDROID}\n\n${INSTALL_IPHONE}`
 
 /** Доля рядом с абсолютным числом: «41 человек» без «из 281» не читается. */
 function pctOf(n: number, total: number): string {
@@ -232,6 +273,17 @@ export default function DormantPage() {
     }
   }
 
+  /** Скопировать готовую подсказку про установку — её диктуют по телефону. */
+  async function copyPlain(key: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(key)
+      setTimeout(() => setCopied(c => (c === key ? null : c)), 1500)
+    } catch {
+      setResult('Браузер не дал доступ к буферу обмена')
+    }
+  }
+
   function exportPhones() {
     downloadCSV(
       groups.phone.map(r => ({
@@ -273,6 +325,67 @@ export default function DormantPage() {
           value={role}
           onChange={setRole}
         />
+
+        {/* Как поставить приложение.
+            Стоит перед полем сообщения, потому что нужно ровно здесь: половина
+            не заходивших не заходила не из-за отсутствия смен, а потому что
+            приложение у них так и не появилось на экране. Дороги две и они
+            разные — держать их в голове при звонке невозможно. */}
+        <div className="jt-card" style={{ padding: 16, display: 'grid', gap: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>Как поставить приложение</div>
+
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{
+              padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--bg-sunken)', border: '1px solid var(--line)',
+            }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>Андроид — RuStore</div>
+              <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4, wordBreak: 'break-all' }}>
+                <a href={RUSTORE_URL} target="_blank" rel="noreferrer">{RUSTORE_URL}</a>
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>
+                В Google Play нас нет — туда российские разработчики не публикуются.
+              </div>
+              <Button style={{ height: 28, marginTop: 8 }}
+                onClick={() => copyPlain('android', INSTALL_ANDROID)}>
+                {copied === 'android' ? 'Скопировано' : 'Скопировать'}
+              </Button>
+            </div>
+
+            <div style={{
+              padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--bg-sunken)', border: '1px solid var(--line)',
+            }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>Айфон — jobtoo.ru на рабочий стол</div>
+              <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4 }}>
+                Открыть <a href={WEB_URL} target="_blank" rel="noreferrer">jobtoo.ru</a> в Safari →
+                «Поделиться» → «На экран «Домой»».
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>
+                Получается иконка и уведомления — то же приложение, а не «сайт вместо приложения».
+                Говорить лучше именно так: иначе человек слышит «нормального приложения нет».
+              </div>
+              <Button style={{ height: 28, marginTop: 8 }}
+                onClick={() => copyPlain('iphone', INSTALL_IPHONE)}>
+                {copied === 'iphone' ? 'Скопировано' : 'Скопировать'}
+              </Button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Button style={{ height: 30 }} onClick={() => copyPlain('both', INSTALL_BOTH)}>
+              {copied === 'both' ? 'Скопировано' : 'Скопировать оба'}
+            </Button>
+            <Button style={{ height: 30 }} onClick={() => {
+              const typed = text.trim()
+              const known = DRAFTS.some(x => x.text === text)
+              if (typed && !known && !confirm('Заменить набранный текст заготовкой?')) return
+              setText(DRAFTS.find(d => d.key === 'install')!.text)
+            }}>
+              Вставить в сообщение
+            </Button>
+          </div>
+        </div>
 
         <div className="jt-card" style={{ padding: 16, display: 'grid', gap: 12 }}>
           <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
