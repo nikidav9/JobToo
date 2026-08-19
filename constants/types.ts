@@ -21,6 +21,22 @@ export interface User {
   telegramId?: number;
   /** Когда пользователь последний раз был в приложении */
   lastSeenAt?: string;
+
+  // ─── JobToo Score ───────────────────────────────────────────────────────
+  // Считает сервер после каждой смены и каждой оценки; приложение только
+  // показывает. Пусто — отработанных смен ещё меньше трёх, и любое число
+  // здесь было бы выдумкой (см. миграцию 037).
+  /** 0–100. */
+  score?: number;
+  /** Сколько смен отработано — знаменатель всего остального. */
+  scoreShifts?: number;
+  /** Доли 0–1 по осям. */
+  scoreReliability?: number;
+  scorePunctuality?: number;
+  scoreQuality?: number;
+  scoreSpeed?: number;
+  /** У скольких разных работодателей работал. */
+  scoreEmployers?: number;
 }
 
 export interface Vacancy {

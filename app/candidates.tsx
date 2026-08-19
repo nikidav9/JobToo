@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { ScoreBadge } from '@/components/feature/ScoreCard';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { notifyWorkerGotMatch } from '@/services/notifications';
@@ -110,7 +111,10 @@ export default function CandidatesScreen() {
                   </View>
                 )}
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.workerName}>{worker.firstName} {worker.lastName}</Text>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.workerName} numberOfLines={1}>{worker.firstName} {worker.lastName}</Text>
+                    <ScoreBadge user={worker} />
+                  </View>
                   <Text style={styles.workerMeta}>
                     🚇 {worker.metroStation ?? '—'}
                     {worker.age ? `  ·  ${worker.age} лет` : ''}
@@ -184,6 +188,7 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: rs(12) },
   avatar: { width: rs(48), height: rs(48), borderRadius: rs(24), alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: rf(17), fontWeight: '700', color: '#fff' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: rs(6) },
   workerName: { fontSize: rf(15), fontWeight: '700', color: Colors.textPrimary },
   workerMeta: { fontSize: rf(12), color: Colors.textMuted, marginTop: rs(2) },
   workerRating: { fontSize: rf(12), color: '#FBBF24', fontWeight: '600', marginTop: rs(2) },

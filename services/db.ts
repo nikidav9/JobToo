@@ -123,6 +123,16 @@ function rowToUser(r: any): User {
     bio: r.bio ?? undefined,
     telegramId: r.telegram_id ?? undefined,
     lastSeenAt: r.last_seen_at ?? undefined,
+    // Рейтинг считает сервер (jt_recalc_score в php-proxy/db.php) и кладёт
+    // сюда же. В userToRow его нет намеренно: сохранение профиля не должно
+    // уметь его переписать — иначе рейтинг можно было бы поставить себе сам.
+    score: r.score ?? undefined,
+    scoreShifts: r.score_shifts ?? 0,
+    scoreReliability: r.score_reliability != null ? Number(r.score_reliability) : undefined,
+    scorePunctuality: r.score_punctuality != null ? Number(r.score_punctuality) : undefined,
+    scoreQuality: r.score_quality != null ? Number(r.score_quality) : undefined,
+    scoreSpeed: r.score_speed != null ? Number(r.score_speed) : undefined,
+    scoreEmployers: r.score_employers ?? 0,
   };
 }
 // NB: telegram_id намеренно НЕ входит в userToRow — привязка живёт только
@@ -1222,6 +1232,9 @@ export async function dbSubmitRatingAndMaybeDelete(params: {
   rating: number;
   role: 'worker' | 'employer';
   reviewText?: string;
+  /** Только когда работодатель оценивает работника; 1–5, необязательно. */
+  quality?: number;
+  speed?: number;
 }): Promise<{ bothRated: boolean }> {
   if (IS_NATIVE) { return proxy<{ bothRated: boolean }>('dbSubmitRatingAndMaybeDelete', [params]); }
   const { likeId, fromUserId, toUserId, vacancyId, rating, role, reviewText } = params;

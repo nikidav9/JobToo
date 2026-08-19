@@ -1331,6 +1331,130 @@ function web_push_to(array $userIds, string $title, string $body, string $dataTy
 }
 
 
+// ─── JobToo Score ─────────────────────────────────────────────────────────────
+//
+// Рейтинг работника из фактов. Считаем на сервере и складываем в строку
+// пользователя: показывать его надо всюду, где показывают человека, и
+// пересчитывать это в приложении на каждом экране было бы и дорого, и
+// по-разному в каждом месте.
+//
+// Веса. Половина — надёжность и пунктуальность: работодателю, набирающему
+// два десятка человек на завтра, важнее всего, что они придут и придут
+// вовремя. Четверть — оценки: это мнение, ценное, но мнение. Остальное —
+// качество, скорость и опыт.
+const SCORE_WEIGHTS = [
+    'reliability' => 30,
+    'punctuality' => 15,
+    'rating'      => 25,
+    'quality'     => 10,
+    'speed'       => 10,
+    'experience'  => 10,
+];
+
+// Меньше трёх отработанных смен — числа не показываем вовсе.
+//
+// Не из осторожности: у человека с одной смены выходит либо 100, либо 0, и
+// оба ответа решают за работодателя на пустом месте. Пусть лучше видит
+// «новичок» и решает сам.
+const SCORE_MIN_SHIFTS = 3;
+
+// К скольким сменам опыт считается набранным. Тридцать — это примерно
+// полтора месяца регулярных подработок; дальше разница между сотней смен и
+// тремя сотнями работодателю уже ничего не говорит.
+const SCORE_EXPERIENCE_FULL = 30;
+
+/**
+ * Пересчитать рейтинг одного работника и записать в его строку.
+ *
+ * Возвращает то, что записал, — пригождается и вызывающему, и проверке.
+ * Ошибки наружу не выпускает: пересчёт идёт следом за записью исхода смены
+ * или оценки, и сорвать саму запись из-за него нельзя.
+ */
+function jt_recalc_score(string $uid): array {
+    $out = [
+        'score' => null, 'score_shifts' => 0,
+        'score_reliability' => null, 'score_punctuality' => null,
+        'score_quality' => null, 'score_speed' => null,
+        'score_employers' => 0, 'score_updated_at' => now_iso(),
+    ];
+    try {
+        $likes = sb_select_all('jm_likes', ['worker_id' => 'eq.' . $uid],
+            'employer_id,outcome,late_minutes');
+
+        $worked = 0; $noShow = 0; $onTime = 0; $lateKnown = 0;
+        $employers = [];
+        foreach ($likes as $l) {
+            $o = $l['outcome'] ?? null;
+            if ($o === 'worked') {
+                $worked++;
+                if ($l['employer_id']) $employers[(string)$l['employer_id']] = true;
+                // late_minutes заполняется только с августа 2026. У смен
+                // постарше его нет, и записывать их как «пришёл вовремя»
+                // значило бы выдумать пунктуальность, которой не мерили.
+                if ($l['late_minutes'] !== null) {
+                    $lateKnown++;
+                    if ((int)$l['late_minutes'] === 0) $onTime++;
+                }
+            } elseif ($o === 'no_show') {
+                $noShow++;
+            }
+            // worker_cancelled: предупредил заранее — это не невыход, и в
+            // надёжность не идёт. employer_cancelled и cancelled_legacy к
+            // работнику отношения не имеют вовсе.
+        }
+
+        $out['score_shifts'] = $worked;
+        $out['score_employers'] = count($employers);
+
+        $ratings = sb_select_all('jm_ratings',
+            ['to_user_id' => 'eq.' . $uid, 'role' => 'eq.employer'],
+            'rating,quality,speed');
+        // role здесь — роль оценивающего: 'employer' значит «работодатель
+        // оценил работника». Оценки, которые сам работник ставил другим, в
+        // его рейтинг, разумеется, не идут.
+        $rSum = 0; $rN = 0; $qSum = 0; $qN = 0; $sSum = 0; $sN = 0;
+        foreach ($ratings as $r) {
+            if ($r['rating'] !== null) { $rSum += (float)$r['rating']; $rN++; }
+            if ($r['quality'] !== null) { $qSum += (float)$r['quality']; $qN++; }
+            if ($r['speed'] !== null) { $sSum += (float)$r['speed']; $sN++; }
+        }
+
+        $out['score_reliability'] = ($worked + $noShow) > 0
+            ? round($worked / ($worked + $noShow), 4) : null;
+        $out['score_punctuality'] = $lateKnown > 0 ? round($onTime / $lateKnown, 4) : null;
+        $out['score_quality'] = $qN > 0 ? round(($qSum / $qN) / 5, 4) : null;
+        $out['score_speed']   = $sN > 0 ? round(($sSum / $sN) / 5, 4) : null;
+
+        if ($worked >= SCORE_MIN_SHIFTS) {
+            $оси = [
+                'reliability' => $out['score_reliability'],
+                'punctuality' => $out['score_punctuality'],
+                'rating'      => $rN > 0 ? ($rSum / $rN) / 5 : null,
+                'quality'     => $out['score_quality'],
+                'speed'       => $out['score_speed'],
+                'experience'  => min(1.0, $worked / SCORE_EXPERIENCE_FULL),
+            ];
+            // Ось, по которой нечего сказать, не тянет вниз — она просто не
+            // участвует, а её вес перераспределяется на остальные. Иначе
+            // работник, которого забыли оценить, оказывался бы хуже того,
+            // кого оценили на тройку.
+            $вес = 0; $сумма = 0;
+            foreach (SCORE_WEIGHTS as $ключ => $w) {
+                if ($оси[$ключ] === null) continue;
+                $вес += $w;
+                $сумма += $w * max(0.0, min(1.0, (float)$оси[$ключ]));
+            }
+            if ($вес > 0) $out['score'] = (int)round(100 * $сумма / $вес);
+        }
+
+        sb_update('jm_users', ['id' => 'eq.' . $uid], $out);
+    } catch (Throwable $e) {
+        // Пересчёт — дело служебное. Смена отмечена, оценка записана; если
+        // рейтинг не сошёлся, он сойдётся при следующей записи.
+    }
+    return $out;
+}
+
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 try {
     $data = null;
@@ -2118,6 +2242,16 @@ try {
             }
             $data = ['sent' => count($sent), 'skipped' => $skipped];
             break;
+        }
+
+        // Пересчитать рейтинги всем работникам разом. Нужно ровно дважды:
+        // сразу после выкладки, чтобы уже накопленные смены и оценки
+        // превратились в числа, и если формулу поменяют.
+        case 'scoreRecalcAll': {
+            $ws = sb_select_all('jm_users', ['role' => 'eq.worker'], 'id');
+            $n = 0;
+            foreach ($ws as $w) { jt_recalc_score((string)$w['id']); $n++; }
+            $data = ['пересчитано' => $n]; break;
         }
 
         // ── Источники чужих вакансий ───────────────────────────────────────
@@ -2945,6 +3079,10 @@ try {
                 'shift_completed'    => $worked,
                 'cancelled'          => !$worked,
             ]);
+            // Рейтинг работника меняется именно здесь: выход, невыход и
+            // опоздание — это три четверти всего, из чего он складывается.
+            $lk = sb_single('jm_likes', ['id' => 'eq.' . $lid], 'worker_id');
+            if (!empty($lk['worker_id'])) jt_recalc_score((string)$lk['worker_id']);
             $data = true; break;
         }
 
@@ -2953,9 +3091,16 @@ try {
             $p = $args[0];
             ['likeId' => $lid, 'fromUserId' => $fuid, 'toUserId' => $tuid,
              'vacancyId' => $vid, 'rating' => $rat, 'role' => $rol] = $p;
+            // Качество и скорость необязательны: кто не захотел отвечать,
+            // ставит только звёзды, как было раньше. Ноль здесь не годится —
+            // «не ответили» и «работал на ноль» это разные вещи, и пустое
+            // поле должно остаться пустым.
+            $q = isset($p['quality']) && $p['quality'] > 0 ? (float)$p['quality'] : null;
+            $sp = isset($p['speed']) && $p['speed'] > 0 ? (float)$p['speed'] : null;
             sb_insert('jm_ratings', [
                 'id' => uid(), 'from_user_id' => $fuid, 'to_user_id' => $tuid,
                 'vacancy_id' => $vid, 'like_id' => $lid, 'rating' => $rat,
+                'quality' => $q, 'speed' => $sp,
                 'role' => $rol, 'review_text' => $p['reviewText'] ?? null, 'created_at' => now_iso(),
             ]);
             // Сигнал тому, кого оценили: у него открыт профиль — обновится сам.
@@ -2967,6 +3112,9 @@ try {
                 $avg = round(array_sum(array_column($all, 'rating')) / count($all), 2);
                 sb_update('jm_users', ['id' => 'eq.' . $tuid], ['avg_rating' => $avg, 'rating_count' => count($all)]);
             }
+            // Оценка работодателя — четверть рейтинга работника, плюс
+            // качество и скорость. Работника оценивают в role='employer'.
+            if ($rol === 'employer') jt_recalc_score($tuid);
             $lr = sb_single('jm_likes', ['id' => 'eq.' . $lid], 'worker_rated,employer_rated');
             $data = ['bothRated' => !empty($lr['worker_rated']) && !empty($lr['employer_rated'])]; break;
         }

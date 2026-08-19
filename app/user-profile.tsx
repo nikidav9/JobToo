@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { ScoreCard } from '@/components/feature/ScoreCard';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { METRO_LINES } from '@/constants/metro';
@@ -223,6 +224,14 @@ export default function UserProfileScreen() {
 
         {tab === 'info' ? (
           <>
+            {/* Рейтинг — первым, до анкеты: работодатель открывает профиль
+                ради него, а не ради станции метро. */}
+            {isWorker ? (
+              <View style={styles.scoreWrap}>
+                <ScoreCard user={user} />
+              </View>
+            ) : null}
+
             {/* Info block */}
             <View style={styles.infoCard}>
               <Text style={styles.sectionTitle}>Основная информация</Text>
@@ -381,6 +390,7 @@ const styles = StyleSheet.create({
   tabLabel: { fontSize: rf(14), fontWeight: '500', color: Colors.textMuted },
   tabLabelActive: { fontWeight: '700', color: Colors.textPrimary },
   tabLine: { position: 'absolute', bottom: 0, left: '15%', right: '15%', height: 2, backgroundColor: Colors.primary, borderRadius: rs(1) },
+  scoreWrap: { marginBottom: rs(12) },
   infoCard: {
     backgroundColor: Colors.bg, borderRadius: Radius.lg, padding: rs(16),
     gap: rs(10), ...Shadow.card,

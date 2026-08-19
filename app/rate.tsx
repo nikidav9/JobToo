@@ -24,6 +24,13 @@ export default function RateScreen() {
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState('');
   const [loading, setLoading] = useState(false);
+  // Качество и скорость спрашиваем только у работодателя и только про
+  // работника: они идут в его рейтинг. Обязательными не делаем — обязательный
+  // вопрос люди не отвечают, а прокликивают, и в базу ложится ровный ряд
+  // пятёрок, из которого ничего не посчитаешь.
+  const [quality, setQuality] = useState(0);
+  const [speed, setSpeed] = useState(0);
+  const оцениваетРаботника = role === 'employer';
 
   const ratingLabel =
     rating === 0 ? 'Нажмите на звезду' :
@@ -44,6 +51,8 @@ export default function RateScreen() {
         rating,
         role,
         reviewText: review.trim() || undefined,
+        quality: оцениваетРаботника && quality > 0 ? quality : undefined,
+        speed: оцениваетРаботника && speed > 0 ? speed : undefined,
       });
 
       // Instant optimistic update: refresh all data from server immediately
@@ -92,6 +101,36 @@ export default function RateScreen() {
           </View>
 
           <Text style={styles.ratingLabel}>{ratingLabel}</Text>
+
+          {rating > 0 && оцениваетРаботника ? (
+            <View style={styles.extraBlock}>
+              <Text style={styles.extraTitle}>Подробнее — по желанию</Text>
+              <Text style={styles.extraSub}>
+                Эти две оценки идут в рейтинг работника: по ним его находят
+                другие работодатели.
+              </Text>
+              {([
+                ['Качество работы', quality, setQuality],
+                ['Скорость', speed, setSpeed],
+              ] as [string, number, (n: number) => void][]).map(([label, value, set]) => (
+                <View key={label} style={styles.extraRow}>
+                  <Text style={styles.extraLabel}>{label}</Text>
+                  <View style={styles.extraStars}>
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <TouchableOpacity
+                        key={n}
+                        onPress={() => set(value === n ? 0 : n)}
+                        activeOpacity={0.7}
+                        hitSlop={4}
+                      >
+                        <Text style={[styles.smallStar, value >= n && styles.starActive]}>★</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
           {rating > 0 ? (
             <View style={styles.reviewBlock}>
@@ -149,6 +188,20 @@ const styles = StyleSheet.create({
   star: { fontSize: rf(44), color: Colors.divider },
   starActive: { color: '#FBBF24' },
   ratingLabel: { fontSize: rf(16), color: Colors.textSecondary, fontWeight: '500', height: rs(24) },
+  extraBlock: {
+    width: '100%', marginTop: rs(8), padding: rs(14),
+    backgroundColor: Colors.surface, borderRadius: rs(12),
+    borderWidth: 1, borderColor: Colors.inputBorder,
+  },
+  extraTitle: { fontSize: rf(14), fontWeight: '700', color: Colors.textPrimary },
+  extraSub: { fontSize: rf(12.5), color: Colors.textMuted, marginTop: rs(2), lineHeight: rf(17) },
+  extraRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: rs(12),
+  },
+  extraLabel: { fontSize: rf(14), color: Colors.textSecondary, fontWeight: '500' },
+  extraStars: { flexDirection: 'row', gap: rs(4) },
+  smallStar: { fontSize: rf(24), color: Colors.divider },
   reviewBlock: { width: '100%', gap: rs(8), marginTop: rs(8) },
   reviewTitle: { fontSize: rf(14), fontWeight: '600', color: Colors.textPrimary },
   reviewInput: {

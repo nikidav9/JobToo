@@ -1,0 +1,148 @@
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+import { Colors } from '@/constants/theme';
+import { rs, rf } from '@/constants/scale';
+import { User } from '@/constants/types';
+
+/**
+ * JobToo Score — то, что в презентации нарисовано кружком с числом.
+ *
+ * Показываем не только итог, но и оси, из которых он сложился. Одно число
+ * без расшифровки — это приговор без объяснения: работник не понимает, за
+ * что ему 62, а работодатель не понимает, чему в этих 62 верить. Оси стоят
+ * ровно столько же места и снимают оба вопроса.
+ *
+ * Ось, по которой данных нет, не рисуем вовсе. Заполнять пробел нулём или
+ * серединой — значит сообщить о человеке то, чего мы не знаем.
+ */
+
+const цвет = (v: number) =>
+  v >= 85 ? Colors.green : v >= 65 ? '#F59E0B' : Colors.red;
+
+function Axis({ label, value, hint }: { label: string; value: number; hint?: string }) {
+  const pct = Math.round(value * 100);
+  return (
+    <View style={s.axis}>
+      <View style={s.axisTop}>
+        <Text style={s.axisLabel}>{label}</Text>
+        <Text style={s.axisValue}>{pct}%</Text>
+      </View>
+      <View style={s.bar}>
+        <View style={[s.barFill, { width: `${Math.max(2, pct)}%`, backgroundColor: цвет(pct) }]} />
+      </View>
+      {hint ? <Text style={s.axisHint}>{hint}</Text> : null}
+    </View>
+  );
+}
+
+/** Компактная плашка для списков: только число. */
+export function ScoreBadge({ user }: { user: User | null | undefined }) {
+  if (!user || user.score == null) return null;
+  return (
+    <View style={[s.badge, { borderColor: цвет(user.score) }]}>
+      <Ionicons name="shield-checkmark" size={rf(11)} color={цвет(user.score)} />
+      <Text style={[s.badgeTxt, { color: цвет(user.score) }]}>{user.score}</Text>
+    </View>
+  );
+}
+
+export function ScoreCard({ user, own = false }: { user: User; own?: boolean }) {
+  if (user.role !== 'worker') return null;
+
+  const смен = user.scoreShifts ?? 0;
+
+  // Меньше трёх смен — числа нет. Объясняем, почему, и сколько осталось:
+  // «нет рейтинга» без объяснения читается как «плохой рейтинг».
+  if (user.score == null) {
+    return (
+      <View style={s.card}>
+        <View style={s.header}>
+          <View style={[s.circle, { borderColor: Colors.divider }]}>
+            <Ionicons name="hourglass-outline" size={rf(20)} color={Colors.textMuted} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.title}>Рейтинг ещё не считается</Text>
+            <Text style={s.sub}>
+              {own
+                ? `Отработано смен: ${смен}. Рейтинг появится после трёх — так он не будет случайным.`
+                : `Отработано смен через JobToo: ${смен}. Для рейтинга нужно минимум три.`}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.card}>
+      <View style={s.header}>
+        <View style={[s.circle, { borderColor: цвет(user.score) }]}>
+          <Text style={[s.circleNum, { color: цвет(user.score) }]}>{user.score}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.title}>JobToo Score</Text>
+          <Text style={s.sub}>
+            {смен} {смен % 10 === 1 && смен % 100 !== 11 ? 'смена' :
+              [2, 3, 4].includes(смен % 10) && ![12, 13, 14].includes(смен % 100) ? 'смены' : 'смен'}
+            {(user.scoreEmployers ?? 0) > 0 ? ` · ${user.scoreEmployers} работодат.` : ''}
+          </Text>
+        </View>
+      </View>
+
+      <View style={s.axes}>
+        {user.scoreReliability != null ? (
+          <Axis label="Выходит на смены" value={user.scoreReliability} />
+        ) : null}
+        {user.scorePunctuality != null ? (
+          <Axis label="Приходит вовремя" value={user.scorePunctuality} />
+        ) : null}
+        {(user.ratingCount ?? 0) > 0 ? (
+          <Axis label="Оценки работодателей" value={(user.avgRating ?? 0) / 5}
+            hint={`${(user.avgRating ?? 0).toFixed(1)} из 5 · отзывов: ${user.ratingCount}`} />
+        ) : null}
+        {user.scoreQuality != null ? (
+          <Axis label="Качество работы" value={user.scoreQuality} />
+        ) : null}
+        {user.scoreSpeed != null ? (
+          <Axis label="Скорость" value={user.scoreSpeed} />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.card, borderRadius: rs(14), padding: rs(16),
+    borderWidth: 1, borderColor: Colors.divider,
+  },
+  header: { flexDirection: 'row', alignItems: 'center', gap: rs(14) },
+  circle: {
+    width: rs(58), height: rs(58), borderRadius: rs(29),
+    borderWidth: rs(3), alignItems: 'center', justifyContent: 'center',
+  },
+  circleNum: { fontSize: rf(21), fontWeight: '800' },
+  title: { fontSize: rf(16), fontWeight: '800', color: Colors.textPrimary },
+  sub: { fontSize: rf(12.5), color: Colors.textMuted, marginTop: rs(3), lineHeight: rf(17) },
+
+  axes: { marginTop: rs(16), gap: rs(12) },
+  axis: {},
+  axisTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  axisLabel: { fontSize: rf(13), color: Colors.textSecondary, fontWeight: '500' },
+  axisValue: { fontSize: rf(13), color: Colors.textPrimary, fontWeight: '700' },
+  bar: {
+    height: rs(6), borderRadius: rs(3), backgroundColor: Colors.surface,
+    marginTop: rs(5), overflow: 'hidden',
+  },
+  barFill: { height: '100%', borderRadius: rs(3) },
+  axisHint: { fontSize: rf(11.5), color: Colors.textMuted, marginTop: rs(3) },
+
+  badge: {
+    flexDirection: 'row', alignItems: 'center', gap: rs(3),
+    paddingHorizontal: rs(7), paddingVertical: rs(2),
+    borderRadius: rs(100), borderWidth: 1.5,
+  },
+  badgeTxt: { fontSize: rf(11.5), fontWeight: '800' },
+});

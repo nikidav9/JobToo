@@ -17,6 +17,7 @@ import {
   dbSetPermApplicationStatus, dbCreateChat,
 } from '@/services/db';
 import { TabHeader } from '@/components/ui/TabHeader';
+import { ScoreBadge } from '@/components/feature/ScoreCard';
 import { useMissingUsers } from '@/hooks/useMissingUsers';
 import { workerLikes, workerActive, workerRejected, workerCompleted,
   employerLikes, employerPending, employerMatched, employerCompleted,
@@ -989,7 +990,12 @@ function EmployerMatches() {
               </View>
             )}
             <View style={{ flex: 1 }}>
-              <Text style={s.workerName}>{workerName}</Text>
+              <View style={s.nameRow}>
+                <Text style={s.workerName} numberOfLines={1}>{workerName}</Text>
+                {/* Рейтинг тут же, у имени: работодатель решает по нему, а
+                    не по тому, на какой станции живёт человек. */}
+                <ScoreBadge user={worker} />
+              </View>
               {worker?.metroStation ? (
                 <View style={s.metroRow}>
                   <Ionicons name="subway-outline" size={12} color={Colors.textMuted} />
@@ -1314,6 +1320,7 @@ const s = StyleSheet.create({
   workerRow: { flexDirection: 'row', alignItems: 'center', gap: rs(10) },
   avatar: { width: rs(44), height: rs(44), borderRadius: rs(22) },
   avatarTxt: { color: '#fff', fontSize: rf(16), fontWeight: '700' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: rs(6) },
   workerName: { fontSize: rf(15), fontWeight: '700', color: Colors.textPrimary },
   phoneTag: {
     backgroundColor: Colors.primaryLight, borderRadius: rs(8),
