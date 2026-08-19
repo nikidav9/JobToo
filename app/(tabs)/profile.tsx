@@ -11,7 +11,6 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { ScoreCard } from '@/components/feature/ScoreCard';
-import { SkillBadges } from '@/components/feature/SkillBadges';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { uploadAvatar } from '@/services/avatarUpload';
@@ -536,11 +535,6 @@ export default function ProfileScreen() {
         <View style={{ marginBottom: rs(12) }}>
           <ScoreCard user={currentUser} own />
         </View>
-        {currentUser.role === 'worker' ? (
-          <View style={{ marginBottom: rs(12) }}>
-            <SkillBadges user={currentUser} own />
-          </View>
-        ) : null}
 
         <SectionCard
           iconName="person"

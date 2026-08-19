@@ -7,7 +7,6 @@ import {
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ScoreCard } from '@/components/feature/ScoreCard';
-import { SkillBadges } from '@/components/feature/SkillBadges';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { METRO_LINES } from '@/constants/metro';
@@ -230,9 +229,6 @@ export default function UserProfileScreen() {
                 платит ли вовремя, совпадает ли работа с описанием. */}
             <View style={styles.scoreWrap}>
               <ScoreCard user={user} />
-            </View>
-            <View style={styles.scoreWrap}>
-              <SkillBadges user={user} />
             </View>
 
             {/* Info block */}
