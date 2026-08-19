@@ -44,6 +44,7 @@ export const NAV: NavItem[] = [
   { href: '/broadcast',   label: 'Рассылка',                                icon: 'bell',    group: 'Общение' },
   { href: '/sources',     label: 'Источники вакансий',   short: 'Фиды',     icon: 'jobs',    group: 'Система' },
   { href: '/api-keys',    label: 'Ключи API',            short: 'API',      icon: 'shield',  group: 'Система' },
+  { href: '/billing',     label: 'К счёту',              short: 'Счёт',     icon: 'summary', group: 'Аналитика' },
   { href: '/funnel',      label: 'Воронка',                                 icon: 'funnel',  group: 'Аналитика' },
   { href: '/cohorts',     label: 'Когорты',                                 icon: 'cohort',  group: 'Аналитика' },
   { href: '/geo',         label: 'Гео',                                     icon: 'geo',     group: 'Аналитика' },
