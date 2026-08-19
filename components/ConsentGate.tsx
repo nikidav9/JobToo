@@ -93,8 +93,12 @@ export default function ConsentGate() {
       } else {
         setNeeded(false);
       }
-    } catch {
-      setError('Не удалось сохранить. Проверьте связь и попробуйте ещё раз.');
+    } catch (e: any) {
+      // Показываем то, что сказал сервер, а не общую фразу. Общая фраза
+      // красивее, но по ней невозможно понять, связь оборвалась или база
+      // отказала, — а разбираться в этом придётся по одному-единственному
+      // скриншоту от человека, который до нас не дозвонится.
+      setError(String(e?.message || e) || 'Не удалось сохранить. Попробуйте ещё раз.');
     } finally {
       setBusy(false);
     }
@@ -220,7 +224,9 @@ const styles = StyleSheet.create({
     lineHeight: rf(21),
     color: Colors.textSecondary,
   },
-  docs: { marginTop: rs(16), flexGrow: 0 },
+  // Занимает оставшуюся высоту, но ужимается, когда документ раскрыт:
+  // иначе развёрнутый текст выдавливает кнопки за край карточки.
+  docs: { marginTop: rs(16), flexShrink: 1 },
   docWrap: { marginBottom: rs(8) },
   doc: {
     flexDirection: 'row',
