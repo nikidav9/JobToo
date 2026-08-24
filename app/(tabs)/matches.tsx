@@ -294,9 +294,8 @@ function WorkerMatches() {
     setRefreshing(false);
   };
 
-  if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
-
-  const myLikes = workerLikes(likes, currentUser.id);
+  const currentUserId = currentUser?.id ?? '';
+  const myLikes = workerLikes(likes, currentUserId);
 
   const getVacancy = (id: string) => vacancies.find(v => v.id === id);
   // Та же история, что и у работодателя: общий список пользователей приходит
@@ -306,6 +305,8 @@ function WorkerMatches() {
     [likes],
   );
   const getEmployer = useMissingUsers(users, neededEmployerIds);
+
+  if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
   const activeItems = workerActive(myLikes);
   const rejectedItems = workerRejected(myLikes);
@@ -555,10 +556,8 @@ function EmployerMatches() {
     setRefreshing(false);
   };
 
-  if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
-
-  const myVacIds = vacancies.filter(v => v.employerId === currentUser.id).map(v => v.id);
-  const allLikes = employerLikes(likes, vacancies, currentUser.id);
+  const currentUserId = currentUser?.id ?? '';
+  const allLikes = employerLikes(likes, vacancies, currentUserId);
 
   // Ожидающие решения — по подбору, а не по времени отклика. При двадцати
   // откликах смотрят первых пятерых, и лучший кандидат может оказаться
@@ -578,7 +577,7 @@ function EmployerMatches() {
   const completed = employerCompleted(allLikes);
 
   // Отклики на постоянные вакансии — тоже сюда, а не только на карточку вакансии
-  const myPermApps: PermApplication[] = employerPermApps(permApplications, currentUser.id);
+  const myPermApps: PermApplication[] = employerPermApps(permApplications, currentUserId);
   const permPending = myPermApps.filter(a => a.status === 'pending');
   const permApproved = myPermApps.filter(a => a.status === 'approved');
   // hired — работодатель нажал «Завершить»: кандидат закрыт, карточка ушла
@@ -608,14 +607,16 @@ function EmployerMatches() {
   const neededWorkerIds = useMemo(() => {
     const ids = new Set<string>();
     permApplications.forEach((a: PermApplication) => {
-      if (a.employerId === currentUser.id) ids.add(a.workerId);
+      if (a.employerId === currentUserId) ids.add(a.workerId);
     });
     likes.forEach((l: Like) => {
-      if (l.employerId === currentUser.id) ids.add(l.workerId);
+      if (l.employerId === currentUserId) ids.add(l.workerId);
     });
     return Array.from(ids);
-  }, [permApplications, likes, currentUser.id]);
+  }, [permApplications, likes, currentUserId]);
   const getWorker = useMissingUsers(users, neededWorkerIds);
+
+  if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
   const approve = async (like: Like) => {
     setLoading(like.id);

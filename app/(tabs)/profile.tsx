@@ -23,18 +23,17 @@ import { TabHeader } from '@/components/ui/TabHeader';
 import { AppInput } from '@/components/ui/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { MetroPicker } from '@/components/feature/MetroPicker';
-import { WorkTypeSelector } from '@/components/feature/WorkTypeSelector';
+import { WorkTypeSelector, WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
 import { WorkType } from '@/constants/types';
-import { WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
-
-const COMPANY_OPTIONS = ['Лавка'] as const;
-type CompanyOption = typeof COMPANY_OPTIONS[number];
 import { METRO_LINES } from '@/constants/metro';
 import { NotifBell } from '@/components/ui/NotifBell';
 import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import { TelegramConnectButton } from '@/components/TelegramConnectButton';
 
 import { rs, rf } from '@/constants/scale';
+
+const COMPANY_OPTIONS = ['Лавка'] as const;
+type CompanyOption = typeof COMPANY_OPTIONS[number];
 
 type EditSection = 'personal' | 'metro' | 'worktypes' | 'company' | 'bio' | null;
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -150,7 +149,7 @@ function RatingsModal({ userId, users, onClose }: { userId: string; users: any[]
           </View>
         </View>
         {item.reviewText ? (
-          <Text style={rmS.review}>"{item.reviewText}"</Text>
+          <Text style={rmS.review}>«{item.reviewText}»</Text>
         ) : (
           <Text style={rmS.noReview}>Комментарий не оставлен</Text>
         )}

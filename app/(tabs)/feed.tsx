@@ -10,7 +10,13 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { Like, User, Vacancy, PermVacancy } from '@/constants/types';
-import { getTodayDates, formatDate } from '@/services/storage';
+import {
+  formatDate,
+  getInitials,
+  getTodayDates,
+  nameColorFromString,
+  normalizeCompany,
+} from '@/services/storage';
 import { scoreVacancyForWorker } from '@/services/matching';
 import { METRO_LINES } from '@/constants/metro';
 import {
@@ -40,7 +46,6 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
-import { nameColorFromString, getInitials, normalizeCompany } from '@/services/storage';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
 import { TabHeader } from '@/components/ui/TabHeader';
 import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
