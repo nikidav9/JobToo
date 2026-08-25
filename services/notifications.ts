@@ -422,7 +422,7 @@ export async function notifyWorkerShiftCancelled(
   workerId: string,
   companyName: string,
   vacancyTitle: string,
-  outcome?: 'no_show' | 'worker_cancelled' | 'employer_cancelled',
+  outcome?: 'no_show' | 'worker_cancelled' | 'employer_cancelled' | 'other_cancelled',
 ): Promise<void> {
   const [title, body] =
     outcome === 'no_show'
@@ -431,6 +431,9 @@ export async function notifyWorkerShiftCancelled(
       : outcome === 'worker_cancelled'
       ? ['Смена отменена',
          `Ваш отказ от смены «${vacancyTitle}» (${companyName}) записан. На рейтинг он не влияет.`]
+      : outcome === 'other_cancelled'
+      ? ['Смена отменена',
+         `Смена «${vacancyTitle}» не состоялась по другой причине. На рейтинг сторон это не влияет.`]
       : ['❌ Смена отменена',
          `${companyName} отменил смену «${vacancyTitle}». Загляните в приложение — там много других подработок!`];
 
@@ -591,4 +594,3 @@ export async function notifyWorkerPermApplicationRejected(
     'perm_rejected', 'matches',
   );
 }
-

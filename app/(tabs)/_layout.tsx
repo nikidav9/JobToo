@@ -5,8 +5,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { bottomSafe } from '@/lib/androidInsets';
-import { useNavigation } from '@react-navigation/native';
-import { StackActions } from '@react-navigation/native';
+import { StackActions, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { BlurView } from 'expo-blur';
