@@ -1,17 +1,23 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, StyleSheet, View } from 'react-native';
 import { Colors } from '@/constants/theme';
+import { ToastType } from '@/contexts/AppContext';
 
 import { rs, rf } from '@/constants/scale';
 
 interface Props {
   message: string;
-  type: 'success' | 'error' | 'match';
+  type: ToastType;
   visible: boolean;
 }
 
-const BAR_COLOR = { success: Colors.primary, error: Colors.red, match: Colors.green };
-const EMOJI = { success: '✅', error: '❌', match: '🎉' };
+const BAR_COLOR: Record<ToastType, string> = {
+  success: Colors.primary,
+  error: Colors.red,
+  info: Colors.primary,
+  match: Colors.green,
+};
+const EMOJI: Record<ToastType, string> = { success: '✅', error: '❌', info: 'ℹ️', match: '🎉' };
 
 export function Toast({ message, type, visible }: Props) {
   const anim = useRef(new Animated.Value(-80)).current;

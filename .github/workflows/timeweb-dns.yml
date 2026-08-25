@@ -1,0 +1,37 @@
+name: Проверка и настройка DNS в Timeweb
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/timeweb-dns.yml
+      - infra/timeweb-dns.py
+  workflow_dispatch:
+
+concurrency:
+  group: timeweb-dns-jobtoo-ru
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    name: Восстановить DNS-зону jobtoo.ru
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Проверить наличие токена Timeweb
+        env:
+          TW_TOKEN: ${{ secrets.TW_TOKEN }}
+        run: |
+          if [ -z "$TW_TOKEN" ]; then
+            echo 'Не найден repository secret TW_TOKEN.' >&2
+            exit 1
+          fi
+          echo "TW_TOKEN получен (${#TW_TOKEN} символов); значение скрыто."
+
+      - name: Записать и проверить DNS-зону
+        env:
+          TW_TOKEN: ${{ secrets.TW_TOKEN }}
+        run: python3 infra/timeweb-dns.py записи

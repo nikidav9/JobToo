@@ -3296,7 +3296,7 @@ try {
             $lid = $args[0];
             $out = $args[1];
             $opts = $args[2] ?? [];
-            $ok = ['worked', 'no_show', 'worker_cancelled', 'employer_cancelled'];
+            $ok = ['worked', 'no_show', 'worker_cancelled', 'employer_cancelled', 'other_cancelled'];
             if (!in_array($out, $ok, true)) throw new Exception('неизвестный итог смены');
             $worked = $out === 'worked';
             sb_update('jm_likes', ['id' => 'eq.' . $lid], [

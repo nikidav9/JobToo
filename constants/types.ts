@@ -125,6 +125,7 @@ export type ShiftOutcome =
   | 'no_show'
   | 'worker_cancelled'
   | 'employer_cancelled'
+  | 'other_cancelled'
   | 'cancelled_legacy';
 
 /** Что работодатель может отметить руками. `cancelled_legacy` только читается. */
