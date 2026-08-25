@@ -8,7 +8,7 @@ export interface AppNotification {
   createdAt: string;
 }
 import { Platform, AppState, AppStateStatus } from 'react-native';
-import { supabase } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { getSupabaseClient } from '@/template';
 import { User, Vacancy, Like, Chat, PermVacancy, PermApplication } from '@/constants/types';
 import {
@@ -391,6 +391,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     if (!currentUser) return;
+    if (!isSupabaseConfigured) return;
 
     const user = currentUser;
     const subs: ReturnType<typeof supabase.channel>[] = [];
