@@ -408,7 +408,7 @@ function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId
             contentContainerStyle={{ padding: 16, gap: 12 }}
             renderItem={({ item: w }) => {
               const color = nameColorFromString(w.id);
-              const initials = getInitials(w.firstName, w.lastName);
+              const initials = getInitials(`${w.firstName} ${w.lastName}`);
               return (
                 <View style={[wS.card, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
                   <View style={[wS.avatar, { backgroundColor: color, alignItems: 'center', justifyContent: 'center' }]}>
@@ -1362,7 +1362,7 @@ function WorkerFeed() {
                 <TouchableOpacity
                   style={styles.detailHintRow}
                   activeOpacity={0.7}
-                  onPress={() => { setDetailVacancy(currentCard); setDetailEmployer(currentEmployer); }}
+                  onPress={() => { setDetailVacancy(currentCard); setDetailEmployer(currentEmployer ?? null); }}
                 >
                   <Text style={styles.detailHintText}>Подробности и нормативы</Text>
                   <Text style={styles.detailHintArrow}>→</Text>

@@ -1167,7 +1167,7 @@ function EmployerMatches() {
     item.kind === 'permApp' ? renderPermApp(item.app) : renderLike(item.like);
 
   const emptyIcon: Record<typeof tab, React.ComponentProps<typeof Ionicons>['name']> = {
-    pending: 'inbox-outline',
+    pending: 'file-tray-outline',
     matched: 'people-outline',
     completed: 'flag-outline',
   };

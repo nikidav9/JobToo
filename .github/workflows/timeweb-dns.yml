@@ -14,24 +14,24 @@ concurrency:
 
 jobs:
   configure:
-    name: Привести jobtoo.ru к конфигурации проекта
+    name: Восстановить DNS-зону jobtoo.ru
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
 
-      - name: Проверить наличие токена
+      - name: Проверить наличие токена Timeweb
         env:
           TW_TOKEN: ${{ secrets.TW_TOKEN }}
         run: |
           if [ -z "$TW_TOKEN" ]; then
-            echo 'Секрет TW_TOKEN не задан в Settings → Secrets and variables → Actions.' >&2
+            echo 'Не найден repository secret TW_TOKEN.' >&2
             exit 1
           fi
-          echo "TW_TOKEN задан (${#TW_TOKEN} символов); значение не выводится."
+          echo "TW_TOKEN получен (${#TW_TOKEN} символов); значение скрыто."
 
-      - name: Настроить и повторно проверить DNS-зону
+      - name: Записать и проверить DNS-зону
         env:
           TW_TOKEN: ${{ secrets.TW_TOKEN }}
         run: python3 infra/timeweb-dns.py записи

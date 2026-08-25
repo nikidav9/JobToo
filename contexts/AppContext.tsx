@@ -52,6 +52,7 @@ import {
 import { LEGAL_STAMP, legalVersions } from '@/constants/legal';
 import { registerForPushNotifications, releasePushTokenIfSignedOut } from '@/services/notifications';
 import { isTelegramMiniApp, getTelegramInitData } from '@/lib/telegram';
+import { registerWebPush } from '@/lib/webPush';
 
 // Polling interval for native (Realtime is primary, polling is fallback)
 const NATIVE_POLL_INTERVAL = 8_000;
@@ -65,7 +66,8 @@ const USERS_REFRESH_INTERVAL = 300_000;
 // Polling interval for web (Supabase realtime may be blocked in Russia)
 const WEB_POLL_INTERVAL = 10_000;
 
-export interface ToastMessage { message: string; type: 'success' | 'error' | 'info' }
+export type ToastType = 'success' | 'error' | 'info' | 'match';
+export interface ToastMessage { message: string; type: ToastType }
 
 export interface VacancyStats { applicants: number; rejected: number; views: number }
 
@@ -85,7 +87,7 @@ export interface AppContextValue {
   loading: boolean;
   vacanciesLoading: boolean;
   toast: ToastMessage | null;
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  showToast: (message: string, type?: ToastType) => void;
   users: User[];
   vacancies: Vacancy[];
   likes: Like[];
@@ -146,7 +148,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const showToast = useCallback((message: string, type: ToastType = 'success') => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ message, type });
     toastTimer.current = setTimeout(() => setToast(null), 3000);
