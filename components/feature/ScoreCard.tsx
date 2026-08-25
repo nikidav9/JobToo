@@ -40,11 +40,14 @@ function Axis({ label, value, hint }: { label: string; value: number; hint?: str
 /** Компактная плашка для списков: только число. */
 export function ScoreBadge({ user }: { user: User | null | undefined }) {
   const n = user?.role === 'employer' ? user?.empScore : user?.score;
-  if (!user || n == null) return null;
+  const enoughReviews = (user?.ratingCount ?? 0) >= 3 && (user?.avgRating ?? 0) > 0;
+  if (!user || (n == null && !enoughReviews)) return null;
+  const value = n ?? Number((user.avgRating ?? 0).toFixed(1));
+  const badgeColor = n == null ? '#F59E0B' : цвет(n);
   return (
-    <View style={[s.badge, { borderColor: цвет(n) }]}>
-      <Ionicons name="shield-checkmark" size={rf(11)} color={цвет(n)} />
-      <Text style={[s.badgeTxt, { color: цвет(n) }]}>{n}</Text>
+    <View style={[s.badge, { borderColor: badgeColor }]}>
+      <Ionicons name={n == null ? 'star' : 'shield-checkmark'} size={rf(11)} color={badgeColor} />
+      <Text style={[s.badgeTxt, { color: badgeColor }]}>{value}</Text>
     </View>
   );
 }
@@ -61,10 +64,28 @@ export function ScoreCard({ user, own = false }: { user: User; own?: boolean }) 
   const работодатель = user.role === 'employer';
   const итог = работодатель ? user.empScore : user.score;
   const смен = (работодатель ? user.empScoreShifts : user.scoreShifts) ?? 0;
+  const достаточноОценок = (user.ratingCount ?? 0) >= 3 && (user.avgRating ?? 0) > 0;
 
   // Меньше трёх смен — числа нет. Объясняем, почему, и сколько осталось:
   // «нет рейтинга» без объяснения читается как «плохой рейтинг».
   if (итог == null) {
+    if (достаточноОценок) {
+      return (
+        <View style={s.card}>
+          <View style={s.header}>
+            <View style={[s.circle, { borderColor: '#F59E0B' }]}>
+              <Text style={[s.circleNum, { color: '#F59E0B' }]}>
+                {(user.avgRating ?? 0).toFixed(1)}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.title}>Общий рейтинг</Text>
+              <Text style={s.sub}>На основании {user.ratingCount} оценок после смен</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
     return (
       <View style={s.card}>
         <View style={s.header}>

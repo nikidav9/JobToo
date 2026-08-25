@@ -2,14 +2,14 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Animated, PanResponder, Dimensions, RefreshControl, Modal, FlatList,
-  TextInput, ActivityIndicator, Share, Platform,
+  TextInput, ActivityIndicator, Share, Platform, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { Like, User, Vacancy, PermVacancy } from '@/constants/types';
+import { ExternalVacancy, Like, User, Vacancy, PermVacancy } from '@/constants/types';
 import {
   formatDate,
   getInitials,
@@ -39,6 +39,8 @@ import {
   dbGetPermVacancyViewers,
   dbAddPermSaved,
   dbRemovePermSaved,
+  dbGetExternalVacancies,
+  dbRecordExternalClick,
 } from '@/services/db';
 import { notifyEmployerGotMatch, notifyWorkerGotMatch,
   notifyEmployerNewMessage } from '@/services/notifications';
@@ -56,7 +58,6 @@ import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/web
 
 import { rs, rf } from '@/constants/scale';
 import { ApplySheet } from '@/components/feature/ApplySheet';
-import { SearchMode } from '@/components/feature/SearchMode';
 import { getChatSuggestions } from '@/constants/chatSuggestions';
 import { payShort } from '@/services/pay';
 import { vacancyInfoLines, permVacancyInfoLines } from '@/services/vacancyCard';
@@ -254,15 +255,13 @@ const metroPickerSt = StyleSheet.create({
 // ─────────────────────────────────────────────────
 // Mode switcher
 // ─────────────────────────────────────────────────
-type AppMode = 'shift' | 'perm' | 'search';
+type AppMode = 'shift' | 'perm';
 
-// Какие кнопки показывать. У работника их три — третья, «Поиск», это единое
-// окно со своими и чужими вакансиями. У работодателя её нет: искать ему
-// нечего, он размещает.
+// Отдельного «Поиска» больше нет: внешняя постоянная работа показывается
+// вместе со своей во вкладке «Работа», а смены остаются в свайп-ленте.
 const MODE_LABELS: Record<AppMode, { label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = {
   shift:  { label: 'Смены',  icon: 'flash' },
   perm:   { label: 'Работа', icon: 'briefcase' },
-  search: { label: 'Поиск',  icon: 'search' },
 };
 
 function ModeSwitcher({ mode, onChange, modes = ['shift', 'perm'] }: {
@@ -1499,10 +1498,24 @@ function WorkerPermMode() {
   const [permApplyFor, setPermApplyFor] = useState<PermVacancy | null>(null);
   const [chatLoading, setChatLoading] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
+  const [externalVacancies, setExternalVacancies] = useState<ExternalVacancy[]>([]);
+
+  const loadExternalVacancies = useCallback(async () => {
+    try {
+      const rows = await dbGetExternalVacancies();
+      setExternalVacancies(rows.filter(v => v.kind === 'permanent'));
+    } catch {
+      // Свои вакансии должны продолжить работать, даже если партнёрский фид
+      // временно недоступен.
+    }
+  }, []);
+
+  useEffect(() => { loadExternalVacancies(); }, [loadExternalVacancies]);
 
   // Вакансии для карты: метка — это адрес, станция остаётся для фильтра
   const permMapItems: MapListItem[] = useMemo(
-    () => (permVacancies as PermVacancy[])
+    () => [
+      ...(permVacancies as PermVacancy[])
       .filter((v: PermVacancy) => v.status === 'open' && (!!v.metroStation || !!v.address))
       .map((v: PermVacancy) => ({
         id: v.id,
@@ -1515,7 +1528,21 @@ function WorkerPermMode() {
         lat: v.lat,
         lng: v.lng,
       })),
-    [permVacancies],
+      ...externalVacancies
+        .filter(v => !!v.metroStation || !!v.address)
+        .map(v => ({
+          id: `external:${v.id}`,
+          station: v.metroStation ?? '',
+          title: v.title,
+          company: v.company ?? v.sourceName ?? 'Компания',
+          pay: v.salary ? `${v.salary.toLocaleString('ru-RU')} ₽/мес` : undefined,
+          meta: v.schedule,
+          address: v.address,
+          lat: v.lat,
+          lng: v.lng,
+        })),
+    ],
+    [permVacancies, externalVacancies],
   );
 
   const viewedPermIds = useRef(new Set<string>());
@@ -1526,6 +1553,7 @@ function WorkerPermMode() {
     const uid = currentUserRef.current?.id;
     if (!uid) return;
     viewableItems.forEach(({ item }: any) => {
+      if (item && 'sourceId' in item) return;
       if (item?.id && !viewedPermIds.current.has(item.id)) {
         viewedPermIds.current.add(item.id);
         dbRecordPermVacancyView(item.id, uid).catch(() => {});
@@ -1535,7 +1563,10 @@ function WorkerPermMode() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refreshPermVacancies(), refreshPermApplications(), refreshPermVacancyViews()]);
+    await Promise.all([
+      refreshPermVacancies(), refreshPermApplications(), refreshPermVacancyViews(),
+      loadExternalVacancies(),
+    ]);
     setRefreshing(false);
   };
 
@@ -1557,13 +1588,21 @@ function WorkerPermMode() {
   };
 
   const openVacancies    = permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id) && matchesSearch(v) && matchesFilters(v));
+  const externalOpenVacancies = externalVacancies.filter(v => {
+    if (filterStation && v.metroStation !== filterStation) return false;
+    if (minSalary > 0 && (v.salary ?? 0) < minSalary) return false;
+    if (!searchText) return true;
+    const q = searchText.toLowerCase();
+    return v.title.toLowerCase().includes(q)
+      || (v.company ?? v.sourceName ?? '').toLowerCase().includes(q);
+  });
   // Отказ больше не прячется в отдельную вкладку: отклик остаётся здесь,
   // просто с красной плашкой «✕ Отказ» — иначе вакансия исчезала без объяснений
   const appliedVacancies = permVacancies.filter(v => myAppVacIds.has(v.id) && matchesSearch(v) && matchesFilters(v));
   const savedVacancies   = permVacancies.filter(v => permSavedIds.includes(v.id) && matchesSearch(v) && matchesFilters(v));
 
-  const shownVacancies =
-    tab === 'open'     ? openVacancies :
+  const shownVacancies: (PermVacancy | ExternalVacancy)[] =
+    tab === 'open'     ? [...openVacancies, ...externalOpenVacancies] :
     tab === 'applied'  ? appliedVacancies :
     savedVacancies;
 
@@ -1641,7 +1680,7 @@ function WorkerPermMode() {
     : null;
 
   const TAB_CONFIG: { key: PermTab; label: string; count: number }[] = [
-    { key: 'open',    label: 'Открытые',     count: openVacancies.length },
+    { key: 'open',    label: 'Открытые',     count: openVacancies.length + externalOpenVacancies.length },
     { key: 'applied', label: 'Откликнулись', count: appliedVacancies.length },
     { key: 'saved',   label: 'Избранное',    count: savedVacancies.length },
   ];
@@ -1670,7 +1709,47 @@ function WorkerPermMode() {
     } catch {}
   };
 
-  const renderPerm = ({ item: v }: { item: PermVacancy }) => {
+  const renderPerm = ({ item: v }: { item: PermVacancy | ExternalVacancy }) => {
+    const isExternal = 'sourceId' in v;
+    if (isExternal) {
+      const company = v.company ?? v.sourceName ?? 'Компания';
+      const openExternal = async () => {
+        dbRecordExternalClick(v.id, v.sourceId, currentUser.id).catch(() => {});
+        try {
+          await Linking.openURL(v.url);
+        } catch {
+          showToast('Не удалось открыть вакансию', 'error');
+        }
+      };
+      return (
+        <TouchableOpacity style={pS.card} onPress={openExternal} activeOpacity={0.9}>
+          <View style={pS.externalHead}>
+            <View style={{ flex: 1 }}>
+              <Text style={pS.jobTitle} numberOfLines={2}>{v.title}</Text>
+              <Text style={pS.companyName} numberOfLines={1}>{company}</Text>
+            </View>
+            <View style={pS.externalBadge}>
+              <Text style={pS.externalBadgeTxt}>{v.sourceName ?? 'Партнёр'}</Text>
+            </View>
+          </View>
+          {v.salary ? <Text style={pS.salaryMain}>{v.salary.toLocaleString('ru-RU')} ₽/мес</Text> : null}
+          {(v.metroStation || v.metroStationRaw || v.address) ? (
+            <View style={pS.locationRow}>
+              <Ionicons name="location-outline" size={14} color={Colors.textMuted} />
+              <Text style={pS.locationTxt} numberOfLines={2}>
+                {[v.metroStation ?? v.metroStationRaw, v.address].filter(Boolean).join(' · ')}
+              </Text>
+            </View>
+          ) : null}
+          {v.schedule ? <Text style={pS.desc} numberOfLines={2}>{v.schedule}</Text> : null}
+          <View style={pS.externalAction}>
+            <Text style={pS.externalActionTxt}>Открыть у источника</Text>
+            <Ionicons name="open-outline" size={15} color={Colors.primary} />
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
     const isApplied = myAppVacIds.has(v.id);
     const isApplying = applying === v.id;
     const isSaved = permSavedIds.includes(v.id);
@@ -1834,17 +1913,14 @@ function WorkerPermMode() {
         </View>
         <TouchableOpacity
           style={[pS.filtersBtn, filterStation ? pS.filtersBtnActive : null]}
-          onPress={() => setMapOpen(true)}
+          onPress={() => (filterStation ? setFilterStation(null) : setMapOpen(true))}
           activeOpacity={0.8}
         >
           <Ionicons
-            name="location"
+            name={filterStation ? 'close' : 'map-outline'}
             size={16}
-            color={filterStation ? Colors.primary : Colors.textSecondary}
+            color={filterStation ? '#FFFFFF' : Colors.textSecondary}
           />
-          <Text style={[pS.filtersBtnTxt, filterStation ? pS.filtersBtnTxtActive : null]}>
-            Карта
-          </Text>
         </TouchableOpacity>
       </View>
 
@@ -1907,7 +1983,7 @@ function WorkerPermMode() {
       ) : (
         <FlatList
           data={shownVacancies}
-          keyExtractor={v => v.id}
+          keyExtractor={v => ('sourceId' in v ? `external:${v.id}` : v.id)}
           extraData={{ users, permVacancyViewsMap }}
           contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: tabBarHeight + 16 }}
           showsVerticalScrollIndicator={false}
@@ -2348,9 +2424,9 @@ function WorkerHome() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <TabHeader tgAnchor />
       <View style={styles.modeSwitcherRow}>
-        <ModeSwitcher mode={mode} onChange={setMode} modes={['shift', 'perm', 'search']} />
+        <ModeSwitcher mode={mode} onChange={setMode} modes={['shift', 'perm']} />
       </View>
-      {mode === 'shift' ? <WorkerFeed /> : mode === 'perm' ? <WorkerPermMode /> : <SearchMode />}
+      {mode === 'shift' ? <WorkerFeed /> : <WorkerPermMode />}
     </SafeAreaView>
   );
 }
@@ -2384,19 +2460,17 @@ const pS = StyleSheet.create({
   searchInput: { flex: 1, fontSize: rf(13), color: Colors.textPrimary },
   searchClear: { fontSize: rf(13), color: Colors.textMuted },
   filtersBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: rs(4),
+    width: rs(42), height: rs(42), alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: Colors.inputBorder, borderRadius: rs(10),
-    paddingHorizontal: rs(10), paddingVertical: rs(7), backgroundColor: Colors.bg,
+    backgroundColor: Colors.bg,
   },
-  filtersBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  filtersBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primary },
   activeStationChip: {
     flexDirection: 'row', alignItems: 'center', gap: rs(6), alignSelf: 'flex-start',
     marginHorizontal: rs(16), marginBottom: rs(4),
     backgroundColor: Colors.primaryLight, borderRadius: rs(100), paddingHorizontal: rs(12), paddingVertical: rs(6),
   },
   activeStationTxt: { fontSize: rf(13), fontWeight: '700', color: Colors.primary },
-  filtersBtnTxt: { fontSize: rf(14), fontWeight: '600', color: Colors.textSecondary },
-  filtersBtnTxtActive: { color: Colors.primary },
 
   // — tab chips —
   tabChipsScroll: {
@@ -2424,6 +2498,18 @@ const pS = StyleSheet.create({
     backgroundColor: Colors.bg, borderRadius: rs(18),
     padding: rs(16), gap: rs(10), ...Shadow.card,
   },
+  externalHead: { flexDirection: 'row', alignItems: 'flex-start', gap: rs(10) },
+  externalBadge: {
+    maxWidth: rs(110), paddingHorizontal: rs(8), paddingVertical: rs(4),
+    borderRadius: rs(100), backgroundColor: Colors.surface,
+    borderWidth: 1, borderColor: Colors.divider,
+  },
+  externalBadgeTxt: { fontSize: rf(11), fontWeight: '700', color: Colors.textMuted },
+  externalAction: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: rs(5),
+    paddingTop: rs(2),
+  },
+  externalActionTxt: { fontSize: rf(13), fontWeight: '700', color: Colors.primary },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: rs(5), borderRadius: rs(8), paddingHorizontal: rs(10), paddingVertical: rs(6), alignSelf: 'flex-start' },
   statusTxt: { fontSize: rf(12), fontWeight: '700' },
 

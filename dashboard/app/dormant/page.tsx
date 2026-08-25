@@ -263,9 +263,12 @@ export default function DormantPage() {
   // человек это нормально, для трёхсот — нет: телеграм считает такое
   // рассылкой и ограничивает отправку незнакомым.
   async function copyFor(r: Row) {
-    if (!text.trim()) return
+    // «Текст» должен работать сразу после открытия страницы. Если оператор
+    // ещё не выбрал шаблон, используем нейтральный вопрос — раньше кнопка
+    // выглядела сломанной, потому что была молча выключена пустым полем.
+    const message = text.trim() || DRAFTS.find(d => d.key === 'ask')!.text
     try {
-      await navigator.clipboard.writeText(text.replace(/\{name\}/g, r.first_name ?? ''))
+      await navigator.clipboard.writeText(message.replace(/\{name\}/g, r.first_name ?? ''))
       setCopied(r.id)
       setTimeout(() => setCopied(c => (c === r.id ? null : c)), 1500)
     } catch {
@@ -510,7 +513,7 @@ export default function DormantPage() {
                              href={`https://t.me/+${digits}`} target="_blank" rel="noreferrer">
                             <IconSend size={12} />Телеграм
                           </a>
-                          <button onClick={() => copyFor(r)} disabled={!text.trim()}
+                          <button onClick={() => copyFor(r)}
                             className="jt-icon-btn" style={{ width: 'auto', padding: '0 9px' }}
                             title="Скопировать текст, чтобы вставить в переписку вручную">
                             {copied === r.id ? 'Скопировано' : 'Текст'}
