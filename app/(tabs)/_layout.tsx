@@ -5,8 +5,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { bottomSafe } from '@/lib/androidInsets';
-import { useNavigation } from '@react-navigation/native';
-import { StackActions } from '@react-navigation/native';
+import { StackActions, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { BlurView } from 'expo-blur';
@@ -233,7 +232,7 @@ export default function TabLayout() {
       route: 'feed',
       iconFilled: isWorker ? 'search' : 'briefcase',
       iconOutline: isWorker ? 'search-outline' : 'briefcase-outline',
-      label: isWorker ? 'Поиск' : 'Вакансии',
+      label: isWorker ? 'Работа' : 'Вакансии',
     },
     { route: 'matches', iconFilled: 'people', iconOutline: 'people-outline', label: 'Мэтчи', badge: matchBadge },
     { route: 'chats', iconFilled: 'chatbubble', iconOutline: 'chatbubble-outline', label: 'Чаты', badge: unreadCount },
@@ -273,7 +272,6 @@ export default function TabLayout() {
       >
         <Tabs.Screen name="feed" options={{ tabBarIcon: () => null }} />
         <Tabs.Screen name="index" options={{ href: null }} />
-        <Tabs.Screen name="saved" options={{ href: null }} />
         <Tabs.Screen name="matches" options={{ tabBarIcon: () => null }} />
         <Tabs.Screen name="chats" options={{ tabBarIcon: () => null }} />
         <Tabs.Screen name="profile" options={{ tabBarIcon: () => null }} />

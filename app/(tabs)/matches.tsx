@@ -47,6 +47,7 @@ function MatchStatus({ like, isWorker }: { like: Like; isWorker: boolean }) {
       like.outcome === 'no_show' ? 'Работник не вышел'
       : like.outcome === 'worker_cancelled' ? 'Работник отказался'
       : like.outcome === 'employer_cancelled' ? 'Смену отменил работодатель'
+      : like.outcome === 'other_cancelled' ? 'Смена отменена'
       : 'Смена отменена';
     return (
       <View style={[s.statusBadge, { backgroundColor: '#FEE2E2' }]}>
@@ -179,17 +180,27 @@ function ConfirmBanner({ onOutcome, loading }: {
           <Text style={s.confirmBannerTitle}>Отметьте смену</Text>
           <Text style={s.confirmBannerSub}>Вышел ли работник — и вовремя ли</Text>
         </View>
-        <TouchableOpacity
-          style={s.confirmBannerBtn}
-          onPress={() => setStep('came')}
-          disabled={loading}
-          activeOpacity={0.8}
-        >
-          {loading
-            ? <ActivityIndicator size="small" color="#fff" />
-            : <Ionicons name="checkmark" size={18} color="#fff" />
-          }
-        </TouchableOpacity>
+        <View style={s.confirmBannerActions}>
+          <TouchableOpacity
+            style={s.confirmBannerBtn}
+            onPress={() => setStep('came')}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            {loading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <><Ionicons name="checkmark" size={14} color="#fff" /><Text style={s.confirmBannerBtnTxt}>Состоялась</Text></>
+            }
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.cancelShiftBtn}
+            onPress={() => setStep('failed')}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            <Text style={s.cancelShiftBtnTxt}>Отменить смену</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {step === 'came' ? (
@@ -208,11 +219,6 @@ function ConfirmBanner({ onOutcome, loading }: {
               <DialogRow
                 title="Вышел, но опоздал"
                 onPress={() => setStep('late')}
-              />
-              <DialogRow
-                title="Смена не состоялась"
-                tone="bad"
-                onPress={() => setStep('failed')}
               />
             </View>
             <TouchableOpacity style={s.dialogCancelBtn} onPress={close} activeOpacity={0.8}>
@@ -266,9 +272,14 @@ function ConfirmBanner({ onOutcome, loading }: {
                 sub="Смена не понадобилась — на рейтинг работника не влияет"
                 onPress={() => { close(); onOutcome('employer_cancelled'); }}
               />
+              <DialogRow
+                title="Другая причина"
+                sub="Нейтральная отмена — рейтинг сторон не изменится"
+                onPress={() => { close(); onOutcome('other_cancelled'); }}
+              />
             </View>
-            <TouchableOpacity style={s.dialogCancelBtn} onPress={() => setStep('came')} activeOpacity={0.8}>
-              <Text style={s.dialogCancelTxt}>Назад</Text>
+            <TouchableOpacity style={s.dialogCancelBtn} onPress={close} activeOpacity={0.8}>
+              <Text style={s.dialogCancelTxt}>Закрыть</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -294,9 +305,8 @@ function WorkerMatches() {
     setRefreshing(false);
   };
 
-  if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
-
-  const myLikes = workerLikes(likes, currentUser.id);
+  const currentUserId = currentUser?.id ?? '';
+  const myLikes = workerLikes(likes, currentUserId);
 
   const getVacancy = (id: string) => vacancies.find(v => v.id === id);
   // Та же история, что и у работодателя: общий список пользователей приходит
@@ -306,6 +316,8 @@ function WorkerMatches() {
     [likes],
   );
   const getEmployer = useMissingUsers(users, neededEmployerIds);
+
+  if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
   const activeItems = workerActive(myLikes);
   const rejectedItems = workerRejected(myLikes);
@@ -555,10 +567,8 @@ function EmployerMatches() {
     setRefreshing(false);
   };
 
-  if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
-
-  const myVacIds = vacancies.filter(v => v.employerId === currentUser.id).map(v => v.id);
-  const allLikes = employerLikes(likes, vacancies, currentUser.id);
+  const currentUserId = currentUser?.id ?? '';
+  const allLikes = employerLikes(likes, vacancies, currentUserId);
 
   // Ожидающие решения — по подбору, а не по времени отклика. При двадцати
   // откликах смотрят первых пятерых, и лучший кандидат может оказаться
@@ -578,7 +588,7 @@ function EmployerMatches() {
   const completed = employerCompleted(allLikes);
 
   // Отклики на постоянные вакансии — тоже сюда, а не только на карточку вакансии
-  const myPermApps: PermApplication[] = employerPermApps(permApplications, currentUser.id);
+  const myPermApps: PermApplication[] = employerPermApps(permApplications, currentUserId);
   const permPending = myPermApps.filter(a => a.status === 'pending');
   const permApproved = myPermApps.filter(a => a.status === 'approved');
   // hired — работодатель нажал «Завершить»: кандидат закрыт, карточка ушла
@@ -608,14 +618,16 @@ function EmployerMatches() {
   const neededWorkerIds = useMemo(() => {
     const ids = new Set<string>();
     permApplications.forEach((a: PermApplication) => {
-      if (a.employerId === currentUser.id) ids.add(a.workerId);
+      if (a.employerId === currentUserId) ids.add(a.workerId);
     });
     likes.forEach((l: Like) => {
-      if (l.employerId === currentUser.id) ids.add(l.workerId);
+      if (l.employerId === currentUserId) ids.add(l.workerId);
     });
     return Array.from(ids);
-  }, [permApplications, likes, currentUser.id]);
+  }, [permApplications, likes, currentUserId]);
   const getWorker = useMissingUsers(users, neededWorkerIds);
+
+  if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
   const approve = async (like: Like) => {
     setLoading(like.id);
@@ -1386,16 +1398,24 @@ const s = StyleSheet.create({
   },
   waitBtnTxt: { color: Colors.textMuted, fontSize: rf(13), fontWeight: '500' },
   confirmBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: rs(10),
+    flexDirection: 'row', alignItems: 'center', gap: rs(8),
     backgroundColor: '#FEF3C7', borderRadius: rs(12), padding: rs(12),
     borderWidth: 1, borderColor: '#F59E0B',
   },
   confirmBannerTitle: { fontSize: rf(13), fontWeight: '700', color: '#92400E' },
   confirmBannerSub: { fontSize: rf(11), color: '#B45309', marginTop: rs(2) },
   confirmBannerBtn: {
-    width: rs(36), height: rs(36), borderRadius: rs(18),
-    backgroundColor: Colors.green, alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row', gap: rs(3), height: rs(32), borderRadius: rs(16),
+    paddingHorizontal: rs(9), backgroundColor: Colors.green,
+    alignItems: 'center', justifyContent: 'center',
   },
+  confirmBannerActions: { alignItems: 'stretch', gap: rs(5) },
+  confirmBannerBtnTxt: { color: '#fff', fontSize: rf(10.5), fontWeight: '700' },
+  cancelShiftBtn: {
+    minHeight: rs(28), paddingHorizontal: rs(8), borderRadius: rs(14),
+    borderWidth: 1, borderColor: Colors.red, alignItems: 'center', justifyContent: 'center',
+  },
+  cancelShiftBtnTxt: { color: Colors.red, fontSize: rf(10.5), fontWeight: '700' },
   // Варианты ответа списком, а не двумя кнопками в ряд: их три-четыре, и в
   // ряд они не помещаются, а подпись под каждым нужна — без неё «отказался»
   // и «не вышел» на вид одно и то же.
@@ -1403,22 +1423,22 @@ const s = StyleSheet.create({
   choiceRow: {
     flexDirection: 'row', alignItems: 'center', gap: rs(10),
     backgroundColor: Colors.surface, borderRadius: rs(12),
-    paddingVertical: rs(12), paddingHorizontal: rs(14),
+    paddingVertical: rs(9), paddingHorizontal: rs(12),
     borderWidth: 1, borderColor: Colors.inputBorder,
   },
-  choiceTitle: { fontSize: rf(15), fontWeight: '700', color: Colors.textPrimary },
-  choiceSub: { fontSize: rf(12.5), color: Colors.textMuted, marginTop: rs(2), lineHeight: rf(17) },
+  choiceTitle: { fontSize: rf(14), fontWeight: '700', color: Colors.textPrimary },
+  choiceSub: { fontSize: rf(11.5), color: Colors.textMuted, marginTop: rs(1), lineHeight: rf(15) },
   dialogOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100,
-    alignItems: 'center', justifyContent: 'center', padding: rs(24),
+    alignItems: 'center', justifyContent: 'flex-end', padding: rs(12),
   },
   dialogCard: {
     backgroundColor: Colors.bg, borderRadius: Radius.xl,
-    padding: rs(24), width: '100%', gap: rs(12),
+    padding: rs(16), width: '100%', gap: rs(8),
   },
-  dialogTitle: { fontSize: rf(17), fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
-  dialogBody: { fontSize: rf(14), color: Colors.textSecondary, textAlign: 'center', lineHeight: rf(20) },
+  dialogTitle: { fontSize: rf(16), fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
+  dialogBody: { fontSize: rf(12.5), color: Colors.textSecondary, textAlign: 'center', lineHeight: rf(17) },
   dialogBtns: { flexDirection: 'row', gap: rs(10), marginTop: rs(4) },
   // Кнопкам нужны боковые поля и центрирование по обеим осям: без них
   // длинная подпись («Отменить смену») вылезала за пределы овала.
