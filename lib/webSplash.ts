@@ -6,3 +6,16 @@ export function hideWebSplash(): void {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return;
   (window as any).__hideSplash?.();
 }
+
+/** Report a completed boot milestone to the single HTML loading screen. */
+export function setWebSplashProgress(percent: number): void {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+  (window as any).__setSplashProgress?.(Math.max(1, Math.min(100, Math.round(percent))));
+}
+
+/** Distinguishes a broken/stale bundle from a bundle that is loading data. */
+export function markWebBundleMounted(): void {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+  (window as any).__jobtooBundleMounted = true;
+  setWebSplashProgress(35);
+}

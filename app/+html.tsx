@@ -27,8 +27,10 @@ export default function Root({ children }: PropsWithChildren) {
         {/* Favicon */}
         <link rel="icon" href="/favicon.ico" />
 
-        {/* Telegram Mini App SDK — no-op outside Telegram's WebView */}
-        <script src="https://telegram.org/js/telegram-web-app.js" />
+        {/* Telegram Mini App SDK не должен задерживать HTML и основной bundle:
+            на части мобильных сетей telegram.org отвечает заметно медленнее
+            самого сайта. Контроллер обращается к SDK уже после монтирования. */}
+        <script defer src="https://telegram.org/js/telegram-web-app.js" />
 
         <ScrollViewStyleReset />
 
@@ -142,25 +144,20 @@ export default function Root({ children }: PropsWithChildren) {
           (function() {
             var splash = document.getElementById('splash');
             var pctEl = document.getElementById('splash-pct');
-            var done = false, ready = false, pct = 1;
-            var start = Date.now(), DRAW = 1280, TAIL = 250;
+            var done = false, pct = 1, target = 5;
 
-            // 1 → 95 % равномерно, затем 96..99 медленно, и до 100 % когда готово.
+            // Процент движется только к подтверждённой приложением отметке:
+            // HTML=5, bundle=35, сессия=55, кэш=70, API=80, готово=100.
             var tick = setInterval(function() {
-              if (pct >= 100) { clearInterval(tick); return; }
-              if (ready) {
-                var left = 100 - pct;
-                pct = Math.min(100, pct + (left > 12 ? Math.ceil(left / 8) : 1));
-              } else {
-                var elapsed = Date.now() - start;
-                if (elapsed < DRAW) {
-                  pct = Math.max(pct, Math.round(1 + (elapsed / DRAW) * 94));
-                } else {
-                  pct = Math.max(pct, Math.min(99, 95 + Math.floor((elapsed - DRAW) / TAIL)));
-                }
-              }
+              if (pct < target) pct += Math.max(1, Math.ceil((target - pct) / 5));
+              if (pct > target) pct = target;
               if (pctEl) pctEl.textContent = pct + '%';
             }, 45);
+
+            window.__setSplashProgress = function(value) {
+              var next = Math.max(1, Math.min(100, Number(value) || 1));
+              target = Math.max(target, Math.round(next));
+            };
 
             function hide() {
               clearInterval(tick);
@@ -178,21 +175,46 @@ export default function Root({ children }: PropsWithChildren) {
             function finish() {
               if (done) return;
               done = true;
-              // Не прыгаем на 100 и не прячем сразу: даём счётчику добежать,
-              // чтобы 96..99 были видны. Страховка — уходим через 600 мс.
-              ready = true;
+              target = 100;
+              // Сначала честно показываем 100 %, потом открываем интерфейс.
               var waitFull = setInterval(function() {
-                if (pct >= 100) { clearInterval(waitFull); hide(); }
+                if (pct >= 100) {
+                  clearInterval(waitFull);
+                  setTimeout(hide, 180);
+                }
               }, 45);
-              setTimeout(function() { clearInterval(waitFull); hide(); }, 600);
             }
 
             // The app hides the splash itself once data is loaded
             // (EntryTransition / index.tsx call window.__hideSplash).
             window.__hideSplash = finish;
 
-            // Failsafe: never trap the user if the app fails to signal
-            setTimeout(finish, 12000);
+            // Service worker нужен не только для push: в установленной PWA он
+            // не даёт старому index.html пережить следующую выкладку.
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+                .then(function(reg) { return reg.update(); })
+                .catch(function() {});
+            }
+
+            // Не перезагружаем страницу автоматически: именно эта страховка
+            // раньше создавала второй загрузочный экран на медленной сети.
+            // Если bundle действительно не стартовал, оставляем заставку и
+            // предлагаем осознанный повтор вместо белого экрана.
+            setTimeout(function() {
+              if (done) return;
+              // React уже работает и может просто ждать сеть: не перезагружаем
+              // его и не показываем пользователю второй загрузочный экран.
+              if (window.__jobtooBundleMounted) {
+                if (pctEl) pctEl.textContent = 'Загружаем данные…';
+                return;
+              }
+              if (pctEl) {
+                pctEl.textContent = 'Нажмите, чтобы повторить';
+                pctEl.style.cursor = 'pointer';
+                pctEl.onclick = function() { location.reload(); };
+              }
+            }, 12000);
           })();
         `}</script>
       </body>

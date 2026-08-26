@@ -15,7 +15,7 @@ import ConsentGate from '@/components/ConsentGate';
 import { ToastLayer } from '@/components/ui/ToastLayer';
 import { setupAndroidChannels } from '@/services/notifications';
 import { routeForNotification } from '@/services/notificationRoute';
-import { hideWebSplash } from '@/lib/webSplash';
+import { hideWebSplash, markWebBundleMounted } from '@/lib/webSplash';
 import { getSessionUser } from '@/services/storage';
 import { initTelegramMiniApp, isTelegramMiniApp, getTelegramStartParam } from '@/lib/telegram';
 
@@ -168,6 +168,8 @@ function useOTAUpdates() {
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({ ...Ionicons.font });
   useOTAUpdates();
+
+  useEffect(() => { markWebBundleMounted(); }, []);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
