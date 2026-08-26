@@ -249,7 +249,7 @@ services:
   #
   # Сборка приезжает выпуском, как и веб-версия: собирать Next.js на самой
   # машине нельзя — он съедает под два гигабайта и уронит базу.
-  dashboard:
+  dashboard-blue:
     image: node:22-alpine
     profiles: ["dashboard"]
     restart: unless-stopped
@@ -257,7 +257,7 @@ services:
     working_dir: /app
     command: ["node", "server.js"]
     volumes:
-      - /opt/jobtoo-dashboard:/app:ro
+      - /opt/jobtoo-dashboard-blue:/app:ro
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -267,6 +267,27 @@ services:
       # Ключей VAPID там пока нет — их надо забрать из Vercel до включения.
       # Пропуск приложения: по нему дашборд отличает рассылку от сервера от
       # запроса с улицы. Кладётся в файл переменных из app_secrets.php.
+      EXPO_PUBLIC_APP_SECRET: ${EXPO_PUBLIC_APP_SECRET:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:nikidav9@gmail.com}
+
+  # Второй слот запускается и проверяется до переключения nginx. Поэтому
+  # обновление панели не обрывает уже открытые запросы и легко откатывается.
+  dashboard-green:
+    image: node:22-alpine
+    profiles: ["dashboard"]
+    restart: unless-stopped
+    ports: ["127.0.0.1:3003:3000"]
+    working_dir: /app
+    command: ["node", "server.js"]
+    volumes:
+      - /opt/jobtoo-dashboard-green:/app:ro
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      ADMIN_API_URL: https://jobtoo.ru/api/admin.php
       EXPO_PUBLIC_APP_SECRET: ${EXPO_PUBLIC_APP_SECRET:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
