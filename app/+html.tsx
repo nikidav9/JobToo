@@ -144,25 +144,20 @@ export default function Root({ children }: PropsWithChildren) {
           (function() {
             var splash = document.getElementById('splash');
             var pctEl = document.getElementById('splash-pct');
-            var done = false, ready = false, pct = 1;
-            var start = Date.now(), DRAW = 1280, TAIL = 250;
+            var done = false, pct = 1, target = 5;
 
-            // 1 → 95 % равномерно, затем 96..99 медленно, и до 100 % когда готово.
+            // Процент движется только к подтверждённой приложением отметке:
+            // HTML=5, bundle=35, сессия=55, кэш=70, API=80, готово=100.
             var tick = setInterval(function() {
-              if (pct >= 100) { clearInterval(tick); return; }
-              if (ready) {
-                var left = 100 - pct;
-                pct = Math.min(100, pct + (left > 12 ? Math.ceil(left / 8) : 1));
-              } else {
-                var elapsed = Date.now() - start;
-                if (elapsed < DRAW) {
-                  pct = Math.max(pct, Math.round(1 + (elapsed / DRAW) * 94));
-                } else {
-                  pct = Math.max(pct, Math.min(99, 95 + Math.floor((elapsed - DRAW) / TAIL)));
-                }
-              }
+              if (pct < target) pct += Math.max(1, Math.ceil((target - pct) / 5));
+              if (pct > target) pct = target;
               if (pctEl) pctEl.textContent = pct + '%';
             }, 45);
+
+            window.__setSplashProgress = function(value) {
+              var next = Math.max(1, Math.min(100, Number(value) || 1));
+              target = Math.max(target, Math.round(next));
+            };
 
             function hide() {
               clearInterval(tick);
@@ -180,14 +175,14 @@ export default function Root({ children }: PropsWithChildren) {
             function finish() {
               if (done) return;
               done = true;
-              try { sessionStorage.removeItem('jt-boot-retry-v2'); } catch (_) {}
-              // Не прыгаем на 100 и не прячем сразу: даём счётчику добежать,
-              // чтобы 96..99 были видны. Страховка — уходим через 600 мс.
-              ready = true;
+              target = 100;
+              // Сначала честно показываем 100 %, потом открываем интерфейс.
               var waitFull = setInterval(function() {
-                if (pct >= 100) { clearInterval(waitFull); hide(); }
+                if (pct >= 100) {
+                  clearInterval(waitFull);
+                  setTimeout(hide, 180);
+                }
               }, 45);
-              setTimeout(function() { clearInterval(waitFull); hide(); }, 600);
             }
 
             // The app hides the splash itself once data is loaded
@@ -202,20 +197,18 @@ export default function Root({ children }: PropsWithChildren) {
                 .catch(function() {});
             }
 
-            // Если bundle не запустился (например, старая оболочка сослалась на
-            // уже удалённый файл), один раз автоматически перечитываем страницу
-            // из сети. После повторной неудачи не открываем белый экран: оставляем
-            // фирменную заставку и превращаем процент в кнопку повтора.
+            // Не перезагружаем страницу автоматически: именно эта страховка
+            // раньше создавала второй загрузочный экран на медленной сети.
+            // Если bundle действительно не стартовал, оставляем заставку и
+            // предлагаем осознанный повтор вместо белого экрана.
             setTimeout(function() {
               if (done) return;
-              var key = 'jt-boot-retry-v2';
-              try {
-                if (!sessionStorage.getItem(key)) {
-                  sessionStorage.setItem(key, '1');
-                  location.reload();
-                  return;
-                }
-              } catch (_) {}
+              // React уже работает и может просто ждать сеть: не перезагружаем
+              // его и не показываем пользователю второй загрузочный экран.
+              if (window.__jobtooBundleMounted) {
+                if (pctEl) pctEl.textContent = 'Загружаем данные…';
+                return;
+              }
               if (pctEl) {
                 pctEl.textContent = 'Нажмите, чтобы повторить';
                 pctEl.style.cursor = 'pointer';
