@@ -15,9 +15,9 @@ import ConsentGate from '@/components/ConsentGate';
 import { ToastLayer } from '@/components/ui/ToastLayer';
 import { setupAndroidChannels } from '@/services/notifications';
 import { routeForNotification } from '@/services/notificationRoute';
-import { hideWebSplash } from '@/lib/webSplash';
+import { hideWebSplash, markWebBundleMounted } from '@/lib/webSplash';
 import { getSessionUser } from '@/services/storage';
-import { initTelegramMiniApp, isTelegramMiniApp, getTelegramStartParam } from '@/lib/telegram';
+import { initTelegramMiniApp, isTelegramMiniApp, getTelegramStartParam, waitForTelegramMiniApp } from '@/lib/telegram';
 
 // Keep the web/native splash visible until hideAsync() is called from the tabs layout or index screen.
 // This prevents the white flash while expo-router navigates and hydrates the tabs route on web.
@@ -47,25 +47,32 @@ function TelegramMiniAppController() {
   const router = useRouter();
 
   useEffect(() => {
-    if (Platform.OS !== 'web' || !isTelegramMiniApp()) return;
-    initTelegramMiniApp();
+    if (Platform.OS !== 'web') return;
+    let cancelled = false;
 
-    const startParam = getTelegramStartParam();
-    if (startParam?.startsWith('vacancy_')) {
-      const vacancyId = startParam.slice('vacancy_'.length);
-      if (vacancyId) {
-        setTimeout(() => {
-          router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId } });
-        }, 300);
+    const init = async () => {
+      if (!await waitForTelegramMiniApp() || cancelled || !isTelegramMiniApp()) return;
+      initTelegramMiniApp();
+
+      const startParam = getTelegramStartParam();
+      if (startParam?.startsWith('vacancy_')) {
+        const vacancyId = startParam.slice('vacancy_'.length);
+        if (vacancyId) {
+          setTimeout(() => {
+            if (!cancelled) router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId } });
+          }, 300);
+        }
+      } else if (startParam?.startsWith('chat_')) {
+        const chatId = startParam.slice('chat_'.length);
+        if (chatId) {
+          setTimeout(() => {
+            if (!cancelled) router.push({ pathname: '/chat-room', params: { chatId } });
+          }, 300);
+        }
       }
-    } else if (startParam?.startsWith('chat_')) {
-      const chatId = startParam.slice('chat_'.length);
-      if (chatId) {
-        setTimeout(() => {
-          router.push({ pathname: '/chat-room', params: { chatId } });
-        }, 300);
-      }
-    }
+    };
+    init().catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   return null;
@@ -168,6 +175,8 @@ function useOTAUpdates() {
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({ ...Ionicons.font });
   useOTAUpdates();
+
+  useEffect(() => { markWebBundleMounted(); }, []);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;

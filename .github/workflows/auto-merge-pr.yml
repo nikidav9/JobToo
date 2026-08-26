@@ -6,7 +6,9 @@ on:
       pr_number:
         description: 'PR number to merge'
         required: true
-        type: number
+        # `number` GitHub передаёт в shell как float (`9.0`), а ref pull/9.0
+        # не существует. Строка сохраняет номер PR ровно в введённом виде.
+        type: string
 
 jobs:
   merge:
@@ -27,7 +29,9 @@ jobs:
 
       - name: Fetch PR branch
         run: |
-          PR=${{ github.event.inputs.pr_number }}
+          PR_RAW='${{ github.event.inputs.pr_number }}'
+          PR=${PR_RAW%.0}
+          [[ "$PR" =~ ^[1-9][0-9]*$ ]] || { echo "Некорректный номер PR: $PR_RAW"; exit 1; }
           git fetch origin pull/${PR}/head:pr-${PR}
 
       - name: Merge PR into main (prefer PR changes)
@@ -35,7 +39,9 @@ jobs:
           TOKEN: ${{ secrets.MERGE_TOKEN }}
         run: |
           set -e
-          PR=${{ github.event.inputs.pr_number }}
+          PR_RAW='${{ github.event.inputs.pr_number }}'
+          PR=${PR_RAW%.0}
+          [[ "$PR" =~ ^[1-9][0-9]*$ ]] || { echo "Некорректный номер PR: $PR_RAW"; exit 1; }
           git checkout main
           git pull origin main
           # Try automatic merge preferring PR changes for conflicts
@@ -59,7 +65,9 @@ jobs:
         env:
           TOKEN: ${{ secrets.MERGE_TOKEN }}
         run: |
-          PR=${{ github.event.inputs.pr_number }}
+          PR_RAW='${{ github.event.inputs.pr_number }}'
+          PR=${PR_RAW%.0}
+          [[ "$PR" =~ ^[1-9][0-9]*$ ]] || { echo "Некорректный номер PR: $PR_RAW"; exit 1; }
           curl -s -X PUT \
             -H "Authorization: token ${TOKEN}" \
             -H "Accept: application/vnd.github+json" \
