@@ -1252,7 +1252,7 @@ function WorkerFeed() {
               <View style={[pS.filterLineDot, { backgroundColor: activeStationLine.color }]} />
             ) : (
               <View style={pS.metroIconWrap}>
-                <Ionicons name="location" size={18} color={Colors.primary} />
+                <Ionicons name="map-outline" size={18} color={Colors.textSecondary} />
               </View>
             )}
           </TouchableOpacity>
@@ -1752,7 +1752,7 @@ function WorkerPermMode() {
           {(v.metroStation || v.metroStationRaw || v.address) ? (
             <View style={pS.locationRow}>
               <Ionicons name="location-outline" size={14} color={Colors.textMuted} />
-              <Text style={pS.locationTxt} numberOfLines={2}>
+              <Text style={pS.locationRowText} numberOfLines={2}>
                 {[v.metroStation ?? v.metroStationRaw, v.address].filter(Boolean).join(' · ')}
               </Text>
             </View>
@@ -1827,9 +1827,9 @@ function WorkerPermMode() {
               </View>
             ) : null}
             {v.address ? (
-              <View style={pS.locationItem}>
+              <View style={pS.addressLocationItem}>
                 <Ionicons name="location-outline" size={14} color={Colors.textMuted} />
-                <Text style={pS.locationTxt} numberOfLines={1}>{v.address}</Text>
+                <Text style={pS.locationRowText} numberOfLines={2}>{v.address}</Text>
               </View>
             ) : null}
           </View>
@@ -2316,7 +2316,7 @@ function EmployerHome() {
                 </View>
                 <View style={pS.permMetaRow}>
                   {v.metroStation ? <Text style={styles.vacMeta}>м. {v.metroStation}</Text> : null}
-                  {v.address ? <Text style={styles.vacAddress}>{v.address}</Text> : null}
+                  {v.address ? <Text style={styles.vacAddress} numberOfLines={2}>{v.address}</Text> : null}
                 </View>
                 <View style={pS.permTagsRow}>
                   <View style={pS.permSalaryTag}>
@@ -2558,14 +2558,22 @@ const pS = StyleSheet.create({
   naRukiTxt: { fontSize: rf(12), fontWeight: '700', color: Colors.green },
 
   // location row
-  locationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: rs(10) },
-  locationItem: { flexDirection: 'row', alignItems: 'center', gap: rs(5) },
+  locationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: rs(10), maxWidth: '100%' },
+  locationItem: { flexDirection: 'row', alignItems: 'center', gap: rs(5), minWidth: 0, maxWidth: '100%' },
+  addressLocationItem: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: rs(5),
+    flexBasis: '100%', minWidth: 0, maxWidth: '100%',
+  },
   metroCircle: {
     width: rs(18), height: rs(18), borderRadius: rs(9),
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   metroCircleTxt: { fontSize: rf(10), fontWeight: '900', color: '#fff', lineHeight: rf(12) },
   locationTxt: { fontSize: rf(13), color: Colors.textSecondary, fontWeight: '500', flexShrink: 1 },
+  locationRowText: {
+    flex: 1, minWidth: 0, fontSize: rf(13), color: Colors.textSecondary,
+    fontWeight: '500', lineHeight: rf(18),
+  },
 
   // schedule row
   scheduleRow: { flexDirection: 'row', gap: rs(16) },
@@ -2597,7 +2605,7 @@ const pS = StyleSheet.create({
   // Employer-side perm card styles (used in EmployerHome)
   permVacCard: { borderLeftWidth: 3, borderLeftColor: '#7C3AED' },
   permCompany: { fontSize: rf(12), color: Colors.textMuted, marginTop: rs(2) },
-  permMetaRow: { gap: rs(2) },
+  permMetaRow: { gap: rs(2), minWidth: 0, maxWidth: '100%' },
   permTagsRow: { flexDirection: 'row', gap: rs(10), flexWrap: 'wrap' },
   permSalaryTag: { backgroundColor: '#D1FAE5', borderRadius: rs(100), paddingHorizontal: rs(12), paddingVertical: rs(5) },
   permSalaryTxt: { fontSize: rf(13), fontWeight: '800', color: Colors.green },
