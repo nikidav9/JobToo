@@ -15,8 +15,8 @@ import {
   getInitials,
   getTodayDates,
   nameColorFromString,
-  normalizeCompany,
 } from '@/services/storage';
+import { companyInitials, isLavkaCompany, normalizeCompany } from '@/services/company';
 import { scoreVacancyForWorker } from '@/services/matching';
 import { METRO_LINES } from '@/constants/metro';
 import {
@@ -61,6 +61,22 @@ import { ApplySheet } from '@/components/feature/ApplySheet';
 import { getChatSuggestions } from '@/constants/chatSuggestions';
 import { payShort } from '@/services/pay';
 import { vacancyInfoLines, permVacancyInfoLines } from '@/services/vacancyCard';
+
+function CompanyMark({ company, size = 44 }: { company?: string | null; size?: number }) {
+  const name = normalizeCompany(company);
+  if (isLavkaCompany(name)) return <LavkaLogo size={size} />;
+  return (
+    <View
+      accessibilityLabel={`Логотип компании ${name}`}
+      style={[
+        styles.companyFallback,
+        { width: size, height: size, borderRadius: size / 2, backgroundColor: nameColorFromString(name) },
+      ]}
+    >
+      <Text style={styles.companyFallbackText}>{companyInitials(name)}</Text>
+    </View>
+  );
+}
 
 // ─── Web push permission banner (iOS PWA requires user gesture) ───────────────
 type WPState = 'ask' | 'retry' | 'denied' | 'hidden';
@@ -1236,7 +1252,7 @@ function WorkerFeed() {
               <View style={[pS.filterLineDot, { backgroundColor: activeStationLine.color }]} />
             ) : (
               <View style={pS.metroIconWrap}>
-                <Ionicons name="location" size={18} color={Colors.primary} />
+                <Ionicons name="map-outline" size={18} color={Colors.textSecondary} />
               </View>
             )}
           </TouchableOpacity>
@@ -1307,10 +1323,10 @@ function WorkerFeed() {
                 >
                   <View style={styles.cardTop}>
                     <View style={styles.companyRow}>
-                      <LavkaLogo size={44} />
+                      <CompanyMark company={currentCard.company} size={44} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.companyName} numberOfLines={1}>
-                          {normalizeCompany()}
+                          {normalizeCompany(currentCard.company)}
                         </Text>
                         <View style={styles.metroHintRow}>
                           <Ionicons name="subway-outline" size={12} color={Colors.textMuted} />
@@ -1759,7 +1775,7 @@ function WorkerPermMode() {
       ? METRO_LINES.find(l => l.stations.includes(v.metroStation!)) ?? null
       : null;
 
-    const displayCompany = normalizeCompany();
+    const displayCompany = normalizeCompany(v.company);
 
     return (
       <TouchableOpacity
@@ -1776,7 +1792,7 @@ function WorkerPermMode() {
 
         {/* Company row */}
         <View style={pS.companyRow}>
-          <LavkaLogo size={42} />
+          <CompanyMark company={v.company} size={42} />
           <View style={pS.companyMeta}>
             <Text style={pS.companyName} numberOfLines={1}>{displayCompany}</Text>
             <View style={pS.verifiedRow}>
@@ -2277,7 +2293,7 @@ function EmployerHome() {
                 <View style={styles.vacTop}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.vacTitle} numberOfLines={1}>{v.title}</Text>
-                    <Text style={pS.permCompany}>{normalizeCompany()}</Text>
+                    <Text style={pS.permCompany}>{normalizeCompany(v.company)}</Text>
                   </View>
                   <View style={styles.vacTopRight}>
                     <TouchableOpacity
@@ -2616,6 +2632,8 @@ const pS = StyleSheet.create({
 // Shared styles (shift mode)
 // ─────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  companyFallback: { alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  companyFallbackText: { color: '#fff', fontSize: rf(15), fontWeight: '800' },
   safe: { flex: 1, backgroundColor: Colors.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

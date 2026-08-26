@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, Vacancy } from '@/constants/types';
+export { normalizeCompany } from '@/services/company';
 
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 export const nowISO = () => new Date().toISOString();
@@ -34,10 +35,6 @@ export function getInitials(name: string): string {
     .join('')
     .toUpperCase()
     .slice(0, 2);
-}
-
-export function normalizeCompany(_raw?: string | null): string {
-  return 'Лавка';
 }
 
 export function nameColorFromString(str: string): string {
