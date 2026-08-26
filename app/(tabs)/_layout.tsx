@@ -206,6 +206,7 @@ export default function TabLayout() {
   const permApplications = app?.permApplications ?? [];
   const isWorker = currentUser?.role === 'worker';
   const navigation = useNavigation();
+  const splashFrameRef = useRef(0);
 
   useEffect(() => {
     if (!app?.loading && !currentUser) {
@@ -214,7 +215,17 @@ export default function TabLayout() {
   }, [app?.loading, currentUser]);
 
   useEffect(() => {
-    SplashScreen.hideAsync().catch(() => {});
+    // На части Android-устройств hideAsync в первый effect успевает убрать
+    // системный splash до того, как EntryTransition отрисовал первый кадр.
+    // Два кадра дают React Native завершить layout и исключают белое окно.
+    const first = requestAnimationFrame(() => {
+      const second = requestAnimationFrame(() => {
+        SplashScreen.hideAsync().catch(() => {});
+      });
+      splashFrameRef.current = second;
+    });
+    splashFrameRef.current = first;
+    return () => cancelAnimationFrame(splashFrameRef.current);
   }, []);
 
   // ─── Match badge ─────────────────────────────────────────────────────────

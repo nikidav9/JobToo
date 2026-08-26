@@ -557,10 +557,28 @@ if gh_asset web dist.tar.gz /tmp/jt-web.tgz; then
   if [ "$SUM" != "$(cat /var/lib/jt-web.sha 2>/dev/null || true)" ]; then
     rm -rf /tmp/jt-web && mkdir -p /tmp/jt-web
     if tar -xzf /tmp/jt-web.tgz -C /tmp/jt-web 2>/dev/null && [ -s /tmp/jt-web/index.html ]; then
+      # iOS сохраняет установленную PWA агрессивнее обычной вкладки. Старый
+      # index.html может проснуться уже после выкладки и запросить bundle с
+      # отпечатком предыдущей версии. Раньше каталог подменялся целиком, такого
+      # файла уже не было — JavaScript не стартовал, заставка повторялась и
+      # оставалась навсегда. Переносим в новую выкладку хешированные файлы
+      # предыдущей: старая оболочка сможет загрузиться, обновить service worker
+      # и на следующей навигации перейти на свежий index.html.
+      if [ -d /var/www/jobtoo ]; then
+        for tree in _expo/static assets; do
+          if [ -d "/var/www/jobtoo/$tree" ]; then
+            mkdir -p "/tmp/jt-web/$tree"
+            cp -an "/var/www/jobtoo/$tree/." "/tmp/jt-web/$tree/" 2>/dev/null || true
+          fi
+        done
+      fi
       rm -rf /var/www/jobtoo.old
       if [ -d /var/www/jobtoo ]; then mv /var/www/jobtoo /var/www/jobtoo.old; fi
       mv /tmp/jt-web /var/www/jobtoo
       chmod -R a+rX /var/www/jobtoo
+      # Совместимость нужна на время, а не навсегда. Удаляем только старые
+      # хешированные файлы; текущие имеют свежую дату из нового архива.
+      find /var/www/jobtoo/_expo/static /var/www/jobtoo/assets -type f -mtime +45 -delete 2>/dev/null || true
       rm -rf /var/www/jobtoo.old
       echo "$SUM" > /var/lib/jt-web.sha
       say "сайт" "обновлён, файлов: $(find /var/www/jobtoo -type f | wc -l)"
