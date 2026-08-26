@@ -648,6 +648,16 @@ fi
 #
 # Забираем всегда, а запускаем только когда есть что запускать: пока файла
 # server.js нет, служба не поднимается и место не занимает.
+# Переход со старой однослотовой схемы должен сработать даже без нового
+# архива. Иначе уже записанная сумма совпадёт, блок обновления будет пропущен,
+# а compose удалит прежний сервис как orphan — панель останется без процесса.
+if [ -s /opt/jobtoo-dashboard/server.js ] \
+   && [ ! -e /opt/jobtoo-dashboard-blue ] && [ ! -e /opt/jobtoo-dashboard-green ]; then
+  mv /opt/jobtoo-dashboard /opt/jobtoo-dashboard-blue
+  printf '%s' blue > /var/lib/jt-dash-slot
+  say "дашборд" "прежняя сборка перенесена в blue-слот"
+fi
+
 if gh_asset dashboard dashboard.tar.gz /tmp/jt-dash.tgz; then
   DSUM=$(sha256sum /tmp/jt-dash.tgz | cut -d' ' -f1)
   if [ "$DSUM" != "$(cat /var/lib/jt-dash.sha 2>/dev/null || true)" ]; then
@@ -688,6 +698,25 @@ if gh_asset dashboard dashboard.tar.gz /tmp/jt-dash.tgz; then
     fi
   fi
   rm -f /tmp/jt-dash.tgz
+fi
+
+# Сумма архива может не измениться, а переменные окружения — измениться.
+# Поднимаем активный слот по отпечатку сборки и секретов, сохраняя поведение
+# актуального main, где новый APP_SECRET доезжал в уже собранный дашборд.
+ACTIVE=$(cat /var/lib/jt-dash-slot 2>/dev/null || echo blue)
+ACTIVE_DIR="/opt/jobtoo-dashboard-$ACTIVE"
+cd "$REPO/infra"
+if [ -s "$ACTIVE_DIR/server.js" ]; then
+  DFP=$(cat /var/lib/jt-dash.sha 2>/dev/null; grep -m1 '^EXPO_PUBLIC_APP_SECRET=' "$SECRETS" 2>/dev/null || true)
+  DFP=$(printf '%s' "$DFP" | sha256sum | cut -d' ' -f1)
+  if [ "$DFP" != "$(cat /var/lib/jt-dash.fp 2>/dev/null || true)" ] \
+     || ! docker compose --env-file "$SECRETS" --profile dashboard ps "dashboard-$ACTIVE" \
+          --format '{{.State}}' 2>/dev/null | grep -q running; then
+    timeout 300 docker compose --env-file "$SECRETS" --profile dashboard \
+      up -d --force-recreate "dashboard-$ACTIVE" >/tmp/jt-dash-active.log 2>&1 \
+      && printf '%s' "$DFP" > /var/lib/jt-dash.fp \
+      || say "дашборд" "активный слот $ACTIVE не поднялся"
+  fi
 fi
 
 # ── Контейнеры ────────────────────────────────────────────────────────────
