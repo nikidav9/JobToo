@@ -51,8 +51,9 @@ import {
 } from '@/services/db';
 import { LEGAL_STAMP, legalVersions } from '@/constants/legal';
 import { registerForPushNotifications, releasePushTokenIfSignedOut } from '@/services/notifications';
-import { isTelegramMiniApp, getTelegramInitData } from '@/lib/telegram';
+import { isTelegramMiniApp, getTelegramInitData, waitForTelegramMiniApp } from '@/lib/telegram';
 import { registerWebPush } from '@/lib/webPush';
+import { setWebSplashProgress } from '@/lib/webSplash';
 
 // Polling interval for native (Realtime is primary, polling is fallback)
 const NATIVE_POLL_INTERVAL = 8_000;
@@ -242,6 +243,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let cancelled = false;
 
     const boot = async () => {
+      setWebSplashProgress(45);
       // Vacancies are public — start fetching immediately, before session/delay
       refreshVacancies(true).catch(() => {});
       // Close shifts that start within 30 min (or already passed), then re-fetch
@@ -263,8 +265,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
         }
         if (cancelled) return;
+        setWebSplashProgress(55);
 
         // Telegram Mini App: auto-login via signed initData — no password needed
+        if (!sessionUser) await waitForTelegramMiniApp();
         if (!sessionUser && isTelegramMiniApp()) {
           const initData = getTelegramInitData();
           if (initData) {
@@ -297,6 +301,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             loadCache<AppNotification[]>(CACHE_KEYS.notifications(sessionUser.id)),
             loadCache<User[]>(CACHE_KEYS.users),
           ]);
+          setWebSplashProgress(70);
 
           if (cancelled) return;
           if (cachedVac) setVacancies(cachedVac);
@@ -333,7 +338,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             ]).catch(() => {});
             // Потолок ожидания: даже при медленной сети не держим экран дольше
             const cap = new Promise<void>(r => setTimeout(r, 1200));
-            Promise.race([critical, cap]).finally(() => { if (!cancelled) setDataReady(true); });
+            setWebSplashProgress(80);
+            Promise.race([critical, cap]).finally(() => {
+              if (!cancelled) {
+                setWebSplashProgress(100);
+                setDataReady(true);
+              }
+            });
 
             // Фоновая догрузка — загрузочный экран её не ждёт
             Promise.all([
@@ -356,6 +367,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }, 2000);
         } else {
           // Guest: nothing user-specific to load
+          setWebSplashProgress(100);
           setDataReady(true);
         }
       } catch (e) {

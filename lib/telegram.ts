@@ -1,9 +1,9 @@
 import { Platform } from 'react-native';
 
 // ─── Telegram Mini App helpers ────────────────────────────────────────────────
-// The telegram-web-app.js SDK is loaded in app/+html.tsx. When JobToo runs
-// inside Telegram's WebView, window.Telegram.WebApp is available and carries
-// signed init data about the Telegram user.
+// The telegram-web-app.js SDK is loaded on demand below. When JobToo runs
+// inside Telegram's WebView, window.Telegram.WebApp carries signed init data
+// about the Telegram user.
 
 type TgWebAppUser = {
   id: number;
@@ -12,6 +12,51 @@ type TgWebAppUser = {
   username?: string;
   photo_url?: string;
 };
+
+let sdkPromise: Promise<void> | null = null;
+
+function hasTelegramLaunchData(): boolean {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+  const url = window.location.href;
+  return url.includes('tgWebAppData=') || url.includes('tgWebAppVersion=');
+}
+
+/**
+ * Load the Telegram SDK only inside a real Mini App launch.
+ *
+ * A global <script defer> still participates in the deferred-script queue.
+ * When telegram.org took 15–20 seconds to answer, Safari kept JobToo's own
+ * bundle behind it. A normal browser/PWA does not need this SDK at all.
+ */
+export async function waitForTelegramMiniApp(timeoutMs = 1_500): Promise<boolean> {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+  if (getWebApp()) return true;
+  if (!hasTelegramLaunchData()) return false;
+
+  if (!sdkPromise) {
+    sdkPromise = new Promise<void>((resolve) => {
+      const existing = document.querySelector<HTMLScriptElement>('script[data-jobtoo-telegram-sdk]');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(), { once: true });
+        existing.addEventListener('error', () => resolve(), { once: true });
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://telegram.org/js/telegram-web-app.js';
+      script.async = true;
+      script.dataset.jobtooTelegramSdk = '1';
+      script.onload = () => resolve();
+      script.onerror = () => resolve();
+      document.head.appendChild(script);
+    });
+  }
+
+  await Promise.race([
+    sdkPromise,
+    new Promise<void>(resolve => setTimeout(resolve, timeoutMs)),
+  ]);
+  return getWebApp() !== null;
+}
 
 function getWebApp(): any | null {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
