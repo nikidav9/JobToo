@@ -341,7 +341,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             setWebSplashProgress(80);
             Promise.race([critical, cap]).finally(() => {
               if (!cancelled) {
-                setWebSplashProgress(100);
+                // Данные готовы, но экран вкладок ещё может не быть смонтирован.
+                // Особенно в установленной iOS PWA router иногда коммитит его
+                // на несколько кадров позже. 100 % выставит уже отрисованный
+                // экран, иначе splash исчезает над пустым белым root-view.
+                setWebSplashProgress(95);
                 setDataReady(true);
               }
             });
@@ -367,7 +371,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }, 2000);
         } else {
           // Guest: nothing user-specific to load
-          setWebSplashProgress(100);
+          // Финальные 100 % выставляет index после первого отрисованного кадра.
+          setWebSplashProgress(95);
           setDataReady(true);
         }
       } catch (e) {
