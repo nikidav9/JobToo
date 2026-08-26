@@ -51,7 +51,7 @@ import {
 } from '@/services/db';
 import { LEGAL_STAMP, legalVersions } from '@/constants/legal';
 import { registerForPushNotifications, releasePushTokenIfSignedOut } from '@/services/notifications';
-import { isTelegramMiniApp, getTelegramInitData } from '@/lib/telegram';
+import { isTelegramMiniApp, getTelegramInitData, waitForTelegramMiniApp } from '@/lib/telegram';
 import { registerWebPush } from '@/lib/webPush';
 import { setWebSplashProgress } from '@/lib/webSplash';
 
@@ -268,6 +268,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setWebSplashProgress(55);
 
         // Telegram Mini App: auto-login via signed initData — no password needed
+        if (!sessionUser) await waitForTelegramMiniApp();
         if (!sessionUser && isTelegramMiniApp()) {
           const initData = getTelegramInitData();
           if (initData) {

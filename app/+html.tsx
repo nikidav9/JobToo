@@ -27,11 +27,6 @@ export default function Root({ children }: PropsWithChildren) {
         {/* Favicon */}
         <link rel="icon" href="/favicon.ico" />
 
-        {/* Telegram Mini App SDK не должен задерживать HTML и основной bundle:
-            на части мобильных сетей telegram.org отвечает заметно медленнее
-            самого сайта. Контроллер обращается к SDK уже после монтирования. */}
-        <script defer src="https://telegram.org/js/telegram-web-app.js" />
-
         <ScrollViewStyleReset />
 
         {/* Веб/Telegram Mini App: браузер рисует свою рамку фокуса вокруг полей
@@ -144,15 +139,28 @@ export default function Root({ children }: PropsWithChildren) {
           (function() {
             var splash = document.getElementById('splash');
             var pctEl = document.getElementById('splash-pct');
-            var done = false, pct = 1, target = 5;
+            var done = false, finishRequested = false, pct = 1;
+            // Пока bundle скачивается, плавно идём до 30 %. Дальше каждая
+            // граница открывается только реальным этапом приложения.
+            var target = Math.max(30, window.__jobtooSplashPendingProgress || 1);
 
-            // Процент движется только к подтверждённой приложением отметке:
-            // HTML=5, bundle=35, сессия=55, кэш=70, API=80, готово=100.
+            // Не перескакиваем десятками: показываем каждое целое значение.
+            // HTML/download=1..30, bundle=35, boot=45, session=55,
+            // cache=70, API=80, ready=100.
             var tick = setInterval(function() {
-              if (pct < target) pct += Math.max(1, Math.ceil((target - pct) / 5));
-              if (pct > target) pct = target;
+              if (pct < target) pct += 1;
               if (pctEl) pctEl.textContent = pct + '%';
-            }, 45);
+              if (finishRequested && pct >= 100) {
+                clearInterval(tick);
+                // 100 % означает готовность: только короткий кадр для чтения.
+                setTimeout(hide, 100);
+              }
+            }, 25);
+
+            window.__setSplashProgress = function(value) {
+              var next = Math.max(1, Math.min(100, Number(value) || 1));
+              target = Math.max(target, Math.round(next));
+            };
 
             window.__setSplashProgress = function(value) {
               var next = Math.max(1, Math.min(100, Number(value) || 1));
@@ -176,18 +184,13 @@ export default function Root({ children }: PropsWithChildren) {
               if (done) return;
               done = true;
               target = 100;
-              // Сначала честно показываем 100 %, потом открываем интерфейс.
-              var waitFull = setInterval(function() {
-                if (pct >= 100) {
-                  clearInterval(waitFull);
-                  setTimeout(hide, 180);
-                }
-              }, 45);
+              finishRequested = true;
             }
 
             // The app hides the splash itself once data is loaded
             // (EntryTransition / index.tsx call window.__hideSplash).
             window.__hideSplash = finish;
+            if (window.__jobtooHideSplashRequested) finish();
 
             // Service worker нужен не только для push: в установленной PWA он
             // не даёт старому index.html пережить следующую выкладку.
@@ -205,10 +208,7 @@ export default function Root({ children }: PropsWithChildren) {
               if (done) return;
               // React уже работает и может просто ждать сеть: не перезагружаем
               // его и не показываем пользователю второй загрузочный экран.
-              if (window.__jobtooBundleMounted) {
-                if (pctEl) pctEl.textContent = 'Загружаем данные…';
-                return;
-              }
+              if (window.__jobtooBundleMounted) return;
               if (pctEl) {
                 pctEl.textContent = 'Нажмите, чтобы повторить';
                 pctEl.style.cursor = 'pointer';
