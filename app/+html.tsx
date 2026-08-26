@@ -162,11 +162,6 @@ export default function Root({ children }: PropsWithChildren) {
               target = Math.max(target, Math.round(next));
             };
 
-            window.__setSplashProgress = function(value) {
-              var next = Math.max(1, Math.min(100, Number(value) || 1));
-              target = Math.max(target, Math.round(next));
-            };
-
             function hide() {
               clearInterval(tick);
               // Полоса браузера была в цвет загрузочного экрана; дальше
