@@ -27,8 +27,10 @@ export default function Root({ children }: PropsWithChildren) {
         {/* Favicon */}
         <link rel="icon" href="/favicon.ico" />
 
-        {/* Telegram Mini App SDK — no-op outside Telegram's WebView */}
-        <script src="https://telegram.org/js/telegram-web-app.js" />
+        {/* Telegram Mini App SDK не должен задерживать HTML и основной bundle:
+            на части мобильных сетей telegram.org отвечает заметно медленнее
+            самого сайта. Контроллер обращается к SDK уже после монтирования. */}
+        <script defer src="https://telegram.org/js/telegram-web-app.js" />
 
         <ScrollViewStyleReset />
 
