@@ -107,13 +107,18 @@ if [ -n "$last_apply" ]; then
 fi
 
 # Деградация служб — тоже событие: контейнер жив, а путь не обслуживается.
+# Флагуем только настоящий отказ (нет ответа или 5xx), а не любой не-200:
+# /api/tenants у Realtime и /api/db.php у прокси штатно отвечают 403/405 без
+# токена — это «служба жива и отвечает», а не авария. Здоровье живого пути
+# Realtime (вебсокет 101, broadcast 202) проверяет check-anon.sh отдельно;
+# метить 403 здесь значило бы поднимать ложную тревогу каждую минуту.
 [ "$nginx" != "active" ] && add_event "nginx=$nginx"
 [ "$site_code" != "200" ] && add_event "сайт=$site_code"
 [ "$rest" != "200" ] && add_event "rest=$rest"
-# storage /status отдаёт 200; realtime /api/tenants — 200.
+# storage /status отдаёт 200; для него не-200 — уже беда.
 [ "$storage" != "200" ] && add_event "storage=$storage"
-[ "$realtime" != "200" ] && add_event "realtime=$realtime"
-case "$api" in 000|5??|502|503|504) add_event "api=$api" ;; esac
+case "$realtime" in 000|5??) add_event "realtime=$realtime" ;; esac
+case "$api" in 000|5??) add_event "api=$api" ;; esac
 
 # ── Строка ────────────────────────────────────────────────────────────────
 # Ключи русские — как в status.json, чтобы читалось единообразно. Значения без
