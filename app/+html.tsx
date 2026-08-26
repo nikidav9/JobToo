@@ -159,7 +159,12 @@ export default function Root({ children }: PropsWithChildren) {
 
             window.__setSplashProgress = function(value) {
               var next = Math.max(1, Math.min(100, Number(value) || 1));
-              target = Math.max(target, Math.round(next));
+              // 100 % по контракту означает, что критические данные готовы.
+              // Не ждём второго независимого сигнала __hideSplash: в старом
+              // iOS-ярлыке переход маршрута иногда его не вызывал, поэтому
+              // счётчик доходил до 100 и оставался там навсегда.
+              if (next >= 100) finish();
+              else target = Math.max(target, Math.round(next));
             };
 
             function hide() {
@@ -185,7 +190,7 @@ export default function Root({ children }: PropsWithChildren) {
             // The app hides the splash itself once data is loaded
             // (EntryTransition / index.tsx call window.__hideSplash).
             window.__hideSplash = finish;
-            if (window.__jobtooHideSplashRequested) finish();
+            if (window.__jobtooHideSplashRequested || window.__jobtooSplashPendingProgress >= 100) finish();
 
             // Service worker нужен не только для push: в установленной PWA он
             // не даёт старому index.html пережить следующую выкладку.
