@@ -72,7 +72,6 @@ export default function RootScreen() {
   useEffect(() => {
     // Post-logout: loading was already false when we mounted — skip splash, show screen now
     if (skipSplash.current && !loading) {
-      SplashScreen.hideAsync().catch(() => {});
       if (currentUserRef.current) {
         router.replace('/(tabs)');
       } else {
@@ -95,13 +94,22 @@ export default function RootScreen() {
         router.replace('/(tabs)');
       } else {
         // No tabs will mount — hide splash now and show the welcome screen
-        SplashScreen.hideAsync().catch(() => {});
         hideWebSplash();
         setReady(true);
       }
     }, wait);
     return () => clearTimeout(t);
   }, [loading, currentUser]);
+
+  useEffect(() => {
+    if (!ready || Platform.OS === 'web') return;
+    // Сначала рисуем приветственный экран и только затем убираем системный
+    // splash. Иначе Android на медленном устройстве показывает белый кадр.
+    const first = requestAnimationFrame(() => {
+      requestAnimationFrame(() => SplashScreen.hideAsync().catch(() => {}));
+    });
+    return () => cancelAnimationFrame(first);
+  }, [ready]);
 
   if (!ready) {
     // Web: the static HTML splash (app/+html.tsx) is the single loading

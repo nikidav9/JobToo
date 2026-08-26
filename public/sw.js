@@ -1,3 +1,22 @@
+self.addEventListener('install', () => {
+  // Новая версия должна начать управлять PWA сразу, а не после закрытия всех
+  // старых вкладок. Иначе установленное приложение может ещё сутки открывать
+  // оболочку от предыдущей выкладки.
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+  // HTML-навигация всегда идёт в сеть. Статические bundle-файлы имеют хеши и
+  // кэшируются nginx надолго, но устаревший index.html может ссылаться на уже
+  // удалённый bundle — результатом был вечный белый экран в установленной PWA.
+  if (event.request.mode !== 'navigate') return;
+  event.respondWith(fetch(event.request, { cache: 'no-store' }));
+});
+
 self.addEventListener('push', (event) => {
   if (!event.data) return;
   const data = event.data.json();
