@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import SplashLoader, { useLoadingPercent, DrawnArt, bootElapsed, SPLASH_MIN_MS } from '@/components/SplashLoader';
 import { ICON_WORKER, ICON_EMPLOYER } from '@/constants/roleIcons';
 import { Ionicons } from '@expo/vector-icons';
-import { hideWebSplash } from '@/lib/webSplash';
+import { hideWebSplash, setWebSplashProgress } from '@/lib/webSplash';
 
 import { rs, rf } from '@/constants/scale';
 import { dbCountUsers } from '@/services/db';
@@ -72,11 +72,9 @@ export default function RootScreen() {
   useEffect(() => {
     // Post-logout: loading was already false when we mounted — skip splash, show screen now
     if (skipSplash.current && !loading) {
-      SplashScreen.hideAsync().catch(() => {});
       if (currentUserRef.current) {
         router.replace('/(tabs)');
       } else {
-        hideWebSplash();
         setReady(true);
       }
       return;
@@ -94,14 +92,31 @@ export default function RootScreen() {
         // native — EntryTransition overlay, web — the static HTML splash.
         router.replace('/(tabs)');
       } else {
-        // No tabs will mount — hide splash now and show the welcome screen
-        SplashScreen.hideAsync().catch(() => {});
-        hideWebSplash();
+        // No tabs will mount. First commit the welcome screen; a separate
+        // paint effect below removes the HTML splash only after it is visible.
         setReady(true);
       }
     }, wait);
     return () => clearTimeout(t);
   }, [loading, currentUser]);
+
+  useEffect(() => {
+    if (!ready) return;
+    // Сначала рисуем приветственный экран и только затем убираем splash.
+    // Два кадра особенно важны для установленной iOS PWA: первый callback
+    // может выполняться до фактической отрисовки React root-view.
+    const first = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (Platform.OS === 'web') {
+          setWebSplashProgress(100);
+          hideWebSplash();
+        } else {
+          SplashScreen.hideAsync().catch(() => {});
+        }
+      });
+    });
+    return () => cancelAnimationFrame(first);
+  }, [ready]);
 
   if (!ready) {
     // Web: the static HTML splash (app/+html.tsx) is the single loading

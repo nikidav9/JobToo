@@ -140,6 +140,38 @@ if [ -f "$REPO/infra/report.sh" ]; then
   install -m 755 "$REPO/infra/report.sh" /usr/local/bin/jt-report
 fi
 
+# Сам nginx обычно надёжен, но при его остановке внешний GitHub-monitor только
+# сообщит о проблеме. Локальный watchdog раз в минуту проверяет настоящий TLS
+# vhost через loopback и после двух последовательных сбоев безопасно
+# перезапускает nginx. Сетевой маршрут Timeweb он намеренно не трогает.
+if [ -f "$REPO/infra/site-watchdog.sh" ]; then
+  install -m 755 "$REPO/infra/site-watchdog.sh" /usr/local/bin/jt-site-watchdog
+  cat > /etc/systemd/system/jt-site-watchdog.service <<'EOF'
+[Unit]
+Description=JobToo website local watchdog
+After=network-online.target nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/jt-site-watchdog
+EOF
+  cat > /etc/systemd/system/jt-site-watchdog.timer <<'EOF'
+[Unit]
+Description=Check and repair JobToo website every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now jt-site-watchdog.timer >/dev/null 2>&1 || true
+fi
+
 # Разовый опыт: дозванивается ли Телеграм до этой машины напрямую.
 # Подробности и сетка безопасности — в самом скрипте. Отметкой, а не
 # каждую минуту: переключать вебхук по кругу нельзя.
@@ -557,10 +589,28 @@ if gh_asset web dist.tar.gz /tmp/jt-web.tgz; then
   if [ "$SUM" != "$(cat /var/lib/jt-web.sha 2>/dev/null || true)" ]; then
     rm -rf /tmp/jt-web && mkdir -p /tmp/jt-web
     if tar -xzf /tmp/jt-web.tgz -C /tmp/jt-web 2>/dev/null && [ -s /tmp/jt-web/index.html ]; then
+      # iOS сохраняет установленную PWA агрессивнее обычной вкладки. Старый
+      # index.html может проснуться уже после выкладки и запросить bundle с
+      # отпечатком предыдущей версии. Раньше каталог подменялся целиком, такого
+      # файла уже не было — JavaScript не стартовал, заставка повторялась и
+      # оставалась навсегда. Переносим в новую выкладку хешированные файлы
+      # предыдущей: старая оболочка сможет загрузиться, обновить service worker
+      # и на следующей навигации перейти на свежий index.html.
+      if [ -d /var/www/jobtoo ]; then
+        for tree in _expo/static assets; do
+          if [ -d "/var/www/jobtoo/$tree" ]; then
+            mkdir -p "/tmp/jt-web/$tree"
+            cp -an "/var/www/jobtoo/$tree/." "/tmp/jt-web/$tree/" 2>/dev/null || true
+          fi
+        done
+      fi
       rm -rf /var/www/jobtoo.old
       if [ -d /var/www/jobtoo ]; then mv /var/www/jobtoo /var/www/jobtoo.old; fi
       mv /tmp/jt-web /var/www/jobtoo
       chmod -R a+rX /var/www/jobtoo
+      # Совместимость нужна на время, а не навсегда. Удаляем только старые
+      # хешированные файлы; текущие имеют свежую дату из нового архива.
+      find /var/www/jobtoo/_expo/static /var/www/jobtoo/assets -type f -mtime +45 -delete 2>/dev/null || true
       rm -rf /var/www/jobtoo.old
       echo "$SUM" > /var/lib/jt-web.sha
       say "сайт" "обновлён, файлов: $(find /var/www/jobtoo -type f | wc -l)"

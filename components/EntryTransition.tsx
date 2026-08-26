@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Animated, Easing, Platform } from 'react-native';
 import { useApp } from '@/hooks/useApp';
-import { hideWebSplash } from '@/lib/webSplash';
+import { hideWebSplash, setWebSplashProgress } from '@/lib/webSplash';
 import SplashLoader, { useLoadingPercent, bootElapsed, SPLASH_MIN_MS } from '@/components/SplashLoader';
 
 // Оверлей поверх вкладок: тот же загрузочный экран, что и при старте, держится
@@ -24,14 +24,23 @@ export default function EntryTransition() {
   const [minPassed, setMinPassed] = useState(Platform.OS === 'web' || bootElapsed() >= MIN_SHOW_MS);
   const overlay = useRef(new Animated.Value(1)).current;
   const dissolving = useRef(false);
+  const webFrame = useRef<number | null>(null);
 
   function dissolve() {
     if (dissolving.current) return;
     dissolving.current = true;
     if (Platform.OS === 'web') {
-      // On web the static HTML splash is the loading screen — just hide it
-      hideWebSplash();
-      setDone(true);
+      // dataReady означает готовые данные, но не гарантирует, что Safari уже
+      // нарисовал вкладки. Ждём два кадра и только после этого показываем 100 %
+      // и убираем HTML splash — иначе iPhone остаётся с белым root-view.
+      webFrame.current = requestAnimationFrame(() => {
+        webFrame.current = requestAnimationFrame(() => {
+          setWebSplashProgress(100);
+          hideWebSplash();
+          setDone(true);
+          webFrame.current = null;
+        });
+      });
       return;
     }
     Animated.timing(overlay, {
@@ -47,7 +56,11 @@ export default function EntryTransition() {
       ? null
       : setTimeout(() => setMinPassed(true), remaining);
     const maxT = setTimeout(dissolve, MAX_SHOW_MS);
-    return () => { if (minT) clearTimeout(minT); clearTimeout(maxT); };
+    return () => {
+      if (minT) clearTimeout(minT);
+      clearTimeout(maxT);
+      if (webFrame.current !== null) cancelAnimationFrame(webFrame.current);
+    };
   }, []);
 
   useEffect(() => {

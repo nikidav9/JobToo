@@ -1,0 +1,78 @@
+name: Проверка доступности сайта
+
+on:
+  schedule:
+    # Минимальный интервал GitHub Actions — пять минут. Это внешний наблюдатель:
+    # он продолжает писать журнал, даже если сам московский сервер недоступен.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: jobtoo-site-availability
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Проверить DNS, IPv4, IPv6 и резервный адрес
+        id: health
+        continue-on-error: true
+        run: |
+          set +e
+          REPORT="$RUNNER_TEMP/site-health.log" bash infra/check-site.sh
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          cat "$RUNNER_TEMP/site-health.log" >> "$GITHUB_STEP_SUMMARY"
+          exit "$code"
+
+      - name: Сохранить диагностический журнал
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-health-${{ github.run_id }}
+          path: ${{ runner.temp }}/site-health.log
+          retention-days: 30
+
+      - name: Записать сбой или восстановление в GitHub Issues
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          HEALTH_EXIT_CODE: ${{ steps.health.outputs.exit_code }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = 'Автомониторинг: jobtoo.ru недоступен';
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const failed = process.env.HEALTH_EXIT_CODE !== '0';
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner, repo, state: 'open', per_page: 100,
+            });
+            const incident = issues.find(issue => issue.title === title);
+
+            if (failed) {
+              const body = `Внешняя проверка обнаружила сбой ${new Date().toISOString()}.\n\n` +
+                `Подробные DNS, IPv4/IPv6, TLS и timing-данные: ${runUrl}`;
+              if (incident) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: incident.number, body });
+              } else {
+                await github.rest.issues.create({ owner, repo, title, body });
+              }
+            } else if (incident) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: incident.number,
+                body: `Сайт снова доступен по внешней проверке ${new Date().toISOString()}.\n\n${runUrl}`,
+              });
+              await github.rest.issues.update({ owner, repo, issue_number: incident.number, state: 'closed' });
+            }
+
+      - name: Завершить workflow ошибкой при недоступности
+        if: steps.health.outputs.exit_code != '0'
+        run: exit 1
