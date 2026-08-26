@@ -140,6 +140,38 @@ if [ -f "$REPO/infra/report.sh" ]; then
   install -m 755 "$REPO/infra/report.sh" /usr/local/bin/jt-report
 fi
 
+# Сам nginx обычно надёжен, но при его остановке внешний GitHub-monitor только
+# сообщит о проблеме. Локальный watchdog раз в минуту проверяет настоящий TLS
+# vhost через loopback и после двух последовательных сбоев безопасно
+# перезапускает nginx. Сетевой маршрут Timeweb он намеренно не трогает.
+if [ -f "$REPO/infra/site-watchdog.sh" ]; then
+  install -m 755 "$REPO/infra/site-watchdog.sh" /usr/local/bin/jt-site-watchdog
+  cat > /etc/systemd/system/jt-site-watchdog.service <<'EOF'
+[Unit]
+Description=JobToo website local watchdog
+After=network-online.target nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/jt-site-watchdog
+EOF
+  cat > /etc/systemd/system/jt-site-watchdog.timer <<'EOF'
+[Unit]
+Description=Check and repair JobToo website every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now jt-site-watchdog.timer >/dev/null 2>&1 || true
+fi
+
 # Разовый опыт: дозванивается ли Телеграм до этой машины напрямую.
 # Подробности и сетка безопасности — в самом скрипте. Отметкой, а не
 # каждую минуту: переключать вебхук по кругу нельзя.

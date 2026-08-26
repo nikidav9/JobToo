@@ -36,6 +36,8 @@ TMP=/tmp/jt-status.$$
   echo "  \"nginx\": \"$(systemctl is-active nginx)\","
   echo "  \"docker\": \"$(systemctl is-active docker)\","
   echo "  \"таймер\": \"$(systemctl is-active jt-apply.timer)\","
+  echo "  \"watchdog\": \"$(systemctl is-active jt-site-watchdog.timer 2>/dev/null || echo отсутствует)\","
+  echo "  \"watchdog_последнее\": \"$(tail -1 /var/log/jt-watchdog.log 2>/dev/null | tr -d '\"\\' | cut -c1-300)\","
   echo "  \"последний_заход\": \"$(systemctl show jt-apply.service -p ExecMainStatus --value 2>/dev/null)\","
   # Слушающие порты — самое полезное: по ним видно, поднялись ли службы,
   # даже когда Docker не отвечает вовсе.
