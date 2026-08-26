@@ -67,6 +67,7 @@ import urllib.request
 
 DOMAIN = 'jobtoo.ru'
 API = 'https://api.timeweb.cloud/api'
+# Повторный прогон 26.08: применяем удаление входящей AAAA (см. DROP ниже).
 
 IPV4 = '147.45.184.99'
 IPV6 = '2a03:6f00:a::1:ba1f'
