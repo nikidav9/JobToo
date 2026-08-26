@@ -94,15 +94,28 @@ IPV6 = '2a03:6f00:a::1:ba1f'
 # Значение — (тип, значение) или (тип, значение, приоритет) для MX.
 WANT = {
     '': [
-        ('A', IPV4), ('AAAA', IPV6),
+        ('A', IPV4),
         ('TXT', 'v=spf1 include:_spf.timeweb.ru ~all'),
         ('MX', 'mx1.timeweb.ru', 10),
         ('MX', 'mx2.timeweb.ru', 20),
     ],
-    'www':   [('A', IPV4), ('AAAA', IPV6)],
-    'admin': [('A', IPV4), ('AAAA', IPV6)],
+    'www':   [('A', IPV4)],
+    'admin': [('A', IPV4)],
     'tg':    [('A', IPV4), ('AAAA', IPV6)],
 }
+
+# AAAA у сайта убрана намеренно (26.08). Входящий IPv6-маршрут к серверу у
+# части сетей — в мобильных особенно — нестабилен: браузер по правилу «сначала
+# IPv6» идёт на AAAA и не откатывается на рабочий IPv4, и сайт «не
+# открывается». Проверено: `<ip>.sslip.io` (только A) открывается, а jobtoo.ru
+# (A+AAAA) — нет, с той же сети. Оставляем входящим только IPv4, он работает у
+# всех. Исходящий IPv6 сервера (доступ к Telegram) это не затрагивает — он
+# живёт на интерфейсе сервера, а не на DNS-записи домена. У `tg` AAAA остаётся:
+# это адрес вебхука, не пользовательский сайт.
+#
+# Просто убрать строку из WANT мало: тогда запись становится «чужой» и остаётся
+# жить (см. `спорит`). Поэтому вычищаем её явно — через DROP ниже.
+DROP = {'': {'AAAA'}, 'www': {'AAAA'}, 'admin': {'AAAA'}}
 
 # Их держит сам Timeweb, и трогать их не наше дело.
 UNTOUCHED = ('NS', 'SOA')
@@ -225,6 +238,15 @@ def diff(sub: str):
     seen = {normalize(t, v, p) for t, v, _, p, поддомен in have if not поддомен}
     absent = [r for r in WANT[sub] if normalize(*r) not in seen]
     unwanted = [r for r in have if спорит(r, want, наши_типы)]
+    # Плюс типы из DROP — их вычищаем явно, даже когда мы их больше не заводим
+    # и потому `спорит` их не трогает. Только записи самого домена, не поддоменные
+    # служебные (_dmarc, dkim._domainkey), и без задвоения с unwanted.
+    drop_types = DROP.get(sub, set())
+    if drop_types:
+        for r in have:
+            rectype, _value, _rid, _prio, поддомен = r
+            if not поддомен and rectype.upper() in drop_types and r not in unwanted:
+                unwanted.append(r)
     return have, absent, unwanted
 
 
