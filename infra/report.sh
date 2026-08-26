@@ -51,14 +51,14 @@ TMP=/tmp/jt-status.$$
 
   echo "  \"журналы\": {"
   first=1
-  for svc in db rest realtime storage dashboard; do
+  for svc in db rest realtime storage dashboard-blue dashboard-green; do
     s=$(cd /opt/jobtoo/infra 2>/dev/null && timeout 10 docker compose ps "$svc" --format '{{.State}}' 2>/dev/null)
     # storage и realtime показываем всегда: оба бывают «running» и при этом
     # не работают — первый отвечал 502, второй отвергает подписки.
     # dashboard показываем всегда: он бывает «running» и при этом отдаёт
     # ошибку на каждый файл статики — снаружи это белый экран без единой
     # записи в отчёте.
-    [ "$s" = "running" ] && [ "$svc" != "storage" ] && [ "$svc" != "realtime" ] && [ "$svc" != "dashboard" ] && continue
+    [ "$s" = "running" ] && [ "$svc" != "storage" ] && [ "$svc" != "realtime" ] && [[ "$svc" != dashboard-* ]] && continue
     [ -n "$s" ] || continue
     [ $first -eq 0 ] && echo ","
     first=0
@@ -68,7 +68,7 @@ TMP=/tmp/jt-status.$$
     # имя ненайденного модуля — в первой строке. Именно её и не хватало,
     # чтобы понять, почему страница открывается, а скрипты к ней нет.
     n=6; cut=600
-    [ "$svc" = "dashboard" ] && { n=40; cut=1400; }
+    [[ "$svc" = dashboard-* ]] && { n=40; cut=1400; }
     log=$(cd /opt/jobtoo/infra && timeout 15 docker compose logs --tail=$n --no-log-prefix "$svc" 2>&1 \
           | grep -aiE "error|cannot|missing|enoent|warn|Ready|Starting" | head -8 \
           | tr -d '"\\\r' | tr '\n' ' ' | tail -c $cut)
@@ -163,9 +163,11 @@ TMP=/tmp/jt-status.$$
   # Со статикой, а не только со страницей. «Отвечает 200» ничего не значит:
   # сервер отдаёт страницу из памяти и при полностью недоступном диске — а
   # человек видит белый экран, потому что ни один скрипт к ней не грузится.
-  echo "  \"дашборд\": \"сборка $([ -s /opt/jobtoo-dashboard/server.js ] && echo есть || echo нет), страница $(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3002/ 2>/dev/null || echo нет), скрипты $(
-    c=$(curl -s -m 5 http://127.0.0.1:3002/ 2>/dev/null | grep -oE '/_next/static/chunks/main-app-[^\"]+\.js' | head -1)
-    [ -n "$c" ] && curl -s -o /dev/null -w '%{http_code}' -m 5 "http://127.0.0.1:3002$c" 2>/dev/null || echo нет)\","
+  DACTIVE=$(cat /var/lib/jt-dash-active 2>/dev/null || echo blue)
+  DPORT=3002; [ "$DACTIVE" = green ] && DPORT=3003
+  echo "  \"дашборд\": \"цвет $DACTIVE, сборка $([ -s /opt/jobtoo-dashboard-$DACTIVE/server.js ] && echo есть || echo нет), страница $(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:$DPORT/ 2>/dev/null || echo нет), скрипты $(
+    c=$(curl -s -m 5 http://127.0.0.1:$DPORT/ 2>/dev/null | grep -oE '/_next/static/chunks/main-app-[^\"]+\.js' | head -1)
+    [ -n "$c" ] && curl -s -o /dev/null -w '%{http_code}' -m 5 "http://127.0.0.1:$DPORT$c" 2>/dev/null || echo нет)\","
   # Забор сообщений бота: жива ли служба и когда в последний раз доходила
   # до Телеграма. «Работает» тут ничего не значит — процесс может висеть,
   # ничего не забирая, и снаружи это неотличимо от тишины в чатах.
@@ -184,9 +186,9 @@ TMP=/tmp/jt-status.$$
   # просто нет открытых смен.
   echo "  \"чужие_вакансии\": \"$(cat /var/lib/jt-ingest.out 2>/dev/null | tr -d '"\\\r\n' | cut -c1-260)\","
   echo "  \"дашборд_пропуск\": \"файл=$(grep -c '^EXPO_PUBLIC_APP_SECRET=.\+' /opt/jobtoo-secrets/env 2>/dev/null | tr -d '\n') внутри=$(
-    cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose --profile dashboard exec -T dashboard \
+    cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose --profile dashboard exec -T "dashboard-$DACTIVE" \
       printenv EXPO_PUBLIC_APP_SECRET 2>/dev/null | tr -d '\r\n' | wc -c | tr -d ' ')\","
-  echo "  \"сайт\": \"файлов $(find /var/www/jobtoo -type f 2>/dev/null | wc -l), оболочка $([ -s /var/www/jobtoo/index.html ] && echo есть || echo нет), страница ключей $([ -s /var/www/private/token.txt ] && echo есть || echo нет)\","
+  echo "  \"сайт\": \"release $(readlink -f /var/www/jobtoo-current 2>/dev/null), файлов $(find -L /var/www/jobtoo-current -type f 2>/dev/null | wc -l), оболочка $([ -s /var/www/jobtoo-current/index.html ] && echo есть || echo нет), страница ключей $([ -s /var/www/private/token.txt ] && echo есть || echo нет)\","
   # Что будет, когда репозиторий закроют.
   #
   # Оттуда сервер берёт три вещи: сами обновления (git pull), сборку сайта и

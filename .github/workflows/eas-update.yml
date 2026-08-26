@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: jobtoo-production-ota
+  cancel-in-progress: true
+
 jobs:
   update:
     name: OTA Update

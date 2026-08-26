@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import * as SplashScreen from 'expo-splash-screen';
 import { useApp } from '@/hooks/useApp';
 import { Colors } from '@/constants/theme';
@@ -18,6 +19,7 @@ import { rs, rf } from '@/constants/scale';
 import { dbCountUsers } from '@/services/db';
 
 const USER_COUNT_KEY = 'cached_user_count';
+const APP_VERSION = Constants.expoConfig?.version ?? '1.4.0';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const sc = Math.min(SW / 390, SH / 844);
@@ -216,7 +218,7 @@ export default function RootScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        <Animated.Text style={[styles.version, { opacity: introFade }]}>JobToo v3.0</Animated.Text>
+        <Animated.Text style={[styles.version, { opacity: introFade }]}>JobToo v{APP_VERSION}</Animated.Text>
       </ScrollView>
     </SafeAreaView>
   );

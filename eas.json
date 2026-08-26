@@ -7,7 +7,7 @@
     "production": {
       "node": "22.13.0",
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       },
       "ios": {
         "simulator": false
@@ -19,6 +19,13 @@
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg2NzM1NTM2LCJleHAiOjIxMDIwOTU1MzZ9.0oR6A_lcSFDJK6iNrwNPFg74T3xRLgQpinf_ThX0sD8",
         "EXPO_PUBLIC_API_URL": "https://jobtoo.ru",
         "EXPO_PUBLIC_DASHBOARD_URL": "https://admin.jobtoo.ru"
+      }
+    },
+    "preview": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       }
     }
   }

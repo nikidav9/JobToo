@@ -555,18 +555,26 @@ print(next((str(a["id"]) for a in d.get("assets", []) if a.get("name") == sys.ar
 if gh_asset web dist.tar.gz /tmp/jt-web.tgz; then
   SUM=$(sha256sum /tmp/jt-web.tgz | cut -d' ' -f1)
   if [ "$SUM" != "$(cat /var/lib/jt-web.sha 2>/dev/null || true)" ]; then
-    rm -rf /tmp/jt-web && mkdir -p /tmp/jt-web
-    if tar -xzf /tmp/jt-web.tgz -C /tmp/jt-web 2>/dev/null && [ -s /tmp/jt-web/index.html ]; then
-      rm -rf /var/www/jobtoo.old
-      if [ -d /var/www/jobtoo ]; then mv /var/www/jobtoo /var/www/jobtoo.old; fi
-      mv /tmp/jt-web /var/www/jobtoo
-      chmod -R a+rX /var/www/jobtoo
-      rm -rf /var/www/jobtoo.old
+    RELEASE="/var/www/jobtoo-releases/$SUM"
+    rm -rf "$RELEASE.tmp" && mkdir -p "$RELEASE.tmp" /var/www/jobtoo-releases
+    if tar -xzf /tmp/jt-web.tgz -C "$RELEASE.tmp" 2>/dev/null && [ -s "$RELEASE.tmp/index.html" ]; then
+      rm -rf "$RELEASE"
+      mv "$RELEASE.tmp" "$RELEASE"
+      chmod -R a+rX "$RELEASE"
+      PREVIOUS=$(readlink -f /var/www/jobtoo-current 2>/dev/null || true)
+      if [ -n "$PREVIOUS" ] && [ -d "$PREVIOUS" ] && [ "$PREVIOUS" != "$RELEASE" ]; then
+        ln -sfn "$PREVIOUS" /var/www/jobtoo-previous.next
+        mv -Tf /var/www/jobtoo-previous.next /var/www/jobtoo-previous
+      fi
+      ln -sfn "$RELEASE" /var/www/jobtoo-current.next
+      mv -Tf /var/www/jobtoo-current.next /var/www/jobtoo-current
       echo "$SUM" > /var/lib/jt-web.sha
-      say "сайт" "обновлён, файлов: $(find /var/www/jobtoo -type f | wc -l)"
+      say "сайт" "атомарно обновлён, файлов: $(find "$RELEASE" -type f | wc -l)"
+      find /var/www/jobtoo-releases -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
+        | sort -nr | tail -n +3 | cut -d' ' -f2- | xargs -r rm -rf
     else
       say "сайт" "архив не распаковался — оставляю прежний"
-      rm -rf /tmp/jt-web
+      rm -rf "$RELEASE.tmp"
     fi
   fi
   rm -f /tmp/jt-web.tgz
@@ -579,43 +587,65 @@ else
 fi
 
 # ── Дашборд ───────────────────────────────────────────────────────────────
-# Тем же способом, что и веб-версия: сборка приезжает выпуском, потому что
-# собирать Next.js здесь нельзя — он съедает под два гигабайта и уронит базу.
-#
-# Забираем всегда, а запускаем только когда есть что запускать: пока файла
-# server.js нет, служба не поднимается и место не занимает.
+# Blue-green: новую сборку запускаем на неактивном порту и проверяем /login.
+# Работающий контейнер не останавливается, пока новая версия не готова.
+# При первом переходе старый одноцветный контейнер остаётся на 3002, а новая
+# версия поднимается зелёной на 3003; так сама миграция тоже проходит без 502.
+if [ -d /opt/jobtoo-dashboard ] \
+   && [ ! -d /opt/jobtoo-dashboard-blue ] && [ ! -d /opt/jobtoo-dashboard-green ]; then
+  cp -a /opt/jobtoo-dashboard /opt/jobtoo-dashboard-blue
+  echo blue > /var/lib/jt-dash-active
+  rm -f /var/lib/jt-dash.fp
+fi
 if gh_asset dashboard dashboard.tar.gz /tmp/jt-dash.tgz; then
   DSUM=$(sha256sum /tmp/jt-dash.tgz | cut -d' ' -f1)
-  if [ "$DSUM" != "$(cat /var/lib/jt-dash.sha 2>/dev/null || true)" ]; then
-    rm -rf /tmp/jt-dash && mkdir -p /tmp/jt-dash
-    if tar -xzf /tmp/jt-dash.tgz -C /tmp/jt-dash 2>/dev/null && [ -s /tmp/jt-dash/server.js ]; then
-      rm -rf /opt/jobtoo-dashboard.old
-      if [ -d /opt/jobtoo-dashboard ]; then mv /opt/jobtoo-dashboard /opt/jobtoo-dashboard.old; fi
-      mv /tmp/jt-dash /opt/jobtoo-dashboard
-      chmod -R a+rX /opt/jobtoo-dashboard
-      echo "$DSUM" > /var/lib/jt-dash.sha
-
-      # Прежний каталог НЕ удаляем здесь, и это важно.
-      #
-      # Контейнер примонтирован к каталогу, а не к пути. Пока он не поднят
-      # заново, он продолжает читать именно тот каталог, который мы только что
-      # переименовали в .old — и если стереть его сейчас, дашборд на несколько
-      # секунд остаётся без файлов: страница приходит, а все скрипты к ней
-      # отвечают ошибкой. Снаружи это белый экран, и попадает в него ровно тот,
-      # кто обновил страницу сразу после выкладки. Дважды так и вышло.
-      #
-      # Поэтому сначала поднимаем службу на новом каталоге, и только следующий
-      # заход убирает прежний. Лишние двадцать мегабайт на диске — плата за то,
-      # что окна без файлов не существует вовсе.
-      say "дашборд" "сборка обновлена"
-      timeout 300 docker compose --env-file "$SECRETS" --profile dashboard \
-        up -d --force-recreate dashboard >/dev/null 2>&1 \
-        && say "дашборд" "поднят на новой сборке" \
-        || say "дашборд" "не поднялся сразу, поднимет следующий заход"
-      rm -f /var/lib/jt-dash.up /var/lib/jt-dash.fp
+  DFP=$(printf '%s\n%s' "$DSUM" "${EXPO_PUBLIC_APP_SECRET:-}" | sha256sum | cut -d' ' -f1)
+  if [ "$DFP" != "$(cat /var/lib/jt-dash.fp 2>/dev/null || true)" ]; then
+    ACTIVE=$(cat /var/lib/jt-dash-active 2>/dev/null || echo blue)
+    [ "$ACTIVE" = blue ] && TARGET=green || TARGET=blue
+    TARGET_DIR="/opt/jobtoo-dashboard-$TARGET"
+    TARGET_PORT=3002; [ "$TARGET" = green ] && TARGET_PORT=3003
+    rm -rf "$TARGET_DIR.new" && mkdir -p "$TARGET_DIR.new"
+    if tar -xzf /tmp/jt-dash.tgz -C "$TARGET_DIR.new" 2>/dev/null && [ -s "$TARGET_DIR.new/server.js" ]; then
+      rm -rf "$TARGET_DIR"
+      mv "$TARGET_DIR.new" "$TARGET_DIR"
+      chmod -R a+rX "$TARGET_DIR"
+      cd "$REPO/infra"
+      if timeout 300 docker compose --env-file "$SECRETS" --profile dashboard \
+           up -d --force-recreate "dashboard-$TARGET" >/tmp/jt-dash-up.log 2>&1; then
+        READY=0
+        for _ in $(seq 1 30); do
+          if curl -fsS --max-time 3 "http://127.0.0.1:$TARGET_PORT/login" >/dev/null 2>&1; then READY=1; break; fi
+          sleep 1
+        done
+        if [ "$READY" = 1 ]; then
+          mkdir -p /etc/nginx/snippets
+          printf 'proxy_pass http://127.0.0.1:%s;\n' "$TARGET_PORT" \
+            > /etc/nginx/snippets/jobtoo-dashboard-upstream.conf.new
+          mv -f /etc/nginx/snippets/jobtoo-dashboard-upstream.conf.new \
+            /etc/nginx/snippets/jobtoo-dashboard-upstream.conf
+          if nginx -t >/dev/null 2>&1 && systemctl reload nginx >/dev/null 2>&1; then
+            echo "$TARGET" > /var/lib/jt-dash-active
+            echo "$DSUM" > /var/lib/jt-dash.sha
+            echo "$DFP" > /var/lib/jt-dash.fp
+            say "дашборд" "$TARGET отвечает, переключение подготовлено"
+          else
+            ACTIVE_PORT=3002; [ "$ACTIVE" = green ] && ACTIVE_PORT=3003
+            printf 'proxy_pass http://127.0.0.1:%s;\n' "$ACTIVE_PORT" \
+              > /etc/nginx/snippets/jobtoo-dashboard-upstream.conf
+            docker compose --env-file "$SECRETS" --profile dashboard stop "dashboard-$TARGET" >/dev/null 2>&1 || true
+            say "дашборд" "nginx не переключился — оставляю $ACTIVE"
+          fi
+        else
+          docker compose --env-file "$SECRETS" --profile dashboard stop "dashboard-$TARGET" >/dev/null 2>&1 || true
+          say "дашборд" "новая сборка не прошла health-check — оставляю $ACTIVE"
+        fi
+      else
+        say "дашборд" "новый контейнер не поднялся — оставляю $ACTIVE"
+      fi
     else
       say "дашборд" "архив не распаковался — оставляю прежний"
-      rm -rf /tmp/jt-dash
+      rm -rf "$TARGET_DIR.new"
     fi
   fi
   rm -f /tmp/jt-dash.tgz
@@ -627,69 +657,10 @@ chmod +x init/*.sh 2>/dev/null || true
 # up -d сам по себе безвреден: контейнеры, у которых ничего не изменилось,
 # он не трогает. Но вывод в журнал каждую минуту засоряет его так, что
 # полезное тонет, поэтому пишем только при изменениях.
-timeout 600 docker compose --env-file "$SECRETS" up -d --remove-orphans >/tmp/jt-compose.log 2>&1 \
+timeout 600 docker compose --env-file "$SECRETS" up -d >/tmp/jt-compose.log 2>&1 \
   || say "контейнеры" "up не уложился в 10 минут"
 grep -qE "Started|Recreated|Created" /tmp/jt-compose.log 2>/dev/null \
   && say "контейнеры" "$(grep -aE "Started|Recreated|Created" /tmp/jt-compose.log | tr -d "\r" | tr "\n" " " | cut -c1-200)"
-
-# Дашборд — отдельным ходом и только когда сборка приехала. Он в профиле,
-# то есть общий up его не касается: это и позволяет держать его готовым, но
-# выключенным, пока не решат переносить.
-#
-# Раньше здесь стояла отметка «уже поднимали», и поднимался он ровно один раз
-# за всю жизнь машины. Из-за неё контейнер так и работал со старым набором
-# переменных: пропуск приложения приехал, в файле лежал, а внутрь не попал —
-# и дашборд отвечал «EXPO_PUBLIC_APP_SECRET не задан на сервере» тому, кто
-# в этот момент отвечал человеку в поддержке.
-#
-# Теперь как у всех остальных: зовём каждый раз, а в журнал пишем, только
-# когда что-то действительно изменилось. Compose сам не трогает контейнер,
-# у которого совпали образ, переменные и настройки.
-#
-# По отпечатку, а не каждую минуту. Прошлая правка звала up -d на каждом
-# заходе — «compose сам не тронет то, что не менялось». На деле контейнер
-# пересоздавался снова и снова, и в эти секунды статика отдавалась с ошибкой:
-# страница открывалась, а стили и скрипты к ней — нет. Снаружи это выглядело
-# как белый экран.
-#
-# Отпечаток — из того, от чего контейнер действительно зависит: версии сборки
-# и пропуска приложения. Изменилось что-то из этого — поднимаем заново.
-if [ -s /opt/jobtoo-dashboard/server.js ]; then
-  DFP=$(cat /var/lib/jt-dash.sha 2>/dev/null; grep -m1 '^EXPO_PUBLIC_APP_SECRET=' "$SECRETS" 2>/dev/null)
-  DFP=$(printf '%s' "$DFP" | sha256sum | cut -d' ' -f1)
-
-  # Сверяем сборку внутри контейнера с той, что лежит на диске.
-  #
-  # Из-за этого и был белый экран. Новая сборка приезжает так: старый каталог
-  # переименовывается, новый встаёт на его место, а на следующем заходе
-  # переименованный удаляется. Контейнер же примонтирован не к пути, а к
-  # каталогу — и после удаления остаётся подключён к тому, чего больше нет.
-  #
-  # Снаружи это выглядит издевательски: сам сервер уже в памяти и страницы
-  # отдаёт, а всё, что ему нужно прочитать с диска, — скрипты, стили, даже
-  # его собственная страница ошибки — исчезло. Отсюда 200 на страницу и 500
-  # на каждый файл к ней. И «running» в списке контейнеров, конечно.
-  #
-  # Номер сборки читается с диска через контейнер: не совпал или не
-  # прочитался — значит контейнер смотрит в пустоту, и его надо поднять заново.
-  DBUILD_ON=$(cat /opt/jobtoo-dashboard/.next/BUILD_ID 2>/dev/null || echo нет)
-  DBUILD_IN=$(docker compose exec -T dashboard cat /app/.next/BUILD_ID 2>/dev/null | tr -d '\r\n' || true)
-
-  if [ "$DFP" != "$(cat /var/lib/jt-dash.fp 2>/dev/null || true)" ] \
-     || [ "$DBUILD_IN" != "$DBUILD_ON" ] \
-     || ! docker compose ps dashboard --format '{{.State}}' 2>/dev/null | grep -q running; then
-    # --force-recreate: при подмене каталога обычный up видит «настройки те
-    # же» и контейнер не трогает — а трогать надо, потому что смотрит он в
-    # удалённый каталог.
-    timeout 300 docker compose --env-file "$SECRETS" --profile dashboard up -d --force-recreate dashboard \
-      >/tmp/jt-dash-up.log 2>&1 && printf '%s' "$DFP" > /var/lib/jt-dash.fp \
-      || say "дашборд" "up не уложился"
-    [ "$DBUILD_IN" != "$DBUILD_ON" ] \
-      && say "дашборд" "контейнер смотрел в удалённый каталог (было «$DBUILD_IN», стало «$DBUILD_ON») — поднял заново"
-    grep -qE "Started|Recreated|Created" /tmp/jt-dash-up.log 2>/dev/null \
-      && say "дашборд" "$(grep -aE "Started|Recreated|Created" /tmp/jt-dash-up.log | tr -d '\r' | tr '\n' ' ' | cut -c1-160)"
-  fi
-fi
 
 # ── Шлюз ──────────────────────────────────────────────────────────────────
 # Свою конфигурацию кладём вместо стандартной: две одновременно спорят
@@ -897,6 +868,19 @@ fi
 # запросов в момент перезагрузки обрывается, и снаружи это выглядит как
 # «картинка иногда не грузится». Проверка с восьми точек мира показала
 # таймаут на половине из них.
+# Одноразовая совместимость при переходе на release-ссылку и динамический
+# upstream дашборда. До первого нового релиза продолжают работать старые пути.
+if [ ! -e /var/www/jobtoo-current ] && [ -d /var/www/jobtoo ]; then
+  ln -s /var/www/jobtoo /var/www/jobtoo-current
+fi
+mkdir -p /etc/nginx/snippets
+if [ ! -s /etc/nginx/snippets/jobtoo-dashboard-upstream.conf ]; then
+  DACTIVE=$(cat /var/lib/jt-dash-active 2>/dev/null || echo blue)
+  DPORT=3002; [ "$DACTIVE" = green ] && DPORT=3003
+  printf 'proxy_pass http://127.0.0.1:%s;\n' "$DPORT" \
+    > /etc/nginx/snippets/jobtoo-dashboard-upstream.conf
+fi
+
 NEW=/tmp/jt-nginx-new.conf
 cp "$REPO/infra/nginx.conf" "$NEW"
 if [ -d "/etc/letsencrypt/live/$HOST" ] && [ -f "$REPO/infra/nginx-tls.conf" ]; then
@@ -916,6 +900,7 @@ if [ -d "/etc/letsencrypt/live/$TG_HOST" ] && [ -f "$REPO/infra/nginx-tg.conf" ]
   cat "$REPO/infra/nginx-tg.conf" >> "$NEW"
 fi
 
+GATEWAY_OK=1
 if cmp -s "$NEW" /etc/nginx/sites-available/jobtoo; then
   # Ничего не изменилось — не трогаем работающий шлюз.
   rm -f "$NEW"
@@ -924,8 +909,10 @@ cp "$NEW" /etc/nginx/sites-available/jobtoo
 ln -sf /etc/nginx/sites-available/jobtoo /etc/nginx/sites-enabled/jobtoo
 rm -f /etc/nginx/sites-enabled/default
 
+GATEWAY_OK=0
 if nginx -t >/tmp/jt-nginx.log 2>&1; then
   systemctl reload nginx
+  GATEWAY_OK=1
   say "шлюз" "пересобран${HOST:+, tls на $HOST}"
 else
   say "шлюз" "не прошёл проверку: $(grep -a -m1 -iE 'emerg|error' /tmp/jt-nginx.log | cut -c1-200)"
@@ -952,6 +939,17 @@ else
   fi
   rm -f "$ALT"
 fi
+fi
+
+# Старую версию останавливаем только после того, как общая конфигурация nginx
+# успешно перечитана и точно направляет трафик в новый цвет.
+if [ "$GATEWAY_OK" = 1 ] && [ -s /var/lib/jt-dash-active ]; then
+  DACTIVE=$(cat /var/lib/jt-dash-active)
+  [ "$DACTIVE" = blue ] && DINACTIVE=green || DINACTIVE=blue
+  cd "$REPO/infra"
+  docker compose --env-file "$SECRETS" --profile dashboard stop "dashboard-$DINACTIVE" >/dev/null 2>&1 || true
+  docker ps -aq --filter label=com.docker.compose.service=dashboard \
+    | xargs -r docker rm -f >/dev/null 2>&1 || true
 fi
 
 set +e
