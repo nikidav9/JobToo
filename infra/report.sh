@@ -165,9 +165,13 @@ TMP=/tmp/jt-status.$$
   # Со статикой, а не только со страницей. «Отвечает 200» ничего не значит:
   # сервер отдаёт страницу из памяти и при полностью недоступном диске — а
   # человек видит белый экран, потому что ни один скрипт к ней не грузится.
-  echo "  \"дашборд\": \"сборка $([ -s /opt/jobtoo-dashboard/server.js ] && echo есть || echo нет), страница $(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:3002/ 2>/dev/null || echo нет), скрипты $(
-    c=$(curl -s -m 5 http://127.0.0.1:3002/ 2>/dev/null | grep -oE '/_next/static/chunks/main-app-[^\"]+\.js' | head -1)
-    [ -n "$c" ] && curl -s -o /dev/null -w '%{http_code}' -m 5 "http://127.0.0.1:3002$c" 2>/dev/null || echo нет)\","
+  slot=$(cat /var/lib/jt-dash-slot 2>/dev/null || echo blue)
+  [ "$slot" = green ] && dport=3003 || dport=3002
+  ddir="/opt/jobtoo-dashboard-$slot"
+  echo "  \"дашборд\": \"слот $slot, сборка $([ -s "$ddir/server.js" ] && echo есть || echo нет), страница $(curl -s -o /dev/null -w %{http_code} -m 5 http://127.0.0.1:$dport/ 2>/dev/null || echo нет), скрипты $(
+    c=$(curl -s -m 5 http://127.0.0.1:$dport/ 2>/dev/null | grep -oE '/_next/static/chunks/main-app-[^\"]+\.js' | head -1)
+    [ -n "$c" ] && curl -s -o /dev/null -w '%{http_code}' -m 5 "http://127.0.0.1:$dport$c" 2>/dev/null || echo нет)\","
+
   # Забор сообщений бота: жива ли служба и когда в последний раз доходила
   # до Телеграма. «Работает» тут ничего не значит — процесс может висеть,
   # ничего не забирая, и снаружи это неотличимо от тишины в чатах.
@@ -186,7 +190,7 @@ TMP=/tmp/jt-status.$$
   # просто нет открытых смен.
   echo "  \"чужие_вакансии\": \"$(cat /var/lib/jt-ingest.out 2>/dev/null | tr -d '"\\\r\n' | cut -c1-260)\","
   echo "  \"дашборд_пропуск\": \"файл=$(grep -c '^EXPO_PUBLIC_APP_SECRET=.\+' /opt/jobtoo-secrets/env 2>/dev/null | tr -d '\n') внутри=$(
-    cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose --profile dashboard exec -T dashboard \
+    cd /opt/jobtoo/infra 2>/dev/null && timeout 15 docker compose --profile dashboard exec -T "dashboard-$slot" \
       printenv EXPO_PUBLIC_APP_SECRET 2>/dev/null | tr -d '\r\n' | wc -c | tr -d ' ')\","
   echo "  \"сайт\": \"файлов $(find /var/www/jobtoo -type f 2>/dev/null | wc -l), оболочка $([ -s /var/www/jobtoo/index.html ] && echo есть || echo нет), страница ключей $([ -s /var/www/private/token.txt ] && echo есть || echo нет)\","
   # Что будет, когда репозиторий закроют.

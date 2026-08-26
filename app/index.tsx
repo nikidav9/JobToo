@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import SplashLoader, { useLoadingPercent, DrawnArt, bootElapsed, SPLASH_MIN_MS } from '@/components/SplashLoader';
 import { ICON_WORKER, ICON_EMPLOYER } from '@/constants/roleIcons';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { hideWebSplash, setWebSplashProgress } from '@/lib/webSplash';
 
 import { rs, rf } from '@/constants/scale';
@@ -231,7 +232,7 @@ export default function RootScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        <Animated.Text style={[styles.version, { opacity: introFade }]}>JobToo v3.0</Animated.Text>
+        <Animated.Text style={[styles.version, { opacity: introFade }]}>JobToo v{Constants.expoConfig?.version ?? '1.4.0'}</Animated.Text>
       </ScrollView>
     </SafeAreaView>
   );
