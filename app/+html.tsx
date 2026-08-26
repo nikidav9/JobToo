@@ -180,6 +180,7 @@ export default function Root({ children }: PropsWithChildren) {
             function finish() {
               if (done) return;
               done = true;
+              try { sessionStorage.removeItem('jt-boot-retry-v2'); } catch (_) {}
               // Не прыгаем на 100 и не прячем сразу: даём счётчику добежать,
               // чтобы 96..99 были видны. Страховка — уходим через 600 мс.
               ready = true;
@@ -193,8 +194,34 @@ export default function Root({ children }: PropsWithChildren) {
             // (EntryTransition / index.tsx call window.__hideSplash).
             window.__hideSplash = finish;
 
-            // Failsafe: never trap the user if the app fails to signal
-            setTimeout(finish, 12000);
+            // Service worker нужен не только для push: в установленной PWA он
+            // не даёт старому index.html пережить следующую выкладку.
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+                .then(function(reg) { return reg.update(); })
+                .catch(function() {});
+            }
+
+            // Если bundle не запустился (например, старая оболочка сослалась на
+            // уже удалённый файл), один раз автоматически перечитываем страницу
+            // из сети. После повторной неудачи не открываем белый экран: оставляем
+            // фирменную заставку и превращаем процент в кнопку повтора.
+            setTimeout(function() {
+              if (done) return;
+              var key = 'jt-boot-retry-v2';
+              try {
+                if (!sessionStorage.getItem(key)) {
+                  sessionStorage.setItem(key, '1');
+                  location.reload();
+                  return;
+                }
+              } catch (_) {}
+              if (pctEl) {
+                pctEl.textContent = 'Нажмите, чтобы повторить';
+                pctEl.style.cursor = 'pointer';
+                pctEl.onclick = function() { location.reload(); };
+              }
+            }, 12000);
           })();
         `}</script>
       </body>
