@@ -172,6 +172,39 @@ EOF
   systemctl enable --now jt-site-watchdog.timer >/dev/null 2>&1 || true
 fi
 
+# Катучая история здоровья: одна строка в минуту в файл, который отдаёт nginx.
+# status.json — снимок без прошлого; этот сэмплер копит таймлайн, по которому
+# видно частоту коротких провалов и что с ними совпало. Своим таймером, а не в
+# конце bootstrap: тот при тяжёлом заходе идёт дольше минуты и дал бы рваную
+# шкалу. Подробности — в самом скрипте.
+if [ -f "$REPO/infra/health-sample.sh" ]; then
+  install -m 755 "$REPO/infra/health-sample.sh" /usr/local/bin/jt-health-sample
+  cat > /etc/systemd/system/jt-health-sample.service <<'EOF'
+[Unit]
+Description=JobToo health history sampler
+After=network-online.target nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/jt-health-sample
+EOF
+  cat > /etc/systemd/system/jt-health-sample.timer <<'EOF'
+[Unit]
+Description=Sample JobToo health every minute
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now jt-health-sample.timer >/dev/null 2>&1 || true
+fi
+
 # Разовый опыт: дозванивается ли Телеграм до этой машины напрямую.
 # Подробности и сетка безопасности — в самом скрипте. Отметкой, а не
 # каждую минуту: переключать вебхук по кругу нельзя.

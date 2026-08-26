@@ -18,10 +18,11 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
-      - name: Проверить DNS, IPv4, IPv6 и резервный адрес
+      - name: Проверить DNS, IPv4, IPv6, /api и серию замеров
         id: health
         continue-on-error: true
         run: |
@@ -29,7 +30,20 @@ jobs:
           REPORT="$RUNNER_TEMP/site-health.log" bash infra/check-site.sh
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          cat "$RUNNER_TEMP/site-health.log" >> "$GITHUB_STEP_SUMMARY"
+          # Моргания (провалы, восстановившиеся к концу серии) выносим в
+          # заголовок: по ним видна частота коротких провалов, которых один
+          # снимок раньше не застёгивал. Прогон они не роняют.
+          flaps=$(grep -oE 'flaps=[0-9]+' "$RUNNER_TEMP/site-health.log" | tail -1 | cut -d= -f2)
+          echo "flaps=${flaps:-0}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Доступность jobtoo.ru"
+            echo "- итог: $([ "$code" = 0 ] && echo ✅ healthy || echo ❌ failed)"
+            echo "- морганий в серии: ${flaps:-0}"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/site-health.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           exit "$code"
 
       - name: Сохранить диагностический журнал
