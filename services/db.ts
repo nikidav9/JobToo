@@ -14,7 +14,16 @@ const IS_NATIVE = true; // always proxy through jobtoo.ru — Supabase is blocke
 // lib/supabase.ts: значения вставляют руками, и в один из адресов уже
 // попадал перевод строки. Пропуск тоже подрезаем: лишний пробел в нём
 // превратился бы в «неверный пропуск» на каждом запросе.
-const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'https://jobtoo.ru').trim().replace(/\/+$/, '');
+// В вебе (обычный браузер, установленная PWA и Telegram Mini App) ходим за
+// данными на тот же адрес, с которого открылось приложение. Иначе, открывшись
+// с «чистого» имени (когда jobtoo.ru режет фильтр ТСПУ), приложение всё равно
+// стучалось бы на зашитый jobtoo.ru — и данные молча не грузились. Тот же nginx
+// на любом нашем имени отдаёт /api/db.php, поэтому same-origin работает везде.
+// На нативных платформах window нет — там остаётся явный адрес из окружения.
+const API_BASE =
+  Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : (process.env.EXPO_PUBLIC_API_URL || 'https://jobtoo.ru').trim().replace(/\/+$/, '');
 
 const APP_SECRET = (process.env.EXPO_PUBLIC_APP_SECRET ?? '').trim();
 

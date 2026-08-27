@@ -32,7 +32,16 @@ const storage =
 // строки: получалось «https://jobtoo.ru\n», а из него — «…\n/rest/v1/…».
 // Где-то такой адрес починится сам, где-то молча не сработает, и искать
 // причину придётся по невидимому символу. Дешевле отрезать здесь.
-const SUPABASE_URL = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
+const ENV_SUPABASE_URL = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
+// В вебе клиент Supabase (живой чат и загрузка файлов) тоже должен ходить на
+// адрес, с которого открылось приложение: пути /rest, /realtime, /storage
+// проксирует тот же nginx на любом нашем имени. Иначе с «чистого» имени
+// realtime и загрузки стучались бы на зашитый адрес и упирались в фильтр.
+// На нативных платформах window нет — там остаётся адрес из окружения.
+const SUPABASE_URL =
+  Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : ENV_SUPABASE_URL;
 const SUPABASE_KEY = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
 
