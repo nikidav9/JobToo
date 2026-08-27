@@ -1715,7 +1715,14 @@ function WorkerPermMode() {
   };
 
   const shareVacancy = async (v: PermVacancy) => {
-    const url = `https://jobtoo.ru/perm-vacancy-detail?vacancyId=${v.id}`;
+    // Ссылку строим от того адреса, с которого открыто приложение (в вебе):
+    // если раздаём с «чистого» имени, то и ссылка «поделиться» должна вести на
+    // него, а не на зашитый jobtoo.ru, который у получателя в РФ режет фильтр.
+    const base =
+      Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin
+        ? window.location.origin
+        : (process.env.EXPO_PUBLIC_API_URL || 'https://jobtoo.ru').trim().replace(/\/+$/, '');
+    const url = `${base}/perm-vacancy-detail?vacancyId=${v.id}`;
     try {
       // iOS: pass url only — system appends it cleanly, no duplicate text
       // Android: url param is ignored, pass as message

@@ -10,10 +10,16 @@ import { Platform } from 'react-native';
 // выдана под другой.
 const VAPID_PUBLIC_KEY = 'BOGmoT8nUYJHXx8zLh7kmn_xDoaaLKu0wbSgWhqphsImHNeiTIscMLFEZsndZflZ6Xp9sJ8UMC1iIIkiLCecNzs';
 
-// Supabase напрямую из браузера блокируется в РФ — сохраняем через прокси jobtoo.ru
-const PROXY_URL = process.env.EXPO_PUBLIC_API_URL
-  ? `${process.env.EXPO_PUBLIC_API_URL}/api/db.php`
-  : 'https://jobtoo.ru/api/db.php';
+// Supabase напрямую из браузера блокируется в РФ — сохраняем через прокси.
+// В вебе адрес прокси — same-origin (тот же хост, с которого открылось
+// приложение), как и API_BASE в services/db.ts: иначе с «чистого» имени
+// подписка на пуш уходила бы на зашитый jobtoo.ru и упиралась в фильтр ТСПУ.
+const PROXY_URL =
+  Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin
+    ? `${window.location.origin}/api/db.php`
+    : process.env.EXPO_PUBLIC_API_URL
+      ? `${process.env.EXPO_PUBLIC_API_URL}/api/db.php`
+      : 'https://jobtoo.ru/api/db.php';
 const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET ?? '';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {

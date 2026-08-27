@@ -6,9 +6,15 @@ import { dbSavePushToken, dbGetPushToken, dbReleasePushToken, dbGetWebPushSubscr
 
 const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET ?? '';
 const DASHBOARD_URL = process.env.EXPO_PUBLIC_DASHBOARD_URL || '';
-const PROXY_URL = process.env.EXPO_PUBLIC_API_URL
-  ? `${process.env.EXPO_PUBLIC_API_URL}/api/db.php`
-  : 'https://jobtoo.ru/api/db.php';
+// В вебе прокси — same-origin (тот же хост, с которого открылось приложение),
+// как API_BASE в services/db.ts: иначе с «чистого» имени вызовы пушей уходили
+// бы на зашитый jobtoo.ru и упирались в фильтр ТСПУ. Нативно window нет.
+const PROXY_URL =
+  Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin
+    ? `${window.location.origin}/api/db.php`
+    : process.env.EXPO_PUBLIC_API_URL
+      ? `${process.env.EXPO_PUBLIC_API_URL}/api/db.php`
+      : 'https://jobtoo.ru/api/db.php';
 
 // Какая переписка сейчас открыта на экране. Экран чата отмечается здесь, а
 // обработчик ниже сверяет отметку с тем, к какому чату относится уведомление.
