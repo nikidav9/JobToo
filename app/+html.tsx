@@ -200,69 +200,19 @@ export default function Root({ children }: PropsWithChildren) {
                 .catch(function() {});
             }
 
-            // Самолечение застрявшей оболочки PWA.
-            //
-            // Если за 12 с bundle так и не стартовал — почти всегда это
-            // установленная PWA, чей service worker держит старый index.html и
-            // мёртвый bundle от прошлой выкладки. Обычный reload не помогает:
-            // тот же worker снова отдаёт ту же старую оболочку, и человеку
-            // приходится удалять приложение. Поэтому чиним по-настоящему:
-            // снимаем service worker, чистим кеши и грузимся начисто.
-            //
-            // Две страховки, чтобы не навредить:
-            //   • лечим только когда bundle НЕ смонтировался (на медленной сети
-            //     React уже поднят и просто ждёт данные — его не трогаем);
-            //   • и только когда страницей управляет service worker
-            //     (controller) — то есть это установленная оболочка, а не
-            //     первый медленный запуск в браузере без worker'а;
-            //   • один раз за сессию: не поднялось и после лечения — показываем
-            //     ручной повтор, а не крутим цикл перезагрузок.
-            function hardHeal() {
-              if (pctEl) pctEl.textContent = 'Обновляем…';
-              var reload = function() {
-                location.replace(location.pathname + '?fresh=' + Date.now());
-              };
-              var jobs = [];
-              try {
-                if ('serviceWorker' in navigator) {
-                  jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs) {
-                    return Promise.all(rs.map(function(r) { return r.unregister(); }));
-                  }).catch(function() {}));
-                }
-                if (window.caches && caches.keys) {
-                  jobs.push(caches.keys().then(function(keys) {
-                    return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-                  }).catch(function() {}));
-                }
-              } catch (e) {}
-              Promise.all(jobs).then(reload).catch(reload);
-              setTimeout(reload, 2500); // если промисы зависли — всё равно грузимся
-            }
-
+            // Не перезагружаем страницу автоматически: именно эта страховка
+            // раньше создавала второй загрузочный экран на медленной сети.
+            // Если bundle действительно не стартовал, оставляем заставку и
+            // предлагаем осознанный повтор вместо белого экрана.
             setTimeout(function() {
               if (done) return;
-              if (window.__jobtooBundleMounted) return; // React жив, ждёт сеть — не трогаем
-
-              var HEALED = 'jt-shell-healed';
-              var healedAt = 0;
-              try { healedAt = +(sessionStorage.getItem(HEALED) || 0); } catch (e) {}
-              var controlled = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
-
-              if (controlled && !(healedAt && (Date.now() - healedAt) < 60000)) {
-                try { sessionStorage.setItem(HEALED, String(Date.now())); } catch (e) {}
-                hardHeal();
-                return;
-              }
-
-              // Либо worker'а нет (обычный медленный запуск), либо уже лечились —
-              // предлагаем осознанный повтор вместо белого экрана.
+              // React уже работает и может просто ждать сеть: не перезагружаем
+              // его и не показываем пользователю второй загрузочный экран.
+              if (window.__jobtooBundleMounted) return;
               if (pctEl) {
                 pctEl.textContent = 'Нажмите, чтобы повторить';
                 pctEl.style.cursor = 'pointer';
-                pctEl.onclick = function() {
-                  try { sessionStorage.removeItem(HEALED); } catch (e) {}
-                  hardHeal();
-                };
+                pctEl.onclick = function() { location.reload(); };
               }
             }, 12000);
           })();
