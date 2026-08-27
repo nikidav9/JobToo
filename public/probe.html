@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>JobToo — проверка доступности</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card:#fff; --fg:#1c1e21; --muted:#6b7280;
+    --ok:#12894a; --okbg:#e6f5ec; --bad:#c62828; --badbg:#fdeaea;
+    --line:#e5e7eb; --accent:#FF6B1A;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#111315; --card:#1b1e21; --fg:#e8eaed; --muted:#9aa0a6;
+      --ok:#4ade80; --okbg:#12351f; --bad:#f87171; --badbg:#3a1414; --line:#2b2f33; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    padding:16px;line-height:1.4;}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+  .cards{display:flex;gap:10px;margin-bottom:14px}
+  .card{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .name{font-size:13px;color:var(--muted);margin-bottom:6px;word-break:break-all}
+  .big{font-size:22px;font-weight:800}
+  .pct{font-size:13px;color:var(--muted);margin-top:4px}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .ok{color:var(--ok)} .bad{color:var(--bad)}
+  .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.wait{background:var(--muted)}
+  .bar{display:flex;gap:2px;margin-top:8px;height:22px;align-items:flex-end}
+  .tick{flex:1;min-width:2px;border-radius:2px;background:var(--line);height:100%}
+  .tick.ok{background:var(--ok)} .tick.bad{background:var(--bad)}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  td.res{font-weight:700}
+  .row-ok{color:var(--ok)} .row-bad{color:var(--bad)}
+  .controls{display:flex;gap:8px;margin:14px 0}
+  button{flex:1;background:var(--accent);color:#fff;border:0;border-radius:10px;
+    padding:11px;font-size:14px;font-weight:700;cursor:pointer}
+  button.sec{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .hint{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:12px;font-size:13px;color:var(--muted);margin-top:14px}
+  .wrap{max-width:640px;margin:0 auto}
+  code{background:var(--line);padding:1px 5px;border-radius:5px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>JobToo — проверка доступности</h1>
+  <p class="sub">Оставьте эту страницу открытой на проблемной сети. Каждые 30 секунд она сама проверяет два адреса и ведёт историю. Так виден настоящий процент сбоев, а не «сейчас работает / не работает».</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="name">jobtoo.ru</div>
+      <div class="big"><span id="d1" class="dot wait"></span><span id="s1">…</span></div>
+      <div class="pct" id="p1">—</div>
+      <div class="bar" id="bar1"></div>
+    </div>
+    <div class="card">
+      <div class="name">147.45.184.99.sslip.io</div>
+      <div class="big"><span id="d2" class="dot wait"></span><span id="s2">…</span></div>
+      <div class="pct" id="p2">—</div>
+      <div class="bar" id="bar2"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="now">Проверить сейчас</button>
+    <button id="clear" class="sec">Очистить историю</button>
+  </div>
+
+  <table>
+    <thead><tr><th>Время</th><th>jobtoo.ru</th><th>sslip</th></tr></thead>
+    <tbody id="log"></tbody>
+  </table>
+
+  <div class="hint">
+    Как читать: если <b>jobtoo.ru</b> периодически «✕», а <b>sslip</b> почти всегда «✓» — режется имя jobtoo.ru (тогда пользователей держим на боте/sslip, а по jobtoo.ru давим через Timeweb/РКН). Если <b>оба</b> проседают вместе — это ваша сеть/канал в эти минуты. Если <b>оба</b> всегда «✓» — в этот период всё в порядке.<br><br>
+    Проверка идёт загрузкой маленькой картинки <code>/favicon.ico</code> — это надёжный признак «адрес ответил», без тонкостей CORS.
+  </div>
+</div>
+
+<script>
+(function(){
+  var TARGETS = [
+    { key:'jobtoo', url:'https://jobtoo.ru/favicon.ico' },
+    { key:'sslip',  url:'https://147.45.184.99.sslip.io/favicon.ico' }
+  ];
+  var KEY = 'jt-probe-history-v1';
+  var MAX = 240;                 // ~2 часа истории при 30с
+  var INTERVAL = 30000;
+
+  var hist = load();
+
+  function load(){
+    try { return JSON.parse(localStorage.getItem(KEY)) || []; }
+    catch(e){ return []; }
+  }
+  function save(){
+    try { localStorage.setItem(KEY, JSON.stringify(hist.slice(-MAX))); } catch(e){}
+  }
+
+  function probe(url, timeoutMs){
+    return new Promise(function(res){
+      var img = new Image();
+      var done = false;
+      var t = setTimeout(function(){ if(!done){ done=true; img.src=''; res(false); } }, timeoutMs||8000);
+      img.onload  = function(){ if(!done){ done=true; clearTimeout(t); res(true);  } };
+      img.onerror = function(){ if(!done){ done=true; clearTimeout(t); res(false); } };
+      img.src = url + (url.indexOf('?')>=0?'&':'?') + 'ts=' + Date.now();
+    });
+  }
+
+  function pad(n){ return n<10?'0'+n:''+n; }
+  function hhmmss(d){ return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
+
+  async function runOnce(){
+    setDot('d1','wait'); setDot('d2','wait');
+    var r = await Promise.all(TARGETS.map(function(t){ return probe(t.url); }));
+    var rec = { t: Date.now(), jobtoo: r[0], sslip: r[1] };
+    hist.push(rec); if(hist.length>MAX) hist = hist.slice(-MAX);
+    save(); render();
+  }
+
+  function pct(key){
+    if(!hist.length) return null;
+    var ok = hist.filter(function(h){ return h[key]; }).length;
+    return Math.round(ok*100/hist.length);
+  }
+
+  function setDot(id, cls){ document.getElementById(id).className = 'dot '+cls; }
+
+  function render(){
+    var last = hist[hist.length-1];
+    var map = [['jobtoo','d1','s1','p1','bar1'],['sslip','d2','s2','p2','bar2']];
+    map.forEach(function(m){
+      var key=m[0];
+      if(last){
+        setDot(m[1], last[key]?'ok':'bad');
+        var el=document.getElementById(m[2]);
+        el.textContent = last[key]?'Доступен':'Нет ответа';
+        el.className = last[key]?'ok':'bad';
+      }
+      var p = pct(key);
+      document.getElementById(m[3]).textContent =
+        p===null ? '—' : ('успешно ' + p + '%  ·  замеров: ' + hist.length);
+      // мини-график последних 40 замеров
+      var bar=document.getElementById(m[4]); bar.innerHTML='';
+      hist.slice(-40).forEach(function(h){
+        var d=document.createElement('div');
+        d.className='tick '+(h[key]?'ok':'bad');
+        bar.appendChild(d);
+      });
+    });
+    var log=document.getElementById('log'); log.innerHTML='';
+    hist.slice(-30).reverse().forEach(function(h){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+hhmmss(new Date(h.t))+'</td>'+
+        '<td class="res '+(h.jobtoo?'row-ok':'row-bad')+'">'+(h.jobtoo?'✓':'✕')+'</td>'+
+        '<td class="res '+(h.sslip?'row-ok':'row-bad')+'">'+(h.sslip?'✓':'✕')+'</td>';
+      log.appendChild(tr);
+    });
+  }
+
+  document.getElementById('now').onclick = runOnce;
+  document.getElementById('clear').onclick = function(){ hist=[]; save(); render(); };
+
+  render();
+  runOnce();
+  setInterval(runOnce, INTERVAL);
+})();
+</script>
+</body>
+</html>
