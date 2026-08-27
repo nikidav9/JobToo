@@ -31,6 +31,7 @@ export default function RootScreen() {
   const router = useRouter();
   const { currentUser, loading } = useApp();
   const finishing = useRef(false);
+  const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // true if loading was already false when this component mounted (post-logout navigation)
   const skipSplash = useRef(!loading);
   const [ready, setReady] = useState(false);
@@ -89,7 +90,7 @@ export default function RootScreen() {
     // Даже если грузить нечего, даём логотипу дорисоваться, а счётчику —
     // добежать до 100 %: иначе экран мелькает и пропадает недорисованным.
     const wait = Math.max(0, SPLASH_MIN_MS - bootElapsed());
-    const t = setTimeout(() => {
+    finishTimer.current = setTimeout(() => {
       // Read from ref so we get the committed value, not a stale closure
       if (currentUserRef.current) {
         // Loading screen hides once tabs are mounted and data is ready:
@@ -101,9 +102,17 @@ export default function RootScreen() {
         hideWebSplash();
         setReady(true);
       }
+      finishTimer.current = null;
     }, wait);
-    return () => clearTimeout(t);
-  }, [loading, currentUser]);
+    // currentUser намеренно не является зависимостью: актуальное значение
+    // читается из currentUserRef. Раньше его изменение между setLoading(false)
+    // и этим таймером запускало cleanup, отменяло переход, а finishing уже не
+    // позволяло назначить таймер повторно — экран навсегда оставался на 95–99 %.
+  }, [loading]);
+
+  useEffect(() => () => {
+    if (finishTimer.current) clearTimeout(finishTimer.current);
+  }, []);
 
   if (!ready) {
     // Web: the static HTML splash (app/+html.tsx) is the single loading
