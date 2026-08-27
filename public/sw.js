@@ -6,7 +6,32 @@ self.addEventListener('install', () => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async () => {
+    await self.clients.claim();
+
+    // Новая версия worker'а активировалась — значит выкладка сменилась.
+    // Заставляем уже открытые окна перезагрузиться, чтобы они взяли свежий
+    // index.html и bundle, а не висели на старой застрявшей оболочке.
+    //
+    // Это единственный способ вытащить залипшую установленную PWA (и вебвью
+    // Телеграма) БЕЗ ручной переустановки: сама зависшая страница
+    // перезагрузиться не может, а worker обновляется независимо от неё —
+    // загрузчик в +html.tsx регистрирует и обновляет его ещё до того, как
+    // зависает bundle. Навигация на тот же URL идёт через fetch-обработчик
+    // ниже (network-first для навигаций) → приходит свежая оболочка.
+    //
+    // Срабатывает один раз на смену версии worker'а, поэтому цикла
+    // перезагрузок не создаёт. Рабочую страницу это перезагрузит разве что в
+    // момент самой выкладки — на заставке/раннем старте это незаметно.
+    try {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      await Promise.all(wins.map((c) => {
+        if (typeof c.navigate === 'function') return c.navigate(c.url).catch(() => {});
+        if (typeof c.postMessage === 'function') { c.postMessage({ type: 'jt-reload' }); }
+        return undefined;
+      }));
+    } catch (e) {}
+  })());
 });
 
 self.addEventListener('fetch', (event) => {
