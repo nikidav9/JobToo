@@ -93,6 +93,16 @@ interface AnalyticsData {
   avgRating: number;
   totalComplaints: number;
   totalApplications: number;
+  // Активация и удержание — из jm_users.last_seen_at (обновляется при каждом
+  // запуске/возврате из фона). Отвечает на «сколько установивших реально
+  // пользуются», чего в тоталах не видно.
+  activationReturned: number;   // вернулись хотя бы раз (last_seen ≥ рег + сутки)
+  activationRate: number;       // их доля, %
+  active7: number;              // заходили за 7 дней
+  active30: number;             // заходили за 30 дней
+  dormant: number;              // не заходили 30+ дней или ни разу
+  medianLifespanDays: number;   // медиана «от регистрации до последнего визита»
+  activationCohorts: { label: string; total: number; returned: number }[];
   userGrowthDays: DayCount[];
   workerGrowthDays: DayCount[];
   employerGrowthDays: DayCount[];
@@ -128,7 +138,7 @@ async function fetchAnalytics(): Promise<AnalyticsData> {
     { data: recentTempVacs },
     { data: recentMatches },
   ] = await Promise.all([
-    sb().from('jm_users').select('id,role,created_at'),
+    sb().from('jm_users').select('id,role,created_at,last_seen_at'),
     sb().from('jm_vacancies').select('id,status,work_type,created_at'),
     sb().from('jm_perm_vacancies').select('id,status,created_at'),
     sb().from('jm_likes').select('id,is_match,matched_at'),
@@ -250,6 +260,50 @@ async function fetchAnalytics(): Promise<AnalyticsData> {
     count,
   }));
 
+  // ── Активация и удержание ────────────────────────────────────────────────
+  // «Вернулся хоть раз» = последний визит хотя бы через сутки после регистрации.
+  // Это лучший из доступных без нового трекинга признак «реально пользуется»:
+  // те, у кого last_seen ≈ момент регистрации, зашли один раз и пропали.
+  const nowMs = Date.now();
+  const DAY = 86_400_000;
+  const seenMs = (u: any) => (u.last_seen_at ? new Date(u.last_seen_at).getTime() : NaN);
+  const bornMs = (u: any) => new Date(u.created_at).getTime();
+
+  const activationReturned = allUsers.filter(
+    (u: any) => u.last_seen_at && seenMs(u) - bornMs(u) >= DAY
+  ).length;
+  const activationRate = allUsers.length
+    ? Math.round((activationReturned / allUsers.length) * 100)
+    : 0;
+  const active7 = allUsers.filter((u: any) => u.last_seen_at && nowMs - seenMs(u) <= 7 * DAY).length;
+  const active30 = allUsers.filter((u: any) => u.last_seen_at && nowMs - seenMs(u) <= 30 * DAY).length;
+  const dormant = allUsers.length - active30;
+
+  const spans = allUsers
+    .filter((u: any) => u.last_seen_at)
+    .map((u: any) => (seenMs(u) - bornMs(u)) / DAY)
+    .sort((a: number, b: number) => a - b);
+  const medianLifespanDays = spans.length
+    ? Math.round(spans[Math.floor(spans.length / 2)] * 10) / 10
+    : 0;
+
+  // Когорты активации по неделям регистрации (последние 6 недель): из каждой
+  // недели — сколько зарегистрировавшихся вернулись хотя бы раз.
+  const WEEK = 7 * DAY;
+  const activationCohorts: { label: string; total: number; returned: number }[] = [];
+  for (let w = 5; w >= 0; w--) {
+    const start = nowMs - (w + 1) * WEEK;
+    const end = nowMs - w * WEEK;
+    const inWk = allUsers.filter((u: any) => {
+      const t = bornMs(u);
+      return t >= start && t < end;
+    });
+    const ret = inWk.filter((u: any) => u.last_seen_at && seenMs(u) - bornMs(u) >= DAY).length;
+    const d0 = new Date(start);
+    const label = `${String(d0.getDate()).padStart(2, '0')}.${String(d0.getMonth() + 1).padStart(2, '0')}`;
+    activationCohorts.push({ label, total: inWk.length, returned: ret });
+  }
+
   return {
     totalWorkers: workers.length,
     totalEmployers: employers.length,
@@ -265,6 +319,13 @@ async function fetchAnalytics(): Promise<AnalyticsData> {
     avgRating,
     totalComplaints: (complaints ?? []).length,
     totalApplications: (applications ?? []).length,
+    activationReturned,
+    activationRate,
+    active7,
+    active30,
+    dormant,
+    medianLifespanDays,
+    activationCohorts,
     userGrowthDays,
     workerGrowthDays,
     employerGrowthDays,
@@ -543,6 +604,36 @@ export default function AnalyticsScreen() {
           <KpiCard label="Работодатели" value={data.totalEmployers} color={Colors.blue} />
           <KpiCard label="Жалоб" value={data.totalComplaints} color={Colors.red} />
         </View>
+
+        {/* ── Активация и удержание ── */}
+        <SectionTitle title="Активация и удержание" icon="🔁" />
+        <View style={s.kpiRow}>
+          <KpiCard
+            label="Вернулись хоть раз"
+            value={data.activationReturned}
+            sub={`${data.activationRate}% от всех — остальные зашли раз и пропали`}
+            color={Colors.primary}
+            wide
+          />
+          <KpiCard label="Активны за 7 дней" value={data.active7} color="#16A34A" />
+          <KpiCard label="Активны за 30 дней" value={data.active30} color={Colors.blue} />
+          <KpiCard label="Спят 30+ дней" value={data.dormant} color={Colors.red} />
+          <KpiCard label="Медиана «прожил», дней" value={data.medianLifespanDays} color={Colors.textSecondary} />
+        </View>
+        <ChartCard title="Активация по неделям регистрации — сколько вернулись">
+          {data.activationCohorts.map((c, i) => (
+            <HorizBarRow
+              key={i}
+              label={`${c.label} · ${c.total} рег.`}
+              value={c.returned}
+              max={c.total}
+              color={Colors.primary}
+            />
+          ))}
+          <Text style={{ color: Colors.textSecondary, fontSize: rf(11.5), marginTop: 10, lineHeight: rf(16) }}>
+            «Вернулись» = последний визит хотя бы через сутки после регистрации. Полные кривые D1/D7/D30 и DAU появятся с событием «открыл приложение» — это Фаза 1b.
+          </Text>
+        </ChartCard>
 
         {/* ── KPI: вакансии и матчи ── */}
         <SectionTitle title="Вакансии и подборки" icon="💼" />
