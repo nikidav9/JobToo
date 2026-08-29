@@ -849,6 +849,15 @@ function MetaBit({ name, text, color }: { name: IconName; text: string; color?: 
   );
 }
 
+const eS = StyleSheet.create({
+  btn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(7),
+    marginTop: rs(16), backgroundColor: Colors.primary,
+    paddingHorizontal: rs(20), paddingVertical: rs(11), borderRadius: rs(14),
+  },
+  btnTxt: { color: '#fff', fontSize: rf(14), fontWeight: '800' },
+});
+
 const gB = StyleSheet.create({
   banner: {
     flexDirection: 'row', alignItems: 'center', gap: rs(8),
@@ -1322,8 +1331,8 @@ function WorkerFeed() {
         }}
       >
         {!currentCard ? (
-          <View style={styles.emptyState} pointerEvents="none">
-            <View style={styles.emptyCharContainer}>
+          <View style={styles.emptyState}>
+            <View style={styles.emptyCharContainer} pointerEvents="none">
               <Image
                 source={require('../../assets/images/char-seeker-empty.png')}
                 style={styles.emptyCharImg}
@@ -1331,8 +1340,46 @@ function WorkerFeed() {
                 contentPosition={{ top: '22%' }}
               />
             </View>
-            <Text style={styles.emptyTitle}>Новых вакансий пока нет</Text>
-            <Text style={styles.emptySubtitle}>Попробуй другую дату или дождись новых объявлений</Text>
+            {(() => {
+              // Пустой экран не должен быть тупиком: если стоит фильтр — даём его
+              // снять; иначе подсказываем ближайший день, где смены реально есть.
+              const nextDay = visibleDates.find(d => d !== selectedDate && getDateCount(d) > 0);
+              if (filterStation) {
+                return (
+                  <>
+                    <Text style={styles.emptyTitle}>На «{filterStation}» смен нет</Text>
+                    <Text style={styles.emptySubtitle}>Уберите фильтр по станции — покажем все смены поблизости</Text>
+                    <TouchableOpacity style={eS.btn} activeOpacity={0.85} onPress={() => setFilterStation(null)}>
+                      <Ionicons name="close-circle-outline" size={rf(17)} color="#fff" />
+                      <Text style={eS.btnTxt}>Показать все смены</Text>
+                    </TouchableOpacity>
+                  </>
+                );
+              }
+              if (nextDay) {
+                const cnt = getDateCount(nextDay);
+                const mod10 = cnt % 10, mod100 = cnt % 100;
+                const word = mod10 === 1 && mod100 !== 11 ? 'смена'
+                  : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? 'смены'
+                  : 'смен';
+                return (
+                  <>
+                    <Text style={styles.emptyTitle}>На этот день смен нет</Text>
+                    <Text style={styles.emptySubtitle}>Зато есть на другой день — посмотрите их</Text>
+                    <TouchableOpacity style={eS.btn} activeOpacity={0.85} onPress={() => setSelectedDate(nextDay)}>
+                      <Ionicons name="calendar-outline" size={rf(16)} color="#fff" />
+                      <Text style={eS.btnTxt}>{getRuDay(nextDay)}, {new Date(nextDay + 'T00:00:00').getDate()} — {cnt} {word}</Text>
+                    </TouchableOpacity>
+                  </>
+                );
+              }
+              return (
+                <>
+                  <Text style={styles.emptyTitle}>Новых вакансий пока нет</Text>
+                  <Text style={styles.emptySubtitle}>Потяните вниз, чтобы обновить, или дождитесь новых объявлений</Text>
+                </>
+              );
+            })()}
           </View>
         ) : (
           <>
