@@ -15,6 +15,7 @@ import { Chat } from '@/constants/types';
 import { nameColorFromString, getInitials, formatChatTime } from '@/services/storage';
 import { dbDeleteChat } from '@/services/db';
 import { TabHeader } from '@/components/ui/TabHeader';
+import GuestGate from '@/components/GuestGate';
 
 import { rs, rf } from '@/constants/scale';
 import { messagePreview } from '@/services/messagePreview';
@@ -153,6 +154,7 @@ export default function ChatsScreen() {
   };
 
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
+  if (currentUser.isGuest) return <GuestGate title="Чаты — после регистрации" subtitle="Зарегистрируйтесь, чтобы написать работодателю и получать ответы." />;
 
   // Сервер отдаёт чаты в порядке их создания — то есть по тому, когда с
   // человеком связались впервые. Со временем это расходится с тем, кто писал

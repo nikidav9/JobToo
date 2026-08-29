@@ -28,7 +28,7 @@ const r = (n: number) => Math.round(n * sc);
 
 export default function RootScreen() {
   const router = useRouter();
-  const { currentUser, loading } = useApp();
+  const { currentUser, loading, enterGuest } = useApp();
   const finishing = useRef(false);
   const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // true if loading was already false when this component mounted (post-logout navigation)
@@ -212,6 +212,18 @@ export default function RootScreen() {
           </View>
         </TouchableOpacity>
 
+        {/* ══ Посмотреть без регистрации ══ */}
+        {/* Снимаем стену регистрации: даём заглянуть в ленту вакансий как
+            гость. Любое действие внутри попросит зарегистрироваться. */}
+        <TouchableOpacity
+          style={styles.guestBtn}
+          activeOpacity={0.7}
+          onPress={() => { enterGuest(); router.replace('/(tabs)'); }}
+        >
+          <Ionicons name="eye-outline" size={r(17)} color={Colors.primary} />
+          <Text style={styles.guestBtnTxt}>Посмотреть вакансии без регистрации</Text>
+        </TouchableOpacity>
+
         {/* ── Преимущества ── */}
         <Animated.View style={[styles.featuresRow, { opacity: introFade }]}>
           <Text style={styles.featureTxt}>Проверенные компании</Text>
@@ -311,6 +323,15 @@ const styles = StyleSheet.create({
   },
   featureTxt: { fontSize: r(11.5), color: Colors.textSecondary },
   featureDot: { fontSize: r(11.5), color: Colors.textMuted },
+
+  guestBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: r(7), marginTop: r(16),
+    paddingVertical: r(12), paddingHorizontal: r(16),
+    borderRadius: r(14), borderWidth: 1, borderColor: Colors.inputBorder,
+    backgroundColor: '#FFFFFF',
+  },
+  guestBtnTxt: { fontSize: r(14), fontWeight: '700', color: Colors.primary },
 
   loginCard: {
     backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: Colors.inputBorder,

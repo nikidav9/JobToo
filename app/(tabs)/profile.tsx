@@ -20,6 +20,7 @@ import { LEGAL_DOCS, formatLegalDate } from '@/constants/legal';
 import { getSupabaseClient } from '@/template';
 import { resetOnboarding } from '@/components/OnboardingOverlay';
 import { TabHeader } from '@/components/ui/TabHeader';
+import GuestGate from '@/components/GuestGate';
 import { AppInput } from '@/components/ui/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { MetroPicker } from '@/components/feature/MetroPicker';
@@ -303,6 +304,7 @@ export default function ProfileScreen() {
   const [editAge, setEditAge] = useState('');
 
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
+  if (currentUser.isGuest) return <GuestGate title="Профиль — после регистрации" subtitle="Заведите аккаунт, чтобы заполнить анкету и откликаться на смены." />;
 
   const initials = getInitials(`${currentUser.firstName} ${currentUser.lastName}`);
   const avatarColor = nameColorFromString(currentUser.id);

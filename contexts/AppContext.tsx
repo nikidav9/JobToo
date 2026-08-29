@@ -118,6 +118,10 @@ export interface AppContextValue {
   registerUser: (u: User) => Promise<void>;
   loginUser: (phone: string, password: string) => Promise<User | null>;
   logout: () => Promise<void>;
+  /** Войти как гость (просмотр без регистрации) в роли соискателя. */
+  enterGuest: () => void;
+  /** Выйти из гостевого режима (перед переходом на регистрацию). */
+  exitGuest: () => void;
   refreshUsers: () => Promise<void>;
   refreshVacancies: () => Promise<void>;
   refreshLikes: (u?: User) => Promise<void>;
@@ -510,7 +514,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Отметка «был в сети». Раньше она стояла только в эффекте для нативных,
     // и у тех, кто заходит с сайта, last_seen_at не появлялся вообще никогда:
     // в шапке чата у них не было статуса, а в дашборде — последнего входа.
-    const touch = () => { if (user.id) dbTouchLastSeen(user.id); };
+    const touch = () => { if (user.id && !user.isGuest) dbTouchLastSeen(user.id); };
     touch();
     const seenInterval = setInterval(touch, LAST_SEEN_INTERVAL);
     const usersInterval = setInterval(() => { refreshUsers().catch(() => {}); }, USERS_REFRESH_INTERVAL);
@@ -574,7 +578,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Отметка «был в сети»: при запуске, при возврате из фона и раз в
     // несколько минут, пока приложение открыто. Из неё собирается статус
     // в шапке чата и раздел активности в дашборде.
-    const touch = () => { if (user?.id) dbTouchLastSeen(user.id); };
+    const touch = () => { if (user?.id && !user.isGuest) dbTouchLastSeen(user.id); };
     touch();
     const seenInterval = setInterval(touch, LAST_SEEN_INTERVAL);
     const usersInterval = setInterval(() => { refreshUsers().catch(() => {}); }, USERS_REFRESH_INTERVAL);
@@ -710,6 +714,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     await saveSessionUser(u);
     await dbUpsertUser(u);
     await refreshUsers();
+  };
+
+  // ─── Гостевой просмотр без регистрации (Фаза 2) ────────────────────────────
+  // Соискательская лента фильтрует и сортирует по currentUser (workTypes, метро,
+  // скор), а без пользователя возвращает пустой список. Поэтому гость — это
+  // синтетический соискатель со всеми типами работы (видит всё) и флагом
+  // isGuest. Его НЕЛЬЗЯ сохранять в сессию и от его имени НЕЛЬЗЯ писать в базу:
+  // и то и другое отсечено по isGuest (в touch, в опросах, в действиях ленты).
+  const enterGuest = () => {
+    _setCurrentUser({
+      id: 'guest',
+      role: 'worker',
+      phone: '',
+      firstName: 'Гость',
+      lastName: '',
+      workTypes: ['stocker', 'cook', 'shift_supervisor', 'picker'],
+      createdAt: new Date().toISOString(),
+      isGuest: true,
+    });
+  };
+  const exitGuest = () => {
+    _setCurrentUser(prev => (prev?.isGuest ? null : prev));
   };
 
   // ─── Refresh helpers ───────────────────────────────────────────────────────
@@ -874,6 +900,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         registerUser,
         loginUser,
         logout,
+        enterGuest,
+        exitGuest,
         refreshUsers,
         refreshVacancies,
         refreshLikes,

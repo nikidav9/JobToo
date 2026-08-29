@@ -17,6 +17,7 @@ import {
   dbSetPermApplicationStatus, dbCreateChat,
 } from '@/services/db';
 import { TabHeader } from '@/components/ui/TabHeader';
+import GuestGate from '@/components/GuestGate';
 import { ScoreBadge } from '@/components/feature/ScoreCard';
 import { rankCandidate } from '@/services/matching';
 import { useMissingUsers } from '@/hooks/useMissingUsers';
@@ -1262,6 +1263,7 @@ function EmployerMatches() {
 export default function MatchesScreen() {
   const { currentUser } = useApp();
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
+  if (currentUser.isGuest) return <GuestGate title="Совпадения — после регистрации" subtitle="Зарегистрируйтесь, чтобы откликаться на смены и видеть, кто ответил вам." />;
   return currentUser.role === 'worker' ? <WorkerMatches /> : <EmployerMatches />;
 }
 

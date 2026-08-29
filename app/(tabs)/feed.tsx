@@ -849,6 +849,21 @@ function MetaBit({ name, text, color }: { name: IconName; text: string; color?: 
   );
 }
 
+const gB = StyleSheet.create({
+  banner: {
+    flexDirection: 'row', alignItems: 'center', gap: rs(8),
+    backgroundColor: Colors.primary,
+    paddingHorizontal: rs(14), paddingVertical: rs(9),
+  },
+  bannerTxt: { flex: 1, color: '#fff', fontSize: rf(12), fontWeight: '600' },
+  bannerCta: {
+    color: Colors.primary, backgroundColor: '#fff',
+    fontSize: rf(12), fontWeight: '800',
+    paddingHorizontal: rs(10), paddingVertical: rs(4), borderRadius: rs(8),
+    overflow: 'hidden',
+  },
+});
+
 const wS = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: Colors.bg, borderTopLeftRadius: rs(24), borderTopRightRadius: rs(24), maxHeight: '85%' },
@@ -899,9 +914,17 @@ function WorkerFeed() {
   const {
     currentUser, users, vacancies, likes, chats,
     refreshAll, refreshLikes, refreshChats,
-    showToast, vacanciesLoading, vacancyStatsMap,
+    showToast, vacanciesLoading, vacancyStatsMap, exitGuest,
   } = useApp();
   const [refreshing, setRefreshing] = useState(false);
+
+  // Гость смотрит ленту, но откликнуться/написать не может — любое такое
+  // действие ведёт на выбор роли и регистрацию.
+  const isGuest = !!currentUser?.isGuest;
+  const promptRegister = useCallback(() => {
+    exitGuest();
+    router.replace('/');
+  }, [exitGuest, router]);
 
   const onRefresh = async () => {
     if (refreshing) return;
@@ -1020,12 +1043,12 @@ function WorkerFeed() {
     : { applicants: 0, rejected: 0, views: 0 };
 
   useEffect(() => {
-    if (!currentCard?.id || !currentUser?.id) return;
+    if (!currentCard?.id || !currentUser?.id || currentUser.isGuest) return;
     const t = setTimeout(() => {
       dbRecordVacancyView(currentCard.id, currentUser.id).catch(() => {});
     }, 300);
     return () => clearTimeout(t);
-  }, [currentCard?.id, currentUser?.id]);
+  }, [currentCard?.id, currentUser?.id, currentUser?.isGuest]);
 
   const animateCard = useCallback((dir: 'left' | 'right', velocity: number, cb: () => void) => {
     const targetX = dir === 'right' ? SW * 1.5 : -SW * 1.5;
@@ -1061,6 +1084,8 @@ function WorkerFeed() {
     animateCard('left', vx, () => {
       setHistory(h => ({ ...h, [date]: [card, ...(h[date] ?? []).slice(0, 9)] }));
       setCards(prev => prev.slice(1));
+      // Гость листает ленту свободно, но «пропуск» в базу не пишем.
+      if (user.isGuest) return;
       dbUpsertLike(card.id, user.id, card.employerId, { workerLiked: false, workerSkipped: true })
         .then(() => refreshLikes(user))
         .catch(() => { pendingLikeIds.current.delete(card.id); });
@@ -1069,6 +1094,7 @@ function WorkerFeed() {
 
   const doWant = useCallback((vx = 0.5) => {
     if (!currentCard || !currentUser || swiping) return;
+    if (currentUser.isGuest) { promptRegister(); return; }
     const card = currentCard;
     const date = selectedDate;
     const user = currentUser;
@@ -1096,7 +1122,7 @@ function WorkerFeed() {
         }
       })();
     });
-  }, [currentCard, currentUser, swiping, selectedDate, animateCard, refreshLikes, router, showToast]);
+  }, [currentCard, currentUser, swiping, selectedDate, animateCard, refreshLikes, router, showToast, promptRegister]);
 
   const doUndo = useCallback(() => {
     if (!dateHistory.length || !currentUser || swiping) return;
@@ -1107,6 +1133,7 @@ function WorkerFeed() {
     setCards(prev => [last, ...prev]);
     pan.setValue({ x: -SW, y: 0 });
     Animated.spring(pan, { toValue: { x: 0, y: 0 }, tension: 200, friction: 20, useNativeDriver: false }).start();
+    if (user.isGuest) return; // гость ничего не писал — откатывать в базе нечего
     dbRemoveLike(last.id, user.id).then(() => refreshLikes(user)).catch(() => {});
   }, [dateHistory, selectedDate, currentUser, swiping, refreshLikes, pan]);
 
@@ -1115,6 +1142,7 @@ function WorkerFeed() {
   // раньше вместо них уходил шаблон от имени системы, и отвечать было нечему.
   const doMessage = useCallback(() => {
     if (!currentCard || !currentUser || messagingRef.current) return;
+    if (currentUser.isGuest) { promptRegister(); return; }
     const existingChat = chats.find(
       c => c.employerId === currentCard.employerId && c.workerId === currentUser.id
     );
@@ -1123,11 +1151,12 @@ function WorkerFeed() {
       return;
     }
     setApplyFor(currentCard);
-  }, [currentCard, currentUser, chats, router]);
+  }, [currentCard, currentUser, chats, router, promptRegister]);
 
   const sendApply = useCallback(async (message: string) => {
     const card = applyFor;
     if (!card || !currentUser || messagingRef.current) return;
+    if (currentUser.isGuest) { promptRegister(); return; }
     messagingRef.current = true;
     try {
       await dbUpsertLike(card.id, currentUser.id, card.employerId, {
@@ -1161,7 +1190,7 @@ function WorkerFeed() {
     } finally {
       messagingRef.current = false;
     }
-  }, [applyFor, currentUser, refreshChats, router, showToast]);
+  }, [applyFor, currentUser, refreshChats, router, showToast, promptRegister]);
 
   const swipeCbRef = useRef<((dir: 'want' | 'skip', vx: number) => void) | null>(null);
   const snapBackRef = useRef<(() => void) | null>(null);
@@ -1222,6 +1251,13 @@ function WorkerFeed() {
 
   return (
     <View style={{ flex: 1 }}>
+      {isGuest && (
+        <TouchableOpacity style={gB.banner} activeOpacity={0.85} onPress={promptRegister}>
+          <Ionicons name="lock-closed" size={rs(15)} color="#fff" />
+          <Text style={gB.bannerTxt}>Вы смотрите как гость. Зарегистрируйтесь, чтобы откликаться</Text>
+          <Text style={gB.bannerCta}>Войти</Text>
+        </TouchableOpacity>
+      )}
       {/* Date strip + inline filter button */}
       <View style={styles.dateStrip}>
         <View style={styles.dateStripInner}>
@@ -1499,9 +1535,14 @@ function WorkerPermMode() {
     refreshPermVacancies, refreshPermApplications,
     chats, refreshChats,
     showToast, permVacancyViewsMap, refreshPermVacancyViews,
-    permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved,
+    permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved, exitGuest,
   } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
+
+  // Гость смотрит постоянные вакансии, но действовать не может — ведём на
+  // регистрацию (см. соискательскую ленту смен).
+  const isGuest = !!currentUser?.isGuest;
+  const promptRegister = () => { exitGuest(); router.replace('/'); };
 
   const [tab, setTab] = useState<PermTab>('open');
   const [refreshing, setRefreshing] = useState(false);
@@ -1628,6 +1669,7 @@ function WorkerPermMode() {
   // приходит большая часть откликов.
   const applyTo = (v: PermVacancy) : void => {
     if (!currentUser) return;
+    if (currentUser.isGuest) { promptRegister(); return; }
     if (myAppVacIds.has(v.id) || applying === v.id) { showToast('Уже откликнулись', 'success'); return; }
     setPermApplyFor(v);
   };
@@ -1659,6 +1701,7 @@ function WorkerPermMode() {
 
   const openPermChat = async (v: PermVacancy, displayCompany: string) => {
     if (!currentUser || chatLoading) return;
+    if (currentUser.isGuest) { promptRegister(); return; }
     // Check if chat already exists
     const existing = chats.find(c => c.employerId === v.employerId && c.workerId === currentUser.id);
     if (existing) {
@@ -1703,6 +1746,7 @@ function WorkerPermMode() {
 
   const toggleSaved = (v: PermVacancy) => {
     if (!currentUser) return;
+    if (currentUser.isGuest) { promptRegister(); return; }
     if (permSavedIds.includes(v.id)) {
       optimisticRemovePermSaved(v.id);
       dbRemovePermSaved(currentUser.id, v.id).catch(() => {});
