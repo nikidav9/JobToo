@@ -2852,6 +2852,21 @@ try {
             break;
         }
 
+        case 'dbLogOpen': {
+            // Событие «открыл приложение». args: [anon_id, user_id|null, role|null, platform|null]
+            $anon = isset($args[0]) ? (string)$args[0] : '';
+            if ($anon === '') { $data = false; break; }
+            sb('POST', 'jm_app_opens', [], [
+                'anon_id'   => $anon,
+                'user_id'   => $args[1] ?? null,
+                'role'      => $args[2] ?? null,
+                'platform'  => $args[3] ?? null,
+                'opened_at' => now_iso(),
+            ], ['Prefer: return=minimal']);
+            $data = true;
+            break;
+        }
+
         case 'dbGetPermVacancyViewers': {
             $rows = sb_select('jm_perm_vacancy_views', ['vacancy_id' => 'eq.' . $args[0]], 'worker_id,viewed_at', 'viewed_at.desc');
             $data = array_values(array_unique(array_column($rows, 'worker_id')));

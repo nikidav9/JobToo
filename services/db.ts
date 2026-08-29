@@ -581,6 +581,38 @@ export async function dbRecordVacancyView(vacancyId: string, workerId: string): 
   );
 }
 
+// ─── Событие «открыл приложение» (Фаза 1b) ───────────────────────────────────
+// Стабильный анонимный id устройства: ставится один раз и переживает logout,
+// поэтому один и тот же человек до и после регистрации — это одна строка воронки.
+const ANON_KEY = 'jt-anon-id';
+let anonCache: string | null = null;
+async function getAnonId(): Promise<string> {
+  if (anonCache) return anonCache;
+  try {
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+    let id = await AsyncStorage.getItem(ANON_KEY);
+    if (!id) { id = uid() + uid(); await AsyncStorage.setItem(ANON_KEY, id); }
+    anonCache = id;
+    return id;
+  } catch {
+    // если хранилище недоступно — не блокируем, просто разовый id
+    anonCache = anonCache || uid() + uid();
+    return anonCache;
+  }
+}
+
+// Fire-and-forget: логирует запуск приложения. role — в каком «мире» человек
+// (worker/employer) или null, если ещё не выбрал. Никогда не бросает и не
+// блокирует UI — аналитика не должна ронять приложение.
+export async function dbLogOpen(userId: string | null, role: string | null, platform: string): Promise<void> {
+  try {
+    const anon = await getAnonId();
+    await proxy('dbLogOpen', [anon, userId, role, platform]);
+  } catch {
+    /* глотаем — событие открытия не критично */
+  }
+}
+
 export async function dbGetPermVacancyViewsMap(): Promise<Record<string, number>> {
   if (IS_NATIVE) return proxy<Record<string, number>>('dbGetPermVacancyViewsMap');
   const { data } = await withTimeout(supabase.from('jm_perm_vacancy_views').select('vacancy_id'));

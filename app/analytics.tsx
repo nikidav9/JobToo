@@ -113,6 +113,14 @@ interface AnalyticsData {
     active7: number;
   }[];
   activationCohorts: { label: string; total: number; returned: number }[];
+  // Воронка «открыл приложение» (Фаза 1b), за 30 дней. Пусто, пока событие не
+  // накопится на сервере — тогда показываем подсказку вместо цифр.
+  openHasData: boolean;
+  openEvents: number;         // всего запусков
+  openDevices: number;        // уникальных устройств
+  openRegistered: number;     // из них с аккаунтом
+  openGuests: number;         // открыли, но аккаунта нет ни разу
+  openByRole: { worker: number; employer: number; guest: number }; // устройства по роли
   userGrowthDays: DayCount[];
   workerGrowthDays: DayCount[];
   employerGrowthDays: DayCount[];
@@ -147,6 +155,7 @@ async function fetchAnalytics(): Promise<AnalyticsData> {
     { data: recentUsers },
     { data: recentTempVacs },
     { data: recentMatches },
+    { data: appOpens },
   ] = await Promise.all([
     sb().from('jm_users').select('id,role,created_at,last_seen_at'),
     sb().from('jm_vacancies').select('id,status,work_type,created_at'),
@@ -164,6 +173,9 @@ async function fetchAnalytics(): Promise<AnalyticsData> {
       .eq('is_match', true)
       .not('matched_at', 'is', null)
       .gte('matched_at', cutoff30Iso),
+    // Событие «открыл приложение» (Фаза 1b). Таблица может ещё не существовать
+    // на сервере — тогда вернётся ошибка и data=null, что мы гасим через ?? [].
+    sb().from('jm_app_opens').select('anon_id,user_id,role,opened_at').gte('opened_at', cutoff30Iso),
   ]);
 
   const allUsers = users ?? [];
@@ -332,6 +344,33 @@ async function fetchAnalytics(): Promise<AnalyticsData> {
     activationCohorts.push({ label, total: inWk.length, returned: ret });
   }
 
+  // ── Воронка «открыл приложение» (Фаза 1b) ────────────────────────────────
+  const opens = appOpens ?? [];
+  const openHasData = opens.length > 0;
+  // сводим по устройству (anon_id): зарегистрировано ли оно и в какой роли
+  // человека видели последний раз (последнее событие устройства).
+  const byDevice = new Map<string, { registered: boolean; role: string | null; t: number }>();
+  for (const o of opens as any[]) {
+    const key = o.anon_id || o.user_id || '?';
+    const t = o.opened_at ? new Date(o.opened_at).getTime() : 0;
+    const prev = byDevice.get(key);
+    const registered = (prev?.registered ?? false) || !!o.user_id;
+    // роль берём из самого свежего события устройства
+    const role = !prev || t >= prev.t ? (o.role ?? null) : prev.role;
+    byDevice.set(key, { registered, role, t: Math.max(t, prev?.t ?? 0) });
+  }
+  const openEvents = opens.length;
+  const openDevices = byDevice.size;
+  let openRegistered = 0;
+  const openByRole = { worker: 0, employer: 0, guest: 0 };
+  byDevice.forEach((d) => {
+    if (d.registered) openRegistered++;
+    if (d.role === 'worker') openByRole.worker++;
+    else if (d.role === 'employer') openByRole.employer++;
+    else openByRole.guest++;
+  });
+  const openGuests = openDevices - openRegistered;
+
   return {
     totalWorkers: workers.length,
     totalEmployers: employers.length,
@@ -355,6 +394,12 @@ async function fetchAnalytics(): Promise<AnalyticsData> {
     medianLifespanDays,
     activationByRole,
     activationCohorts,
+    openHasData,
+    openEvents,
+    openDevices,
+    openRegistered,
+    openGuests,
+    openByRole,
     userGrowthDays,
     workerGrowthDays,
     employerGrowthDays,
@@ -674,8 +719,42 @@ export default function AnalyticsScreen() {
             />
           ))}
           <Text style={{ color: Colors.textSecondary, fontSize: rf(11.5), marginTop: 10, lineHeight: rf(16) }}>
-            «Вернулись» = последний визит хотя бы через сутки после регистрации. Полные кривые D1/D7/D30 и DAU появятся с событием «открыл приложение» — это Фаза 1b.
+            «Вернулись» = последний визит хотя бы через сутки после регистрации.
           </Text>
+        </ChartCard>
+
+        {/* ── Воронка запусков (Фаза 1b) ── */}
+        <ChartCard title="Открыли приложение — за 30 дней">
+          {data.openHasData ? (
+            <>
+              <View style={s.kpiRow}>
+                <KpiCard label="Запусков" value={data.openEvents} color={Colors.primary} />
+                <KpiCard label="Устройств" value={data.openDevices} color={Colors.blue} />
+                <KpiCard
+                  label="С аккаунтом"
+                  value={data.openRegistered}
+                  sub={data.openDevices ? `${Math.round((data.openRegistered / data.openDevices) * 100)}% дошли до регистрации` : undefined}
+                  color="#16A34A"
+                />
+                <KpiCard
+                  label="Ушли гостями"
+                  value={data.openGuests}
+                  sub="открыли, но не завели аккаунт"
+                  color={Colors.red}
+                />
+              </View>
+              <Text style={{ color: Colors.textSecondary, fontSize: rf(12), fontWeight: '600', marginTop: 6, marginBottom: 2 }}>
+                В какой роли открывали (по устройствам)
+              </Text>
+              <HorizBarRow label="Соискатель" value={data.openByRole.worker} max={data.openDevices} color={Colors.primary} />
+              <HorizBarRow label="Работодатель" value={data.openByRole.employer} max={data.openDevices} color={Colors.blue} />
+              <HorizBarRow label="Ещё не выбрал (гость)" value={data.openByRole.guest} max={data.openDevices} color={Colors.textSecondary} />
+            </>
+          ) : (
+            <Text style={{ color: Colors.textSecondary, fontSize: rf(12.5), lineHeight: rf(18) }}>
+              Событие «открыл приложение» только что включено. Цифры появятся, как только пользователи начнут открывать приложение: тогда станут видны установил → открыл → зарегистрировался и в какой роли люди заходят.
+            </Text>
+          )}
         </ChartCard>
 
         {/* ── KPI: вакансии и матчи ── */}

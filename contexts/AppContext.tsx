@@ -38,6 +38,7 @@ import {
   dbGetPermApplications,
   dbGetPermSaved,
   dbTouchLastSeen,
+  dbLogOpen,
   dbWarmup,
   dbClearPushToken,
   dbDeleteWebPushSubscription,
@@ -281,6 +282,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
 
         if (cancelled) return;
+
+        // Событие «открыл приложение» (Фаза 1b). Один раз за холодный старт,
+        // как только выяснили, кто открыл: role — в каком «мире» человек уже
+        // (worker/employer), либо null, если он ещё гость и видит экран выбора
+        // «Выберите, кто вы». Так виден и тот, кто установил и открыл, но так и
+        // не завёл аккаунт (в last_seen_at его нет вообще). Fire-and-forget —
+        // никогда не блокирует загрузку.
+        {
+          const platform =
+            Platform.OS !== 'web'
+              ? Platform.OS
+              : isTelegramMiniApp()
+              ? 'tg'
+              : (typeof window !== 'undefined' &&
+                  (window.matchMedia?.('(display-mode: standalone)')?.matches ||
+                    (window.navigator as any)?.standalone))
+              ? 'pwa'
+              : 'web';
+          dbLogOpen(sessionUser?.id ?? null, sessionUser?.role ?? null, platform);
+        }
 
         // Открыли приложение, а входить некому — значит это устройство ни за
         // кем не числится. Снимаем с него токен: иначе уведомления так и
