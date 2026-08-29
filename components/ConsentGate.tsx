@@ -60,7 +60,11 @@ export default function ConsentGate() {
   const [open, setOpen] = useState<LegalDocKey | null>(null);
 
   useEffect(() => {
-    if (!user) { setChecked(false); setNeeded(false); return; }
+    // Гость ничего не подписывает: аккаунта нет, согласие писать не за кого и
+    // некому. Требовать его — тупик (запись за синтетического гостя не
+    // сохраняется, отсюда «Согласие не сохранилось»). Согласие спросим при
+    // регистрации, как и раньше.
+    if (!user || user.isGuest) { setChecked(false); setNeeded(false); return; }
     let alive = true;
     setChecked(false);
     dbGetConsent(user.id)

@@ -40,11 +40,11 @@ export default function CompleteProfileSheet() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const needsAge = !!currentUser && !currentUser.age;
-  const needsPhoto = !!currentUser && !currentUser.avatarUrl;
+  const needsAge = !!currentUser && !currentUser.isGuest && !currentUser.age;
+  const needsPhoto = !!currentUser && !currentUser.isGuest && !currentUser.avatarUrl;
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || currentUser.isGuest) return;
     if (!needsAge && !needsPhoto) return;
     let alive = true;
     const t = setTimeout(async () => {
@@ -110,7 +110,7 @@ export default function CompleteProfileSheet() {
     }
   };
 
-  if (!visible || !currentUser) return null;
+  if (!visible || !currentUser || currentUser.isGuest) return null;
 
   const isWorker = currentUser.role === 'worker';
 

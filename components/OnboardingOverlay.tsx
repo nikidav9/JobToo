@@ -132,7 +132,10 @@ export function OnboardingOverlay() {
   }, [visible, step]);
 
   useEffect(() => {
-    if (!user) { setVisible(false); return; }
+    // Гостю онбординг не показываем: он листает ленту на просмотр, а обучение
+    // «откликайся свайпом» про действие, которого у гостя нет. Увидит после
+    // регистрации.
+    if (!user || user.isGuest) { setVisible(false); return; }
     let cancelled = false;
     AsyncStorage.getItem(KEY(user.id)).then(v => {
       if (!cancelled && !v) { setStep(0); setVisible(true); }
@@ -142,7 +145,7 @@ export function OnboardingOverlay() {
     return () => { cancelled = true; replayListeners.delete(replay); };
   }, [user?.id]);
 
-  if (!visible || !user) return null;
+  if (!visible || !user || user.isGuest) return null;
 
   const isWorker = user.role === 'worker';
   const top = insets.top;

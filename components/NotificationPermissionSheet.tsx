@@ -32,7 +32,8 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 export default function NotificationPermissionSheet() {
   const insets = useSafeAreaInsets();
   const app = useApp();
-  const userId = app?.currentUser?.id ?? null;
+  // Гостю — ничего: он не зарегистрирован, подписывать на пуши некого.
+  const userId = app?.currentUser?.isGuest ? null : (app?.currentUser?.id ?? null);
 
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
