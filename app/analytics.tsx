@@ -102,6 +102,16 @@ interface AnalyticsData {
   active30: number;             // заходили за 30 дней
   dormant: number;              // не заходили 30+ дней или ни разу
   medianLifespanDays: number;   // медиана «от регистрации до последнего визита»
+  // Активация в разрезе роли: приложение показывает два разных мира —
+  // соискателю (worker) и работодателю (employer). Важно понимать, в какой
+  // роли человек «залипает», а в какой отваливается сразу.
+  activationByRole: {
+    role: 'worker' | 'employer';
+    total: number;
+    returned: number;
+    rate: number;
+    active7: number;
+  }[];
   activationCohorts: { label: string; total: number; returned: number }[];
   userGrowthDays: DayCount[];
   workerGrowthDays: DayCount[];
@@ -287,6 +297,24 @@ async function fetchAnalytics(): Promise<AnalyticsData> {
     ? Math.round(spans[Math.floor(spans.length / 2)] * 10) / 10
     : 0;
 
+  // Активация по роли (worker/employer) — тот же признак «вернулся хоть раз»,
+  // но отдельно по каждому миру приложения.
+  const roleStat = (role: 'worker' | 'employer') => {
+    const arr = allUsers.filter((u: any) => u.role === role);
+    const returned = arr.filter(
+      (u: any) => u.last_seen_at && seenMs(u) - bornMs(u) >= DAY
+    ).length;
+    const a7 = arr.filter((u: any) => u.last_seen_at && nowMs - seenMs(u) <= 7 * DAY).length;
+    return {
+      role,
+      total: arr.length,
+      returned,
+      rate: arr.length ? Math.round((returned / arr.length) * 100) : 0,
+      active7: a7,
+    };
+  };
+  const activationByRole = [roleStat('worker'), roleStat('employer')];
+
   // Когорты активации по неделям регистрации (последние 6 недель): из каждой
   // недели — сколько зарегистрировавшихся вернулись хотя бы раз.
   const WEEK = 7 * DAY;
@@ -325,6 +353,7 @@ async function fetchAnalytics(): Promise<AnalyticsData> {
     active30,
     dormant,
     medianLifespanDays,
+    activationByRole,
     activationCohorts,
     userGrowthDays,
     workerGrowthDays,
@@ -620,6 +649,20 @@ export default function AnalyticsScreen() {
           <KpiCard label="Спят 30+ дней" value={data.dormant} color={Colors.red} />
           <KpiCard label="Медиана «прожил», дней" value={data.medianLifespanDays} color={Colors.textSecondary} />
         </View>
+        <ChartCard title="Активация по роли — в каком «мире» залипают">
+          {data.activationByRole.map((r) => (
+            <HorizBarRow
+              key={r.role}
+              label={`${r.role === 'worker' ? 'Соискатели' : 'Работодатели'} · ${r.total} рег. · верн. ${r.rate}% · за 7 дн. ${r.active7}`}
+              value={r.returned}
+              max={r.total}
+              color={r.role === 'worker' ? Colors.primary : Colors.blue}
+            />
+          ))}
+          <Text style={{ color: Colors.textSecondary, fontSize: rf(11.5), marginTop: 10, lineHeight: rf(16) }}>
+            Приложение — это два разных продукта под одним входом. Если у одной роли «вернулись» заметно ниже — первый экран именно этой роли не удерживает.
+          </Text>
+        </ChartCard>
         <ChartCard title="Активация по неделям регистрации — сколько вернулись">
           {data.activationCohorts.map((c, i) => (
             <HorizBarRow
