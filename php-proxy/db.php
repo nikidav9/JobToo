@@ -96,7 +96,7 @@ define('SB_KEY', sb_resolve_key());
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-App-Secret');
+header('Access-Control-Allow-Headers: Content-Type, X-App-Secret, X-Admin-Token');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -143,6 +143,29 @@ $fn   = $body['fn'] ?? null;
 $args = $body['args'] ?? [];
 
 if (!$fn) { jt_respond(['error' => 'Missing fn'], 400); exit; }
+
+// Операции управления нельзя защищать тем же ключом, который встроен в
+// публичный web/APK-клиент. ADMIN_API_TOKEN хранится только на сервере и в
+// закрытом дашборде. Если он не настроен, административные вызовы безопасно
+// закрыты, а пользовательские сценарии продолжают работать.
+$adminFns = [
+    'dbKeyKind', 'adminResetPassword', 'dbMigrateChatMedia', 'dbDeleteUser',
+    'cronEveningDigest', 'cronDailyNudges', 'cronShiftNudge',
+    'tgBroadcast', 'tgSendToUsers', 'scoreRecalcAll', 'billingReport',
+    'extSourcesList', 'extSourceSave', 'extSourceDelete', 'extStats',
+    'apiKeysList', 'apiKeyCreate', 'apiKeyRevoke',
+    'botAdminGet', 'botAdminSet', 'supportClose', 'supportReopen',
+    'supportReply', 'supportThreads', 'botReply', 'botInbox',
+    'tgGroupInfo', 'tgPostToGroup', 'tgSetWebhook', 'tgWebhookInfo',
+    'dbGetWorkerTokensByMetro', 'dbGetAllWorkerTokens',
+];
+if (in_array($fn, $adminFns, true)) {
+    $adminToken = jt_secret('ADMIN_API_TOKEN');
+    $providedAdmin = (string)($_SERVER['HTTP_X_ADMIN_TOKEN'] ?? '');
+    if ($adminToken === '' || !hash_equals($adminToken, $providedAdmin)) {
+        jt_respond(['error' => 'Admin authorization required'], 403); exit;
+    }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -241,10 +264,10 @@ function sb_count(string $t, array $f = []): int {
 // и пароль каждого. Перечисляем поля поимённо: добавится новое, оно не
 // просочится само собой.
 define('USER_PUBLIC_COLS', implode(',', [
-    'id', 'role', 'phone', 'first_name', 'last_name', 'age',
+    'id', 'role', 'first_name', 'last_name', 'age',
     'metro_line_id', 'metro_station', 'work_types', 'company', 'bio',
     'avatar_url', 'avg_rating', 'rating_count', 'is_blocked',
-    'created_at', 'push_token', 'telegram_id', 'last_seen_at',
+    'created_at', 'last_seen_at',
 ]));
 
 // bcrypt-хеш от пароля, положенного как есть, отличается началом строки.
@@ -2044,8 +2067,10 @@ try {
             break;
         }
 
+        // Старый клиентский вход по номеру возвращал всю строку, включая
+        // пароль. Современный вход — только dbLogin; этот путь закрыт.
         case 'dbGetUserByPhone':
-            $data = sb_single('jm_users', ['phone' => 'eq.' . $args[0]]); break;
+            jt_respond(['error' => 'Deprecated endpoint'], 410); exit;
 
         // ── Telegram Mini App ──────────────────────────────────────────────────
         // args: [initDataString] → { ok, user|null, tg: {id, first_name, ...} }
