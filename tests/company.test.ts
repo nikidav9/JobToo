@@ -8,12 +8,12 @@ test('normalizeCompany preserves a partner company name', () => {
 });
 
 test('normalizeCompany uses Lavka only when a company is missing', () => {
-  assert.equal(normalizeCompany(null), 'Лавка');
-  assert.equal(normalizeCompany('   '), 'Лавка');
+  assert.equal(normalizeCompany(null), 'Компания');
+  assert.equal(normalizeCompany('   '), 'Компания');
 });
 
 test('isLavkaCompany recognises supported Lavka spellings', () => {
-  assert.equal(isLavkaCompany('Яндекс Лавка'), true);
+  assert.equal(isLavkaCompany('Яндекс Компания'), true);
   assert.equal(isLavkaCompany('Купер'), false);
 });
 
