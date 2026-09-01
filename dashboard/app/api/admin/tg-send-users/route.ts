@@ -52,7 +52,7 @@ export async function POST(req: Request) {
 
   const res = await fetch('https://jobtoo.ru/api/db.php', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-App-Secret': appSecret },
+    headers: { 'Content-Type': 'application/json', 'X-App-Secret': appSecret, 'X-Admin-Token': process.env.ADMIN_API_TOKEN ?? '' },
     body: JSON.stringify({ fn: 'tgSendToUsers', args: [ids, template] }),
   })
   const data = await res.json()
