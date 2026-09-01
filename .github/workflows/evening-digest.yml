@@ -16,6 +16,7 @@ jobs:
       - name: Call cronEveningDigest
         env:
           APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+          ADMIN_TOKEN: ${{ secrets.DASHBOARD_PASSWORD }}
         run: |
           # Запасного пропуска в коде больше нет. Он тут был «чтобы не легло»,
           # но репозиторий открыт, и любой мог им обратиться к db.php — то есть
