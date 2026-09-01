@@ -160,7 +160,15 @@ $adminFns = [
     'dbGetWorkerTokensByMetro', 'dbGetAllWorkerTokens',
 ];
 if (in_array($fn, $adminFns, true)) {
+    // На переходном этапе отдельный токен можно задать как ADMIN_API_TOKEN.
+    // Если он ещё не создан, используем пароль закрытого дашборда: он уже
+    // серверный и, в отличие от APP_SECRET, не попадает в web/APK-бандл.
     $adminToken = jt_secret('ADMIN_API_TOKEN');
+    if ($adminToken === '') {
+        $credFile = __DIR__ . '/admin_credentials.php';
+        $creds = is_readable($credFile) ? @include $credFile : null;
+        $adminToken = is_array($creds) ? (string)($creds['password'] ?? '') : '';
+    }
     $providedAdmin = (string)($_SERVER['HTTP_X_ADMIN_TOKEN'] ?? '');
     if ($adminToken === '' || !hash_equals($adminToken, $providedAdmin)) {
         jt_respond(['error' => 'Admin authorization required'], 403); exit;
