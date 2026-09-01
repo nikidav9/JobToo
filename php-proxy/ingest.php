@@ -33,15 +33,19 @@ function ing_secret(string $name): string
     return (string)($file[$name] ?? '');
 }
 
-// Пропуск тот же, что у остального прокси: этот адрес зовут только наши —
-// таймер на сервере и кнопка в панели.
-$given = $_SERVER['HTTP_X_APP_SECRET'] ?? '';
-$ok = false;
-foreach (['APP_SECRET', 'APP_SECRET_PREV'] as $k) {
-    $v = ing_secret($k);
-    if ($v !== '' && hash_equals($v, $given)) { $ok = true; break; }
+// Сборщик меняет партнёрские данные, поэтому публичный APP_SECRET здесь
+// недопустим. Приоритет — отдельный ADMIN_API_TOKEN; на переходном этапе
+// подходит пароль закрытого дашборда, который уже хранится только на сервере.
+$expectedAdmin = ing_secret('ADMIN_API_TOKEN');
+if ($expectedAdmin === '') {
+    $credFile = __DIR__ . '/admin_credentials.php';
+    $creds = is_readable($credFile) ? @include $credFile : null;
+    $expectedAdmin = is_array($creds) ? (string)($creds['password'] ?? '') : '';
 }
-if (!$ok) { http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit; }
+$givenAdmin = (string)($_SERVER['HTTP_X_ADMIN_TOKEN'] ?? '');
+if ($expectedAdmin === '' || !hash_equals($expectedAdmin, $givenAdmin)) {
+    http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
+}
 
 /** Отпечаток «та же самая работа». */
 function ing_dedupe_key(array $v): string
