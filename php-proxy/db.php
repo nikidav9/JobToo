@@ -96,7 +96,7 @@ define('SB_KEY', sb_resolve_key());
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-App-Secret, X-Admin-Token');
+header('Access-Control-Allow-Headers: Content-Type, X-App-Secret, X-Admin-Token, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -172,6 +172,43 @@ if (in_array($fn, $adminFns, true)) {
     $providedAdmin = (string)($_SERVER['HTTP_X_ADMIN_TOKEN'] ?? '');
     if ($adminToken === '' || !hash_equals($adminToken, $providedAdmin)) {
         jt_respond(['error' => 'Admin authorization required'], 403); exit;
+    }
+}
+
+$authHeader = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? '');
+$authUid = jt_session_uid($authHeader);
+$publicFns = [
+    'dbCountUsers', 'dbWarmup', 'dbCheckPhoneExists', 'dbLogin',
+    'dbUpsertUser', 'tgAuth', 'dbGetVacancies', 'dbGetPermVacancies',
+    'extVacancies', 'extClick', 'addressSuggest', 'dbLogOpen',
+    'dbResponsivenessMap',
+];
+if (!in_array($fn, $publicFns, true) && !in_array($fn, $adminFns, true) && $authUid === null) {
+    jt_respond(['error' => 'Authentication required'], 401); exit;
+}
+
+// Для операций, где первый/второй аргумент прямо обозначает владельца,
+// сервер не доверяет ID из тела запроса и сверяет его с подписанной сессией.
+$selfArgFns = [
+    'tgPrepareLink' => 0, 'dbTouchLastSeen' => 0,
+    'dbChangePassword' => 0, 'dbDeleteAccount' => 0,
+    'dbRecordConsent' => 0, 'dbGetConsent' => 0,
+    'tgBindTelegram' => 0, 'tgUnbindTelegram' => 0,
+    'dbGetSkillResults' => 0, 'dbSubmitSkillTest' => 0,
+    'supportHistory' => 0, 'supportSend' => 0,
+    'dbGetLikesForUser' => 0, 'dbGetChats' => 0,
+    'dbGetSaved' => 0, 'dbAddSaved' => 0, 'dbRemoveSaved' => 0,
+    'dbGetPermVacanciesByEmployer' => 0, 'dbGetPermApplications' => 0,
+    'dbGetPermSaved' => 0, 'dbAddPermSaved' => 0, 'dbRemovePermSaved' => 0,
+    'dbSavePushToken' => 0, 'dbClearPushToken' => 0,
+    'dbGetWebPushSubscription' => 0, 'dbSaveWebPushSubscription' => 0,
+    'dbDeleteWebPushSubscription' => 0, 'dbGetNotifications' => 0,
+    'dbMarkAllNotifsRead' => 0, 'dbDeleteAllNotifs' => 0,
+];
+if (isset($selfArgFns[$fn])) {
+    $pos = $selfArgFns[$fn];
+    if ($authUid === null || (string)($args[$pos] ?? '') !== $authUid) {
+        jt_respond(['error' => 'Forbidden for this user'], 403); exit;
     }
 }
 
@@ -369,6 +406,39 @@ function jt_secret(string $name, string $fallback = ''): string {
     if (!empty($file[$name])) return (string)$file[$name];
 
     return $fallback;
+}
+
+// ─── Пользовательские сессии ─────────────────────────────────────────────────
+function jt_b64url_encode(string $raw): string {
+    return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+}
+function jt_b64url_decode(string $raw): string|false {
+    $pad = strlen($raw) % 4;
+    if ($pad) $raw .= str_repeat('=', 4 - $pad);
+    return base64_decode(strtr($raw, '-_', '+/'), true);
+}
+function jt_session_key(): string {
+    $key = jt_secret('SESSION_SECRET');
+    return $key !== '' ? $key : SB_KEY;
+}
+function jt_session_issue(string $uid): string {
+    $payload = jt_b64url_encode(json_encode([
+        'uid' => $uid, 'exp' => time() + 30 * 86400,
+    ], JSON_UNESCAPED_SLASHES));
+    $sig = jt_b64url_encode(hash_hmac('sha256', $payload, jt_session_key(), true));
+    return $payload . '.' . $sig;
+}
+function jt_session_uid(string $header): ?string {
+    if (!preg_match('/^Bearer\s+(.+)$/i', trim($header), $m)) return null;
+    $parts = explode('.', trim($m[1]), 2);
+    if (count($parts) !== 2) return null;
+    [$payload, $provided] = $parts;
+    $expected = jt_b64url_encode(hash_hmac('sha256', $payload, jt_session_key(), true));
+    if (!hash_equals($expected, $provided)) return null;
+    $raw = jt_b64url_decode($payload);
+    $data = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($data) || empty($data['uid']) || (int)($data['exp'] ?? 0) < time()) return null;
+    return (string)$data['uid'];
 }
 
 // ─── Мгновенные сообщения ─────────────────────────────────────────────────────
@@ -1650,17 +1720,25 @@ try {
         // текстом. Уже готовый хеш второй раз не трогаем: этой же операцией
         // сохраняется профиль целиком, и пароль в нём приезжает обратно.
         case 'dbUpsertUser': {
-            $u = $args[0];
+            $u = is_array($args[0] ?? null) ? $args[0] : [];
+            $uid = trim((string)($u['id'] ?? ''));
+            if ($uid === '') throw new RuntimeException('Нужен id пользователя');
+            $existing = sb_single('jm_users', ['id' => 'eq.' . $uid], 'id');
+            if ($existing && $authUid !== $uid) {
+                jt_respond(['error' => 'Authentication required'], 401); exit;
+            }
+            if (!$existing && (empty($u['phone']) || empty($u['password']))) {
+                throw new RuntimeException('Для регистрации нужны телефон и пароль');
+            }
             // Пустой пароль — это не «сотри пароль», а «в профиле его нет».
-            // После того как вход перестал отдавать пароль наружу, сохранение
-            // профиля присылает сюда пустую строку — записать её значит
-            // запереть человека без единой ошибки.
             if (empty($u['password'])) {
                 unset($u['password']);
             } elseif (!is_bcrypt($u['password'])) {
                 $u['password'] = password_hash((string)$u['password'], PASSWORD_BCRYPT);
             }
-            sb_upsert('jm_users', $u, 'id'); break;
+            sb_upsert('jm_users', $u, 'id');
+            $data = ['session_token' => $existing ? null : jt_session_issue($uid)];
+            break;
         }
 
         // Вход. Сверка переехала сюда с клиента: раньше приложение спрашивало
@@ -1689,7 +1767,13 @@ try {
             }
 
             unset($row['password']);
-            $data = $row; break;
+            $data = ['user' => $row, 'session_token' => jt_session_issue((string)$row['id'])]; break;
+        }
+
+        case 'dbSession': {
+            $row = sb_single('jm_users', ['id' => 'eq.' . $authUid], USER_PUBLIC_COLS);
+            $data = $row ? ['user' => $row] : null;
+            break;
         }
 
         // Смена пароля в профиле. Тоже на сервере — на клиенте старый пароль
@@ -2120,6 +2204,7 @@ try {
             $data = [
                 'ok' => true,
                 'user' => $u,
+                'session_token' => $u ? jt_session_issue((string)$u['id']) : null,
                 'tg' => [
                     'id' => $tgId,
                     'first_name' => $v['user']['first_name'] ?? '',
