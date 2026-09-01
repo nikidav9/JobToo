@@ -24,6 +24,8 @@ import {
   dbGetUsers,
   dbUpsertUser,
   dbLogin,
+  dbRestoreSession,
+  dbClearSession,
   dbGetVacancies,
   dbGetLikes,
   dbGetLikesForUser,
@@ -271,6 +273,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         if (cancelled) return;
         setWebSplashProgress(55);
+
+        // Кэш профиля сам по себе больше не считается входом. Проверяем
+        // подписанную серверную сессию; старые установки без токена один раз
+        // вернутся на экран входа, вместо доступа по подставленному user id.
+        if (sessionUser && !sessionUser.isGuest) {
+          const restored = await dbRestoreSession().catch(() => null);
+          if (restored && !restored.isBlocked) {
+            sessionUser = restored;
+            await saveSessionUser(restored).catch(() => {});
+          } else {
+            sessionUser = null;
+            await clearSessionUser().catch(() => {});
+          }
+        }
 
         // Telegram Mini App: auto-login via signed initData — no password needed
         if (!sessionUser) await waitForTelegramMiniApp();
@@ -699,6 +715,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     _setCurrentUser(null);
     await clearSessionUser();
+    await dbClearSession();
     setUsers([]);
     setVacancies([]);
     setLikes([]);
