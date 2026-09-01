@@ -732,6 +732,36 @@ function vacancy_dates_guard(array $rows): void {
     }
 }
 
+/**
+ * Не публикуем требования к полу, возрасту, национальности или внешности.
+ * Законные специальные требования редки и должны пройти ручную проверку,
+ * а не попадать в массовую ленту автоматически.
+ */
+function vacancy_content_guard(array $row): void {
+    $text = mb_strtolower(implode(' ', array_map(
+        fn($v) => is_scalar($v) ? (string)$v : '',
+        [
+            $row['title'] ?? '', $row['description'] ?? '',
+            $row['conditions'] ?? '', $row['requirements'] ?? '',
+        ]
+    )));
+    $blocked = [
+        '~\\bмужчин[аы]?\\b|мужского\\s+пола~u',
+        '~\\bженщин[аы]?\\b|женского\\s+пола~u',
+        '~русскоязычн|славянск(?:ая|ой)\\s+внешност~u',
+        '~\\b(?:до|от)\\s*\\d{2}\\s*(?:лет|года)~u',
+        '~\\b\\d{2}\\s*[–—-]\\s*\\d{2}\\s*(?:лет|года)~u',
+    ];
+    foreach ($blocked as $pattern) {
+        if (preg_match($pattern, $text)) {
+            throw new RuntimeException(
+                'Уберите требования к полу, возрасту, национальности или внешности. '
+                . 'Оставьте только навыки и условия работы.'
+            );
+        }
+    }
+}
+
 // Дописываем координаты в строку вакансии перед сохранением. Без этого метка
 // на карте не появляется вовсе: раньше телефон геокодировал адреса сам при
 // каждом открытии карты, и пока все тридцать запросов не пройдут, на карте
@@ -2802,6 +2832,7 @@ try {
 
         case 'dbUpsertVacancy':
             vacancy_dates_guard([$args[0]]);
+            vacancy_content_guard($args[0]);
             save_then_geocode('jm_vacancies', $args[0]); break;
 
         case 'dbUpsertVacancyBatch': {
@@ -2811,6 +2842,7 @@ try {
             vacancy_dates_guard($rows);
             $cache = [];
             foreach ($rows as $k => $r) {
+                vacancy_content_guard($r);
                 $a = trim((string)($r['address'] ?? ''));
                 if ($a === '' || (isset($r['lat']) && $r['lat'] !== null)) continue;
                 if (!array_key_exists($a, $cache)) $cache[$a] = fill_coords($r);
@@ -2824,6 +2856,7 @@ try {
             // Если правят адрес, координаты пересчитываем: иначе метка
             // осталась бы висеть на старом месте.
             vacancy_dates_guard([$args[1]]);
+            vacancy_content_guard($args[1]);
             sb_update('jm_vacancies', ['id' => 'eq.' . $args[0]], fill_coords($args[1])); break;
 
         // ── Likes ──────────────────────────────────────────────────────────────
@@ -3253,6 +3286,7 @@ try {
             $data = sb_select('jm_perm_vacancies', ['employer_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;
 
         case 'dbUpsertPermVacancy':
+            vacancy_content_guard($args[0]);
             save_then_geocode('jm_perm_vacancies', $args[0]); break;
 
         case 'dbClosePermVacancy':
