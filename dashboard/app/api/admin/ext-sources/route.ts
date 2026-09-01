@@ -28,7 +28,7 @@ function secret(): string {
 async function call(fn: string, args: unknown[]) {
   const res = await fetch('https://jobtoo.ru/api/db.php', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret() },
+    headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret(), 'X-Admin-Token': process.env.ADMIN_API_TOKEN ?? '' },
     body: JSON.stringify({ fn, args }),
   })
   const data = await res.json()
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     if (body.run) {
       const res = await fetch(
         `https://jobtoo.ru/api/ingest.php?source=${encodeURIComponent(body.run)}&force=1`,
-        { headers: { 'X-App-Secret': secret() } },
+        { headers: { 'X-Admin-Token': process.env.ADMIN_API_TOKEN ?? '' } },
       )
       const data = await res.json()
       return NextResponse.json(data, { headers: CORS })
