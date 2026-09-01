@@ -34,8 +34,25 @@ type Stats = {
   по_источникам: Record<string, number>
   переходов_7дней?: number
   переходы_по_источникам?: Record<string, number>
+  переходов_30дней?: number
+  переходы_30дней_по_источникам?: Record<string, number>
+  уникальных_пользователей_30дней?: number
+  уникальные_по_источникам?: Record<string, number>
+  переходы_14дней?: { date: string; count: number }[]
   без_станции?: number
   без_профессии?: number
+  аудитория?: {
+    работников: number
+    работодателей: number
+    активных_30дней: number
+  }
+  площадка?: {
+    открытых_смен: number
+    постоянных_вакансий: number
+    станций_метро: number
+    мэтчей: number
+    завершенных_смен: number
+  }
 }
 
 type ExtVacancy = {
@@ -169,6 +186,7 @@ export default function SourcesPage() {
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [updated, setUpdated] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
@@ -235,6 +253,31 @@ export default function SourcesPage() {
     setBusy(null)
   }
 
+  async function copyPartnerSummary() {
+    if (!stats) return
+    const a = stats.аудитория
+    const p = stats.площадка
+    const lines = [
+      'JobToo — сводка для партнёра',
+      `Работников: ${a?.работников ?? 0}`,
+      `Работодателей: ${a?.работодателей ?? 0}`,
+      `Активных пользователей за 30 дней: ${a?.активных_30дней ?? 0}`,
+      `Открытых смен: ${p?.открытых_смен ?? 0}`,
+      `Постоянных вакансий: ${p?.постоянных_вакансий ?? 0}`,
+      `Станций метро в активных предложениях: ${p?.станций_метро ?? 0}`,
+      `Мэтчей: ${p?.мэтчей ?? 0}`,
+      `Завершённых смен: ${p?.завершенных_смен ?? 0}`,
+      `Партнёрских вакансий: ${stats.всего ?? 0}`,
+      `Переходов к партнёрам за 30 дней: ${stats.переходов_30дней ?? 0}`,
+      `Уникальных пользователей с переходом за 30 дней: ${stats.уникальных_пользователей_30дней ?? 0}`,
+    ]
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch { setErr('Не удалось скопировать сводку') }
+  }
+
   const box: React.CSSProperties = {
     border: '1px solid var(--line)', borderRadius: 'var(--radius)',
     padding: 16, background: 'var(--bg-elev)',
@@ -264,6 +307,54 @@ export default function SourcesPage() {
               источник людям. «В базе 400 вакансий» без неё не значит ничего. */}
           <KpiCard label="Переходов за неделю" value={stats?.переходов_7дней ?? null}
             sub="люди ушли к источнику" />
+        </div>
+
+        <div className="jt-card" style={{ padding: 16 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 240 }}>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>Сводка для партнёрства</div>
+              <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 3 }}>
+                Обезличенные показатели аудитории, активности и результата — их можно использовать
+                в презентации или отправить потенциальному партнёру.
+              </div>
+            </div>
+            <Button onClick={copyPartnerSummary} disabled={!stats}>
+              {copied ? 'Скопировано' : 'Скопировать сводку'}
+            </Button>
+          </div>
+
+          <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', marginBottom: 8 }}>
+            Аудитория
+          </div>
+          <div className="g-3">
+            <KpiCard label="Работников" value={stats?.аудитория?.работников ?? null} sub="зарегистрировано" />
+            <KpiCard label="Работодателей" value={stats?.аудитория?.работодателей ?? null} sub="зарегистрировано" />
+            <KpiCard label="Активных за 30 дней" value={stats?.аудитория?.активных_30дней ?? null} sub="заходили в JobToo" />
+          </div>
+
+          <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', margin: '16px 0 8px' }}>
+            Площадка и результат
+          </div>
+          <div className="g-3">
+            <KpiCard label="Открытых смен" value={stats?.площадка?.открытых_смен ?? null} sub="собственные вакансии" />
+            <KpiCard label="Постоянных вакансий" value={stats?.площадка?.постоянных_вакансий ?? null} sub="собственные вакансии" />
+            <KpiCard label="Станций метро" value={stats?.площадка?.станций_метро ?? null} sub="в активных предложениях" />
+            <KpiCard label="Мэтчей" value={stats?.площадка?.мэтчей ?? null} sub="взаимный интерес" />
+            <KpiCard label="Завершённых смен" value={stats?.площадка?.завершенных_смен ?? null} sub="подтверждённый результат" />
+            <KpiCard label="Уникальных переходов" value={stats?.уникальных_пользователей_30дней ?? null} sub="пользователей за 30 дней" />
+          </div>
+
+          {(stats?.переходы_14дней?.length ?? 0) > 0 ? (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 7 }}>Переходы к партнёрам · последние 14 дней</div>
+              <div style={{ height: 70, display: 'flex', alignItems: 'flex-end', gap: 4 }}>
+                {stats!.переходы_14дней!.map(d => {
+                  const max = Math.max(1, ...stats!.переходы_14дней!.map(x => x.count))
+                  return <div key={d.date} title={`${d.date}: ${d.count}`} style={{ flex: 1, minWidth: 4, height: `${Math.max(5, d.count / max * 100)}%`, background: 'var(--accent)', borderRadius: '3px 3px 0 0', opacity: d.count ? 0.9 : 0.18 }} />
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Качество разбора. Станция, которую мы не узнали, не попадает в
@@ -333,13 +424,13 @@ export default function SourcesPage() {
           <table className="jt-table" style={{ minWidth: 700 }}>
             <thead>
               <tr>
-                {['Источник', 'Последний заход', 'Что вышло', 'В базе', 'Переходов', ''].map(h => <th key={h}>{h}</th>)}
+                {['Источник', 'Последний заход', 'Что вышло', 'В базе', '7 дней', '30 дней', 'Уникальных', ''].map(h => <th key={h}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={6} style={{ padding: 16, color: 'var(--ink-3)' }}>Загружаю…</td></tr>}
+              {loading && <tr><td colSpan={8} style={{ padding: 16, color: 'var(--ink-3)' }}>Загружаю…</td></tr>}
               {!loading && !items.length && (
-                <tr><td colSpan={6} style={{ padding: 16, color: 'var(--ink-3)' }}>
+                <tr><td colSpan={8} style={{ padding: 16, color: 'var(--ink-3)' }}>
                   Источников пока нет. Нажмите «Подставить наш образец», чтобы посмотреть, как всё работает.
                 </td></tr>
               )}
@@ -372,6 +463,12 @@ export default function SourcesPage() {
                     <td className="num" style={{ color: 'var(--ink-2)' }}>
                       {stats?.переходы_по_источникам?.[s.id] ?? 0}
                     </td>
+                    <td className="num" style={{ color: 'var(--ink-2)' }}>
+                      {stats?.переходы_30дней_по_источникам?.[s.id] ?? 0}
+                    </td>
+                    <td className="num" style={{ color: 'var(--ink-2)' }}>
+                      {stats?.уникальные_по_источникам?.[s.id] ?? 0}
+                    </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <Button style={{ height: 28, padding: '0 10px' }}
@@ -399,7 +496,7 @@ export default function SourcesPage() {
         <VacancyList />
 
         <div style={{ fontSize: 12.5, color: 'var(--ink-3)', maxWidth: '68ch' }}>
-          Чужие вакансии видны людям во вкладке «Поиск» — с пометкой источника и кнопкой
+          Чужие вакансии видны людям во вкладке «Работа» — с пометкой источника и кнопкой
           «Открыть у источника». Откликнуться у нас на них нельзя, и карточка об этом говорит
           прямо: отклик происходит на той стороне.
         </div>
