@@ -32,7 +32,7 @@ export async function GET(req: Request) {
   try {
     const res = await fetch('https://jobtoo.ru/api/db.php', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret },
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': secret, 'X-Admin-Token': process.env.ADMIN_API_TOKEN ?? '' },
       body: JSON.stringify({
         fn: 'billingReport',
         args: [u.searchParams.get('from') ?? '', u.searchParams.get('to') ?? ''],
