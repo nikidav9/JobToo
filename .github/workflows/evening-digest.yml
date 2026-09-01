@@ -24,13 +24,14 @@ jobs:
           #
           # Нет секрета — ход честно падает. Это видно сразу, в отличие от
           # тихой работы на ключе, который знает посторонний.
-          if [ -z "$APP_SECRET" ]; then
-            echo "Секрет EXPO_PUBLIC_APP_SECRET не задан"; exit 1
+          if [ -z "$APP_SECRET" ] || [ -z "$ADMIN_TOKEN" ]; then
+            echo "Серверные секреты для задания не настроены"; exit 1
           fi
           SECRET="$APP_SECRET"
           RESP=$(curl -s -X POST "https://jobtoo.ru/api/db.php" \
             -H "Content-Type: application/json" \
             -H "X-App-Secret: $SECRET" \
+            -H "X-Admin-Token: $ADMIN_TOKEN" \
             -d '{"fn":"cronEveningDigest","args":[]}')
           echo "Response: $RESP"
           echo "$RESP" | grep -q '"data"' || { echo "cronEveningDigest failed"; exit 1; }
