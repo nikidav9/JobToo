@@ -177,6 +177,21 @@ function ing_time(?string $raw): ?string
     return sprintf('%02d:%02d', $h, $i);
 }
 
+function ing_discriminatory(array $it): bool
+{
+    $text = mb_strtolower(implode(' ', [
+        (string)($it['title'] ?? ''),
+        (string)($it['description'] ?? ''),
+        (string)($it['requirements'] ?? ''),
+    ]));
+    return (bool)preg_match(
+        '~\\bмужчин[аы]?\\b|мужского\\s+пола|\\bженщин[аы]?\\b|женского\\s+пола'
+        . '|русскоязычн|славянск(?:ая|ой)\\s+внешност'
+        . '|\\b(?:до|от)\\s*\\d{2}\\s*(?:лет|года)|\\b\\d{2}\\s*[–—-]\\s*\\d{2}\\s*(?:лет|года)~u',
+        $text
+    );
+}
+
 /** Привести запись фида к нашему виду. Возвращает null, если она бесполезна. */
 function ing_normalize(array $it, string $sourceId): ?array
 {
@@ -185,7 +200,8 @@ function ing_normalize(array $it, string $sourceId): ?array
     $url = trim((string)($it['url'] ?? ''));
     // Три обязательных поля. Без ссылки показывать чужую вакансию нельзя —
     // это была бы перепечатка чужого содержимого без пути к источнику.
-    if ($ext === '' || $title === '' || !preg_match('~^https?://~i', $url)) return null;
+    if ($ext === '' || $title === '' || !preg_match('~^https://~i', $url)) return null;
+    if (ing_discriminatory($it)) return null;
 
     $kind = ($it['kind'] ?? 'shift') === 'permanent' ? 'permanent' : 'shift';
     $loc = is_array($it['location'] ?? null) ? $it['location'] : [];
