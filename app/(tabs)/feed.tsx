@@ -1477,8 +1477,16 @@ function WorkerFeed() {
                           {normalizeCompany(currentCard.company)}
                         </Text>
                         <View style={styles.metroHintRow}>
-                          <Ionicons name="subway-outline" size={12} color={Colors.textMuted} />
-                          <Text style={styles.metroHint}>{currentCard.metroStation}</Text>
+                          <Ionicons
+                            name={'external' in currentCard ? 'open-outline' : 'subway-outline'}
+                            size={12}
+                            color={Colors.textMuted}
+                          />
+                          <Text style={styles.metroHint}>
+                            {'external' in currentCard
+                              ? `Источник: ${(currentCard as PartnerShiftCard).external.sourceName ?? 'партнёр'} · отклик на его сайте`
+                              : currentCard.metroStation}
+                          </Text>
                         </View>
                       </View>
                       {currentCard.isUrgent ? (
@@ -1559,7 +1567,11 @@ function WorkerFeed() {
                     onPress={() => doMessageRef.current?.()}
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="chatbubble-outline" size={20} color={Colors.textSecondary} />
+                    <Ionicons
+                      name={'external' in currentCard ? 'open-outline' : 'chatbubble-outline'}
+                      size={20}
+                      color={Colors.textSecondary}
+                    />
                   </TouchableOpacity>
 
                   <TouchableOpacity
