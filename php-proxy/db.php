@@ -2551,85 +2551,13 @@ try {
                 $поКликам[$k] = ($поКликам[$k] ?? 0) + 1;
             }
 
-            // Цифры, с которыми можно идти на встречу с партнёром. Это не
-            // персональные данные, а размер доступной аудитории и уже
-            // доказанная активность площадки. Считаем здесь же, чтобы в
-            // панели была одна согласованная сводка, а не четыре числа из
-            // разных разделов, снятые в разное время.
-            $c30 = gmdate('Y-m-d\TH:i:s', time() - 30 * 86400) . 'Z';
-            $users = sb_select_all('jm_users', [], 'id,role,last_seen_at');
-            $workers = 0; $employers = 0; $active30 = 0;
-            foreach ($users as $u) {
-                if (($u['role'] ?? '') === 'worker') $workers++;
-                if (($u['role'] ?? '') === 'employer') $employers++;
-                $seenAt = !empty($u['last_seen_at']) ? strtotime((string)$u['last_seen_at']) : false;
-                if ($seenAt !== false && $seenAt >= time() - 30 * 86400) $active30++;
-            }
-
-            $ownShifts = sb_select_all('jm_vacancies', ['status' => 'eq.open'], 'metro_station');
-            $ownPerm = sb_select_all('jm_perm_vacancies', ['status' => 'eq.open'], 'metro_station');
-            $metros = [];
-            foreach (array_merge($ownShifts, $ownPerm, $rows) as $v) {
-                $m = trim((string)($v['metro_station_norm'] ?? $v['metro_station'] ?? ''));
-                if ($m !== '') $metros[$m] = true;
-            }
-
-            $likes = sb_select_all('jm_likes', [], 'is_match,shift_completed');
-            $matches = 0; $completed = 0;
-            foreach ($likes as $l) {
-                if (!empty($l['is_match'])) $matches++;
-                if (!empty($l['shift_completed'])) $completed++;
-            }
-
-            $clicks30 = sb_select_all('jm_ext_clicks', ['clicked_at' => 'gte.' . $c30],
-                'source_id,user_id,clicked_at');
-            $clicks30By = []; $uniqueBy = []; $uniqueAll = []; $daily = [];
-            for ($i = 13; $i >= 0; $i--) {
-                $day = gmdate('Y-m-d', time() - $i * 86400);
-                $daily[$day] = 0;
-            }
-            foreach ($clicks30 as $c) {
-                $sid = (string)$c['source_id'];
-                $clicks30By[$sid] = ($clicks30By[$sid] ?? 0) + 1;
-                $uid = trim((string)($c['user_id'] ?? ''));
-                if ($uid !== '') {
-                    $uniqueAll[$uid] = true;
-                    if (!isset($uniqueBy[$sid])) $uniqueBy[$sid] = [];
-                    $uniqueBy[$sid][$uid] = true;
-                }
-                $day = substr((string)($c['clicked_at'] ?? ''), 0, 10);
-                if (array_key_exists($day, $daily)) $daily[$day]++;
-            }
-            $uniqueByCounts = [];
-            foreach ($uniqueBy as $sid => $ids) $uniqueByCounts[$sid] = count($ids);
-
             $data = [
                 'всего' => count($rows),
                 'по_источникам' => $by,
                 'переходов_7дней' => count($clicks),
                 'переходы_по_источникам' => $поКликам,
-                'переходов_30дней' => count($clicks30),
-                'переходы_30дней_по_источникам' => $clicks30By,
-                'уникальных_пользователей_30дней' => count($uniqueAll),
-                'уникальные_по_источникам' => $uniqueByCounts,
-                'переходы_14дней' => array_map(
-                    fn($day, $count) => ['date' => $day, 'count' => $count],
-                    array_keys($daily), array_values($daily)
-                ),
                 'без_станции' => $безСтанции,
                 'без_профессии' => $безПрофессии,
-                'аудитория' => [
-                    'работников' => $workers,
-                    'работодателей' => $employers,
-                    'активных_30дней' => $active30,
-                ],
-                'площадка' => [
-                    'открытых_смен' => count($ownShifts),
-                    'постоянных_вакансий' => count($ownPerm),
-                    'станций_метро' => count($metros),
-                    'мэтчей' => $matches,
-                    'завершенных_смен' => $completed,
-                ],
             ];
             break;
         }
