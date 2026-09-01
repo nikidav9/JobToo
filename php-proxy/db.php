@@ -204,11 +204,80 @@ $selfArgFns = [
     'dbGetWebPushSubscription' => 0, 'dbSaveWebPushSubscription' => 0,
     'dbDeleteWebPushSubscription' => 0, 'dbGetNotifications' => 0,
     'dbMarkAllNotifsRead' => 0, 'dbDeleteAllNotifs' => 0,
+    'dbRecordVacancyView' => 1, 'dbRecordPermVacancyView' => 1,
+    'dbGetLikeByVacancyWorker' => 1, 'dbRemoveLike' => 1,
+    'dbCheckAndCreateMatch' => 1, 'dbApplyPermVacancy' => 1,
 ];
 if (isset($selfArgFns[$fn])) {
     $pos = $selfArgFns[$fn];
     if ($authUid === null || (string)($args[$pos] ?? '') !== $authUid) {
         jt_respond(['error' => 'Forbidden for this user'], 403); exit;
+    }
+}
+
+// Переписка доступна только её участникам.
+$chatArgFns = [
+    'dbGetMessages' => 0, 'dbGetChatById' => 0, 'dbInsertMessage' => 0,
+    'dbMarkRead' => 0, 'dbIncrementUnread' => 0, 'dbDeleteChat' => 0,
+];
+if (isset($chatArgFns[$fn])) {
+    $chatId = (string)($args[$chatArgFns[$fn]] ?? '');
+    $chat = $chatId !== '' ? sb_single('jm_chats', ['id' => 'eq.' . $chatId], 'worker_id,employer_id') : null;
+    if (!$chat || ($authUid !== (string)$chat['worker_id'] && $authUid !== (string)$chat['employer_id'])) {
+        jt_respond(['error' => 'Chat access denied'], 403); exit;
+    }
+    if ($fn === 'dbInsertMessage' && (string)($args[1] ?? '') !== $authUid) {
+        jt_respond(['error' => 'Invalid sender'], 403); exit;
+    }
+}
+if ($fn === 'dbCreateChat') {
+    $workerId = (string)($args[0] ?? '');
+    $employerId = (string)($args[1] ?? '');
+    if ($authUid !== $workerId && $authUid !== $employerId) {
+        jt_respond(['error' => 'Chat access denied'], 403); exit;
+    }
+}
+
+// Создавать и менять объявления может только указанный в них работодатель.
+if (in_array($fn, ['dbUpsertVacancy', 'dbUpsertPermVacancy'], true)) {
+    $owner = (string)(($args[0]['employer_id'] ?? ''));
+    if ($owner === '' || $owner !== $authUid) {
+        jt_respond(['error' => 'Vacancy owner required'], 403); exit;
+    }
+}
+if ($fn === 'dbUpsertVacancyBatch') {
+    foreach ((array)($args[0] ?? []) as $row) {
+        if ((string)($row['employer_id'] ?? '') !== $authUid) {
+            jt_respond(['error' => 'Vacancy owner required'], 403); exit;
+        }
+    }
+}
+$ownedVacancyFns = [
+    'dbUpdateVacancy' => ['jm_vacancies', 0],
+    'dbDeleteVacancy' => ['jm_vacancies', 0],
+    'dbGetLikesByVacancy' => ['jm_vacancies', 0],
+    'dbGetVacancyViewers' => ['jm_vacancies', 0],
+    'dbClosePermVacancy' => ['jm_perm_vacancies', 0],
+    'dbDeletePermVacancy' => ['jm_perm_vacancies', 0],
+    'dbGetPermApplicationsForVacancy' => ['jm_perm_vacancies', 0],
+];
+if (isset($ownedVacancyFns[$fn])) {
+    [$table, $pos] = $ownedVacancyFns[$fn];
+    $vac = sb_single($table, ['id' => 'eq.' . (string)($args[$pos] ?? '')], 'employer_id');
+    if (!$vac || (string)($vac['employer_id'] ?? '') !== $authUid) {
+        jt_respond(['error' => 'Vacancy owner required'], 403); exit;
+    }
+}
+if ($fn === 'dbSetPermApplicationStatus') {
+    $app = sb_single('jm_perm_applications', ['id' => 'eq.' . (string)($args[0] ?? '')], 'employer_id');
+    if (!$app || (string)($app['employer_id'] ?? '') !== $authUid) {
+        jt_respond(['error' => 'Application access denied'], 403); exit;
+    }
+}
+if ($fn === 'dbSubmitRatingAndMaybeDelete') {
+    $params = is_array($args[0] ?? null) ? $args[0] : [];
+    if ((string)($params['fromUserId'] ?? '') !== $authUid) {
+        jt_respond(['error' => 'Rating author mismatch'], 403); exit;
     }
 }
 
@@ -2201,6 +2270,7 @@ try {
             if (!$v || empty($v['user']['id'])) { $data = ['ok' => false]; break; }
             $tgId = (int)$v['user']['id'];
             $u = sb_single('jm_users', ['telegram_id' => 'eq.' . $tgId]);
+            if (is_array($u)) unset($u['password'], $u['push_token']);
             $data = [
                 'ok' => true,
                 'user' => $u,
