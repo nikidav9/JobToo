@@ -1372,7 +1372,7 @@ export async function dbSubmitSkillTest(
  */
 export async function dbGetExternalVacancies(): Promise<ExternalVacancy[]> {
   const rows = await proxy<any[]>('extVacancies');
-  return (rows ?? []).map(r => ({
+  const mapped: ExternalVacancy[] = (rows ?? []).map(r => ({
     id: r.id,
     sourceId: r.source_id,
     sourceName: r.source_name ?? undefined,
@@ -1397,6 +1397,16 @@ export async function dbGetExternalVacancies(): Promise<ExternalVacancy[]> {
     lastSeenAt: r.last_seen_at ?? undefined,
     dedupeKey: r.dedupe_key ?? undefined,
   }));
+
+  // Один и тот же заказ может прийти от нескольких интеграций. Оставляем
+  // одну карточку по серверному отпечатку, чтобы лента не выглядела спамом.
+  const seen = new Set<string>();
+  return mapped.filter(v => {
+    const key = v.dedupeKey || `${v.sourceId}:${v.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**
