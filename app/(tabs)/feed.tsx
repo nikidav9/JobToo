@@ -918,6 +918,38 @@ const wS = StyleSheet.create({
 // ─────────────────────────────────────────────────
 // Worker swipe feed (Подработка)
 // ─────────────────────────────────────────────────
+type PartnerShiftCard = Vacancy & { external: ExternalVacancy };
+
+function partnerShiftToCard(v: ExternalVacancy): PartnerShiftCard | null {
+  if (v.kind !== 'shift' || !v.date || !v.url) return null;
+  return {
+    id: `external:${v.id}`,
+    employerId: `external:${v.sourceId}`,
+    company: v.company ?? v.sourceName ?? 'Компания',
+    title: v.title,
+    workType: v.workType ?? 'stocker',
+    workTypeLabel: v.workType ?? 'Смена',
+    metroLineId: v.metroLineId ?? '',
+    metroStation: v.metroStation ?? v.metroStationRaw ?? '',
+    date: v.date,
+    timeStart: v.timeStart ?? '—',
+    timeEnd: v.timeEnd ?? '—',
+    salary: v.salary ?? 0,
+    normsAndPay: v.description ?? 'Условия и отклик — на сайте источника',
+    address: v.address,
+    lat: v.lat,
+    lng: v.lng,
+    workersNeeded: 0,
+    workersFound: 0,
+    isUrgent: false,
+    noExperienceNeeded: false,
+    conditions: v.description ?? '',
+    status: 'open',
+    createdAt: v.lastSeenAt ?? new Date().toISOString(),
+    external: v,
+  };
+}
+
 function WorkerFeed() {
   const router = useRouter();
   const {
@@ -926,6 +958,18 @@ function WorkerFeed() {
     showToast, vacanciesLoading, vacancyStatsMap, exitGuest,
   } = useApp();
   const [refreshing, setRefreshing] = useState(false);
+  const [partnerShifts, setPartnerShifts] = useState<PartnerShiftCard[]>([]);
+
+  const loadPartnerShifts = useCallback(async () => {
+    try {
+      const rows = await dbGetExternalVacancies();
+      setPartnerShifts(rows.map(partnerShiftToCard).filter((v): v is PartnerShiftCard => !!v));
+    } catch {
+      // Свои смены остаются доступны при временной ошибке партнёрского фида.
+    }
+  }, []);
+
+  useEffect(() => { loadPartnerShifts(); }, [loadPartnerShifts]);
 
   // Гость смотрит ленту, но откликнуться/написать не может — любое такое
   // действие ведёт на выбор роли и регистрацию.
@@ -938,7 +982,7 @@ function WorkerFeed() {
   const onRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
-    await refreshAll();
+    await Promise.all([refreshAll(), loadPartnerShifts()]);
     setRefreshing(false);
   };
 
@@ -957,12 +1001,13 @@ function WorkerFeed() {
   // передаём адрес и координаты — по ним карта и группирует точки.
   const mapItems: MapListItem[] = useMemo(() => {
     if (!currentUser) return [];
-    return (vacancies as Vacancy[])
+    return ([...vacancies, ...partnerShifts] as Vacancy[])
       .filter((v: Vacancy) =>
         v.status === 'open' &&
         v.date === selectedDate &&
         (!!v.metroStation || !!v.address) &&
-        currentUser.workTypes?.includes(v.workType))
+        (('external' in v && !(v as PartnerShiftCard).external.workType)
+          || currentUser.workTypes?.includes(v.workType)))
       .map((v: Vacancy) => ({
         id: v.id,
         station: v.metroStation,
@@ -974,7 +1019,7 @@ function WorkerFeed() {
         lat: v.lat,
         lng: v.lng,
       }));
-  }, [vacancies, selectedDate, currentUser]);
+  }, [vacancies, partnerShifts, selectedDate, currentUser]);
 
   const pan = useRef(new Animated.ValueXY()).current;
   const cardAreaRef = useRef<View>(null);
@@ -1012,11 +1057,12 @@ function WorkerFeed() {
 
   useEffect(() => {
     if (!currentUser) return;
-    const filtered = vacancies
+    const filtered = [...vacancies, ...partnerShifts]
       .filter(v => {
         if (v.status !== 'open') return false;
         if (v.date !== selectedDate) return false;
-        if (!currentUser.workTypes?.includes(v.workType)) return false;
+        if (!('external' in v && !(v as PartnerShiftCard).external.workType)
+          && !currentUser.workTypes?.includes(v.workType)) return false;
         if (pendingLikeIds.current.has(v.id)) return false;
         const liked = likes.find(l => l.vacancyId === v.id && l.workerId === currentUser.id);
         if (liked) return false;
@@ -1040,7 +1086,7 @@ function WorkerFeed() {
       pan.flattenOffset();
       pan.setValue({ x: 0, y: 0 });
     }
-  }, [selectedDate, vacancies, likes, myLikes, users, currentUser, filterStation]);
+  }, [selectedDate, vacancies, partnerShifts, likes, myLikes, users, currentUser, filterStation]);
 
   const currentCard = cards[0];
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;
@@ -1052,7 +1098,7 @@ function WorkerFeed() {
     : { applicants: 0, rejected: 0, views: 0 };
 
   useEffect(() => {
-    if (!currentCard?.id || !currentUser?.id || currentUser.isGuest) return;
+    if (!currentCard?.id || 'external' in currentCard || !currentUser?.id || currentUser.isGuest) return;
     const t = setTimeout(() => {
       dbRecordVacancyView(currentCard.id, currentUser.id).catch(() => {});
     }, 300);
@@ -1093,8 +1139,8 @@ function WorkerFeed() {
     animateCard('left', vx, () => {
       setHistory(h => ({ ...h, [date]: [card, ...(h[date] ?? []).slice(0, 9)] }));
       setCards(prev => prev.slice(1));
-      // Гость листает ленту свободно, но «пропуск» в базу не пишем.
-      if (user.isGuest) return;
+      // Партнёрскую карточку и гость листают локально: своей записи в базе нет.
+      if (user.isGuest || 'external' in card) return;
       dbUpsertLike(card.id, user.id, card.employerId, { workerLiked: false, workerSkipped: true })
         .then(() => refreshLikes(user))
         .catch(() => { pendingLikeIds.current.delete(card.id); });
@@ -1108,6 +1154,18 @@ function WorkerFeed() {
     const date = selectedDate;
     const user = currentUser;
     pendingLikeIds.current.add(card.id);
+
+    if ('external' in card) {
+      const ext = (card as PartnerShiftCard).external;
+      animateCard('right', vx, () => {
+        setHistory(h => ({ ...h, [date]: [card, ...(h[date] ?? []).slice(0, 9)] }));
+        setCards(prev => prev.slice(1));
+        dbRecordExternalClick(ext.id, ext.sourceId, user.id).catch(() => {});
+        Linking.openURL(ext.url).catch(() => showToast('Не удалось открыть источник', 'error'));
+      });
+      return;
+    }
+
     animateCard('right', vx, () => {
       setHistory(h => ({ ...h, [date]: [card, ...(h[date] ?? []).slice(0, 9)] }));
       setCards(prev => prev.slice(1));
@@ -1152,6 +1210,12 @@ function WorkerFeed() {
   const doMessage = useCallback(() => {
     if (!currentCard || !currentUser || messagingRef.current) return;
     if (currentUser.isGuest) { promptRegister(); return; }
+    if ('external' in currentCard) {
+      const ext = (currentCard as PartnerShiftCard).external;
+      dbRecordExternalClick(ext.id, ext.sourceId, currentUser.id).catch(() => {});
+      Linking.openURL(ext.url).catch(() => showToast('Не удалось открыть источник', 'error'));
+      return;
+    }
     const existingChat = chats.find(
       c => c.employerId === currentCard.employerId && c.workerId === currentUser.id
     );
@@ -1237,10 +1301,11 @@ function WorkerFeed() {
 
   const getDateCount = (d: string) => {
     if (!currentUser) return 0;
-    return vacancies.filter(v => {
+    return [...vacancies, ...partnerShifts].filter(v => {
       if (v.status !== 'open') return false;
       if (v.date !== d) return false;
-      if (!currentUser.workTypes?.includes(v.workType)) return false;
+      if (!('external' in v && !(v as PartnerShiftCard).external.workType)
+        && !currentUser.workTypes?.includes(v.workType)) return false;
       const alreadySwiped = likes.find(l => l.vacancyId === v.id && l.workerId === currentUser.id);
       if (alreadySwiped) return false;
       if (filterStation && v.metroStation !== filterStation) return false;
@@ -1463,7 +1528,9 @@ function WorkerFeed() {
                   activeOpacity={0.7}
                   onPress={() => { setDetailVacancy(currentCard); setDetailEmployer(currentEmployer ?? null); }}
                 >
-                  <Text style={styles.detailHintText}>Подробности и нормативы</Text>
+                  <Text style={styles.detailHintText}>
+                    {'external' in currentCard ? 'Условия и отклик у источника' : 'Подробности и нормативы'}
+                  </Text>
                   <Text style={styles.detailHintArrow}>→</Text>
                 </TouchableOpacity>
 
