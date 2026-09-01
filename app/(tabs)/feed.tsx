@@ -1893,12 +1893,14 @@ function WorkerPermMode() {
           <CompanyMark company={v.company} size={42} />
           <View style={pS.companyMeta}>
             <Text style={pS.companyName} numberOfLines={1}>{displayCompany}</Text>
-            <View style={pS.verifiedRow}>
-              <View style={pS.verifiedBadge}>
-                <Ionicons name="checkmark" size={9} color="#fff" />
+            {'verified' in v && (v as any).verified === true ? (
+              <View style={pS.verifiedRow}>
+                <View style={pS.verifiedBadge}>
+                  <Ionicons name="checkmark" size={9} color="#fff" />
+                </View>
+                <Text style={pS.verifiedTxt}>Проверено JobToo</Text>
               </View>
-              <Text style={pS.verifiedTxt}>Проверено</Text>
-            </View>
+            ) : null}
           </View>
         </View>
 
