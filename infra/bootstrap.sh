@@ -283,9 +283,9 @@ if [ -f /opt/jobtoo-proxy/ingest.php ]; then
   if [ ! -f /var/lib/jt-ingest ] \
      || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-ingest 2>/dev/null || echo 0) )) -gt 600 ]; then
     touch /var/lib/jt-ingest
-    AS=$(grep -m1 '^EXPO_PUBLIC_APP_SECRET=' "$SECRETS" 2>/dev/null | cut -d= -f2-)
-    if [ -n "${AS:-}" ]; then
-      curl -s -m 120 -o /var/lib/jt-ingest.out -H "X-App-Secret: $AS" \
+    AT=$(grep -m1 '^ADMIN_API_TOKEN=' "$SECRETS" 2>/dev/null | cut -d= -f2-)
+    if [ -n "${AT:-}" ]; then
+      curl -s -m 120 -o /var/lib/jt-ingest.out -H "X-Admin-Token: $AT" \
         https://jobtoo.ru/api/ingest.php >/dev/null 2>&1 || true
     fi
   fi
@@ -542,6 +542,20 @@ if [ -n "${GH_TOKEN+x}" ]; then
     sed -i '/^EXPO_PUBLIC_APP_SECRET=/d' "$SECRETS"
     echo "EXPO_PUBLIC_APP_SECRET=$APP_SECRET_VAL" >> "$SECRETS"
   fi
+fi
+
+# Серверный пропуск административных API. Пока отдельный токен не задан,
+# используем пароль дашборда: он уже не попадает в клиентские сборки.
+ADMIN_TOKEN_VAL=$( (cd "$REPO/infra" && docker compose exec -T php php -r '
+  $s = @include "/var/www/api/app_secrets.php";
+  $a = @include "/var/www/api/admin_credentials.php";
+  echo is_array($s) && !empty($s["ADMIN_API_TOKEN"])
+    ? $s["ADMIN_API_TOKEN"]
+    : (is_array($a) ? ($a["password"] ?? "") : "");') 2>/dev/null | tr -d '\r\n' || true)
+if [ -n "${ADMIN_TOKEN_VAL:-}" ] \
+   && ! grep -qx "ADMIN_API_TOKEN=$ADMIN_TOKEN_VAL" "$SECRETS" 2>/dev/null; then
+  sed -i '/^ADMIN_API_TOKEN=/d' "$SECRETS"
+  echo "ADMIN_API_TOKEN=$ADMIN_TOKEN_VAL" >> "$SECRETS"
 fi
 
 # Ключи к объектному хранилищу — туда же, в файл переменных: скрипт копий
