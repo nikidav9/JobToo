@@ -742,7 +742,6 @@ fi
 # Строго IPv4: ifconfig.me отдавал IPv6, и имя получалось несуществующим —
 # certbot честно не мог выпустить сертификат на 2a03:...sslip.io.
 IP=$(ip -4 addr show scope global 2>/dev/null | grep -oE 'inet [0-9.]+' | awk '{print $2}' | head -1)
-IP6=$(ip -6 addr show scope global 2>/dev/null | grep -oE 'inet6 [0-9a-f:]+' | awk '{print $2}' | head -1)
 HOST="${IP}.sslip.io"
 
 # certonly, а не --nginx: правки certbot в конфигурации не выживали. Этот
@@ -842,15 +841,14 @@ if [ ! -d "/etc/letsencrypt/live/$ADMIN_HOST" ] && command -v certbot >/dev/null
   fi
 fi
 
-# tg.jobtoo.ru — имя только под вебхук, и намеренно без A-записи. Проверяем
-# соответственно AAAA, а не A: A там не появится никогда, это и есть смысл
-# записи. Ждём, пока имя укажет на наш же IPv6.
+# tg.jobtoo.ru — имя только под вебхук. Проверяем A-запись: IPv6 временно
+# убран из публичного DNS, потому что HTTPS по нему не отвечает снаружи.
 TG_HOST=tg.jobtoo.ru
 if [ ! -d "/etc/letsencrypt/live/$TG_HOST" ] && command -v certbot >/dev/null 2>&1 \
-   && command -v dig >/dev/null 2>&1 && [ -n "${IP6:-}" ]; then
+   && command -v dig >/dev/null 2>&1 && [ -n "${IP:-}" ]; then
   TNS=$(dig +short +time=5 +tries=1 NS jobtoo.ru 2>/dev/null | head -1)
   TOK=0
-  [ -n "$TNS" ] && TOK=$(dig +short +time=5 +tries=1 AAAA "$TG_HOST" "@$TNS" 2>/dev/null | grep -c "^${IP6}$" || true)
+  [ -n "$TNS" ] && TOK=$(dig +short +time=5 +tries=1 A "$TG_HOST" "@$TNS" 2>/dev/null | grep -c "^${IP}$" || true)
   if [ "${TOK:-0}" -ge 1 ]; then
     TLAST=$(cat /var/lib/jt-tg-cert-last 2>/dev/null || echo 0)
     if [ "$(( $(date +%s) - ${TLAST:-0} ))" -gt 900 ]; then
