@@ -117,8 +117,8 @@ for i in $(seq 1 "$SAMPLES"); do
   [[ $PROBE_OK -eq 1 ]] || { fails[api]=$(( fails[api]+1 )); }
   last_api_ok=$PROBE_OK
 
-  # Запасной адрес: status.json по имени из IP, мимо DNS домена.
-  probe fallback -4 "https://$FALLBACK_HOST/status.json"
+  # Запасной адрес: минимальный health-check по имени из IP, мимо DNS домена.
+  probe fallback -4 "https://$FALLBACK_HOST/health"
   [[ $PROBE_OK -eq 1 ]] || { fails[fallback]=$(( fails[fallback]+1 )); }
 
   [[ $i -lt $SAMPLES ]] && sleep "$SAMPLE_GAP"
@@ -137,19 +137,7 @@ flaps=$(( fails[browser] + fails[ipv4] + fails[api] ))
 [[ $last_api_ok     -eq 1 ]] || failed=1
 echo "flaps=$flaps (провалы, восстановившиеся к концу серии)"
 
-# ── Серверная история и снимок ────────────────────────────────────────────
-# Забираем то, что сервер накопил о себе между нашими редкими прогонами. Даже
-# часовой прогон так вытаскивает минутную историю. Не роняем прогон, если не
-# отдалось: это диагностика, а не приговор доступности.
-echo "── снимок сервера (status.json) ──"
-curl -4 --silent --connect-timeout 8 --max-time 20 \
-  "https://$FALLBACK_HOST/status.json" 2>/dev/null | sed 's/^/  /' | head -60 \
-  || echo "  status.json не отдался"
-
-echo "── история здоровья (последние 40 минут) ──"
-curl -4 --silent --connect-timeout 8 --max-time 20 \
-  "https://$FALLBACK_HOST/health-history.ndjson" 2>/dev/null | tail -40 | sed 's/^/  /' \
-  || echo "  health-history.ndjson не отдался (сэмплер ещё не выложен?)"
-
+# Подробные отчёты сервера намеренно не публикуются. Внешний мониторинг
+# хранит собственный журнал как artifact GitHub Actions.
 echo "result=$([[ $failed -eq 0 ]] && echo healthy || echo failed) flaps=$flaps"
 exit "$failed"
