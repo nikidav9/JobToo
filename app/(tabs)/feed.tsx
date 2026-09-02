@@ -1274,13 +1274,7 @@ function WorkerFeed() {
     const card = applyFor;
     if (!card || !currentUser || messagingRef.current) return;
     if (currentUser.isGuest) {
-      const isExternal = 'external' in currentCard;
-      const ext = isExternal ? (currentCard as PartnerShiftCard).external : null;
-      promptRegister({
-        vacancyId: ext?.id ?? currentCard.id,
-        vacancyKind: isExternal ? 'external' : 'shift',
-        sourceId: ext?.sourceId ?? null,
-      });
+      promptRegister({ vacancyId: card.id, vacancyKind: 'shift' });
       return;
     }
     messagingRef.current = true;
@@ -1865,13 +1859,7 @@ function WorkerPermMode() {
   const applyTo = (v: PermVacancy) : void => {
     if (!currentUser) return;
     if (currentUser.isGuest) {
-      const isExternal = 'external' in currentCard;
-      const ext = isExternal ? (currentCard as PartnerShiftCard).external : null;
-      promptRegister({
-        vacancyId: ext?.id ?? currentCard.id,
-        vacancyKind: isExternal ? 'external' : 'shift',
-        sourceId: ext?.sourceId ?? null,
-      });
+      promptRegister({ vacancyId: v.id, vacancyKind: 'permanent' });
       return;
     }
     if (myAppVacIds.has(v.id) || applying === v.id) { showToast('Уже откликнулись', 'success'); return; }
@@ -1906,13 +1894,7 @@ function WorkerPermMode() {
   const openPermChat = async (v: PermVacancy, displayCompany: string) => {
     if (!currentUser || chatLoading) return;
     if (currentUser.isGuest) {
-      const isExternal = 'external' in currentCard;
-      const ext = isExternal ? (currentCard as PartnerShiftCard).external : null;
-      promptRegister({
-        vacancyId: ext?.id ?? currentCard.id,
-        vacancyKind: isExternal ? 'external' : 'shift',
-        sourceId: ext?.sourceId ?? null,
-      });
+      promptRegister({ vacancyId: v.id, vacancyKind: 'permanent' });
       return;
     }
     // Check if chat already exists
@@ -1960,13 +1942,7 @@ function WorkerPermMode() {
   const toggleSaved = (v: PermVacancy) => {
     if (!currentUser) return;
     if (currentUser.isGuest) {
-      const isExternal = 'external' in currentCard;
-      const ext = isExternal ? (currentCard as PartnerShiftCard).external : null;
-      promptRegister({
-        vacancyId: ext?.id ?? currentCard.id,
-        vacancyKind: isExternal ? 'external' : 'shift',
-        sourceId: ext?.sourceId ?? null,
-      });
+      promptRegister({ vacancyId: v.id, vacancyKind: 'permanent' });
       return;
     }
     if (permSavedIds.includes(v.id)) {
