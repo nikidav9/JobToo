@@ -2781,16 +2781,27 @@ try {
                 ], 'id')
                 : null;
             if (!$vac) { $data = false; break; }
-            sb_insert('jm_ext_clicks', [
-                'id' => uid(), 'ext_id' => $extId, 'source_id' => $sourceId,
-                'user_id' => $authUid, 'clicked_at' => now_iso(),
-            ]);
-            sb_insert('jm_ext_events', [
-                'id' => uid(), 'ext_id' => $extId, 'source_id' => $sourceId,
-                'event_type' => 'click', 'user_id' => $authUid,
-                'occurred_at' => now_iso(),
-            ]);
-            $data = true; break;
+            // Непрозрачный click_id создаётся клиентом до открытия URL, чтобы
+            // браузер не блокировал переход ожиданием API. В нём нет user_id.
+            $clickId = trim((string)($args[3] ?? ''));
+            if (!preg_match('~^[A-Za-z0-9_-]{16,80}$~', $clickId)) $clickId = uid();
+            try {
+                sb_insert('jm_ext_clicks', [
+                    'id' => $clickId, 'ext_id' => $extId, 'source_id' => $sourceId,
+                    'user_id' => $authUid, 'clicked_at' => now_iso(),
+                ]);
+                sb_insert('jm_ext_events', [
+                    'id' => uid(), 'ext_id' => $extId, 'source_id' => $sourceId,
+                    'event_type' => 'click', 'user_id' => $authUid,
+                    'attribution_id' => $clickId, 'occurred_at' => now_iso(),
+                ]);
+            } catch (Throwable $e) {
+                // Повтор того же click_id идемпотентен: двойной tap не должен
+                // превращаться в два оплачиваемых перехода.
+                if (stripos($e->getMessage(), 'duplicate') === false
+                    && stripos($e->getMessage(), 'unique') === false) throw $e;
+            }
+            $data = ['recorded' => true, 'click_id' => $clickId]; break;
         }
 
         // Сводка по партнёрским вакансиям: объём, качество фида и воронка.
