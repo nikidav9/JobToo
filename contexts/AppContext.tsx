@@ -51,6 +51,7 @@ import {
   dbBindTelegram,
   dbAutoClosePastVacancies,
   dbRecordConsent,
+  dbCompleteGuestRegistration,
 } from '@/services/db';
 import { LEGAL_STAMP, legalVersions } from '@/constants/legal';
 import { registerForPushNotifications, releasePushTokenIfSignedOut } from '@/services/notifications';
@@ -646,6 +647,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const registerUser = async (u: User) => {
     await dbUpsertUser(u);
+    // Если человек пришёл из гостевого просмотра, замыкаем анонимную
+    // воронку. user_id не связываем с anon_id и в событие не передаём.
+    void dbCompleteGuestRegistration();
     // Галочка на экране регистрации была переменной в памяти, и дальше
     // кнопки «Продолжить» о ней не знал никто. Теперь принятое остаётся
     // в базе — здесь, а не в двух экранах регистрации по отдельности:
