@@ -180,7 +180,7 @@ $authUid = jt_session_uid($authHeader);
 $publicFns = [
     'dbCountUsers', 'dbWarmup', 'dbCheckPhoneExists', 'dbLogin',
     'dbUpsertUser', 'tgAuth', 'dbGetVacancies', 'dbGetPermVacancies',
-    'extVacancies', 'extClick', 'addressSuggest', 'dbLogOpen',
+    'extVacancies', 'extClick', 'addressSuggest', 'dbLogOpen', 'guestEvent',
     'dbResponsivenessMap',
 ];
 if (!in_array($fn, $publicFns, true) && !in_array($fn, $adminFns, true) && $authUid === null) {
@@ -3139,6 +3139,42 @@ try {
                 'role'      => $args[2] ?? null,
                 'platform'  => $args[3] ?? null,
                 'opened_at' => now_iso(),
+            ], ['Prefer: return=minimal']);
+            $data = true;
+            break;
+        }
+
+        case 'guestEvent': {
+            // Гостевая воронка: только случайный идентификатор и строгий набор
+            // технических полей. Произвольный payload и персональные данные не принимаем.
+            $anon = trim((string)($args[0] ?? ''));
+            $event = (string)($args[1] ?? '');
+            $vacancyId = isset($args[2]) ? trim((string)$args[2]) : '';
+            $kind = isset($args[3]) ? (string)$args[3] : '';
+            $sourceId = isset($args[4]) ? trim((string)$args[4]) : '';
+            $platform = isset($args[5]) ? (string)$args[5] : '';
+
+            $events = ['guest_started', 'vacancy_impression', 'apply_intent',
+                'registration_started', 'registration_completed', 'external_click'];
+            $kinds = ['', 'shift', 'permanent', 'external'];
+            $platforms = ['', 'web', 'ios', 'android', 'windows', 'macos'];
+            if ($anon === '' || strlen($anon) > 128 || !preg_match('/^[A-Za-z0-9._:-]+$/', $anon)
+                || !in_array($event, $events, true)
+                || !in_array($kind, $kinds, true)
+                || !in_array($platform, $platforms, true)
+                || strlen($vacancyId) > 160 || strlen($sourceId) > 160) {
+                jt_respond(['error' => 'Invalid guest analytics event'], 400); exit;
+            }
+
+            sb('POST', 'jm_guest_events', [], [
+                'id' => uid(),
+                'anon_id' => $anon,
+                'event_type' => $event,
+                'vacancy_id' => $vacancyId !== '' ? $vacancyId : null,
+                'vacancy_kind' => $kind !== '' ? $kind : null,
+                'source_id' => $sourceId !== '' ? $sourceId : null,
+                'platform' => $platform !== '' ? $platform : null,
+                'occurred_at' => now_iso(),
             ], ['Prefer: return=minimal']);
             $data = true;
             break;

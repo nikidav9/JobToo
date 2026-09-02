@@ -47,7 +47,7 @@ function FunnelBar({ items }: { items: { name: string; value: number; fill: stri
 export default function FunnelPage() {
   const fetcher = useCallback(() => fetchFunnel(), [])
   const { data: d, loading, lastUpdated, pulse, refresh } = useRealtime(fetcher, {
-    tables: ['jm_likes', 'jm_users', 'jm_perm_applications'],
+    tables: ['jm_likes', 'jm_users', 'jm_perm_applications', 'jm_guest_events'],
     intervalSec: 60,
   })
 
@@ -58,6 +58,43 @@ export default function FunnelPage() {
       <PageHeader title="Воронка конверсии" intervalSec={60} lastUpdated={lastUpdated} pulse={pulse} onRefresh={refresh} />
 
       <div className="page-content">
+        {/* Гостевой просмотр */}
+        <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', fontWeight: 500, fontFamily: 'Geist Mono, monospace', paddingBottom: 2 }}>
+          Гости без регистрации · 30 дней
+        </div>
+        <div className="g-4">
+          <KpiCard label="Уникальных гостей" value={d.kpi.guestUnique30}
+            sub={`${d.kpi.guestUnique7} за 7 дней`} sparkColor={PALETTE.blue} />
+          <KpiCard label="Просмотров вакансий" value={d.kpi.guestImpressions30}
+            sub="карточки в гостевом режиме" sparkColor={PALETTE.cyan} />
+          <KpiCard label="Хотели откликнуться" value={d.kpi.guestIntent30}
+            sub="нажали отклик или сообщение" sparkColor={PALETTE.orange} />
+          <KpiCard label="Гость → регистрация" value={`${d.kpi.guestRegistrationRate30}%`}
+            sub={`${d.kpi.guestRegistrations30} регистраций`} sparkColor={PALETTE.green} />
+        </div>
+
+        <div className="g-2">
+          <ChartCard title="Гостевая воронка" sub="Уникальные устройства за 30 дней · без персональных данных">
+            <FunnelBar items={d.guestFunnel} />
+          </ChartCard>
+          <ChartCard title="Активность гостей" sub="30 дней — просмотры, намерения и регистрации">
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={d.guestDaily30} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+                <XAxis dataKey="date" tick={AXIS} tickLine={false} axisLine={false} interval={3} />
+                <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={TT} formatter={(v: any, name: string) => [
+                  v,
+                  name === 'impressions' ? 'Просмотры' : name === 'intents' ? 'Намерения' : 'Регистрации',
+                ]} />
+                <Area type="monotone" dataKey="impressions" stroke={PALETTE.blue} fill={PALETTE.blue} fillOpacity={0.08} strokeWidth={1.7} dot={false} />
+                <Area type="monotone" dataKey="intents" stroke={PALETTE.orange} fill={PALETTE.orange} fillOpacity={0.06} strokeWidth={1.7} dot={false} />
+                <Area type="monotone" dataKey="registrations" stroke={PALETTE.green} fill={PALETTE.green} fillOpacity={0.06} strokeWidth={1.7} dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </div>
+
         {/* Активация */}
         <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', fontWeight: 500, fontFamily: 'Geist Mono, monospace', paddingBottom: 2 }}>
           Активация
