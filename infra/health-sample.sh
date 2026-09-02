@@ -23,7 +23,7 @@ set -u
 
 DOMAIN="${DOMAIN:-jobtoo.ru}"
 OUT="${OUT:-/var/www/html/health-history.ndjson}"
-KEEP="${KEEP:-1440}"          # строк в окне: 1440 = сутки при шаге в минуту
+KEEP="${KEEP:-43200}"         # 30 суток при шаге в минуту
 LOCK=/run/jt-health-sample.lock
 STATE=/run/jt-health-nginx-ts # засечка времени запуска nginx — ловим перезапуск
 
