@@ -1373,7 +1373,7 @@ function WorkerFeed() {
   return (
     <View style={{ flex: 1 }}>
       {isGuest && (
-        <TouchableOpacity style={gB.banner} activeOpacity={0.85} onPress={promptRegister}>
+        <TouchableOpacity style={gB.banner} activeOpacity={0.85} onPress={() => promptRegister()}>
           <Ionicons name="lock-closed" size={rs(15)} color="#fff" />
           <Text style={gB.bannerTxt}>Вы смотрите как гость. Зарегистрируйтесь, чтобы откликаться</Text>
           <Text style={gB.bannerCta}>Войти</Text>
