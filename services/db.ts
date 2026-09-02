@@ -655,6 +655,64 @@ export async function dbLogOpen(userId: string | null, role: string | null, plat
   }
 }
 
+export type GuestEventType =
+  | 'guest_started'
+  | 'vacancy_impression'
+  | 'apply_intent'
+  | 'registration_started'
+  | 'registration_completed'
+  | 'external_click';
+
+export interface GuestEventContext {
+  vacancyId?: string | null;
+  vacancyKind?: 'shift' | 'permanent' | 'external' | null;
+  sourceId?: string | null;
+}
+
+const GUEST_REGISTRATION_PENDING_KEY = 'jt-guest-registration-pending';
+
+// Отдельная воронка гостевого режима. Передаём только случайный anon_id и
+// технический контекст вакансии — без имени, телефона, IP или fingerprint.
+export async function dbRecordGuestEvent(
+  eventType: GuestEventType,
+  context: GuestEventContext = {},
+): Promise<void> {
+  try {
+    const anon = await getAnonId();
+    await proxy('guestEvent', [
+      anon,
+      eventType,
+      context.vacancyId ?? null,
+      context.vacancyKind ?? null,
+      context.sourceId ?? null,
+      Platform.OS,
+    ]);
+  } catch {
+    /* аналитика не должна мешать просмотру и регистрации */
+  }
+}
+
+export async function dbStartGuestRegistration(context: GuestEventContext = {}): Promise<void> {
+  try {
+    await AsyncStorage.setItem(GUEST_REGISTRATION_PENDING_KEY, '1');
+  } catch {}
+  await Promise.all([
+    dbRecordGuestEvent('apply_intent', context),
+    dbRecordGuestEvent('registration_started', context),
+  ]);
+}
+
+export async function dbCompleteGuestRegistration(): Promise<void> {
+  try {
+    const pending = await AsyncStorage.getItem(GUEST_REGISTRATION_PENDING_KEY);
+    if (pending !== '1') return;
+    await dbRecordGuestEvent('registration_completed');
+    await AsyncStorage.removeItem(GUEST_REGISTRATION_PENDING_KEY);
+  } catch {
+    /* повторим при следующей успешной регистрации, если хранилище доступно */
+  }
+}
+
 export async function dbGetPermVacancyViewsMap(): Promise<Record<string, number>> {
   if (IS_NATIVE) return proxy<Record<string, number>>('dbGetPermVacancyViewsMap');
   const { data } = await withTimeout(supabase.from('jm_perm_vacancy_views').select('vacancy_id'));
