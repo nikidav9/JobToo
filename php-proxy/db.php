@@ -2814,8 +2814,18 @@ try {
 
         // Сводка по партнёрским вакансиям: объём, качество фида и воронка.
         case 'extStats': {
-            $rows = sb_select_all('jm_ext_vacancies', ['active' => 'is.true'],
+            $sources = sb_select_all('jm_ext_sources', [], 'id,name,environment');
+            $production = [];
+            foreach ($sources as $source) {
+                if (($source['environment'] ?? 'production') === 'production') {
+                    $production[(string)$source['id']] = (string)$source['name'];
+                }
+            }
+
+            $allVacancies = sb_select_all('jm_ext_vacancies', ['active' => 'is.true'],
                 'source_id,kind,metro_station,metro_station_norm,work_type');
+            $rows = array_values(array_filter($allVacancies,
+                fn($r) => isset($production[(string)($r['source_id'] ?? '')])));
             $by = []; $withoutStation = 0; $withoutProfession = 0;
             foreach ($rows as $r) {
                 $k = (string)$r['source_id'];
@@ -2824,14 +2834,16 @@ try {
                 if (empty($r['work_type'])) $withoutProfession++;
             }
 
-            $c7 = gmdate('Y-m-d\TH:i:s', time() - 7 * 86400) . 'Z';
-            $c30 = gmdate('Y-m-d\TH:i:s', time() - 30 * 86400) . 'Z';
-            $events7 = sb_select_all('jm_ext_events', ['occurred_at' => 'gte.' . $c7],
-                'source_id,event_type,user_id');
-            $events30 = sb_select_all('jm_ext_events', ['occurred_at' => 'gte.' . $c30],
-                'source_id,event_type,user_id');
-            $runs7 = sb_select_all('jm_ext_ingest_runs', ['ran_at' => 'gte.' . $c7],
-                'source_id,success,received,status,ran_at');
+            $c7 = gmdate('Y-m-d\\TH:i:s', time() - 7 * 86400) . 'Z';
+            $c30 = gmdate('Y-m-d\\TH:i:s', time() - 30 * 86400) . 'Z';
+            $date30 = gmdate('Y-m-d', time() - 30 * 86400);
+            $onlyProduction = fn($r) => isset($production[(string)($r['source_id'] ?? '')]);
+            $events7 = array_values(array_filter(sb_select_all('jm_ext_events',
+                ['occurred_at' => 'gte.' . $c7], 'id,source_id,event_type,user_id,new_candidate'), $onlyProduction));
+            $events30 = array_values(array_filter(sb_select_all('jm_ext_events',
+                ['occurred_at' => 'gte.' . $c30], 'id,source_id,event_type,user_id,new_candidate'), $onlyProduction));
+            $runs7 = array_values(array_filter(sb_select_all('jm_ext_ingest_runs',
+                ['ran_at' => 'gte.' . $c7], 'source_id,success,received,status,ran_at'), $onlyProduction));
 
             $summarize = function(array $events): array {
                 $totals = ['impression' => 0, 'click' => 0, 'conversion' => 0];
@@ -2856,6 +2868,93 @@ try {
             $conversions = $s7['totals']['conversion'];
             $errors7 = count(array_filter($runs7, fn($r) => empty($r['success'])));
 
+            // Аудитория JobToo: только реальные незаблокированные работники.
+            $workers = sb_select_all('jm_users', ['role' => 'eq.worker', 'is_blocked' => 'not.is.true'],
+                'id,metro_station,created_at,last_seen_at');
+            $workerById = []; $regions = []; $activeRegions = [];
+            $active30 = 0; $registered30 = 0;
+            foreach ($workers as $worker) {
+                $uid = (string)($worker['id'] ?? '');
+                if ($uid !== '') $workerById[$uid] = $worker;
+                $region = trim((string)($worker['metro_station'] ?? ''));
+                if ($region !== '') $regions[$region] = ($regions[$region] ?? 0) + 1;
+                if (!empty($worker['last_seen_at']) && (string)$worker['last_seen_at'] >= $c30) {
+                    $active30++;
+                    if ($region !== '') $activeRegions[$region] = ($activeRegions[$region] ?? 0) + 1;
+                }
+                if (!empty($worker['created_at']) && (string)$worker['created_at'] >= $c30) $registered30++;
+            }
+            arsort($regions); arsort($activeRegions);
+
+            $unique = ['impression' => [], 'click' => [], 'conversion' => []];
+            $activityRegions = []; $newYes = 0; $newNo = 0; $newUnknown = 0;
+            $perSourceBusiness = [];
+            foreach ($events30 as $event) {
+                $type = (string)($event['event_type'] ?? '');
+                $sid = (string)($event['source_id'] ?? '');
+                $uid = trim((string)($event['user_id'] ?? ''));
+                if (!isset($perSourceBusiness[$sid])) {
+                    $perSourceBusiness[$sid] = [
+                        'source_name' => $production[$sid] ?? $sid,
+                        'unique_reached' => [], 'unique_interested' => [], 'unique_converted' => [],
+                        'new_yes' => 0, 'new_no' => 0, 'new_unknown' => 0, 'spend_rub' => 0.0,
+                    ];
+                }
+                if ($uid !== '' && isset($unique[$type])) {
+                    $unique[$type][$uid] = true;
+                    $field = $type === 'impression' ? 'unique_reached'
+                        : ($type === 'click' ? 'unique_interested' : 'unique_converted');
+                    $perSourceBusiness[$sid][$field][$uid] = true;
+                    $region = trim((string)($workerById[$uid]['metro_station'] ?? ''));
+                    if ($region !== '') $activityRegions[$region] = ($activityRegions[$region] ?? 0) + 1;
+                }
+                if ($type === 'conversion') {
+                    if (($event['new_candidate'] ?? null) === true) {
+                        $newYes++; $perSourceBusiness[$sid]['new_yes']++;
+                    } elseif (($event['new_candidate'] ?? null) === false) {
+                        $newNo++; $perSourceBusiness[$sid]['new_no']++;
+                    } else {
+                        $newUnknown++; $perSourceBusiness[$sid]['new_unknown']++;
+                    }
+                }
+            }
+            arsort($activityRegions);
+
+            $costs = array_values(array_filter(sb_select_all('jm_partner_costs',
+                ['incurred_at' => 'gte.' . $date30], 'source_id,amount_rub,incurred_at'), $onlyProduction));
+            $spend30 = 0.0;
+            foreach ($costs as $cost) {
+                $sid = (string)($cost['source_id'] ?? '');
+                $amount = (float)($cost['amount_rub'] ?? 0);
+                $spend30 += $amount;
+                if (!isset($perSourceBusiness[$sid])) {
+                    $perSourceBusiness[$sid] = [
+                        'source_name' => $production[$sid] ?? $sid,
+                        'unique_reached' => [], 'unique_interested' => [], 'unique_converted' => [],
+                        'new_yes' => 0, 'new_no' => 0, 'new_unknown' => 0, 'spend_rub' => 0.0,
+                    ];
+                }
+                $perSourceBusiness[$sid]['spend_rub'] += $amount;
+            }
+
+            foreach ($perSourceBusiness as $sid => &$metric) {
+                $metric['unique_reached'] = count($metric['unique_reached']);
+                $metric['unique_interested'] = count($metric['unique_interested']);
+                $metric['unique_converted'] = count($metric['unique_converted']);
+                $known = $metric['new_yes'] + $metric['new_no'];
+                $metric['new_candidate_share_pct'] = $known > 0
+                    ? round($metric['new_yes'] * 100 / $known, 2) : null;
+                $metric['cost_per_conversion_rub'] = $metric['unique_converted'] > 0
+                    && $metric['spend_rub'] > 0
+                    ? round($metric['spend_rub'] / $metric['unique_converted'], 2) : null;
+            }
+            unset($metric);
+
+            $uniqueReached = count($unique['impression']);
+            $uniqueInterested = count($unique['click']);
+            $uniqueConverted = count($unique['conversion']);
+            $knownNew = $newYes + $newNo;
+
             $data = [
                 'всего' => count($rows),
                 'по_источникам' => $by,
@@ -2869,8 +2968,52 @@ try {
                 'ошибок_фида_7дней' => $errors7,
                 'воронка_по_источникам_7дней' => $s7['sources'],
                 'воронка_30дней' => $s30['totals'],
+                'партнёрский_отчёт_30дней' => [
+                    'аудитория_работников' => count($workers),
+                    'активных_работников' => $active30,
+                    'новых_регистраций' => $registered30,
+                    'уникальный_охват' => $uniqueReached,
+                    'уникальный_интерес' => $uniqueInterested,
+                    'уникальные_конверсии' => $uniqueConverted,
+                    'конверсия_охват_интерес_pct' => $uniqueReached > 0
+                        ? round($uniqueInterested * 100 / $uniqueReached, 2) : null,
+                    'конверсия_интерес_отклик_pct' => $uniqueInterested > 0
+                        ? round($uniqueConverted * 100 / $uniqueInterested, 2) : null,
+                    'расходы_rub' => round($spend30, 2),
+                    'стоимость_отклика_rub' => $uniqueConverted > 0 && $spend30 > 0
+                        ? round($spend30 / $uniqueConverted, 2) : null,
+                    'новых_для_партнёра' => $newYes,
+                    'известных_партнёру' => $newNo,
+                    'статус_новизны_не_передан' => $newUnknown,
+                    'доля_новых_pct' => $knownNew > 0 ? round($newYes * 100 / $knownNew, 2) : null,
+                    'регионы_аудитории' => array_slice($regions, 0, 15, true),
+                    'регионы_активной_аудитории' => array_slice($activeRegions, 0, 15, true),
+                    'регионы_партнёрской_активности' => array_slice($activityRegions, 0, 15, true),
+                    'по_источникам' => $perSourceBusiness,
+                ],
             ];
             break;
+        }
+
+        // Расходы пилота вводятся фактами. Нулевое или отсутствующее значение
+        // не считается бесплатным откликом и не искажает коммерческий отчёт.
+        case 'extPartnerCostSave': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $sourceId = trim((string)($v['source_id'] ?? ''));
+            $amount = (float)($v['amount_rub'] ?? 0);
+            $date = trim((string)($v['incurred_at'] ?? ''));
+            if ($sourceId === '' || $amount <= 0 || !preg_match('~^\\d{4}-\\d{2}-\\d{2}$~', $date)) {
+                $data = ['error' => 'нужны источник, положительная сумма и дата']; break;
+            }
+            $source = sb_single('jm_ext_sources', ['id' => 'eq.' . $sourceId], 'id');
+            if (!$source) { $data = ['error' => 'источник не найден']; break; }
+            sb_insert('jm_partner_costs', [
+                'id' => uid(), 'source_id' => $sourceId,
+                'amount_rub' => round($amount, 2), 'incurred_at' => $date,
+                'note' => trim((string)($v['note'] ?? '')) ?: null,
+                'created_at' => now_iso(),
+            ]);
+            $data = ['ok' => true]; break;
         }
 
         // ── Ключи внешнего API ─────────────────────────────────────────────

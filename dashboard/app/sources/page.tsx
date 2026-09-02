@@ -38,6 +38,26 @@ type Source = {
   notifications_enabled: boolean
 }
 
+type PartnerReport = {
+  аудитория_работников: number
+  активных_работников: number
+  новых_регистраций: number
+  уникальный_охват: number
+  уникальный_интерес: number
+  уникальные_конверсии: number
+  конверсия_охват_интерес_pct: number | null
+  конверсия_интерес_отклик_pct: number | null
+  расходы_rub: number
+  стоимость_отклика_rub: number | null
+  новых_для_партнёра: number
+  известных_партнёру: number
+  статус_новизны_не_передан: number
+  доля_новых_pct: number | null
+  регионы_аудитории: Record<string, number>
+  регионы_активной_аудитории: Record<string, number>
+  регионы_партнёрской_активности: Record<string, number>
+}
+
 type Stats = {
   всего: number
   по_источникам: Record<string, number>
@@ -54,6 +74,7 @@ type Stats = {
   }>
   без_станции?: number
   без_профессии?: number
+  партнёрский_отчёт_30дней?: PartnerReport
 }
 
 type ExtVacancy = {
@@ -194,6 +215,10 @@ export default function SourcesPage() {
   const [value, setValue] = useState('')
   const [period, setPeriod] = useState(30)
   const [environment, setEnvironment] = useState<'production' | 'sandbox'>('sandbox')
+  const [costSource, setCostSource] = useState('')
+  const [costAmount, setCostAmount] = useState('')
+  const [costDate, setCostDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [costNote, setCostNote] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null)
@@ -231,6 +256,18 @@ export default function SourcesPage() {
         notifications_enabled: environment === 'production',
       })
       setName(''); setUrl(''); setHeader(''); setValue('')
+      await load()
+    } catch (e: any) { setErr(e.message) }
+    setBusy(null)
+  }
+
+  async function saveCost() {
+    const amount = Number(costAmount.replace(',', '.'))
+    if (!costSource || !Number.isFinite(amount) || amount <= 0 || !costDate) return
+    setBusy('cost'); setErr(null)
+    try {
+      await send({ cost: { source_id: costSource, amount_rub: amount, incurred_at: costDate, note: costNote } })
+      setCostAmount(''); setCostNote('')
       await load()
     } catch (e: any) { setErr(e.message) }
     setBusy(null)
@@ -286,6 +323,66 @@ export default function SourcesPage() {
           <KpiCard label="Ошибок фида за неделю" value={stats?.ошибок_фида_7дней ?? null}
             sub={`сейчас с ошибкой: ${items.filter(s => s.last_status && !s.last_status.startsWith('ок')).length}`} />
         </div>
+
+        {stats?.партнёрский_отчёт_30дней ? (() => {
+          const p = stats.партнёрский_отчёт_30дней
+          const pct = (v: number | null) => v === null ? 'нет данных' : `${v.toLocaleString('ru-RU')}%`
+          const money = (v: number | null) => v === null ? 'нет данных' : `${v.toLocaleString('ru-RU')} ₽`
+          const regions = Object.entries(p.регионы_активной_аудитории).slice(0, 10)
+          return (
+            <div className="jt-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 17, fontWeight: 650, marginBottom: 4 }}>Отчёт для партнёра · 30 дней</div>
+              <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 14 }}>
+                Только production-источники и уникальные незаблокированные работники. Неизвестные значения не заменяются нулями.
+              </div>
+              <div className="g-3">
+                <KpiCard label="Аудитория работников" value={p.аудитория_работников}
+                  sub={`активны: ${p.активных_работников} · новых: ${p.новых_регистраций}`} />
+                <KpiCard label="Уникальный охват" value={p.уникальный_охват}
+                  sub={`интерес: ${p.уникальный_интерес}`} />
+                <KpiCard label="Подтверждённые отклики" value={p.уникальные_конверсии}
+                  sub={`из интереса: ${pct(p.конверсия_интерес_отклик_pct)}`} />
+                <KpiCard label="Стоимость отклика" value={money(p.стоимость_отклика_rub)}
+                  sub={p.расходы_rub > 0 ? `расходы: ${money(p.расходы_rub)}` : 'внесите фактические расходы'} />
+                <KpiCard label="Доля новых кандидатов" value={pct(p.доля_новых_pct)}
+                  sub={`подтверждено новых: ${p.новых_для_партнёра} · неизвестно: ${p.статус_новизны_не_передан}`} />
+                <KpiCard label="Охват → интерес" value={pct(p.конверсия_охват_интерес_pct)}
+                  sub="по уникальным кандидатам" />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16, marginTop: 16 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Активная аудитория по регионам</div>
+                  {regions.length ? regions.map(([region, count]) => (
+                    <div key={region} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
+                      <span style={{ color: 'var(--ink-2)' }}>{region}</span><b className="num">{count}</b>
+                    </div>
+                  )) : <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Регион пока не указан.</div>}
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Добавить расходы пилота</div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <select className="jt-input" value={costSource} onChange={e => setCostSource(e.target.value)}>
+                      <option value="">Выберите production-источник</option>
+                      {items.filter(s => s.environment === 'production').map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                    <input className="jt-input num" inputMode="decimal" value={costAmount}
+                      onChange={e => setCostAmount(e.target.value)} placeholder="Сумма, ₽" />
+                    <input className="jt-input" type="date" value={costDate} onChange={e => setCostDate(e.target.value)} />
+                    <input className="jt-input" value={costNote} onChange={e => setCostNote(e.target.value)}
+                      placeholder="Комментарий — например, рекламная кампания" />
+                    <Button onClick={saveCost} disabled={busy === 'cost' || !costSource || !costAmount || !costDate}>
+                      Учесть расход
+                    </Button>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
+                    Стоимость отклика = фактические расходы / уникальные подтверждённые партнёром отклики.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })() : null}
 
         {/* Качество разбора. Станция, которую мы не узнали, не попадает в
             фильтр по метро — вакансия висит в поиске, но найти её по метро
