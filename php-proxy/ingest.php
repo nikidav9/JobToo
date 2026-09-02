@@ -276,21 +276,18 @@ function ing_safe_https_url(string $url): bool
     return true;
 }
 
-/** Сходить в один источник. */
-function ing_run_source(array $src): array
+/** Скачать одну страницу фида с жёстким ограничением размера. */
+function ing_fetch_page(string $url, array $hdrs, string $originHost): array
 {
-    $hdrs = ['Accept: application/json'];
-    if (!empty($src['auth_header']) && !empty($src['auth_value'])) {
-        $hdrs[] = $src['auth_header'] . ': ' . $src['auth_value'];
-    }
-
-    $url = trim((string)($src['url'] ?? ''));
     if (!ing_safe_https_url($url)) {
-        return ['status' => 'запрещённый или непубличный HTTPS-адрес', 'count' => 0];
+        return ['ok' => false, 'error' => 'запрещённый или непубличный HTTPS-адрес'];
+    }
+    $pageHost = strtolower((string)(parse_url($url, PHP_URL_HOST) ?? ''));
+    if ($pageHost === '' || $pageHost !== $originHost) {
+        // Authorization нельзя унести по next_url на чужой домен.
+        return ['ok' => false, 'error' => 'следующая страница ведёт на другой домен'];
     }
 
-    // Не следуем редиректам: каждый новый адрес потребовал бы повторной
-    // проверки DNS. Партнёр должен указать конечный HTTPS URL.
     $body = '';
     $tooLarge = false;
     $ch = curl_init($url);
@@ -318,45 +315,117 @@ function ing_run_source(array $src): array
     $err = curl_error($ch);
     curl_close($ch);
 
-    if ($tooLarge) return ['status' => 'ответ больше 5 МБ', 'count' => 0];
+    if ($tooLarge) return ['ok' => false, 'error' => 'страница ответа больше 5 МБ'];
     if ($curlOk === false || $code < 200 || $code >= 300) {
-        return ['status' => "не ответил ($code $err)", 'count' => 0];
+        return ['ok' => false, 'error' => "не ответил ($code $err)"];
     }
-
     $dec = json_decode($body, true);
-    $items = is_array($dec['items'] ?? null) ? $dec['items'] : (is_array($dec) ? $dec : null);
-    if (!is_array($items)) return ['status' => 'ответ не разобрать', 'count' => 0];
+    if (!is_array($dec)) return ['ok' => false, 'error' => 'JSON не разобрать'];
+    return ['ok' => true, 'data' => $dec];
+}
 
-    $rows = [];
+/** URL следующей страницы. Поддерживаем next_url, next и next_cursor. */
+function ing_next_page(array $dec, string $baseUrl): ?string
+{
+    foreach (['next_url', 'next'] as $key) {
+        $v = trim((string)($dec[$key] ?? ''));
+        if ($v !== '') return $v;
+    }
+    $cursor = trim((string)($dec['next_cursor'] ?? ''));
+    if ($cursor === '') return null;
+    $sep = str_contains($baseUrl, '?') ? '&' : '?';
+    return $baseUrl . $sep . 'cursor=' . rawurlencode($cursor);
+}
+
+/** Сходить в один источник, включая все страницы полного фида. */
+function ing_run_source(array $src): array
+{
+    $hdrs = ['Accept: application/json'];
+    if (!empty($src['auth_header']) && !empty($src['auth_value'])) {
+        $hdrs[] = $src['auth_header'] . ': ' . $src['auth_value'];
+    }
+
+    $baseUrl = trim((string)($src['url'] ?? ''));
+    if (!ing_safe_https_url($baseUrl)) {
+        return ['status' => 'запрещённый или непубличный HTTPS-адрес', 'count' => 0];
+    }
+    $originHost = strtolower((string)(parse_url($baseUrl, PHP_URL_HOST) ?? ''));
+    $startedAt = now_iso();
+    $nextUrl = $baseUrl;
+    $visited = [];
+    $received = 0;
     $skipped = 0;
-    foreach ($items as $it) {
-        if (!is_array($it)) { $skipped++; continue; }
-        $r = ing_normalize($it, (string)$src['id']);
-        if ($r === null) { $skipped++; continue; }
-        $rows[] = $r;
+    $pages = 0;
+    $complete = false;
+
+    while ($nextUrl !== null) {
+        if (++$pages > 100) {
+            return ['status' => "ошибка: больше 100 страниц; загружено $received", 'count' => $received];
+        }
+        if (isset($visited[$nextUrl])) {
+            return ['status' => "ошибка: цикл пагинации на странице $pages", 'count' => $received];
+        }
+        $visited[$nextUrl] = true;
+
+        $page = ing_fetch_page($nextUrl, $hdrs, $originHost);
+        if (empty($page['ok'])) {
+            return [
+                'status' => "ошибка страницы $pages: " . (string)($page['error'] ?? 'неизвестно')
+                    . "; уже загружено $received, прежние вакансии сохранены",
+                'count' => $received,
+            ];
+        }
+
+        $dec = $page['data'];
+        $items = is_array($dec['items'] ?? null) ? $dec['items']
+            : (array_is_list($dec) ? $dec : null);
+        if (!is_array($items)) {
+            return ['status' => "ошибка страницы $pages: нет массива items", 'count' => $received];
+        }
+
+        $rows = [];
+        foreach ($items as $it) {
+            if (!is_array($it)) { $skipped++; continue; }
+            $r = ing_normalize($it, (string)$src['id']);
+            if ($r === null) { $skipped++; continue; }
+            $rows[] = $r;
+        }
+        foreach (array_chunk($rows, 200) as $chunk) {
+            sb_upsert_rows('jm_ext_vacancies', $chunk, 'source_id,external_id');
+        }
+        $received += count($rows);
+        if ($received + $skipped > 50000) {
+            return [
+                'status' => "ошибка: больше 50000 записей; загружено $received, прежние вакансии сохранены",
+                'count' => $received,
+            ];
+        }
+
+        $candidate = ing_next_page($dec, $baseUrl);
+        $hasMore = !empty($dec['has_more']);
+        if ($candidate === null) {
+            if ($hasMore) {
+                return [
+                    'status' => "ошибка страницы $pages: has_more=true без next_url/next_cursor; "
+                        . "загружено $received, прежние вакансии сохранены",
+                    'count' => $received,
+                ];
+            }
+            $complete = true;
+            $nextUrl = null;
+        } else {
+            $nextUrl = $candidate;
+        }
     }
 
-    // Пачкой, а не по одной: триста записей по одному запросу — это триста
-    // обращений к базе на каждый заход, и сорванный таймаут при первом же
-    // крупном фиде.
-    foreach (array_chunk($rows, 200) as $chunk) {
-        sb_upsert_rows('jm_ext_vacancies', $chunk, 'source_id,external_id');
-    }
-
-    // Пропавшие из фида гасим. Признак — last_seen_at старше начала захода:
-    // всё, что пришло сейчас, только что обновилось.
-    //
-    // Только для полного фида. Если партнёр отдаёт постранично или по
-    // updated_since, «не пришло» не значит «пропало», и гасить было бы
-    // вредительством.
+    // Гасим пропавшие вакансии только после полного успешного обхода. Если
+    // партнёрская API упала на середине, старые карточки остаются доступными.
     $gone = 0;
-    if (empty($dec['has_more'])) {
-        $cutoff = gmdate('Y-m-d\TH:i:s', time() - 120) . 'Z';
-        $stale = sb_select('jm_ext_vacancies', [
+    if ($complete) {
+        $stale = sb_select_all('jm_ext_vacancies', [
             'source_id' => 'eq.' . $src['id'],
             'active' => 'is.true',
-            'last_seen_at' => 'lt.' . $cutoff,
-            'limit' => '1000',
+            'last_seen_at' => 'lt.' . $startedAt,
         ], 'id');
         foreach (array_chunk(array_column($stale, 'id'), 100) as $chunk) {
             sb_update('jm_ext_vacancies', ['id' => 'in.(' . implode(',', $chunk) . ')'], ['active' => false]);
@@ -365,8 +434,8 @@ function ing_run_source(array $src): array
     }
 
     return [
-        'status' => "ок: получено " . count($rows) . ", пропущено $skipped, погашено $gone",
-        'count'  => count($rows),
+        'status' => "ок: страниц $pages, получено $received, пропущено $skipped, погашено $gone",
+        'count' => $received,
     ];
 }
 
