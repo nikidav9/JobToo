@@ -43,13 +43,11 @@ type Props = {
   placeholder?: string;
   sendLabel?: string;
   hint?: string;
-  /** Короткое разграничение ролей, которое пользователь видит до отправки. */
-  responsibilityNotice?: string;
 };
 
 export function ApplySheet({
   visible, onClose, onSend, info, chips, title,
-  label, placeholder, sendLabel, hint, responsibilityNotice,
+  label, placeholder, sendLabel, hint,
 }: Props) {
   const insets = useSafeAreaInsets();
   const swipe = useSwipeToDismiss(onClose, visible);
@@ -92,12 +90,6 @@ export function ApplySheet({
                 ))}
               </View>
             )}
-
-            {responsibilityNotice ? (
-              <View style={s.responsibilityNotice}>
-                <Text style={s.responsibilityNoticeText}>{responsibilityNotice}</Text>
-              </View>
-            ) : null}
 
             <Text style={s.label}>{label ?? 'Напишите пару слов о себе'}</Text>
             <TextInput
@@ -161,14 +153,6 @@ const s = StyleSheet.create({
   },
   infoHead: { fontSize: rf(14), fontWeight: '700', color: Colors.textPrimary },
   infoLine: { fontSize: rf(13), color: Colors.textSecondary },
-
-  responsibilityNotice: {
-    backgroundColor: Colors.primaryLight, borderRadius: rs(10), padding: rs(10),
-    borderWidth: 1, borderColor: Colors.primaryBorder, marginTop: rs(10),
-  },
-  responsibilityNoticeText: {
-    fontSize: rf(11), color: Colors.textSecondary, lineHeight: rf(15),
-  },
 
   label: { fontSize: rf(13), color: Colors.textSecondary, marginTop: rs(14), marginBottom: rs(6) },
   input: {
