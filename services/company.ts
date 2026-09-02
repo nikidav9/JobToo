@@ -1,4 +1,4 @@
-const DEFAULT_COMPANY = 'Лавка';
+const DEFAULT_COMPANY = 'Компания';
 
 /** Preserve a partner's brand instead of labelling every vacancy as Lavka. */
 export function normalizeCompany(raw?: string | null): string {

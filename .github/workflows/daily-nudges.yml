@@ -16,6 +16,7 @@ jobs:
       - name: Call cronDailyNudges
         env:
           APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+          ADMIN_TOKEN: ${{ secrets.DASHBOARD_PASSWORD }}
         run: |
           # Запасного пропуска в коде больше нет. Он тут был «чтобы не легло»,
           # но репозиторий открыт, и любой мог им обратиться к db.php — то есть
@@ -23,13 +24,14 @@ jobs:
           #
           # Нет секрета — ход честно падает. Это видно сразу, в отличие от
           # тихой работы на ключе, который знает посторонний.
-          if [ -z "$APP_SECRET" ]; then
-            echo "Секрет EXPO_PUBLIC_APP_SECRET не задан"; exit 1
+          if [ -z "$APP_SECRET" ] || [ -z "$ADMIN_TOKEN" ]; then
+            echo "Серверные секреты для задания не настроены"; exit 1
           fi
           SECRET="$APP_SECRET"
           RESP=$(curl -s -X POST "https://jobtoo.ru/api/db.php" \
             -H "Content-Type: application/json" \
             -H "X-App-Secret: $SECRET" \
+            -H "X-Admin-Token: $ADMIN_TOKEN" \
             -d '{"fn":"cronDailyNudges","args":[]}')
           echo "Response: $RESP"
           echo "$RESP" | grep -q '"data"' || { echo "cronDailyNudges failed"; exit 1; }

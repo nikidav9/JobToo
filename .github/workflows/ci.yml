@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App, tests and web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: PHP syntax
+        run: find php-proxy -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Web build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          EXPO_PUBLIC_SUPABASE_URL: https://example.invalid
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+          EXPO_PUBLIC_API_URL: https://example.invalid
+          EXPO_PUBLIC_APP_SECRET: ci-placeholder
+          EXPO_PUBLIC_DASHBOARD_URL: https://example.invalid
+        run: npx expo export --platform web --max-workers 2
+
+  dashboard:
+    name: Dashboard build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        env:
+          ADMIN_API_URL: https://example.invalid/api/admin.php
+          EXPO_PUBLIC_APP_SECRET: ci-placeholder
+          ADMIN_API_TOKEN: ci-placeholder
+          VAPID_PUBLIC_KEY: ci-placeholder
+          VAPID_PRIVATE_KEY: ci-placeholder
+          VAPID_SUBJECT: mailto:ci@example.invalid
+        run: npm run build

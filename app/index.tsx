@@ -151,7 +151,7 @@ export default function RootScreen() {
             <Text style={styles.logoDark}>Job</Text>
             <Text style={styles.logoOrange}>Too</Text>
           </Text>
-          <Text style={styles.tagline}>Подработки на складах в Москве</Text>
+          <Text style={styles.tagline}>Смены и вакансии разных сервисов — в одной ленте</Text>
         </Animated.View>
 
         {/* ── Заголовок ── */}
@@ -226,11 +226,11 @@ export default function RootScreen() {
 
         {/* ── Преимущества ── */}
         <Animated.View style={[styles.featuresRow, { opacity: introFade }]}>
-          <Text style={styles.featureTxt}>Проверенные компании</Text>
+          <Text style={styles.featureTxt}>Разные источники</Text>
           <Text style={styles.featureDot}>·</Text>
-          <Text style={styles.featureTxt}>Подбор за день</Text>
+          <Text style={styles.featureTxt}>Без комиссии</Text>
           <Text style={styles.featureDot}>·</Text>
-          <Text style={styles.featureTxt}>Поддержка 24/7</Text>
+          <Text style={styles.featureTxt}>Поддержка в приложении</Text>
         </Animated.View>
 
         {/* ── Счётчик пользователей ── */}
@@ -238,7 +238,7 @@ export default function RootScreen() {
           <Text style={styles.userCountTxt}>
             {userCountReady && userCount != null
               ? <>Более <Text style={styles.userCountNum}>{userCount.toLocaleString('ru')}</Text> пользователей уже с нами!</>
-              : 'Уже тысячи с нами!'
+              : 'Сообщество JobToo растёт'
             }
           </Text>
         </Animated.View>

@@ -96,7 +96,7 @@ define('SB_KEY', sb_resolve_key());
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-App-Secret');
+header('Access-Control-Allow-Headers: Content-Type, X-App-Secret, X-Admin-Token, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -143,6 +143,143 @@ $fn   = $body['fn'] ?? null;
 $args = $body['args'] ?? [];
 
 if (!$fn) { jt_respond(['error' => 'Missing fn'], 400); exit; }
+
+// Операции управления нельзя защищать тем же ключом, который встроен в
+// публичный web/APK-клиент. ADMIN_API_TOKEN хранится только на сервере и в
+// закрытом дашборде. Если он не настроен, административные вызовы безопасно
+// закрыты, а пользовательские сценарии продолжают работать.
+$adminFns = [
+    'dbKeyKind', 'adminResetPassword', 'dbMigrateChatMedia', 'dbDeleteUser',
+    'cronEveningDigest', 'cronDailyNudges', 'cronShiftNudge',
+    'tgBroadcast', 'tgSendToUsers', 'scoreRecalcAll', 'billingReport',
+    'extSourcesList', 'extSourceSave', 'extSourceDelete', 'extStats',
+    'apiKeysList', 'apiKeyCreate', 'apiKeyRevoke',
+    'botAdminGet', 'botAdminSet', 'supportClose', 'supportReopen',
+    'supportReply', 'supportThreads', 'botReply', 'botInbox',
+    'tgGroupInfo', 'tgPostToGroup', 'tgSetWebhook', 'tgWebhookInfo',
+    'dbGetWorkerTokensByMetro', 'dbGetAllWorkerTokens',
+];
+if (in_array($fn, $adminFns, true)) {
+    // На переходном этапе отдельный токен можно задать как ADMIN_API_TOKEN.
+    // Если он ещё не создан, используем пароль закрытого дашборда: он уже
+    // серверный и, в отличие от APP_SECRET, не попадает в web/APK-бандл.
+    $adminToken = jt_secret('ADMIN_API_TOKEN');
+    if ($adminToken === '') {
+        $credFile = __DIR__ . '/admin_credentials.php';
+        $creds = is_readable($credFile) ? @include $credFile : null;
+        $adminToken = is_array($creds) ? (string)($creds['password'] ?? '') : '';
+    }
+    $providedAdmin = (string)($_SERVER['HTTP_X_ADMIN_TOKEN'] ?? '');
+    if ($adminToken === '' || !hash_equals($adminToken, $providedAdmin)) {
+        jt_respond(['error' => 'Admin authorization required'], 403); exit;
+    }
+}
+
+$authHeader = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? '');
+$authUid = jt_session_uid($authHeader);
+$publicFns = [
+    'dbCountUsers', 'dbWarmup', 'dbCheckPhoneExists', 'dbLogin',
+    'dbUpsertUser', 'tgAuth', 'dbGetVacancies', 'dbGetPermVacancies',
+    'extVacancies', 'extClick', 'addressSuggest', 'dbLogOpen',
+    'dbResponsivenessMap',
+];
+if (!in_array($fn, $publicFns, true) && !in_array($fn, $adminFns, true) && $authUid === null) {
+    jt_respond(['error' => 'Authentication required'], 401); exit;
+}
+
+// Для операций, где первый/второй аргумент прямо обозначает владельца,
+// сервер не доверяет ID из тела запроса и сверяет его с подписанной сессией.
+$selfArgFns = [
+    'tgPrepareLink' => 0, 'dbTouchLastSeen' => 0,
+    'dbChangePassword' => 0, 'dbDeleteAccount' => 0,
+    'dbRecordConsent' => 0, 'dbGetConsent' => 0,
+    'tgBindTelegram' => 0, 'tgUnbindTelegram' => 0,
+    'dbGetSkillResults' => 0, 'dbSubmitSkillTest' => 0,
+    'supportHistory' => 0, 'supportSend' => 0,
+    'dbGetLikesForUser' => 0, 'dbGetChats' => 0,
+    'dbGetSaved' => 0, 'dbAddSaved' => 0, 'dbRemoveSaved' => 0,
+    'dbGetPermVacanciesByEmployer' => 0, 'dbGetPermApplications' => 0,
+    'dbGetPermSaved' => 0, 'dbAddPermSaved' => 0, 'dbRemovePermSaved' => 0,
+    'dbSavePushToken' => 0, 'dbClearPushToken' => 0,
+    'dbGetWebPushSubscription' => 0, 'dbSaveWebPushSubscription' => 0,
+    'dbDeleteWebPushSubscription' => 0, 'dbGetNotifications' => 0,
+    'dbMarkAllNotifsRead' => 0, 'dbDeleteAllNotifs' => 0,
+    'dbRecordVacancyView' => 1, 'dbRecordPermVacancyView' => 1,
+    'dbGetLikeByVacancyWorker' => 1, 'dbRemoveLike' => 1,
+    'dbCheckAndCreateMatch' => 1, 'dbApplyPermVacancy' => 1,
+];
+if (isset($selfArgFns[$fn])) {
+    $pos = $selfArgFns[$fn];
+    if ($authUid === null || (string)($args[$pos] ?? '') !== $authUid) {
+        jt_respond(['error' => 'Forbidden for this user'], 403); exit;
+    }
+}
+
+// Переписка доступна только её участникам.
+$chatArgFns = [
+    'dbGetMessages' => 0, 'dbGetChatById' => 0, 'dbInsertMessage' => 0,
+    'dbMarkRead' => 0, 'dbIncrementUnread' => 0, 'dbDeleteChat' => 0,
+];
+if (isset($chatArgFns[$fn])) {
+    $chatId = (string)($args[$chatArgFns[$fn]] ?? '');
+    $chat = $chatId !== '' ? sb_single('jm_chats', ['id' => 'eq.' . $chatId], 'worker_id,employer_id') : null;
+    if (!$chat || ($authUid !== (string)$chat['worker_id'] && $authUid !== (string)$chat['employer_id'])) {
+        jt_respond(['error' => 'Chat access denied'], 403); exit;
+    }
+    if ($fn === 'dbInsertMessage' && (string)($args[1] ?? '') !== $authUid) {
+        jt_respond(['error' => 'Invalid sender'], 403); exit;
+    }
+}
+if ($fn === 'dbCreateChat') {
+    $workerId = (string)($args[0] ?? '');
+    $employerId = (string)($args[1] ?? '');
+    if ($authUid !== $workerId && $authUid !== $employerId) {
+        jt_respond(['error' => 'Chat access denied'], 403); exit;
+    }
+}
+
+// Создавать и менять объявления может только указанный в них работодатель.
+if (in_array($fn, ['dbUpsertVacancy', 'dbUpsertPermVacancy'], true)) {
+    $owner = (string)(($args[0]['employer_id'] ?? ''));
+    if ($owner === '' || $owner !== $authUid) {
+        jt_respond(['error' => 'Vacancy owner required'], 403); exit;
+    }
+}
+if ($fn === 'dbUpsertVacancyBatch') {
+    foreach ((array)($args[0] ?? []) as $row) {
+        if ((string)($row['employer_id'] ?? '') !== $authUid) {
+            jt_respond(['error' => 'Vacancy owner required'], 403); exit;
+        }
+    }
+}
+$ownedVacancyFns = [
+    'dbUpdateVacancy' => ['jm_vacancies', 0],
+    'dbDeleteVacancy' => ['jm_vacancies', 0],
+    'dbGetLikesByVacancy' => ['jm_vacancies', 0],
+    'dbGetVacancyViewers' => ['jm_vacancies', 0],
+    'dbClosePermVacancy' => ['jm_perm_vacancies', 0],
+    'dbDeletePermVacancy' => ['jm_perm_vacancies', 0],
+    'dbGetPermApplicationsForVacancy' => ['jm_perm_vacancies', 0],
+];
+if (isset($ownedVacancyFns[$fn])) {
+    [$table, $pos] = $ownedVacancyFns[$fn];
+    $vac = sb_single($table, ['id' => 'eq.' . (string)($args[$pos] ?? '')], 'employer_id');
+    if (!$vac || (string)($vac['employer_id'] ?? '') !== $authUid) {
+        jt_respond(['error' => 'Vacancy owner required'], 403); exit;
+    }
+}
+if ($fn === 'dbSetPermApplicationStatus') {
+    $app = sb_single('jm_perm_applications', ['id' => 'eq.' . (string)($args[0] ?? '')], 'employer_id');
+    if (!$app || (string)($app['employer_id'] ?? '') !== $authUid) {
+        jt_respond(['error' => 'Application access denied'], 403); exit;
+    }
+}
+if ($fn === 'dbSubmitRatingAndMaybeDelete') {
+    $params = is_array($args[0] ?? null) ? $args[0] : [];
+    if ((string)($params['fromUserId'] ?? '') !== $authUid) {
+        jt_respond(['error' => 'Rating author mismatch'], 403); exit;
+    }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -241,10 +378,10 @@ function sb_count(string $t, array $f = []): int {
 // и пароль каждого. Перечисляем поля поимённо: добавится новое, оно не
 // просочится само собой.
 define('USER_PUBLIC_COLS', implode(',', [
-    'id', 'role', 'phone', 'first_name', 'last_name', 'age',
+    'id', 'role', 'first_name', 'last_name', 'age',
     'metro_line_id', 'metro_station', 'work_types', 'company', 'bio',
     'avatar_url', 'avg_rating', 'rating_count', 'is_blocked',
-    'created_at', 'push_token', 'telegram_id', 'last_seen_at',
+    'created_at', 'last_seen_at',
 ]));
 
 // bcrypt-хеш от пароля, положенного как есть, отличается началом строки.
@@ -338,6 +475,39 @@ function jt_secret(string $name, string $fallback = ''): string {
     if (!empty($file[$name])) return (string)$file[$name];
 
     return $fallback;
+}
+
+// ─── Пользовательские сессии ─────────────────────────────────────────────────
+function jt_b64url_encode(string $raw): string {
+    return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+}
+function jt_b64url_decode(string $raw): string|false {
+    $pad = strlen($raw) % 4;
+    if ($pad) $raw .= str_repeat('=', 4 - $pad);
+    return base64_decode(strtr($raw, '-_', '+/'), true);
+}
+function jt_session_key(): string {
+    $key = jt_secret('SESSION_SECRET');
+    return $key !== '' ? $key : SB_KEY;
+}
+function jt_session_issue(string $uid): string {
+    $payload = jt_b64url_encode(json_encode([
+        'uid' => $uid, 'exp' => time() + 30 * 86400,
+    ], JSON_UNESCAPED_SLASHES));
+    $sig = jt_b64url_encode(hash_hmac('sha256', $payload, jt_session_key(), true));
+    return $payload . '.' . $sig;
+}
+function jt_session_uid(string $header): ?string {
+    if (!preg_match('/^Bearer\s+(.+)$/i', trim($header), $m)) return null;
+    $parts = explode('.', trim($m[1]), 2);
+    if (count($parts) !== 2) return null;
+    [$payload, $provided] = $parts;
+    $expected = jt_b64url_encode(hash_hmac('sha256', $payload, jt_session_key(), true));
+    if (!hash_equals($expected, $provided)) return null;
+    $raw = jt_b64url_decode($payload);
+    $data = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($data) || empty($data['uid']) || (int)($data['exp'] ?? 0) < time()) return null;
+    return (string)$data['uid'];
 }
 
 // ─── Мгновенные сообщения ─────────────────────────────────────────────────────
@@ -706,6 +876,36 @@ function vacancy_dates_guard(array $rows): void {
             'За одну публикацию можно выложить не больше ' . VACANCY_HORIZON_DAYS . ' дней, '
             . 'а пришло ' . count($dates) . '.'
         );
+    }
+}
+
+/**
+ * Не публикуем требования к полу, возрасту, национальности или внешности.
+ * Законные специальные требования редки и должны пройти ручную проверку,
+ * а не попадать в массовую ленту автоматически.
+ */
+function vacancy_content_guard(array $row): void {
+    $text = mb_strtolower(implode(' ', array_map(
+        fn($v) => is_scalar($v) ? (string)$v : '',
+        [
+            $row['title'] ?? '', $row['description'] ?? '',
+            $row['conditions'] ?? '', $row['requirements'] ?? '',
+        ]
+    )));
+    $blocked = [
+        '~\\bмужчин[аы]?\\b|мужского\\s+пола~u',
+        '~\\bженщин[аы]?\\b|женского\\s+пола~u',
+        '~русскоязычн|славянск(?:ая|ой)\\s+внешност~u',
+        '~\\b(?:до|от)\\s*\\d{2}\\s*(?:лет|года)~u',
+        '~\\b\\d{2}\\s*[–—-]\\s*\\d{2}\\s*(?:лет|года)~u',
+    ];
+    foreach ($blocked as $pattern) {
+        if (preg_match($pattern, $text)) {
+            throw new RuntimeException(
+                'Уберите требования к полу, возрасту, национальности или внешности. '
+                . 'Оставьте только навыки и условия работы.'
+            );
+        }
     }
 }
 
@@ -1589,17 +1789,25 @@ try {
         // текстом. Уже готовый хеш второй раз не трогаем: этой же операцией
         // сохраняется профиль целиком, и пароль в нём приезжает обратно.
         case 'dbUpsertUser': {
-            $u = $args[0];
+            $u = is_array($args[0] ?? null) ? $args[0] : [];
+            $uid = trim((string)($u['id'] ?? ''));
+            if ($uid === '') throw new RuntimeException('Нужен id пользователя');
+            $existing = sb_single('jm_users', ['id' => 'eq.' . $uid], 'id');
+            if ($existing && $authUid !== $uid) {
+                jt_respond(['error' => 'Authentication required'], 401); exit;
+            }
+            if (!$existing && (empty($u['phone']) || empty($u['password']))) {
+                throw new RuntimeException('Для регистрации нужны телефон и пароль');
+            }
             // Пустой пароль — это не «сотри пароль», а «в профиле его нет».
-            // После того как вход перестал отдавать пароль наружу, сохранение
-            // профиля присылает сюда пустую строку — записать её значит
-            // запереть человека без единой ошибки.
             if (empty($u['password'])) {
                 unset($u['password']);
             } elseif (!is_bcrypt($u['password'])) {
                 $u['password'] = password_hash((string)$u['password'], PASSWORD_BCRYPT);
             }
-            sb_upsert('jm_users', $u, 'id'); break;
+            sb_upsert('jm_users', $u, 'id');
+            $data = ['session_token' => $existing ? null : jt_session_issue($uid)];
+            break;
         }
 
         // Вход. Сверка переехала сюда с клиента: раньше приложение спрашивало
@@ -1628,7 +1836,13 @@ try {
             }
 
             unset($row['password']);
-            $data = $row; break;
+            $data = ['user' => $row, 'session_token' => jt_session_issue((string)$row['id'])]; break;
+        }
+
+        case 'dbSession': {
+            $row = sb_single('jm_users', ['id' => 'eq.' . $authUid], USER_PUBLIC_COLS);
+            $data = $row ? ['user' => $row] : null;
+            break;
         }
 
         // Смена пароля в профиле. Тоже на сервере — на клиенте старый пароль
@@ -2044,8 +2258,10 @@ try {
             break;
         }
 
+        // Старый клиентский вход по номеру возвращал всю строку, включая
+        // пароль. Современный вход — только dbLogin; этот путь закрыт.
         case 'dbGetUserByPhone':
-            $data = sb_single('jm_users', ['phone' => 'eq.' . $args[0]]); break;
+            jt_respond(['error' => 'Deprecated endpoint'], 410); exit;
 
         // ── Telegram Mini App ──────────────────────────────────────────────────
         // args: [initDataString] → { ok, user|null, tg: {id, first_name, ...} }
@@ -2054,9 +2270,11 @@ try {
             if (!$v || empty($v['user']['id'])) { $data = ['ok' => false]; break; }
             $tgId = (int)$v['user']['id'];
             $u = sb_single('jm_users', ['telegram_id' => 'eq.' . $tgId]);
+            if (is_array($u)) unset($u['password'], $u['push_token']);
             $data = [
                 'ok' => true,
                 'user' => $u,
+                'session_token' => $u ? jt_session_issue((string)$u['id']) : null,
                 'tg' => [
                     'id' => $tgId,
                     'first_name' => $v['user']['first_name'] ?? '',
@@ -2777,6 +2995,7 @@ try {
 
         case 'dbUpsertVacancy':
             vacancy_dates_guard([$args[0]]);
+            vacancy_content_guard($args[0]);
             save_then_geocode('jm_vacancies', $args[0]); break;
 
         case 'dbUpsertVacancyBatch': {
@@ -2786,6 +3005,7 @@ try {
             vacancy_dates_guard($rows);
             $cache = [];
             foreach ($rows as $k => $r) {
+                vacancy_content_guard($r);
                 $a = trim((string)($r['address'] ?? ''));
                 if ($a === '' || (isset($r['lat']) && $r['lat'] !== null)) continue;
                 if (!array_key_exists($a, $cache)) $cache[$a] = fill_coords($r);
@@ -2799,6 +3019,7 @@ try {
             // Если правят адрес, координаты пересчитываем: иначе метка
             // осталась бы висеть на старом месте.
             vacancy_dates_guard([$args[1]]);
+            vacancy_content_guard($args[1]);
             sb_update('jm_vacancies', ['id' => 'eq.' . $args[0]], fill_coords($args[1])); break;
 
         // ── Likes ──────────────────────────────────────────────────────────────
@@ -3228,6 +3449,7 @@ try {
             $data = sb_select('jm_perm_vacancies', ['employer_id' => 'eq.' . $args[0]], '*', 'created_at.desc'); break;
 
         case 'dbUpsertPermVacancy':
+            vacancy_content_guard($args[0]);
             save_then_geocode('jm_perm_vacancies', $args[0]); break;
 
         case 'dbClosePermVacancy':

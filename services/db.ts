@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus, ReportableOutcome, ExternalVacancy, WorkType } from '@/constants/types';
 import { uid, nowISO } from '@/services/storage';
@@ -26,6 +27,24 @@ const API_BASE =
     : (process.env.EXPO_PUBLIC_API_URL || 'https://jobtoo.ru').trim().replace(/\/+$/, '');
 
 const APP_SECRET = (process.env.EXPO_PUBLIC_APP_SECRET ?? '').trim();
+const SESSION_TOKEN_KEY = 'jm_session_token';
+let sessionTokenCache: string | null | undefined;
+
+async function getSessionToken(): Promise<string | null> {
+  if (sessionTokenCache !== undefined) return sessionTokenCache;
+  sessionTokenCache = await AsyncStorage.getItem(SESSION_TOKEN_KEY).catch(() => null);
+  return sessionTokenCache;
+}
+
+async function saveSessionToken(token: string | null): Promise<void> {
+  sessionTokenCache = token;
+  if (token) await AsyncStorage.setItem(SESSION_TOKEN_KEY, token);
+  else await AsyncStorage.removeItem(SESSION_TOKEN_KEY);
+}
+
+export async function dbClearSession(): Promise<void> {
+  await saveSessionToken(null);
+}
 
 /**
  * Запрос к прокси.
@@ -55,9 +74,14 @@ async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
     const timer = setTimeout(() => ctl.abort(), PROXY_TIMEOUT);
     let res: Response;
     try {
+      const sessionToken = await getSessionToken();
       res = await fetch(`${API_BASE}/api/db.php`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-App-Secret': APP_SECRET,
+          ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+        },
         body: JSON.stringify({ fn, args }),
         signal: ctl.signal,
       });
@@ -247,8 +271,22 @@ export async function dbGetUsers(): Promise<User[]> {
  * пароль у себя — то есть пароль уходил наружу всякому, кто знает номер.
  */
 export async function dbLogin(phone: string, password: string): Promise<User | null> {
-  const d = await proxy<any>('dbLogin', [phone, password]);
-  return d ? rowToUser(d) : null;
+  const d = await proxy<{ user?: any; session_token?: string } | null>('dbLogin', [phone, password]);
+  if (!d?.user || !d.session_token) return null;
+  await saveSessionToken(d.session_token);
+  return rowToUser(d.user);
+}
+
+export async function dbRestoreSession(): Promise<User | null> {
+  const token = await getSessionToken();
+  if (!token) return null;
+  try {
+    const d = await proxy<{ user?: any } | null>('dbSession');
+    return d?.user ? rowToUser(d.user) : null;
+  } catch {
+    await saveSessionToken(null);
+    return null;
+  }
 }
 
 /** Смена пароля: старый сверяет сервер, новый он же и хеширует. */
@@ -265,7 +303,11 @@ export async function dbUpsertUser(u: User): Promise<void> {
   // Пустой пароль не отправляем: он означает «профиль пришёл без пароля»
   // (вход его больше не отдаёт), а не «стереть пароль».
   if (!row.password) delete (row as Partial<typeof row>).password;
-  if (IS_NATIVE) { await proxy('dbUpsertUser', [row]); return; }
+  if (IS_NATIVE) {
+    const d = await proxy<{ session_token?: string | null }>('dbUpsertUser', [row]);
+    if (d?.session_token) await saveSessionToken(d.session_token);
+    return;
+  }
   const { error } = await withTimeout(
     supabase.from('jm_users').upsert(row, { onConflict: 'id' })
   );
@@ -1372,7 +1414,7 @@ export async function dbSubmitSkillTest(
  */
 export async function dbGetExternalVacancies(): Promise<ExternalVacancy[]> {
   const rows = await proxy<any[]>('extVacancies');
-  return (rows ?? []).map(r => ({
+  const mapped: ExternalVacancy[] = (rows ?? []).map(r => ({
     id: r.id,
     sourceId: r.source_id,
     sourceName: r.source_name ?? undefined,
@@ -1397,6 +1439,16 @@ export async function dbGetExternalVacancies(): Promise<ExternalVacancy[]> {
     lastSeenAt: r.last_seen_at ?? undefined,
     dedupeKey: r.dedupe_key ?? undefined,
   }));
+
+  // Один и тот же заказ может прийти от нескольких интеграций. Оставляем
+  // одну карточку по серверному отпечатку, чтобы лента не выглядела спамом.
+  const seen = new Set<string>();
+  return mapped.filter(v => {
+    const key = v.dedupeKey || `${v.sourceId}:${v.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**
@@ -1566,7 +1618,8 @@ export type TgAuthResult = {
 
 /** Validates Telegram initData server-side and returns the linked user (if any) */
 export async function dbTelegramAuth(initData: string): Promise<TgAuthResult> {
-  const res = await proxy<{ ok: boolean; user?: any; tg?: TgAuthResult['tg'] }>('tgAuth', [initData]);
+  const res = await proxy<{ ok: boolean; user?: any; session_token?: string | null; tg?: TgAuthResult['tg'] }>('tgAuth', [initData]);
+  if (res.session_token) await saveSessionToken(res.session_token);
   return { ...res, user: res.user ? rowToUser(res.user) : null };
 }
 

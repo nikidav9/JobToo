@@ -33,15 +33,19 @@ function ing_secret(string $name): string
     return (string)($file[$name] ?? '');
 }
 
-// Пропуск тот же, что у остального прокси: этот адрес зовут только наши —
-// таймер на сервере и кнопка в панели.
-$given = $_SERVER['HTTP_X_APP_SECRET'] ?? '';
-$ok = false;
-foreach (['APP_SECRET', 'APP_SECRET_PREV'] as $k) {
-    $v = ing_secret($k);
-    if ($v !== '' && hash_equals($v, $given)) { $ok = true; break; }
+// Сборщик меняет партнёрские данные, поэтому публичный APP_SECRET здесь
+// недопустим. Приоритет — отдельный ADMIN_API_TOKEN; на переходном этапе
+// подходит пароль закрытого дашборда, который уже хранится только на сервере.
+$expectedAdmin = ing_secret('ADMIN_API_TOKEN');
+if ($expectedAdmin === '') {
+    $credFile = __DIR__ . '/admin_credentials.php';
+    $creds = is_readable($credFile) ? @include $credFile : null;
+    $expectedAdmin = is_array($creds) ? (string)($creds['password'] ?? '') : '';
 }
-if (!$ok) { http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit; }
+$givenAdmin = (string)($_SERVER['HTTP_X_ADMIN_TOKEN'] ?? '');
+if ($expectedAdmin === '' || !hash_equals($expectedAdmin, $givenAdmin)) {
+    http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
+}
 
 /** Отпечаток «та же самая работа». */
 function ing_dedupe_key(array $v): string
@@ -177,6 +181,21 @@ function ing_time(?string $raw): ?string
     return sprintf('%02d:%02d', $h, $i);
 }
 
+function ing_discriminatory(array $it): bool
+{
+    $text = mb_strtolower(implode(' ', [
+        (string)($it['title'] ?? ''),
+        (string)($it['description'] ?? ''),
+        (string)($it['requirements'] ?? ''),
+    ]));
+    return (bool)preg_match(
+        '~\\bмужчин[аы]?\\b|мужского\\s+пола|\\bженщин[аы]?\\b|женского\\s+пола'
+        . '|русскоязычн|славянск(?:ая|ой)\\s+внешност'
+        . '|\\b(?:до|от)\\s*\\d{2}\\s*(?:лет|года)|\\b\\d{2}\\s*[–—-]\\s*\\d{2}\\s*(?:лет|года)~u',
+        $text
+    );
+}
+
 /** Привести запись фида к нашему виду. Возвращает null, если она бесполезна. */
 function ing_normalize(array $it, string $sourceId): ?array
 {
@@ -185,7 +204,8 @@ function ing_normalize(array $it, string $sourceId): ?array
     $url = trim((string)($it['url'] ?? ''));
     // Три обязательных поля. Без ссылки показывать чужую вакансию нельзя —
     // это была бы перепечатка чужого содержимого без пути к источнику.
-    if ($ext === '' || $title === '' || !preg_match('~^https?://~i', $url)) return null;
+    if ($ext === '' || $title === '' || !preg_match('~^https://~i', $url)) return null;
+    if (ing_discriminatory($it)) return null;
 
     $kind = ($it['kind'] ?? 'shift') === 'permanent' ? 'permanent' : 'shift';
     $loc = is_array($it['location'] ?? null) ? $it['location'] : [];
@@ -224,6 +244,38 @@ function ing_normalize(array $it, string $sourceId): ?array
     return $row;
 }
 
+/**
+ * Разрешаем только публичные HTTPS-адреса. URL источника задаётся из панели,
+ * но панель — не повод давать сборщику доступ к localhost, служебным IP и
+ * метаданным облака.
+ */
+function ing_safe_https_url(string $url): bool
+{
+    if (!filter_var($url, FILTER_VALIDATE_URL)) return false;
+    $p = parse_url($url);
+    if (($p['scheme'] ?? '') !== 'https' || empty($p['host'])) return false;
+    $host = strtolower((string)$p['host']);
+    if ($host === 'localhost' || str_ends_with($host, '.local')) return false;
+
+    $ips = [];
+    if (filter_var($host, FILTER_VALIDATE_IP)) {
+        $ips[] = $host;
+    } else {
+        $records = @dns_get_record($host, DNS_A | DNS_AAAA);
+        foreach (is_array($records) ? $records : [] as $record) {
+            if (!empty($record['ip'])) $ips[] = $record['ip'];
+            if (!empty($record['ipv6'])) $ips[] = $record['ipv6'];
+        }
+    }
+    if (!$ips) return false;
+    foreach ($ips as $ip) {
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /** Сходить в один источник. */
 function ing_run_source(array $src): array
 {
@@ -232,20 +284,42 @@ function ing_run_source(array $src): array
         $hdrs[] = $src['auth_header'] . ': ' . $src['auth_value'];
     }
 
-    $ch = curl_init($src['url']);
+    $url = trim((string)($src['url'] ?? ''));
+    if (!ing_safe_https_url($url)) {
+        return ['status' => 'запрещённый или непубличный HTTPS-адрес', 'count' => 0];
+    }
+
+    // Не следуем редиректам: каждый новый адрес потребовал бы повторной
+    // проверки DNS. Партнёр должен указать конечный HTTPS URL.
+    $body = '';
+    $tooLarge = false;
+    $ch = curl_init($url);
     curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_RETURNTRANSFER => false,
         CURLOPT_HTTPHEADER => $hdrs,
+        CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_TIMEOUT => 60,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_MAXREDIRS => 3,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+        CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_WRITEFUNCTION => function ($ch, string $chunk) use (&$body, &$tooLarge): int {
+            if (strlen($body) + strlen($chunk) > 5 * 1024 * 1024) {
+                $tooLarge = true;
+                return 0;
+            }
+            $body .= $chunk;
+            return strlen($chunk);
+        },
     ]);
-    $body = curl_exec($ch);
+    $curlOk = curl_exec($ch);
     $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $err = curl_error($ch);
     curl_close($ch);
 
-    if ($body === false || $code >= 400) {
+    if ($tooLarge) return ['status' => 'ответ больше 5 МБ', 'count' => 0];
+    if ($curlOk === false || $code < 200 || $code >= 300) {
         return ['status' => "не ответил ($code $err)", 'count' => 0];
     }
 
@@ -276,7 +350,7 @@ function ing_run_source(array $src): array
     // updated_since, «не пришло» не значит «пропало», и гасить было бы
     // вредительством.
     $gone = 0;
-    if (empty($dec['has_more']) && $rows) {
+    if (empty($dec['has_more'])) {
         $cutoff = gmdate('Y-m-d\TH:i:s', time() - 120) . 'Z';
         $stale = sb_select('jm_ext_vacancies', [
             'source_id' => 'eq.' . $src['id'],
