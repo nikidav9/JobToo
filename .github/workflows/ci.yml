@@ -44,6 +44,8 @@ jobs:
 
       - name: Partner gateway state machine
         run: php tests/partner_core_test.php
+      - name: Isolated partner sandbox flow
+        run: php tests/partner_sandbox_e2e_test.php
 
       - name: Service worker and infrastructure syntax
         run: |

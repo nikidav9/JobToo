@@ -1,0 +1,21 @@
+name: Partner monthly report
+
+on:
+  schedule:
+    - cron: '15 3 1 * *'
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate previous month snapshots
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          test -n "$CRON_SECRET"
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-delay 10 \
+            -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://admin.jobtoo.ru/api/cron/partner-monthly-report

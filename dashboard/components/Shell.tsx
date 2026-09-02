@@ -16,6 +16,11 @@ function isOnLoginPage(): boolean {
   return window.location.pathname.replace(/\/$/, '').endsWith('/login')
 }
 
+function isPartnerPortal(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.location.pathname.replace(/\/$/, '').endsWith('/partner')
+}
+
 // Список разделов — общий, из lib/nav. Своя копия здесь отставала: новые
 // разделы появлялись в боковом меню и не появлялись в нижнем.
 import { NAV as NAV_ITEMS } from '@/lib/nav'
@@ -49,7 +54,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null)
 
   useEffect(() => {
-    if (isOnLoginPage()) {
+    if (isOnLoginPage() || isPartnerPortal()) {
       setAuthed(true)
       return
     }
@@ -60,7 +65,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  if (path === '/login' || isOnLoginPage()) {
+  if (path === '/login' || isOnLoginPage() || path === '/partner' || isPartnerPortal()) {
     return <>{children}</>
   }
 
