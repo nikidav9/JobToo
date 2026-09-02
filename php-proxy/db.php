@@ -2729,7 +2729,7 @@ try {
         // источника: на карточке обязана быть надпись, откуда она, иначе это
         // не агрегатор, а перепечатка чужого под своим именем.
         case 'extVacancies': {
-            $rows = sb_select('jm_ext_vacancies', ['active' => 'is.true', 'limit' => '1000'],
+            $rows = sb_select('jm_ext_vacancies', ['active' => 'is.true', 'environment' => 'eq.production', 'limit' => '1000'],
                 '*', 'last_seen_at.desc');
             $names = [];
             foreach (sb_select('jm_ext_sources', [], 'id,name') as $s) {

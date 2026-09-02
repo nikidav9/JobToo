@@ -42,4 +42,12 @@ expect_true($late['fact_kind'] === 'late_minutes' && $late['numeric_value'] === 
 $ontime = pg_rating_fact_for_status('checked_in', ['late_minutes' => 0]);
 expect_true($ontime['fact_kind'] === 'on_time', 'zero lateness becomes on-time fact');
 
-echo "partner core: ok\n";
+$sandboxMigration = file_get_contents(__DIR__ . '/../supabase/migrations/046_partner_sandbox_isolation.sql');
+expect_true($sandboxMigration !== false, 'sandbox migration exists');
+expect_true(str_contains($sandboxMigration, "environment <> 'sandbox' or notifications_enabled = false"), 'sandbox notifications are forbidden');
+expect_true(str_contains($sandboxMigration, "environment = 'production' and active = true"), 'public policy exposes production only');
+
+$dbProxy = file_get_contents(__DIR__ . '/../php-proxy/db.php');
+expect_true($dbProxy !== false && str_contains($dbProxy, "'environment' => 'eq.production'"), 'API hides sandbox vacancies');
+
+echo "partner core: ok\\n";
