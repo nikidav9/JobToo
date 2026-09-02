@@ -14,6 +14,7 @@
 @ini_set('display_errors', '0');
 @ini_set('html_errors', '0');
 ob_start();
+require_once __DIR__ . '/partner_billing.php';
 
 /** Отдать ответ, отбросив всё, что случайно напечаталось до него. */
 function jt_respond(array $payload, int $code = 200): void {
@@ -3014,6 +3015,152 @@ try {
                 'created_at' => now_iso(),
             ]);
             $data = ['ok' => true]; break;
+        }
+
+        // ── Биллинг и сверка партнёрского пилота ─────────────────────────
+        case 'partnerTariffsList': {
+            $sourceId = trim((string)($args[0] ?? ''));
+            $filters = $sourceId !== '' ? ['source_id' => 'eq.' . $sourceId] : [];
+            $data = sb_select_all('jm_partner_tariffs', $filters,
+                'id,source_id,name,billing_model,amount_rub,fixed_monthly_rub,effective_from,effective_to,active,terms_version,created_at');
+            break;
+        }
+
+        case 'partnerTariffSave': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $sourceId = trim((string)($v['source_id'] ?? ''));
+            $model = trim((string)($v['billing_model'] ?? ''));
+            $allowed = ['first_completed_shift','completed_shift','qualified_application','fixed_monthly','hybrid'];
+            $from = trim((string)($v['effective_from'] ?? ''));
+            if ($sourceId === '' || !in_array($model, $allowed, true)
+                || !preg_match('~^\\d{4}-\\d{2}-\\d{2}$~', $from)) {
+                $data = ['error' => 'Нужны источник, модель и дата начала тарифа']; break;
+            }
+            $row = [
+                'id' => trim((string)($v['id'] ?? '')) ?: uid(),
+                'source_id' => $sourceId,
+                'name' => trim((string)($v['name'] ?? '')) ?: $model,
+                'billing_model' => $model,
+                'amount_rub' => max(0, round((float)($v['amount_rub'] ?? 0), 2)),
+                'fixed_monthly_rub' => max(0, round((float)($v['fixed_monthly_rub'] ?? 0), 2)),
+                'effective_from' => $from,
+                'effective_to' => !empty($v['effective_to']) ? (string)$v['effective_to'] : null,
+                'active' => ($v['active'] ?? true) !== false,
+                'terms_version' => trim((string)($v['terms_version'] ?? '')) ?: $from,
+                'created_at' => now_iso(),
+            ];
+            sb_upsert('jm_partner_tariffs', $row, 'id');
+            $data = $row; break;
+        }
+
+        case 'partnerBillableEventRecord': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $sourceId = trim((string)($v['source_id'] ?? ''));
+            $occurredAt = trim((string)($v['occurred_at'] ?? '')) ?: now_iso();
+            $tariffs = sb_select_all('jm_partner_tariffs',
+                ['source_id' => 'eq.' . $sourceId, 'active' => 'is.true'],
+                'id,source_id,billing_model,amount_rub,effective_from,effective_to,active');
+            $v['occurred_at'] = $occurredAt;
+            try {
+                $dedupe = pb_dedupe_key($v);
+                $existing = sb_single('jm_partner_billable_events',
+                    ['source_id' => 'eq.' . $sourceId, 'dedupe_key' => 'eq.' . $dedupe], 'id,dedupe_key,status');
+                if ($existing) { $data = ['created' => false, 'reason' => 'duplicate', 'event' => $existing]; break; }
+                $built = pb_build_billable_event($v, $tariffs);
+                if (!$built['created']) { $data = $built; break; }
+                sb_insert('jm_partner_billable_events', $built['billable_event']);
+                $data = $built;
+            } catch (Throwable $e) {
+                if (stripos($e->getMessage(), 'duplicate') !== false
+                    || stripos($e->getMessage(), 'unique') !== false) {
+                    $data = ['created' => false, 'reason' => 'duplicate'];
+                } else throw $e;
+            }
+            break;
+        }
+
+        case 'partnerReconciliationRecord': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $eventId = trim((string)($v['billable_event_id'] ?? ''));
+            $event = $eventId !== '' ? sb_single('jm_partner_billable_events',
+                ['id' => 'eq.' . $eventId], 'id,source_id,application_id,status') : null;
+            if (!$event) { $data = ['error' => 'Оплачиваемое событие не найдено']; break; }
+            $issue = pb_reconciliation_issue($event, [
+                'status' => (string)($v['partner_status'] ?? ''),
+                'reason_code' => (string)($v['reason_code'] ?? 'status_mismatch'),
+                'reason_text' => $v['reason_text'] ?? null,
+            ]);
+            if ($issue === null) { $data = ['created' => false, 'reason' => 'statuses_match']; break; }
+            $issue['id'] = uid();
+            try { sb_insert('jm_partner_reconciliation_issues', $issue); }
+            catch (Throwable $e) {
+                if (stripos($e->getMessage(), 'duplicate') === false
+                    && stripos($e->getMessage(), 'unique') === false) throw $e;
+            }
+            $data = ['created' => true, 'issue' => $issue]; break;
+        }
+
+        case 'partnerConsentRecord': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $required = ['source_id','worker_id','ext_vacancy_id','recipient_name','consent_version'];
+            foreach ($required as $key) {
+                if (trim((string)($v[$key] ?? '')) === '') {
+                    $data = ['error' => 'Не заполнено поле согласия: ' . $key]; break 2;
+                }
+            }
+            $categories = is_array($v['data_categories'] ?? null)
+                ? array_values(array_intersect($v['data_categories'], ['profile','application','messages','statuses'])) : [];
+            if (!$categories) { $data = ['error' => 'Не указан состав передаваемых данных']; break; }
+            $row = [
+                'id' => uid(), 'source_id' => (string)$v['source_id'],
+                'worker_id' => (string)$v['worker_id'], 'ext_vacancy_id' => (string)$v['ext_vacancy_id'],
+                'application_id' => $v['application_id'] ?? null,
+                'recipient_name' => (string)$v['recipient_name'], 'data_categories' => $categories,
+                'purpose' => trim((string)($v['purpose'] ?? '')) ?: 'Передача отклика, сообщений и статусов по выбранной смене',
+                'consent_version' => (string)$v['consent_version'], 'accepted_at' => now_iso(),
+                'evidence' => [
+                    'ip_hash' => isset($v['ip']) ? hash('sha256', (string)$v['ip']) : null,
+                    'user_agent' => substr((string)($v['user_agent'] ?? ''), 0, 300),
+                ],
+            ];
+            try { sb_insert('jm_partner_data_consents', $row); }
+            catch (Throwable $e) {
+                if (stripos($e->getMessage(), 'duplicate') === false
+                    && stripos($e->getMessage(), 'unique') === false) throw $e;
+            }
+            $data = ['recorded' => true, 'consent_version' => $row['consent_version']]; break;
+        }
+
+        case 'partnerBillingReport': {
+            $sourceId = trim((string)($args[0] ?? ''));
+            $from = trim((string)($args[1] ?? ''));
+            $to = trim((string)($args[2] ?? ''));
+            if ($sourceId === '' || !preg_match('~^\\d{4}-\\d{2}-\\d{2}$~', $from)
+                || !preg_match('~^\\d{4}-\\d{2}-\\d{2}$~', $to)) {
+                $data = ['error' => 'Нужны источник и границы периода']; break;
+            }
+            $events = sb_select_all('jm_partner_billable_events', [
+                'source_id' => 'eq.' . $sourceId,
+                'occurred_at' => 'gte.' . $from . 'T00:00:00Z',
+                'and' => '(occurred_at.lt.' . $to . 'T23:59:59Z)',
+            ], 'id,source_id,application_id,worker_id,ext_vacancy_id,partner_event_id,event_kind,occurred_at,amount_rub,status,partner_status,rejection_reason');
+            $issues = sb_select_all('jm_partner_reconciliation_issues', [
+                'source_id' => 'eq.' . $sourceId,
+                'detected_at' => 'gte.' . $from . 'T00:00:00Z',
+            ], 'id,billable_event_id,local_status,partner_status,reason_code,reason_text,resolution_status,detected_at,resolved_at');
+            $approved = array_values(array_filter($events, fn($e) => in_array($e['status'] ?? '', ['approved','invoiced','paid'], true)));
+            $amount = array_sum(array_map(fn($e) => (float)($e['amount_rub'] ?? 0), $approved));
+            $data = [
+                'source_id' => $sourceId, 'period_start' => $from, 'period_end' => $to,
+                'events' => $events, 'discrepancies' => $issues,
+                'summary' => [
+                    'events' => count($events), 'approved' => count($approved),
+                    'rejected' => count(array_filter($events, fn($e) => ($e['status'] ?? '') === 'rejected')),
+                    'open_discrepancies' => count(array_filter($issues, fn($i) => ($i['resolution_status'] ?? '') === 'open')),
+                    'amount_rub' => round($amount, 2),
+                ],
+            ];
+            break;
         }
 
         // ── Ключи внешнего API ─────────────────────────────────────────────
