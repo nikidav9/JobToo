@@ -174,21 +174,48 @@ if ($method === 'POST' && $path === 'conversions') {
     $key = api_key_row();
     api_require_scope($key, 'conversions:write');
     $payload = json_decode(file_get_contents('php://input'), true);
-    $extId = trim((string)($payload['ext_id'] ?? ''));
+    if (!is_array($payload)) api_error(400, 'invalid_json', 'Тело должно быть JSON-объектом');
+
     $partnerEventId = trim((string)($payload['event_id'] ?? ''));
-    if ($extId === '' || $partnerEventId === '') {
-        api_error(400, 'invalid_event', 'Нужны ext_id и уникальный event_id');
+    $clickId = trim((string)($payload['click_id'] ?? ''));
+    $extId = trim((string)($payload['ext_id'] ?? ''));
+    if ($partnerEventId === '' || ($clickId === '' && $extId === '')) {
+        api_error(400, 'invalid_event', 'Нужны event_id и click_id (либо ext_id для старой интеграции)');
     }
-    $vacancy = sb_single('jm_ext_vacancies', ['id' => 'eq.' . $extId], 'id,source_id');
-    if (!$vacancy) api_error(404, 'vacancy_not_found', 'Внешняя вакансия не найдена');
+
+    $sourceId = '';
+    if ($clickId !== '') {
+        $click = sb_single('jm_ext_clicks', ['id' => 'eq.' . $clickId], 'id,ext_id,source_id');
+        if (!$click) api_error(404, 'click_not_found', 'Переход с таким click_id не найден');
+        $extId = (string)$click['ext_id'];
+        $sourceId = (string)$click['source_id'];
+    } else {
+        $vacancy = sb_single('jm_ext_vacancies', ['id' => 'eq.' . $extId], 'id,source_id');
+        if (!$vacancy) api_error(404, 'vacancy_not_found', 'Внешняя вакансия не найдена');
+        $sourceId = (string)$vacancy['source_id'];
+    }
+
+    // Если партнёр передал время события, сохраняем его, но не принимаем
+    // очевидно ошибочные даты. Без поля используется время получения callback.
+    $occurredAt = now_iso();
+    $rawOccurred = trim((string)($payload['occurred_at'] ?? ''));
+    if ($rawOccurred !== '') {
+        $ts = strtotime($rawOccurred);
+        if ($ts === false || $ts < time() - 90 * 86400 || $ts > time() + 86400) {
+            api_error(400, 'invalid_occurred_at', 'occurred_at должен быть ISO-временем не старше 90 дней');
+        }
+        $occurredAt = gmdate('Y-m-d\\TH:i:s\\Z', $ts);
+    }
+
     try {
         sb_insert('jm_ext_events', [
             'id' => bin2hex(random_bytes(12)),
             'ext_id' => $extId,
-            'source_id' => (string)$vacancy['source_id'],
+            'source_id' => $sourceId,
             'event_type' => 'conversion',
             'partner_event_id' => $partnerEventId,
-            'occurred_at' => now_iso(),
+            'attribution_id' => $clickId !== '' ? $clickId : null,
+            'occurred_at' => $occurredAt,
         ]);
     } catch (Throwable $e) {
         // Повтор одного event_id идемпотентен: партнёр может безопасно ретраить.
@@ -197,7 +224,11 @@ if ($method === 'POST' && $path === 'conversions') {
             api_error(502, 'event_store_failed', 'Не удалось сохранить конверсию');
         }
     }
-    api_out(202, ['accepted' => true, 'event_id' => $partnerEventId]);
+    api_out(202, [
+        'accepted' => true,
+        'event_id' => $partnerEventId,
+        'click_id' => $clickId !== '' ? $clickId : null,
+    ]);
 }
 
 if ($method !== 'GET') {
