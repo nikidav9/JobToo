@@ -53,7 +53,8 @@ export default function PartnerBillingPage() {
   }
 
   return <div className="page">
-    <PageHeader title="Партнёрский биллинг" subtitle="Тарифы, оплачиваемые события и расхождения сверки" />
+    <PageHeader title="Партнёрский биллинг" />
+    <p style={{ color: 'var(--ink-3)', marginTop: -8 }}>Тарифы, оплачиваемые события и расхождения сверки</p>
     <div style={{ display: 'grid', gap: 16 }}>
       <div className="jt-card" style={{ padding: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
         <label>Источник<select className="jt-input" value={source} onChange={e => setSource(e.target.value)}>
