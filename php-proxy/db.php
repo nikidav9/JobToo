@@ -155,7 +155,7 @@ $adminFns = [
     'tgBroadcast', 'tgSendToUsers', 'scoreRecalcAll', 'billingReport',
     'extSourcesList', 'extSourceSave', 'extSourceDelete', 'extStats',
     'partnerTariffsList', 'partnerTariffSave', 'partnerBillableEventRecord',
-    'partnerReconciliationRecord', 'partnerBillingReport',
+    'partnerReconciliationRecord', 'partnerBillingReport', 'partnerReportSnapshotSave',
     'apiKeysList', 'apiKeyCreate', 'apiKeyRevoke',
     'botAdminGet', 'botAdminSet', 'supportClose', 'supportReopen',
     'supportReply', 'supportThreads', 'botReply', 'botInbox',
@@ -3167,6 +3167,33 @@ try {
             ];
             break;
         }
+
+        case 'partnerReportSnapshotSave': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $required = ['source_id','period_start','period_end','checksum_sha256'];
+            foreach ($required as $key) {
+                if (trim((string)($v[$key] ?? '')) === '') {
+                    $data = ['error' => 'Не заполнено поле отчёта: ' . $key]; break 2;
+                }
+            }
+            $row = [
+                'id' => trim((string)($v['id'] ?? '')) ?: uid(),
+                'source_id' => (string)$v['source_id'],
+                'period_start' => (string)$v['period_start'],
+                'period_end' => (string)$v['period_end'],
+                'status' => 'generated',
+                'event_count' => max(0, (int)($v['event_count'] ?? 0)),
+                'amount_rub' => max(0, round((float)($v['amount_rub'] ?? 0), 2)),
+                'approved_count' => max(0, (int)($v['approved_count'] ?? 0)),
+                'rejected_count' => max(0, (int)($v['rejected_count'] ?? 0)),
+                'discrepancy_count' => max(0, (int)($v['discrepancy_count'] ?? 0)),
+                'checksum_sha256' => (string)$v['checksum_sha256'],
+                'generated_at' => now_iso(),
+            ];
+            sb_upsert('jm_partner_report_runs', $row, 'source_id,period_start,period_end');
+            $data = ['saved' => true, 'report' => $row]; break;
+        }
+
 
         // ── Ключи внешнего API ─────────────────────────────────────────────
         //
