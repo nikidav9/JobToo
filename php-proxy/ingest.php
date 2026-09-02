@@ -388,10 +388,19 @@ foreach ($sources as $src) {
         if ($age < (int)$src['period_min'] * 60) continue;
     }
     $res = ing_run_source($src);
+    $ranAt = now_iso();
     sb_update('jm_ext_sources', ['id' => 'eq.' . $src['id']], [
-        'last_run_at' => now_iso(),
+        'last_run_at' => $ranAt,
         'last_status' => $res['status'],
         'last_count'  => $res['count'],
+    ]);
+    sb_insert('jm_ext_ingest_runs', [
+        'id' => bin2hex(random_bytes(12)),
+        'source_id' => (string)$src['id'],
+        'success' => str_starts_with((string)$res['status'], 'ок'),
+        'received' => (int)$res['count'],
+        'status' => (string)$res['status'],
+        'ran_at' => $ranAt,
     ]);
     $done[] = ['name' => $src['name'], 'status' => $res['status']];
 }
