@@ -436,6 +436,9 @@ function ing_run_source(array $src): array
     return [
         'status' => "ок: страниц $pages, получено $received, пропущено $skipped, погашено $gone",
         'count' => $received,
+        'pages' => $pages,
+        'skipped' => $skipped,
+        'deactivated' => $gone,
     ];
 }
 
@@ -456,20 +459,40 @@ foreach ($sources as $src) {
         $age = time() - strtotime((string)$src['last_run_at']);
         if ($age < (int)$src['period_min'] * 60) continue;
     }
+    $started = microtime(true);
     $res = ing_run_source($src);
+    $durationMs = (int)round((microtime(true) - $started) * 1000);
     $ranAt = now_iso();
-    sb_update('jm_ext_sources', ['id' => 'eq.' . $src['id']], [
+    $success = str_starts_with((string)$res['status'], 'ок');
+    $pages = isset($res['pages']) ? (int)$res['pages'] : null;
+    $skipped = isset($res['skipped']) ? (int)$res['skipped'] : null;
+    $deactivated = isset($res['deactivated']) ? (int)$res['deactivated'] : null;
+
+    $sourceUpdate = [
         'last_run_at' => $ranAt,
         'last_status' => $res['status'],
-        'last_count'  => $res['count'],
-    ]);
+        'last_count' => $res['count'],
+        'last_duration_ms' => $durationMs,
+        'last_pages' => $pages,
+        'last_skipped' => $skipped,
+        'last_deactivated' => $deactivated,
+        'consecutive_failures' => $success
+            ? 0 : ((int)($src['consecutive_failures'] ?? 0) + 1),
+    ];
+    if ($success) $sourceUpdate['last_success_at'] = $ranAt;
+    sb_update('jm_ext_sources', ['id' => 'eq.' . $src['id']], $sourceUpdate);
+
     sb_insert('jm_ext_ingest_runs', [
         'id' => bin2hex(random_bytes(12)),
         'source_id' => (string)$src['id'],
-        'success' => str_starts_with((string)$res['status'], 'ок'),
+        'success' => $success,
         'received' => (int)$res['count'],
         'status' => (string)$res['status'],
         'ran_at' => $ranAt,
+        'duration_ms' => $durationMs,
+        'pages' => $pages,
+        'skipped' => $skipped,
+        'deactivated' => $deactivated,
     ]);
     $done[] = ['name' => $src['name'], 'status' => $res['status']];
 }

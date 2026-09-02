@@ -27,6 +27,13 @@ type Source = {
   last_run_at: string | null
   last_status: string | null
   last_count: number | null
+  last_success_at: string | null
+  consecutive_failures: number
+  last_duration_ms: number | null
+  last_pages: number | null
+  last_skipped: number | null
+  last_deactivated: number | null
+  auth_configured: boolean
 }
 
 type Stats = {
@@ -337,16 +344,16 @@ export default function SourcesPage() {
 
         <div className="jt-card" style={{ overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
-          <table className="jt-table" style={{ minWidth: 700 }}>
+          <table className="jt-table" style={{ minWidth: 980 }}>
             <thead>
               <tr>
-                {['Источник', 'Последний заход', 'Что вышло', 'В базе', 'Показы', 'Переходы', 'Конверсии', ''].map(h => <th key={h}>{h}</th>)}
+                {['Источник', 'Последний заход', 'Что вышло', 'Готовность', 'В базе', 'Показы', 'Переходы', 'Конверсии', ''].map(h => <th key={h}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={8} style={{ padding: 16, color: 'var(--ink-3)' }}>Загружаю…</td></tr>}
+              {loading && <tr><td colSpan={9} style={{ padding: 16, color: 'var(--ink-3)' }}>Загружаю…</td></tr>}
               {!loading && !items.length && (
-                <tr><td colSpan={8} style={{ padding: 16, color: 'var(--ink-3)' }}>
+                <tr><td colSpan={9} style={{ padding: 16, color: 'var(--ink-3)' }}>
                   Источников пока нет. Нажмите «Подставить наш образец», чтобы посмотреть, как всё работает.
                 </td></tr>
               )}
@@ -372,6 +379,22 @@ export default function SourcesPage() {
                       {s.last_status
                         ? <Chip tone={failed ? 'negative' : 'positive'}>{s.last_status}</Chip>
                         : <span style={{ color: 'var(--ink-3)' }}>ещё не заходили</span>}
+                    </td>
+                    <td style={{ minWidth: 150 }}>
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                        <Chip tone={(s.consecutive_failures ?? 0) > 0 ? 'negative' : 'positive'}>
+                          {(s.consecutive_failures ?? 0) > 0
+                            ? `ошибок подряд: ${s.consecutive_failures}`
+                            : 'стабилен'}
+                        </Chip>
+                        {s.auth_configured && <Chip tone="neutral">доступ настроен</Chip>}
+                      </div>
+                      <div className="num" style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+                        успешно: {when(s.last_success_at)}
+                        {s.last_duration_ms != null ? ` · ${(s.last_duration_ms / 1000).toLocaleString('ru-RU')} с` : ''}
+                        {s.last_pages != null ? ` · ${s.last_pages} стр.` : ''}
+                        {s.last_skipped != null ? ` · пропущено ${s.last_skipped}` : ''}
+                      </div>
                     </td>
                     <td className="num" style={{ color: 'var(--ink-2)' }}>
                       {stats?.по_источникам?.[s.id] ?? 0}

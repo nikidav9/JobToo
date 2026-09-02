@@ -2676,25 +2676,43 @@ try {
 
         // ── Источники чужих вакансий ───────────────────────────────────────
         case 'extSourcesList':
-            $data = sb_select('jm_ext_sources', ['order' => 'created_at.desc']); break;
+            // Никогда не отдаём auth_header/auth_value в браузер дашборда.
+            // Даже администратору достаточно знать, что секрет настроен.
+            $rows = sb_select('jm_ext_sources', ['order' => 'created_at.desc'],
+                'id,name,url,enabled,period_min,last_run_at,last_status,last_count,'
+                . 'last_success_at,consecutive_failures,last_duration_ms,last_pages,'
+                . 'last_skipped,last_deactivated,created_at,auth_header');
+            foreach ($rows as &$source) {
+                $source['auth_configured'] = !empty($source['auth_header']);
+                unset($source['auth_header']);
+            }
+            unset($source);
+            $data = $rows; break;
 
         // args: [{id?, name, url, auth_header?, auth_value?, period_min?, enabled?}]
         case 'extSourceSave': {
             $v = is_array($args[0] ?? null) ? $args[0] : [];
             $name = trim((string)($v['name'] ?? ''));
             $url  = trim((string)($v['url'] ?? ''));
-            if ($name === '' || !preg_match('~^https?://~i', $url)) {
-                $data = ['error' => 'нужны имя и адрес фида']; break;
+            if ($name === '' || !preg_match('~^https://~i', $url)) {
+                $data = ['error' => 'нужны имя и публичный HTTPS-адрес фида']; break;
             }
+            $isNew = (string)($v['id'] ?? '') === '';
             $row = [
-                'id' => (string)($v['id'] ?? '') !== '' ? (string)$v['id'] : uid(),
+                'id' => $isNew ? uid() : (string)$v['id'],
                 'name' => $name,
                 'url' => $url,
-                'auth_header' => $v['auth_header'] ?? null,
-                'auth_value' => $v['auth_value'] ?? null,
                 'period_min' => max(5, (int)($v['period_min'] ?? 30)),
                 'enabled' => array_key_exists('enabled', $v) ? (bool)$v['enabled'] : true,
             ];
+            // При переключении enabled браузер не знает секрет и не должен
+            // стирать его. Меняем доступ только когда поля присланы явно.
+            if ($isNew || array_key_exists('auth_header', $v)) {
+                $row['auth_header'] = $v['auth_header'] ?? null;
+            }
+            if ($isNew || array_key_exists('auth_value', $v)) {
+                $row['auth_value'] = $v['auth_value'] ?? null;
+            }
             sb_upsert('jm_ext_sources', $row, 'id');
             $data = ['ok' => true, 'id' => $row['id']]; break;
         }
