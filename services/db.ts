@@ -1518,8 +1518,15 @@ export async function dbRecordExternalImpression(extId: string, sourceId: string
   try { await proxy('extImpression', [extId, sourceId]); } catch { /* не мешаем просмотру */ }
 }
 
-export async function dbRecordExternalClick(extId: string, sourceId: string, userId?: string): Promise<void> {
-  try { await proxy('extClick', [extId, sourceId, userId ?? null]); } catch { /* не мешаем переходу */ }
+export async function dbRecordExternalClick(
+  extId: string,
+  sourceId: string,
+  userId?: string,
+  clickId?: string,
+): Promise<void> {
+  try {
+    await proxy('extClick', [extId, sourceId, userId ?? null, clickId ?? null]);
+  } catch { /* не мешаем переходу */ }
 }
 
 // ─── Push tokens ──────────────────────────────────────────────────────────────
