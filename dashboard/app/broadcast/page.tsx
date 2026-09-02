@@ -8,7 +8,7 @@ import { broadcastBoth, broadcastWebPush, broadcastTelegram, sendTelegramToUsers
 import { supabaseAdmin } from '@/lib/supabase'
 import { logActivity } from '@/lib/activity-log'
 
-type Target = 'all' | 'workers' | 'employers' | 'metro' | 'webpush' | 'telegram' | 'telegram_workers' | 'telegram_inactive_workers' | 'telegram_employers'
+type Target = 'all' | 'workers' | 'employers' | 'metro' | 'webpush' | 'telegram' | 'telegram_workers' | 'telegram_reactivation_workers' | 'telegram_employers'
 type St = 'idle' | 'loading' | 'ok' | 'err'
 
 interface UserRow {
@@ -43,7 +43,7 @@ const TARGETS: { value: Target; label: string; desc: string }[] = [
   { value: 'webpush',   label: 'Веб-пуш · iPhone',    desc: 'Только подписчики PWA (Safari/iOS)' },
   { value: 'telegram',           label: 'Telegram — все',        desc: 'Все с привязанным Telegram, доставка ~100%' },
   { value: 'telegram_workers',   label: 'Telegram — работники',  desc: 'Только работники с Telegram' },
-  { value: 'telegram_inactive_workers', label: 'Telegram — неактивные 30+ дней', desc: 'Только работники, заходившие ранее и неактивные более 30 дней' },
+  { value: 'telegram_reactivation_workers', label: 'Telegram — вернуть работников', desc: 'Не заходили 30+ дней или ни разу не открывали приложение' },
   { value: 'telegram_employers', label: 'Telegram — директора',  desc: 'Только директора с Telegram' },
 ]
 
@@ -148,12 +148,11 @@ export default function BroadcastPage() {
   const withPush = users.filter(u => u.push_token).length
   const withoutPush = users.filter(u => !u.push_token).length
   const inactiveCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
-  const inactiveTelegramWorkers = users.filter(u =>
+  const reactivationTelegramWorkers = users.filter(u =>
     u.role === 'worker' &&
     !!u.telegram_id &&
     !u.is_blocked &&
-    !!u.last_seen_at &&
-    new Date(u.last_seen_at).getTime() < inactiveCutoff
+    (!u.last_seen_at || new Date(u.last_seen_at).getTime() < inactiveCutoff)
   )
 
   async function handleBroadcast() {
@@ -163,9 +162,9 @@ export default function BroadcastPage() {
       if (target === 'webpush') {
         const { sent, failed } = await broadcastWebPush(title, body)
         setSt('ok'); setResult(`Веб-пуш отправлен: ${sent}${failed > 0 ? `, ошибок: ${failed}` : ''}`)
-      } else if (target === 'telegram_inactive_workers') {
-        const ids = inactiveTelegramWorkers.map(u => u.id)
-        if (ids.length === 0) throw new Error('Нет неактивных работников с привязанным Telegram')
+      } else if (target === 'telegram_reactivation_workers') {
+        const ids = reactivationTelegramWorkers.map(u => u.id)
+        if (ids.length === 0) throw new Error('Нет подходящих работников с привязанным Telegram')
         const { sent, skipped } = await sendTelegramToUsers(ids, `*${title}*\n\n${body}`)
         setSt('ok'); setResult(`Telegram: доставлено ${sent} из ${ids.length}${skipped.length ? `, пропущено: ${skipped.length}` : ''}`)
       } else if (target.startsWith('telegram')) {
@@ -338,9 +337,9 @@ export default function BroadcastPage() {
                     </label>
                   ))}
                 </div>
-                {target === 'telegram_inactive_workers' && (
+                {target === 'telegram_reactivation_workers' && (
                   <div style={{ marginTop: 10, padding: '9px 12px', borderRadius: 8, background: 'var(--info-soft)', color: 'var(--info)', fontSize: 12.5 }}>
-                    Получателей с привязанным Telegram: <strong>{inactiveTelegramWorkers.length}</strong>
+                    Получателей с привязанным Telegram: <strong>{reactivationTelegramWorkers.length}</strong>
                   </div>
                 )}
                 {target === 'metro' && (
