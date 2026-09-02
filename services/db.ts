@@ -1456,6 +1456,10 @@ export async function dbGetExternalVacancies(): Promise<ExternalVacancy[]> {
  * задерживаем — потерянная строка статистики не стоит того, чтобы у человека
  * не открылась вакансия.
  */
+export async function dbRecordExternalImpression(extId: string, sourceId: string): Promise<void> {
+  try { await proxy('extImpression', [extId, sourceId]); } catch { /* не мешаем просмотру */ }
+}
+
 export async function dbRecordExternalClick(extId: string, sourceId: string, userId?: string): Promise<void> {
   try { await proxy('extClick', [extId, sourceId, userId ?? null]); } catch { /* не мешаем переходу */ }
 }
