@@ -34,6 +34,8 @@ type Source = {
   last_skipped: number | null
   last_deactivated: number | null
   auth_configured: boolean
+  environment: 'production' | 'sandbox'
+  notifications_enabled: boolean
 }
 
 type Stats = {
@@ -191,6 +193,7 @@ export default function SourcesPage() {
   const [header, setHeader] = useState('')
   const [value, setValue] = useState('')
   const [period, setPeriod] = useState(30)
+  const [environment, setEnvironment] = useState<'production' | 'sandbox'>('sandbox')
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null)
@@ -222,7 +225,11 @@ export default function SourcesPage() {
     if (!name.trim() || !url.trim()) return
     setBusy('add'); setErr(null)
     try {
-      await send({ name, url, auth_header: header || null, auth_value: value || null, period_min: period })
+      await send({
+        name, url, auth_header: header || null, auth_value: value || null,
+        period_min: period, environment,
+        notifications_enabled: environment === 'production',
+      })
       setName(''); setUrl(''); setHeader(''); setValue('')
       await load()
     } catch (e: any) { setErr(e.message) }
@@ -327,12 +334,25 @@ export default function SourcesPage() {
                 onChange={e => setPeriod(Math.max(5, Number(e.target.value) || 30))}
                 className="jt-input num" style={{ width: 88 }} /> мин
             </label>
+            <label style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+              режим{' '}
+              <select className="jt-input" value={environment}
+                onChange={e => setEnvironment(e.target.value as 'production' | 'sandbox')}>
+                <option value="sandbox">Sandbox — скрыто</option>
+                <option value="production">Production — пользователям</option>
+              </select>
+            </label>
             <Button variant="primary" onClick={add} disabled={busy === 'add' || !name.trim() || !url.trim()}>
               Добавить
             </Button>
             <Button onClick={() => { setName('Образец (проверка)'); setUrl(SAMPLE); setPeriod(60) }}>
               Подставить наш образец
             </Button>
+          </div>
+          <div style={{ fontSize: 12.5, color: environment === 'sandbox' ? 'var(--positive)' : 'var(--negative)', marginTop: 8 }}>
+            {environment === 'sandbox'
+              ? 'Безопасный режим: вакансии не видны пользователям, уведомления запрещены на уровне базы.'
+              : 'Боевой режим: вакансии появятся в приложении. Использовать только после приёмки и письменного допуска.'}
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>
             Смены на сегодня протухают за часы — для них 15–30 минут. Постоянные вакансии живут
@@ -368,6 +388,7 @@ export default function SourcesPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontWeight: 550, color: 'var(--ink)' }}>{s.name}</span>
                         {!s.enabled && <Chip tone="neutral">Выключен</Chip>}
+                        {s.environment === 'sandbox' && <Chip tone="neutral">Sandbox</Chip>}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--ink-3)', wordBreak: 'break-all' }}>{s.url}</div>
                     </td>
