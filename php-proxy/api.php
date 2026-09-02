@@ -185,7 +185,7 @@ if ($method === 'POST' && $path === 'conversions') {
 
     $sourceId = '';
     if ($clickId !== '') {
-        $click = sb_single('jm_ext_clicks', ['id' => 'eq.' . $clickId], 'id,ext_id,source_id');
+        $click = sb_single('jm_ext_clicks', ['id' => 'eq.' . $clickId], 'id,ext_id,source_id,user_id');
         if (!$click) api_error(404, 'click_not_found', 'Переход с таким click_id не найден');
         $extId = (string)$click['ext_id'];
         $sourceId = (string)$click['source_id'];
@@ -207,6 +207,14 @@ if ($method === 'POST' && $path === 'conversions') {
         $occurredAt = gmdate('Y-m-d\\TH:i:s\\Z', $ts);
     }
 
+    $newCandidate = null;
+    if (array_key_exists('new_candidate', $payload)) {
+        if (!is_bool($payload['new_candidate'])) {
+            api_error(400, 'invalid_new_candidate', 'new_candidate должен быть true или false');
+        }
+        $newCandidate = $payload['new_candidate'];
+    }
+
     try {
         sb_insert('jm_ext_events', [
             'id' => bin2hex(random_bytes(12)),
@@ -215,6 +223,8 @@ if ($method === 'POST' && $path === 'conversions') {
             'event_type' => 'conversion',
             'partner_event_id' => $partnerEventId,
             'attribution_id' => $clickId !== '' ? $clickId : null,
+            'user_id' => $clickId !== '' ? ($click['user_id'] ?? null) : null,
+            'new_candidate' => $newCandidate,
             'occurred_at' => $occurredAt,
         ]);
     } catch (Throwable $e) {
@@ -228,6 +238,7 @@ if ($method === 'POST' && $path === 'conversions') {
         'accepted' => true,
         'event_id' => $partnerEventId,
         'click_id' => $clickId !== '' ? $clickId : null,
+        'new_candidate' => $newCandidate,
     ]);
 }
 
