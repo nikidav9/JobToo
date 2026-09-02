@@ -16,7 +16,7 @@ import Constants from 'expo-constants';
 import { hideWebSplash, setWebSplashProgress } from '@/lib/webSplash';
 
 import { rs, rf } from '@/constants/scale';
-import { dbCountUsers } from '@/services/db';
+import { dbCountUsers, dbRecordGuestEvent } from '@/services/db';
 
 const USER_COUNT_KEY = 'cached_user_count';
 
@@ -218,7 +218,11 @@ export default function RootScreen() {
         <TouchableOpacity
           style={styles.guestBtn}
           activeOpacity={0.7}
-          onPress={() => { enterGuest(); router.replace('/(tabs)'); }}
+          onPress={() => {
+            void dbRecordGuestEvent('guest_started');
+            enterGuest();
+            router.replace('/(tabs)');
+          }}
         >
           <Ionicons name="eye-outline" size={r(17)} color={Colors.primary} />
           <Text style={styles.guestBtnTxt}>Посмотреть вакансии без регистрации</Text>
