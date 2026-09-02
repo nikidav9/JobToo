@@ -4,11 +4,11 @@ import PageHeader from '@/components/PageHeader'
 import KpiCard from '@/components/KpiCard'
 import Chip from '@/components/Chip'
 import { IconApp, IconBell } from '@/components/icons'
-import { broadcastBoth, broadcastWebPush, broadcastTelegram, sendBothToUser, sendInAppToUser } from '@/lib/admin-actions'
+import { broadcastBoth, broadcastWebPush, broadcastTelegram, sendTelegramToUsers, sendBothToUser, sendInAppToUser } from '@/lib/admin-actions'
 import { supabaseAdmin } from '@/lib/supabase'
 import { logActivity } from '@/lib/activity-log'
 
-type Target = 'all' | 'workers' | 'employers' | 'metro' | 'webpush' | 'telegram' | 'telegram_workers' | 'telegram_employers'
+type Target = 'all' | 'workers' | 'employers' | 'metro' | 'webpush' | 'telegram' | 'telegram_workers' | 'telegram_inactive_workers' | 'telegram_employers'
 type St = 'idle' | 'loading' | 'ok' | 'err'
 
 interface UserRow {
@@ -20,6 +20,9 @@ interface UserRow {
   metro_station: string | null
   created_at: string
   push_token: string | null
+  telegram_id: string | null
+  last_seen_at: string | null
+  is_blocked: boolean | null
 }
 
 interface NotifRow {
@@ -40,6 +43,7 @@ const TARGETS: { value: Target; label: string; desc: string }[] = [
   { value: 'webpush',   label: 'Веб-пуш · iPhone',    desc: 'Только подписчики PWA (Safari/iOS)' },
   { value: 'telegram',           label: 'Telegram — все',        desc: 'Все с привязанным Telegram, доставка ~100%' },
   { value: 'telegram_workers',   label: 'Telegram — работники',  desc: 'Только работники с Telegram' },
+  { value: 'telegram_inactive_workers', label: 'Telegram — неактивные 30+ дней', desc: 'Только работники, заходившие ранее и неактивные более 30 дней' },
   { value: 'telegram_employers', label: 'Telegram — директора',  desc: 'Только директора с Telegram' },
 ]
 
@@ -125,7 +129,7 @@ export default function BroadcastPage() {
     setDataLoading(true)
     const [{ data: u }, { data: n }, { data: wpSubs }] = await Promise.all([
       supabaseAdmin.from('jm_users')
-        .select('id, first_name, last_name, phone, role, metro_station, created_at, push_token')
+        .select('id, first_name, last_name, phone, role, metro_station, created_at, push_token, telegram_id, last_seen_at, is_blocked')
         .order('created_at', { ascending: false }),
       supabaseAdmin.from('jm_notifications')
         .select('id, user_id, title, body, is_read, created_at, jm_users(first_name, last_name, phone)')
@@ -143,6 +147,14 @@ export default function BroadcastPage() {
 
   const withPush = users.filter(u => u.push_token).length
   const withoutPush = users.filter(u => !u.push_token).length
+  const inactiveCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+  const inactiveTelegramWorkers = users.filter(u =>
+    u.role === 'worker' &&
+    !!u.telegram_id &&
+    !u.is_blocked &&
+    !!u.last_seen_at &&
+    new Date(u.last_seen_at).getTime() < inactiveCutoff
+  )
 
   async function handleBroadcast() {
     if (!title.trim() || !body.trim()) return
@@ -151,6 +163,11 @@ export default function BroadcastPage() {
       if (target === 'webpush') {
         const { sent, failed } = await broadcastWebPush(title, body)
         setSt('ok'); setResult(`Веб-пуш отправлен: ${sent}${failed > 0 ? `, ошибок: ${failed}` : ''}`)
+      } else if (target === 'telegram_inactive_workers') {
+        const ids = inactiveTelegramWorkers.map(u => u.id)
+        if (ids.length === 0) throw new Error('Нет неактивных работников с привязанным Telegram')
+        const { sent, skipped } = await sendTelegramToUsers(ids, `*${title}*\n\n${body}`)
+        setSt('ok'); setResult(`Telegram: доставлено ${sent} из ${ids.length}${skipped.length ? `, пропущено: ${skipped.length}` : ''}`)
       } else if (target.startsWith('telegram')) {
         const role = target === 'telegram_workers' ? 'worker' : target === 'telegram_employers' ? 'employer' : 'all'
         const { sent, total } = await broadcastTelegram(title, body, role)
@@ -321,6 +338,11 @@ export default function BroadcastPage() {
                     </label>
                   ))}
                 </div>
+                {target === 'telegram_inactive_workers' && (
+                  <div style={{ marginTop: 10, padding: '9px 12px', borderRadius: 8, background: 'var(--info-soft)', color: 'var(--info)', fontSize: 12.5 }}>
+                    Получателей с привязанным Telegram: <strong>{inactiveTelegramWorkers.length}</strong>
+                  </div>
+                )}
                 {target === 'metro' && (
                   <div style={{ marginTop: 10 }}>{inp('Станция метро', metro, setMetro, 'Напр.: Тульская')}</div>
                 )}
