@@ -5,45 +5,148 @@
     "version": "1.0.0",
     "description": "Открытые вакансии JobToo: смены на день и постоянные позиции в Москве. Персональных данных в выдаче нет. Ключ выдаётся по договорённости; частота — 1000 запросов в час на ключ по умолчанию."
   },
-  "servers": [{ "url": "https://jobtoo.ru/api/v1" }],
-  "security": [{ "bearerAuth": [] }],
+  "servers": [
+    {
+      "url": "https://jobtoo.ru/api/v1"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
   "components": {
     "securitySchemes": {
-      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "Ключ партнёра: Authorization: Bearer <ключ>" }
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Ключ партнёра: Authorization: Bearer <ключ>"
+      }
     },
     "schemas": {
       "Vacancy": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "example": "shift_a1b2c3" },
-          "type": { "type": "string", "enum": ["shift", "permanent"] },
-          "title": { "type": "string", "example": "Кладовщик" },
-          "company": { "type": "string", "example": "Сеть магазинов «Пятёрочка»" },
-          "category": { "type": "string", "nullable": true },
-          "category_label": { "type": "string", "nullable": true },
-          "metro": { "type": "string", "nullable": true, "example": "Сухаревская" },
-          "address": { "type": "string", "nullable": true },
-          "location": {
-            "type": "object", "nullable": true,
-            "properties": { "lat": { "type": "number" }, "lon": { "type": "number" } }
+          "id": {
+            "type": "string",
+            "example": "shift_a1b2c3"
           },
-          "date": { "type": "string", "nullable": true, "example": "2026-08-20" },
-          "time_start": { "type": "string", "nullable": true, "example": "07:00" },
-          "time_end": { "type": "string", "nullable": true, "example": "16:30" },
-          "pay": { "type": "number", "nullable": true, "example": 3000 },
-          "currency": { "type": "string", "example": "RUB" },
-          "pay_period": { "type": "string", "enum": ["shift", "month"] },
-          "spots_total": { "type": "integer" },
-          "spots_left": { "type": "integer" },
-          "urgent": { "type": "boolean" },
-          "no_experience": { "type": "boolean" },
-          "schedule": { "type": "string", "nullable": true, "description": "Только для type=permanent" },
-          "description": { "type": "string", "nullable": true },
-          "conditions": { "type": "string", "nullable": true },
-          "status": { "type": "string", "example": "open" },
-          "url": { "type": "string", "description": "Страница вакансии на сайте JobToo" },
-          "created_at": { "type": "string", "format": "date-time" },
-          "updated_at": { "type": "string", "format": "date-time" }
+          "type": {
+            "type": "string",
+            "enum": [
+              "shift",
+              "permanent"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "example": "Кладовщик"
+          },
+          "company": {
+            "type": "string",
+            "example": "Сеть магазинов «Пятёрочка»"
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "category_label": {
+            "type": "string",
+            "nullable": true
+          },
+          "metro": {
+            "type": "string",
+            "nullable": true,
+            "example": "Сухаревская"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "lat": {
+                "type": "number"
+              },
+              "lon": {
+                "type": "number"
+              }
+            }
+          },
+          "date": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-08-20"
+          },
+          "time_start": {
+            "type": "string",
+            "nullable": true,
+            "example": "07:00"
+          },
+          "time_end": {
+            "type": "string",
+            "nullable": true,
+            "example": "16:30"
+          },
+          "pay": {
+            "type": "number",
+            "nullable": true,
+            "example": 3000
+          },
+          "currency": {
+            "type": "string",
+            "example": "RUB"
+          },
+          "pay_period": {
+            "type": "string",
+            "enum": [
+              "shift",
+              "month"
+            ]
+          },
+          "spots_total": {
+            "type": "integer"
+          },
+          "spots_left": {
+            "type": "integer"
+          },
+          "urgent": {
+            "type": "boolean"
+          },
+          "no_experience": {
+            "type": "boolean"
+          },
+          "schedule": {
+            "type": "string",
+            "nullable": true,
+            "description": "Только для type=permanent"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "conditions": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "example": "open"
+          },
+          "url": {
+            "type": "string",
+            "description": "Страница вакансии на сайте JobToo"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "Error": {
@@ -52,8 +155,13 @@
           "error": {
             "type": "object",
             "properties": {
-              "code": { "type": "string", "example": "bad_key" },
-              "message": { "type": "string" }
+              "code": {
+                "type": "string",
+                "example": "bad_key"
+              },
+              "message": {
+                "type": "string"
+              }
             }
           }
         }
@@ -65,7 +173,11 @@
       "get": {
         "summary": "Проверка доступности",
         "security": [],
-        "responses": { "200": { "description": "Сервис отвечает" } }
+        "responses": {
+          "200": {
+            "description": "Сервис отвечает"
+          }
+        }
       }
     },
     "/vacancies": {
@@ -73,11 +185,52 @@
         "summary": "Открытые вакансии",
         "description": "Отдаёт открытые смены и постоянные вакансии, новые первыми. Для догрузки используйте updated_since — так не придётся тянуть весь список каждый раз.",
         "parameters": [
-          { "name": "type", "in": "query", "schema": { "type": "string", "enum": ["all", "shift", "permanent"], "default": "all" } },
-          { "name": "metro", "in": "query", "schema": { "type": "string" }, "description": "Точное название станции; список — в /metro" },
-          { "name": "updated_since", "in": "query", "schema": { "type": "string", "format": "date-time" } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50, "maximum": 200 } },
-          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "shift",
+                "permanent"
+              ],
+              "default": "all"
+            }
+          },
+          {
+            "name": "metro",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Точное название станции; список — в /metro"
+          },
+          {
+            "name": "updated_since",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -87,17 +240,53 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "items": { "type": "array", "items": { "$ref": "#/components/schemas/Vacancy" } },
-                    "count": { "type": "integer" },
-                    "has_more": { "type": "boolean" }
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Vacancy"
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    }
                   }
                 }
               }
             }
           },
-          "401": { "description": "Ключ не передан или отозван", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "403": { "description": "У ключа нет нужного права", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "429": { "description": "Превышена частота запросов", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "401": {
+            "description": "Ключ не передан или отозван",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "У ключа нет нужного права",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Превышена частота запросов",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -117,8 +306,12 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "name": { "type": "string" },
-                          "open_vacancies": { "type": "integer" }
+                          "name": {
+                            "type": "string"
+                          },
+                          "open_vacancies": {
+                            "type": "integer"
+                          }
                         }
                       }
                     }
@@ -126,6 +319,53 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/conversions": {
+      "post": {
+        "summary": "Подтвердить конверсию после перехода",
+        "description": "Идемпотентный callback партнёра. event_id должен быть уникальным в рамках источника.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ext_id",
+                  "event_id"
+                ],
+                "properties": {
+                  "ext_id": {
+                    "type": "string",
+                    "description": "ID внешней вакансии JobToo"
+                  },
+                  "event_id": {
+                    "type": "string",
+                    "description": "Уникальный ID события у партнёра"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Конверсия принята"
+          },
+          "400": {
+            "description": "Неверное событие"
+          },
+          "401": {
+            "description": "Ключ не передан или отозван"
+          },
+          "403": {
+            "description": "Нет права conversions:write"
+          },
+          "404": {
+            "description": "Вакансия не найдена"
           }
         }
       }

@@ -170,8 +170,38 @@ if ($path === 'health') {
     api_out(200, ['status' => 'ok', 'time' => now_iso()]);
 }
 
+if ($method === 'POST' && $path === 'conversions') {
+    $key = api_key_row();
+    api_require_scope($key, 'conversions:write');
+    $payload = json_decode(file_get_contents('php://input'), true);
+    $extId = trim((string)($payload['ext_id'] ?? ''));
+    $partnerEventId = trim((string)($payload['event_id'] ?? ''));
+    if ($extId === '' || $partnerEventId === '') {
+        api_error(400, 'invalid_event', 'Нужны ext_id и уникальный event_id');
+    }
+    $vacancy = sb_single('jm_ext_vacancies', ['id' => 'eq.' . $extId], 'id,source_id');
+    if (!$vacancy) api_error(404, 'vacancy_not_found', 'Внешняя вакансия не найдена');
+    try {
+        sb_insert('jm_ext_events', [
+            'id' => bin2hex(random_bytes(12)),
+            'ext_id' => $extId,
+            'source_id' => (string)$vacancy['source_id'],
+            'event_type' => 'conversion',
+            'partner_event_id' => $partnerEventId,
+            'occurred_at' => now_iso(),
+        ]);
+    } catch (Throwable $e) {
+        // Повтор одного event_id идемпотентен: партнёр может безопасно ретраить.
+        if (stripos($e->getMessage(), 'duplicate') === false
+            && stripos($e->getMessage(), 'unique') === false) {
+            api_error(502, 'event_store_failed', 'Не удалось сохранить конверсию');
+        }
+    }
+    api_out(202, ['accepted' => true, 'event_id' => $partnerEventId]);
+}
+
 if ($method !== 'GET') {
-    api_error(405, 'method_not_allowed', 'Пока только GET');
+    api_error(405, 'method_not_allowed', 'Поддерживаются GET и POST /conversions');
 }
 
 $key = api_key_row();

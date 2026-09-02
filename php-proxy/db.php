@@ -2729,53 +2729,109 @@ try {
             $data = $rows; break;
         }
 
-        // Переход на чужую вакансию. Ничего не проверяем и ничего не отдаём:
-        // это отметка в журнале, и задерживать из-за неё человека нельзя.
-        case 'extClick': {
-            sb_insert('jm_ext_clicks', [
-                'id'         => uid(),
-                'ext_id'     => (string)($args[0] ?? ''),
-                'source_id'  => (string)($args[1] ?? ''),
-                'user_id'    => ($args[2] ?? null) ?: null,
-                'clicked_at' => now_iso(),
+        // События партнёрской воронки. Показы принимаются только от
+        // авторизованного пользователя; переход может быть анонимным.
+        case 'extImpression': {
+            $extId = (string)($args[0] ?? '');
+            $sourceId = (string)($args[1] ?? '');
+            $vac = ($extId !== '' && $sourceId !== '')
+                ? sb_single('jm_ext_vacancies', [
+                    'id' => 'eq.' . $extId,
+                    'source_id' => 'eq.' . $sourceId,
+                    'active' => 'is.true',
+                ], 'id')
+                : null;
+            if (!$vac) { $data = false; break; }
+            sb_insert('jm_ext_events', [
+                'id' => uid(), 'ext_id' => $extId, 'source_id' => $sourceId,
+                'event_type' => 'impression', 'user_id' => $authUid,
+                'occurred_at' => now_iso(),
             ]);
             $data = true; break;
         }
 
-        // Сводка по чужим вакансиям — для панели и для проверки, что фид жив.
+        // Переход на чужую вакансию. Отдельную старую таблицу сохраняем для
+        // совместимости, а универсальный журнал строит полную воронку.
+        case 'extClick': {
+            $extId = (string)($args[0] ?? '');
+            $sourceId = (string)($args[1] ?? '');
+            $vac = ($extId !== '' && $sourceId !== '')
+                ? sb_single('jm_ext_vacancies', [
+                    'id' => 'eq.' . $extId,
+                    'source_id' => 'eq.' . $sourceId,
+                    'active' => 'is.true',
+                ], 'id')
+                : null;
+            if (!$vac) { $data = false; break; }
+            sb_insert('jm_ext_clicks', [
+                'id' => uid(), 'ext_id' => $extId, 'source_id' => $sourceId,
+                'user_id' => $authUid, 'clicked_at' => now_iso(),
+            ]);
+            sb_insert('jm_ext_events', [
+                'id' => uid(), 'ext_id' => $extId, 'source_id' => $sourceId,
+                'event_type' => 'click', 'user_id' => $authUid,
+                'occurred_at' => now_iso(),
+            ]);
+            $data = true; break;
+        }
+
+        // Сводка по партнёрским вакансиям: объём, качество фида и воронка.
         case 'extStats': {
             $rows = sb_select_all('jm_ext_vacancies', ['active' => 'is.true'],
                 'source_id,kind,metro_station,metro_station_norm,work_type');
-            $by = [];
-            // Сколько записей мы не сумели разобрать. Это не про базу, это
-            // про фид: если у источника половина станций неузнана, фильтр по
-            // метро для его вакансий не работает, и знать об этом надо
-            // раньше, чем об этом напишет человек.
-            $безСтанции = 0; $безПрофессии = 0;
+            $by = []; $withoutStation = 0; $withoutProfession = 0;
             foreach ($rows as $r) {
                 $k = (string)$r['source_id'];
                 $by[$k] = ($by[$k] ?? 0) + 1;
-                if (!empty($r['metro_station']) && empty($r['metro_station_norm'])) $безСтанции++;
-                if (empty($r['work_type'])) $безПрофессии++;
+                if (!empty($r['metro_station']) && empty($r['metro_station_norm'])) $withoutStation++;
+                if (empty($r['work_type'])) $withoutProfession++;
             }
 
-            // Переходы за неделю — единственная цифра, по которой видно,
-            // нужен ли источник вообще.
             $c7 = gmdate('Y-m-d\TH:i:s', time() - 7 * 86400) . 'Z';
-            $clicks = sb_select_all('jm_ext_clicks', ['clicked_at' => 'gte.' . $c7], 'source_id');
-            $поКликам = [];
-            foreach ($clicks as $c) {
-                $k = (string)$c['source_id'];
-                $поКликам[$k] = ($поКликам[$k] ?? 0) + 1;
-            }
+            $c30 = gmdate('Y-m-d\TH:i:s', time() - 30 * 86400) . 'Z';
+            $events7 = sb_select_all('jm_ext_events', ['occurred_at' => 'gte.' . $c7],
+                'source_id,event_type,user_id');
+            $events30 = sb_select_all('jm_ext_events', ['occurred_at' => 'gte.' . $c30],
+                'source_id,event_type,user_id');
+            $runs7 = sb_select_all('jm_ext_ingest_runs', ['ran_at' => 'gte.' . $c7],
+                'source_id,success,received,status,ran_at');
+
+            $summarize = function(array $events): array {
+                $totals = ['impression' => 0, 'click' => 0, 'conversion' => 0];
+                $perSource = [];
+                foreach ($events as $e) {
+                    $type = (string)($e['event_type'] ?? '');
+                    $source = (string)($e['source_id'] ?? '');
+                    if (!isset($totals[$type])) continue;
+                    $totals[$type]++;
+                    if (!isset($perSource[$source])) {
+                        $perSource[$source] = ['impressions' => 0, 'clicks' => 0, 'conversions' => 0];
+                    }
+                    $field = $type === 'impression' ? 'impressions' : ($type === 'click' ? 'clicks' : 'conversions');
+                    $perSource[$source][$field]++;
+                }
+                return ['totals' => $totals, 'sources' => $perSource];
+            };
+            $s7 = $summarize($events7);
+            $s30 = $summarize($events30);
+            $impressions = $s7['totals']['impression'];
+            $clicks = $s7['totals']['click'];
+            $conversions = $s7['totals']['conversion'];
+            $errors7 = count(array_filter($runs7, fn($r) => empty($r['success'])));
 
             $data = [
                 'всего' => count($rows),
                 'по_источникам' => $by,
-                'переходов_7дней' => count($clicks),
-                'переходы_по_источникам' => $поКликам,
-                'без_станции' => $безСтанции,
-                'без_профессии' => $безПрофессии,
+                'без_станции' => $withoutStation,
+                'без_профессии' => $withoutProfession,
+                'показы_7дней' => $impressions,
+                'переходов_7дней' => $clicks,
+                'конверсии_7дней' => $conversions,
+                'ctr_7дней' => $impressions > 0 ? round($clicks * 100 / $impressions, 2) : 0,
+                'конверсия_из_переходов_7дней' => $clicks > 0 ? round($conversions * 100 / $clicks, 2) : 0,
+                'ошибок_фида_7дней' => $errors7,
+                'воронка_по_источникам_7дней' => $s7['sources'],
+                'воронка_30дней' => $s30['totals'],
             ];
             break;
         }

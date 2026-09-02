@@ -32,8 +32,17 @@ type Source = {
 type Stats = {
   всего: number
   по_источникам: Record<string, number>
+  показы_7дней?: number
   переходов_7дней?: number
-  переходы_по_источникам?: Record<string, number>
+  конверсии_7дней?: number
+  ctr_7дней?: number
+  конверсия_из_переходов_7дней?: number
+  ошибок_фида_7дней?: number
+  воронка_по_источникам_7дней?: Record<string, {
+    impressions: number
+    clicks: number
+    conversions: number
+  }>
   без_станции?: number
   без_профессии?: number
 }
@@ -254,16 +263,14 @@ export default function SourcesPage() {
           <KpiCard label="Источников" value={items.length}
             sub={items.length ? `включено ${items.filter(s => s.enabled).length}` : 'пока ни одного'} />
           <KpiCard label="Чужих вакансий" value={stats?.всего ?? null} sub="сейчас в базе" />
-          {/* Карточка «Своих в ленте: —» показывала прочерк всегда: значение
-              для неё нигде не считалось. Вместо неё — то, что здесь и правда
-              важно знать: сколько источников отвалилось. */}
-          <KpiCard label="Источников с ошибкой"
-            value={items.filter(s => s.last_status && !s.last_status.startsWith('ок')).length}
-            sub="последний заход не удался" />
-          {/* Переходы — единственная цифра, по которой видно, нужен ли
-              источник людям. «В базе 400 вакансий» без неё не значит ничего. */}
+          <KpiCard label="Показов за неделю" value={stats?.показы_7дней ?? null}
+            sub="карточка была видна пользователю" />
           <KpiCard label="Переходов за неделю" value={stats?.переходов_7дней ?? null}
-            sub="люди ушли к источнику" />
+            sub={`CTR ${(stats?.ctr_7дней ?? 0).toLocaleString('ru-RU')}%`} />
+          <KpiCard label="Конверсий за неделю" value={stats?.конверсии_7дней ?? null}
+            sub={`${(stats?.конверсия_из_переходов_7дней ?? 0).toLocaleString('ru-RU')}% от переходов`} />
+          <KpiCard label="Ошибок фида за неделю" value={stats?.ошибок_фида_7дней ?? null}
+            sub={`сейчас с ошибкой: ${items.filter(s => s.last_status && !s.last_status.startsWith('ок')).length}`} />
         </div>
 
         {/* Качество разбора. Станция, которую мы не узнали, не попадает в
@@ -333,13 +340,13 @@ export default function SourcesPage() {
           <table className="jt-table" style={{ minWidth: 700 }}>
             <thead>
               <tr>
-                {['Источник', 'Последний заход', 'Что вышло', 'В базе', 'Переходов', ''].map(h => <th key={h}>{h}</th>)}
+                {['Источник', 'Последний заход', 'Что вышло', 'В базе', 'Показы', 'Переходы', 'Конверсии', ''].map(h => <th key={h}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={6} style={{ padding: 16, color: 'var(--ink-3)' }}>Загружаю…</td></tr>}
+              {loading && <tr><td colSpan={8} style={{ padding: 16, color: 'var(--ink-3)' }}>Загружаю…</td></tr>}
               {!loading && !items.length && (
-                <tr><td colSpan={6} style={{ padding: 16, color: 'var(--ink-3)' }}>
+                <tr><td colSpan={8} style={{ padding: 16, color: 'var(--ink-3)' }}>
                   Источников пока нет. Нажмите «Подставить наш образец», чтобы посмотреть, как всё работает.
                 </td></tr>
               )}
@@ -370,7 +377,13 @@ export default function SourcesPage() {
                       {stats?.по_источникам?.[s.id] ?? 0}
                     </td>
                     <td className="num" style={{ color: 'var(--ink-2)' }}>
-                      {stats?.переходы_по_источникам?.[s.id] ?? 0}
+                      {stats?.воронка_по_источникам_7дней?.[s.id]?.impressions ?? 0}
+                    </td>
+                    <td className="num" style={{ color: 'var(--ink-2)' }}>
+                      {stats?.воронка_по_источникам_7дней?.[s.id]?.clicks ?? 0}
+                    </td>
+                    <td className="num" style={{ color: 'var(--ink-2)' }}>
+                      {stats?.воронка_по_источникам_7дней?.[s.id]?.conversions ?? 0}
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: 6 }}>

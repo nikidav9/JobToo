@@ -40,6 +40,7 @@ import {
   dbAddPermSaved,
   dbRemovePermSaved,
   dbGetExternalVacancies,
+  dbRecordExternalImpression,
   dbRecordExternalClick,
 } from '@/services/db';
 import { notifyEmployerGotMatch, notifyWorkerGotMatch,
@@ -1098,12 +1099,17 @@ function WorkerFeed() {
     : { applicants: 0, rejected: 0, views: 0 };
 
   useEffect(() => {
-    if (!currentCard?.id || 'external' in currentCard || !currentUser?.id || currentUser.isGuest) return;
+    if (!currentCard?.id || !currentUser?.id || currentUser.isGuest) return;
     const t = setTimeout(() => {
-      dbRecordVacancyView(currentCard.id, currentUser.id).catch(() => {});
+      if ('external' in currentCard) {
+        const ext = (currentCard as PartnerShiftCard).external;
+        dbRecordExternalImpression(ext.id, ext.sourceId).catch(() => {});
+      } else {
+        dbRecordVacancyView(currentCard.id, currentUser.id).catch(() => {});
+      }
     }, 300);
     return () => clearTimeout(t);
-  }, [currentCard?.id, currentUser?.id, currentUser?.isGuest]);
+  }, [currentCard, currentUser?.id, currentUser?.isGuest]);
 
   const animateCard = useCallback((dir: 'left' | 'right', velocity: number, cb: () => void) => {
     const targetX = dir === 'right' ? SW * 1.5 : -SW * 1.5;
@@ -1736,9 +1742,11 @@ function WorkerPermMode() {
     const uid = currentUserRef.current?.id;
     if (!uid) return;
     viewableItems.forEach(({ item }: any) => {
-      if (item && 'sourceId' in item) return;
-      if (item?.id && !viewedPermIds.current.has(item.id)) {
-        viewedPermIds.current.add(item.id);
+      if (!item?.id || viewedPermIds.current.has(item.id)) return;
+      viewedPermIds.current.add(item.id);
+      if ('sourceId' in item) {
+        dbRecordExternalImpression(item.id, item.sourceId).catch(() => {});
+      } else {
         dbRecordPermVacancyView(item.id, uid).catch(() => {});
       }
     });
