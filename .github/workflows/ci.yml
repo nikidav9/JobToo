@@ -51,3 +51,32 @@ jobs:
           EXPO_PUBLIC_APP_SECRET: ci-placeholder
           EXPO_PUBLIC_DASHBOARD_URL: https://example.invalid
         run: npx expo export --platform web --max-workers 2
+
+  dashboard:
+    name: Dashboard build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        env:
+          ADMIN_API_URL: https://example.invalid/api/admin.php
+          EXPO_PUBLIC_APP_SECRET: ci-placeholder
+          ADMIN_API_TOKEN: ci-placeholder
+          VAPID_PUBLIC_KEY: ci-placeholder
+          VAPID_PRIVATE_KEY: ci-placeholder
+          VAPID_SUBJECT: mailto:ci@example.invalid
+        run: npm run build
