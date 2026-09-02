@@ -56,8 +56,8 @@ expect_true(str_contains($metricsMigration, 'jm_partner_costs'), 'partner costs 
 expect_true(str_contains($metricsMigration, 'new_candidate boolean'), 'partner confirms candidate novelty');
 
 $conversionApi = file_get_contents(__DIR__ . '/../php-proxy/api.php');
-expect_true($conversionApi !== false && str_contains($conversionApi, "'new_candidate' => $newCandidate"), 'conversion callback stores partner novelty');
-expect_true(str_contains($conversionApi, "'user_id' => $clickId"), 'conversion keeps attributed worker');
+expect_true($conversionApi !== false && str_contains($conversionApi, "'new_candidate' => " . '$newCandidate'), 'conversion callback stores partner novelty');
+expect_true(str_contains($conversionApi, "'user_id' => " . '$clickId'), 'conversion keeps attributed worker');
 
 expect_true(str_contains($dbProxy, "'партнёрский_отчёт_30дней'"), 'dashboard API exposes partner report');
 expect_true(str_contains($dbProxy, "'стоимость_отклика_rub'"), 'cost per response is reported');
