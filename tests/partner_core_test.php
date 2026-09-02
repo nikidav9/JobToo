@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../php-proxy/partner_core.php';
+require_once __DIR__ . '/../php-proxy/partner_billing.php';
 
 function expect_true(bool $value, string $message): void {
     if (!$value) {
@@ -66,5 +67,32 @@ expect_true(str_contains($dbProxy, '$knownNew > 0'), 'unknown novelty is not sho
 $sourcePage = file_get_contents(__DIR__ . '/../dashboard/app/sources/page.tsx');
 expect_true($sourcePage !== false && str_contains($sourcePage, 'Отчёт для партнёра · 30 дней'), 'partner report is visible');
 expect_true(str_contains($sourcePage, 'Неизвестные значения не заменяются нулями'), 'dashboard labels incomplete data honestly');
+
+$billingMigration = file_get_contents(__DIR__ . '/../supabase/migrations/048_partner_billing_and_reconciliation.sql');
+expect_true($billingMigration !== false, 'billing migration exists');
+expect_true(str_contains($billingMigration, 'jm_partner_first_shift_once_idx'), 'database prevents double first-shift payment');
+expect_true(str_contains($billingMigration, 'jm_partner_reconciliation_issues'), 'reconciliation ledger exists');
+expect_true(str_contains($billingMigration, 'jm_partner_data_consents'), 'partner consent evidence exists');
+
+$tariffs = [[
+    'id' => 't1', 'source_id' => 's1', 'billing_model' => 'first_completed_shift',
+    'amount_rub' => 500, 'effective_from' => '2026-09-01', 'effective_to' => null, 'active' => true,
+]];
+$billable = pb_build_billable_event([
+    'source_id' => 's1', 'worker_id' => 'w1', 'event_kind' => 'first_completed_shift',
+    'application_id' => 'a1', 'partner_event_id' => 'e1', 'occurred_at' => '2026-09-02T12:00:00Z',
+], $tariffs);
+expect_true($billable['created'] === true && $billable['billable_event']['amount_rub'] === 500.0, 'tariff produces billable event');
+$duplicate = pb_build_billable_event([
+    'source_id' => 's1', 'worker_id' => 'w1', 'event_kind' => 'first_completed_shift',
+    'application_id' => 'a2', 'partner_event_id' => 'e2', 'occurred_at' => '2026-09-03T12:00:00Z',
+], $tariffs, [$billable['billable_event']['dedupe_key']]);
+expect_true($duplicate['reason'] === 'duplicate', 'same worker is not charged twice');
+
+$partnerRoute = file_get_contents(__DIR__ . '/../dashboard/app/api/partner/report/route.ts');
+expect_true($partnerRoute !== false && str_contains($partnerRoute, 'PARTNER_PORTAL_TOKENS_JSON'), 'partner portal is source-scoped');
+expect_true(str_contains($partnerRoute, "format === 'xlsx'"), 'XLSX export exists');
+$consentSheet = file_get_contents(__DIR__ . '/../components/feature/PartnerConsentSheet.tsx');
+expect_true($consentSheet !== false && str_contains($consentSheet, 'Получатель:'), 'specific partner is shown before transfer');
 
 echo "partner core: ok\\n";
