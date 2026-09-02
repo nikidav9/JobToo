@@ -2,8 +2,6 @@ name: Проверка доступности сайта
 
 on:
   schedule:
-    # Минимальный интервал GitHub Actions — пять минут. Это внешний наблюдатель:
-    # он продолжает писать журнал, даже если сам московский сервер недоступен.
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
@@ -22,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Проверить DNS, IPv4, IPv6, /api и серию замеров
+      - name: Проверить сайт, приложение, API и админ-панель
         id: health
         continue-on-error: true
         run: |
@@ -30,17 +28,14 @@ jobs:
           REPORT="$RUNNER_TEMP/site-health.log" bash infra/check-site.sh
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          # Моргания (провалы, восстановившиеся к концу серии) выносим в
-          # заголовок: по ним видна частота коротких провалов, которых один
-          # снимок раньше не застёгивал. Прогон они не роняют.
           flaps=$(grep -oE 'flaps=[0-9]+' "$RUNNER_TEMP/site-health.log" | tail -1 | cut -d= -f2)
           echo "flaps=${flaps:-0}" >> "$GITHUB_OUTPUT"
           {
-            echo "## Доступность jobtoo.ru"
+            echo "## Доступность JobToo"
             echo "- итог: $([ "$code" = 0 ] && echo ✅ healthy || echo ❌ failed)"
-            echo "- морганий в серии: ${flaps:-0}"
+            echo "- замеченных провалов: ${flaps:-0}"
             echo
-            echo '```'
+            echo '```text'
             cat "$RUNNER_TEMP/site-health.log"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -61,28 +56,45 @@ jobs:
           HEALTH_EXIT_CODE: ${{ steps.health.outputs.exit_code }}
         with:
           script: |
+            const fs = require('fs');
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const title = 'Автомониторинг: jobtoo.ru недоступен';
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
             const failed = process.env.HEALTH_EXIT_CODE !== '0';
+            const reportPath = process.env.RUNNER_TEMP + '/site-health.log';
+            const report = fs.existsSync(reportPath) ? fs.readFileSync(reportPath, 'utf8') : 'Журнал не найден';
+            const failedLines = report.split('\n')
+              .filter(line => /FAIL|ERROR|fails_.*=[1-9]/.test(line))
+              .slice(-40)
+              .join('\n');
+            const details = failedLines || report.slice(-5000);
             const { data: issues } = await github.rest.issues.listForRepo({
               owner, repo, state: 'open', per_page: 100,
             });
             const incident = issues.find(issue => issue.title === title);
 
             if (failed) {
-              const body = `Внешняя проверка обнаружила сбой ${new Date().toISOString()}.\n\n` +
-                `Подробные DNS, IPv4/IPv6, TLS и timing-данные: ${runUrl}`;
+              const body = `Внешняя проверка обнаружила сбой **${new Date().toISOString()}**.\n\n` +
+                `Проверяются сайт, IPv4, API, JS/CSS приложения, вход в админ-панель и её JS/CSS.\n\n` +
+                `### Что не прошло\n\n\`\`\`text\n${details}\n\`\`\`\n\n` +
+                `[Полный журнал и timing-данные](${runUrl})`;
               if (incident) {
                 await github.rest.issues.createComment({ owner, repo, issue_number: incident.number, body });
               } else {
-                await github.rest.issues.create({ owner, repo, title, body });
+                await github.rest.issues.create({
+                  owner, repo, title,
+                  body: body + '\n\nIssue будет закрыт автоматически после восстановления.',
+                });
               }
             } else if (incident) {
+              const started = new Date(incident.created_at);
+              const recovered = new Date();
+              const durationMinutes = Math.max(1, Math.round((recovered - started) / 60000));
               await github.rest.issues.createComment({
                 owner, repo, issue_number: incident.number,
-                body: `Сайт снова доступен по внешней проверке ${new Date().toISOString()}.\n\n${runUrl}`,
+                body: `Сайт и админ-панель снова полностью доступны **${recovered.toISOString()}**. ` +
+                  `Оценочная длительность инцидента: **${durationMinutes} мин.**\n\n[Контрольный прогон](${runUrl})`,
               });
               await github.rest.issues.update({ owner, repo, issue_number: incident.number, state: 'closed' });
             }
