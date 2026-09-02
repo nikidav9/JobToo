@@ -393,6 +393,32 @@ export async function dbRecordConsent(
   }
 }
 
+export type PartnerDataConsent = {
+  sourceId: string;
+  workerId: string;
+  externalVacancyId: string;
+  applicationId?: string | null;
+  recipientName: string;
+  dataCategories: Array<'profile' | 'application' | 'messages' | 'statuses'>;
+  purpose: string;
+  consentVersion: string;
+};
+
+/** Отдельное доказательное согласие для конкретного получателя и смены. */
+export async function dbRecordPartnerDataConsent(value: PartnerDataConsent): Promise<void> {
+  await proxy('partnerConsentRecord', [{
+    source_id: value.sourceId,
+    worker_id: value.workerId,
+    ext_vacancy_id: value.externalVacancyId,
+    application_id: value.applicationId ?? null,
+    recipient_name: value.recipientName,
+    data_categories: value.dataCategories,
+    purpose: value.purpose,
+    consent_version: value.consentVersion,
+    user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+  }]);
+}
+
 /** Последнее принятое: что показать в профиле и спрашивать ли заново. */
 export async function dbGetConsent(userId: string): Promise<{
   stamp: string; docs: Record<string, string>; source: string; accepted_at: string;
