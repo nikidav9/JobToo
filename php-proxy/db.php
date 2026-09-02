@@ -154,6 +154,8 @@ $adminFns = [
     'cronEveningDigest', 'cronDailyNudges', 'cronShiftNudge',
     'tgBroadcast', 'tgSendToUsers', 'scoreRecalcAll', 'billingReport',
     'extSourcesList', 'extSourceSave', 'extSourceDelete', 'extStats',
+    'partnerTariffsList', 'partnerTariffSave', 'partnerBillableEventRecord',
+    'partnerReconciliationRecord', 'partnerBillingReport',
     'apiKeysList', 'apiKeyCreate', 'apiKeyRevoke',
     'botAdminGet', 'botAdminSet', 'supportClose', 'supportReopen',
     'supportReply', 'supportThreads', 'botReply', 'botInbox',
@@ -3102,6 +3104,9 @@ try {
 
         case 'partnerConsentRecord': {
             $v = is_array($args[0] ?? null) ? $args[0] : [];
+            if ($authUid === null || (string)($v['worker_id'] ?? '') !== $authUid) {
+                $data = ['error' => 'Нельзя записать согласие за другого пользователя']; break;
+            }
             $required = ['source_id','worker_id','ext_vacancy_id','recipient_name','consent_version'];
             foreach ($required as $key) {
                 if (trim((string)($v[$key] ?? '')) === '') {
