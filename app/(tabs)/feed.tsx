@@ -42,6 +42,8 @@ import {
   dbGetExternalVacancies,
   dbRecordExternalImpression,
   dbRecordExternalClick,
+  dbRecordGuestEvent,
+  dbStartGuestRegistration,
 } from '@/services/db';
 import { notifyEmployerGotMatch, notifyWorkerGotMatch,
   notifyEmployerNewMessage } from '@/services/notifications';
@@ -975,7 +977,12 @@ function WorkerFeed() {
   // Гость смотрит ленту, но откликнуться/написать не может — любое такое
   // действие ведёт на выбор роли и регистрацию.
   const isGuest = !!currentUser?.isGuest;
-  const promptRegister = useCallback(() => {
+  const promptRegister = useCallback((context: {
+    vacancyId?: string | null;
+    vacancyKind?: 'shift' | 'permanent' | 'external' | null;
+    sourceId?: string | null;
+  } = {}) => {
+    void dbStartGuestRegistration(context);
     exitGuest();
     router.replace('/');
   }, [exitGuest, router]);
@@ -1099,8 +1106,21 @@ function WorkerFeed() {
     : { applicants: 0, rejected: 0, views: 0 };
 
   useEffect(() => {
-    if (!currentCard?.id || !currentUser?.id || currentUser.isGuest) return;
+    if (!currentCard?.id || !currentUser?.id) return;
     const t = setTimeout(() => {
+      if (currentUser.isGuest) {
+        if ('external' in currentCard) {
+          const ext = (currentCard as PartnerShiftCard).external;
+          void dbRecordGuestEvent('vacancy_impression', {
+            vacancyId: ext.id, vacancyKind: 'external', sourceId: ext.sourceId,
+          });
+        } else {
+          void dbRecordGuestEvent('vacancy_impression', {
+            vacancyId: currentCard.id, vacancyKind: 'shift',
+          });
+        }
+        return;
+      }
       if ('external' in currentCard) {
         const ext = (currentCard as PartnerShiftCard).external;
         dbRecordExternalImpression(ext.id, ext.sourceId).catch(() => {});
@@ -1155,7 +1175,16 @@ function WorkerFeed() {
 
   const doWant = useCallback((vx = 0.5) => {
     if (!currentCard || !currentUser || swiping) return;
-    if (currentUser.isGuest) { promptRegister(); return; }
+    if (currentUser.isGuest) {
+      const isExternal = 'external' in currentCard;
+      const ext = isExternal ? (currentCard as PartnerShiftCard).external : null;
+      promptRegister({
+        vacancyId: ext?.id ?? currentCard.id,
+        vacancyKind: isExternal ? 'external' : 'shift',
+        sourceId: ext?.sourceId ?? null,
+      });
+      return;
+    }
     const card = currentCard;
     const date = selectedDate;
     const user = currentUser;
@@ -1215,7 +1244,16 @@ function WorkerFeed() {
   // раньше вместо них уходил шаблон от имени системы, и отвечать было нечему.
   const doMessage = useCallback(() => {
     if (!currentCard || !currentUser || messagingRef.current) return;
-    if (currentUser.isGuest) { promptRegister(); return; }
+    if (currentUser.isGuest) {
+      const isExternal = 'external' in currentCard;
+      const ext = isExternal ? (currentCard as PartnerShiftCard).external : null;
+      promptRegister({
+        vacancyId: ext?.id ?? currentCard.id,
+        vacancyKind: isExternal ? 'external' : 'shift',
+        sourceId: ext?.sourceId ?? null,
+      });
+      return;
+    }
     if ('external' in currentCard) {
       const ext = (currentCard as PartnerShiftCard).external;
       dbRecordExternalClick(ext.id, ext.sourceId, currentUser.id).catch(() => {});
@@ -1235,7 +1273,16 @@ function WorkerFeed() {
   const sendApply = useCallback(async (message: string) => {
     const card = applyFor;
     if (!card || !currentUser || messagingRef.current) return;
-    if (currentUser.isGuest) { promptRegister(); return; }
+    if (currentUser.isGuest) {
+      const isExternal = 'external' in currentCard;
+      const ext = isExternal ? (currentCard as PartnerShiftCard).external : null;
+      promptRegister({
+        vacancyId: ext?.id ?? currentCard.id,
+        vacancyKind: isExternal ? 'external' : 'shift',
+        sourceId: ext?.sourceId ?? null,
+      });
+      return;
+    }
     messagingRef.current = true;
     try {
       await dbUpsertLike(card.id, currentUser.id, card.employerId, {
@@ -1674,7 +1721,15 @@ function WorkerPermMode() {
   // Гость смотрит постоянные вакансии, но действовать не может — ведём на
   // регистрацию (см. соискательскую ленту смен).
   const isGuest = !!currentUser?.isGuest;
-  const promptRegister = () => { exitGuest(); router.replace('/'); };
+  const promptRegister = (context: {
+    vacancyId?: string | null;
+    vacancyKind?: 'shift' | 'permanent' | 'external' | null;
+    sourceId?: string | null;
+  } = {}) => {
+    void dbStartGuestRegistration(context);
+    exitGuest();
+    router.replace('/');
+  };
 
   const [tab, setTab] = useState<PermTab>('open');
   const [refreshing, setRefreshing] = useState(false);
@@ -1739,15 +1794,21 @@ function WorkerPermMode() {
   const currentUserRef = useRef(currentUser);
   useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    const uid = currentUserRef.current?.id;
-    if (!uid) return;
+    const user = currentUserRef.current;
+    if (!user?.id) return;
     viewableItems.forEach(({ item }: any) => {
       if (!item?.id || viewedPermIds.current.has(item.id)) return;
       viewedPermIds.current.add(item.id);
-      if ('sourceId' in item) {
+      if (user.isGuest) {
+        void dbRecordGuestEvent('vacancy_impression', {
+          vacancyId: item.id,
+          vacancyKind: 'sourceId' in item ? 'external' : 'permanent',
+          sourceId: 'sourceId' in item ? item.sourceId : null,
+        });
+      } else if ('sourceId' in item) {
         dbRecordExternalImpression(item.id, item.sourceId).catch(() => {});
       } else {
-        dbRecordPermVacancyView(item.id, uid).catch(() => {});
+        dbRecordPermVacancyView(item.id, user.id).catch(() => {});
       }
     });
   });
@@ -1803,7 +1864,16 @@ function WorkerPermMode() {
   // приходит большая часть откликов.
   const applyTo = (v: PermVacancy) : void => {
     if (!currentUser) return;
-    if (currentUser.isGuest) { promptRegister(); return; }
+    if (currentUser.isGuest) {
+      const isExternal = 'external' in currentCard;
+      const ext = isExternal ? (currentCard as PartnerShiftCard).external : null;
+      promptRegister({
+        vacancyId: ext?.id ?? currentCard.id,
+        vacancyKind: isExternal ? 'external' : 'shift',
+        sourceId: ext?.sourceId ?? null,
+      });
+      return;
+    }
     if (myAppVacIds.has(v.id) || applying === v.id) { showToast('Уже откликнулись', 'success'); return; }
     setPermApplyFor(v);
   };
@@ -1835,7 +1905,16 @@ function WorkerPermMode() {
 
   const openPermChat = async (v: PermVacancy, displayCompany: string) => {
     if (!currentUser || chatLoading) return;
-    if (currentUser.isGuest) { promptRegister(); return; }
+    if (currentUser.isGuest) {
+      const isExternal = 'external' in currentCard;
+      const ext = isExternal ? (currentCard as PartnerShiftCard).external : null;
+      promptRegister({
+        vacancyId: ext?.id ?? currentCard.id,
+        vacancyKind: isExternal ? 'external' : 'shift',
+        sourceId: ext?.sourceId ?? null,
+      });
+      return;
+    }
     // Check if chat already exists
     const existing = chats.find(c => c.employerId === v.employerId && c.workerId === currentUser.id);
     if (existing) {
@@ -1880,7 +1959,16 @@ function WorkerPermMode() {
 
   const toggleSaved = (v: PermVacancy) => {
     if (!currentUser) return;
-    if (currentUser.isGuest) { promptRegister(); return; }
+    if (currentUser.isGuest) {
+      const isExternal = 'external' in currentCard;
+      const ext = isExternal ? (currentCard as PartnerShiftCard).external : null;
+      promptRegister({
+        vacancyId: ext?.id ?? currentCard.id,
+        vacancyKind: isExternal ? 'external' : 'shift',
+        sourceId: ext?.sourceId ?? null,
+      });
+      return;
+    }
     if (permSavedIds.includes(v.id)) {
       optimisticRemovePermSaved(v.id);
       dbRemovePermSaved(currentUser.id, v.id).catch(() => {});
@@ -1916,6 +2004,11 @@ function WorkerPermMode() {
       const company = v.company ?? v.sourceName ?? 'Компания';
       const openExternal = async () => {
         dbRecordExternalClick(v.id, v.sourceId, currentUser.id).catch(() => {});
+        if (currentUser.isGuest) {
+          void dbRecordGuestEvent('external_click', {
+            vacancyId: v.id, vacancyKind: 'external', sourceId: v.sourceId,
+          });
+        }
         try {
           await Linking.openURL(v.url);
         } catch {
