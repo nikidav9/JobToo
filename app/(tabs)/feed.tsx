@@ -48,6 +48,7 @@ import {
 import { notifyEmployerGotMatch, notifyWorkerGotMatch,
   notifyEmployerNewMessage } from '@/services/notifications';
 import { Image } from 'expo-image';
+import * as Crypto from 'expo-crypto';
 import { Ionicons } from '@expo/vector-icons';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
@@ -64,6 +65,22 @@ import { ApplySheet } from '@/components/feature/ApplySheet';
 import { getChatSuggestions } from '@/constants/chatSuggestions';
 import { payShort } from '@/services/pay';
 import { vacancyInfoLines, permVacancyInfoLines } from '@/services/vacancyCard';
+
+function partnerAttributionUrl(raw: string, clickId: string, sourceId: string): string {
+  try {
+    const url = new URL(raw);
+    url.searchParams.set('jt_click_id', clickId);
+    url.searchParams.set('utm_source', 'jobtoo');
+    url.searchParams.set('utm_medium', 'aggregator');
+    url.searchParams.set('utm_campaign', sourceId);
+    return url.toString();
+  } catch {
+    // Сам импорт принимает только корректный HTTPS URL; fallback нужен для
+    // старой карточки, которая могла сохраниться до появления этой проверки.
+    const sep = raw.includes('?') ? '&' : '?';
+    return `${raw}${sep}jt_click_id=${encodeURIComponent(clickId)}&utm_source=jobtoo&utm_medium=aggregator&utm_campaign=${encodeURIComponent(sourceId)}`;
+  }
+}
 
 function CompanyMark({ company, size = 44 }: { company?: string | null; size?: number }) {
   const name = normalizeCompany(company);
@@ -1979,14 +1996,19 @@ function WorkerPermMode() {
     if (isExternal) {
       const company = v.company ?? v.sourceName ?? 'Компания';
       const openExternal = async () => {
-        dbRecordExternalClick(v.id, v.sourceId, currentUser.id).catch(() => {});
+        // ID создаётся до сетевого запроса и сразу попадает в URL: переход
+        // остаётся прямым пользовательским жестом, а партнёр может вернуть
+        // этот непрозрачный ID в callback без каких-либо данных человека.
+        const clickId = Crypto.randomUUID().replace(/-/g, '');
+        const targetUrl = partnerAttributionUrl(v.url, clickId, v.sourceId);
+        dbRecordExternalClick(v.id, v.sourceId, currentUser.id, clickId).catch(() => {});
         if (currentUser.isGuest) {
           void dbRecordGuestEvent('external_click', {
             vacancyId: v.id, vacancyKind: 'external', sourceId: v.sourceId,
           });
         }
         try {
-          await Linking.openURL(v.url);
+          await Linking.openURL(targetUrl);
         } catch {
           showToast('Не удалось открыть вакансию', 'error');
         }
