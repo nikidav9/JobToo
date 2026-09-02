@@ -113,6 +113,7 @@ export async function fetchOverview() {
     { data: messages },
     { data: ratings },
     { data: permApps },
+    { data: guestEvents },
   ] = await Promise.all([
     supabase.from('jm_users').select('id,role,created_at,is_blocked'),
     supabase.from('jm_vacancies').select('id,status,work_type,created_at,workers_needed,workers_found'),
@@ -1020,11 +1021,13 @@ export async function fetchFunnel() {
     supabase.from('jm_users').select('id,role,created_at'),
     supabase.from('jm_likes').select('id,worker_id,is_match,worker_liked,worker_confirmed,employer_confirmed,shift_completed,created_at'),
     supabase.from('jm_perm_applications').select('id,worker_id,status,created_at'),
+    supabase.from('jm_guest_events').select('anon_id,event_type,vacancy_kind,occurred_at'),
   ])
 
   const u = users ?? []
   const lk = likes ?? []
   const ap = permApps ?? []
+  const ge = guestEvents ?? []
 
   const workers = u.filter((x: any) => x.role === 'worker')
 
@@ -1094,6 +1097,36 @@ export async function fetchFunnel() {
     completed: completedByDay[d] ?? 0,
   }))
 
+  const guestUnique = (eventType: string, since?: string) =>
+    new Set(ge.filter((e: any) =>
+      e.event_type === eventType && (!since || e.occurred_at >= since)
+    ).map((e: any) => e.anon_id)).size
+  const guestEventsCount = (eventType: string, since?: string) =>
+    ge.filter((e: any) => e.event_type === eventType && (!since || e.occurred_at >= since)).length
+  const nowIso = new Date()
+  const guestSince7 = subDays(nowIso, 7).toISOString()
+  const guestSince30 = subDays(nowIso, 30).toISOString()
+  const guestStarted30 = guestUnique('guest_started', guestSince30)
+  const guestCompleted30 = guestUnique('registration_completed', guestSince30)
+  const guestByDay = (eventType: string) => groupByDate(
+    ge.filter((e: any) => e.event_type === eventType), 'occurred_at'
+  )
+  const guestImpressionsByDay = guestByDay('vacancy_impression')
+  const guestIntentByDay = guestByDay('apply_intent')
+  const guestCompletedByDay = guestByDay('registration_completed')
+  const guestDaily30 = days30.map(d => ({
+    date: toDayLabel(d),
+    impressions: guestImpressionsByDay[d] ?? 0,
+    intents: guestIntentByDay[d] ?? 0,
+    registrations: guestCompletedByDay[d] ?? 0,
+  }))
+  const guestFunnel = [
+    { name: 'Вошли гостем', value: guestUnique('guest_started', guestSince30), fill: PALETTE.blue },
+    { name: 'Смотрели вакансии', value: guestUnique('vacancy_impression', guestSince30), fill: PALETTE.cyan },
+    { name: 'Хотели откликнуться', value: guestUnique('apply_intent', guestSince30), fill: PALETTE.orange },
+    { name: 'Зарегистрировались', value: guestCompleted30, fill: PALETTE.green },
+  ]
+
   const mainFunnel = [
     { name: 'Зарегистрировались', value: workers.length, fill: PALETTE.blue },
     { name: 'Лайкнули (уник.)', value: workersWhoLiked, fill: PALETTE.cyan },
@@ -1130,7 +1163,16 @@ export async function fetchFunnel() {
       returningRate: workersWithShift > 0 ? ((returningWorkers / workersWithShift) * 100).toFixed(1) : '0',
       permApplications: ap.length,
       permApproved: ap.filter((a: any) => a.status === 'approved').length,
+      guestUnique7: guestUnique('guest_started', guestSince7),
+      guestUnique30: guestStarted30,
+      guestImpressions30: guestEventsCount('vacancy_impression', guestSince30),
+      guestIntent30: guestEventsCount('apply_intent', guestSince30),
+      guestRegistrations30: guestCompleted30,
+      guestRegistrationRate30: guestStarted30 > 0
+        ? ((guestCompleted30 / guestStarted30) * 100).toFixed(1) : '0',
     },
+    guestFunnel,
+    guestDaily30,
     mainFunnel,
     eventFunnel,
     daily30,
