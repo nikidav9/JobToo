@@ -62,6 +62,9 @@ export async function POST(req: Request) {
   try {
     // Разовый заход по кнопке «Проверить сейчас». Расписание при этом не
     // сбивается: force относится только к этому вызову.
+    if (body.cost) {
+      return NextResponse.json(await call('extPartnerCostSave', [body.cost]), { headers: CORS })
+    }
     if (body.run) {
       const res = await fetch(
         `https://jobtoo.ru/api/ingest.php?source=${encodeURIComponent(body.run)}&force=1`,
