@@ -113,7 +113,6 @@ export async function fetchOverview() {
     { data: messages },
     { data: ratings },
     { data: permApps },
-    { data: guestEvents },
   ] = await Promise.all([
     supabase.from('jm_users').select('id,role,created_at,is_blocked'),
     supabase.from('jm_vacancies').select('id,status,work_type,created_at,workers_needed,workers_found'),
@@ -1017,6 +1016,7 @@ export async function fetchFunnel() {
     { data: users },
     { data: likes },
     { data: permApps },
+    { data: guestEvents },
   ] = await Promise.all([
     supabase.from('jm_users').select('id,role,created_at'),
     supabase.from('jm_likes').select('id,worker_id,is_match,worker_liked,worker_confirmed,employer_confirmed,shift_completed,created_at'),
