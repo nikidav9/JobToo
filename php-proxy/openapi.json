@@ -326,7 +326,7 @@
     "/conversions": {
       "post": {
         "summary": "Подтвердить конверсию после перехода",
-        "description": "Идемпотентный callback партнёра. Передайте непрозрачный jt_click_id из URL как click_id и уникальный event_id. Персональные данные не нужны.",
+        "description": "Идемпотентный callback партнёра. Передайте непрозрачный jt_click_id из URL как click_id и уникальный event_id. Персональные данные не нужны. Поле new_candidate позволяет партнёру подтвердить долю новой аудитории.",
         "requestBody": {
           "required": true,
           "content": {
@@ -355,6 +355,10 @@
                     "type": "string",
                     "deprecated": true,
                     "description": "Старый способ без атрибуции; используйте click_id"
+                  },
+                  "new_candidate": {
+                    "type": "boolean",
+                    "description": "Необязательное подтверждение партнёра: кандидат новый для партнёра (true) или уже известен ему (false)"
                   }
                 }
               }
