@@ -81,7 +81,7 @@ export async function GET(req: Request) {
       });
     }
     if (format === 'xlsx') {
-      return new Response(makeXlsx(HEADERS, table), {
+      return new Response(new Uint8Array(makeXlsx(HEADERS, table)), {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           'Content-Disposition': `attachment; filename="${filename}.xlsx"`,
