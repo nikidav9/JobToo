@@ -1,57 +1,114 @@
-self.addEventListener('install', () => {
-  // Новая версия должна начать управлять PWA сразу, а не после закрытия всех
-  // старых вкладок. Иначе установленное приложение может ещё сутки открывать
-  // оболочку от предыдущей выкладки.
-  self.skipWaiting();
+// App-shell cache. Bump on every behavioral change; hashed Expo assets remain immutable.
+const SHELL_CACHE = 'jobtoo-app-shell-v3';
+const SHELL_URLS = ['/', '/index.html', '/manifest.json', '/favicon.ico', '/jt-logo.jpg'];
+
+async function fetchWithTimeout(request, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(request, { cache: 'no-store', signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function cacheCompleteShell() {
+  const response = await fetchWithTimeout('/', 12000);
+  if (!response.ok) throw new Error('shell HTTP ' + response.status);
+
+  const html = await response.clone().text();
+  // A new worker becomes active only after every bundle referenced by its HTML
+  // is downloadable. This prevents an updated index from pointing to missing JS.
+  const assetUrls = Array.from(html.matchAll(/(?:src|href)=["']([^"']+)["']/g))
+    .map((match) => match[1])
+    .filter((url) => url.startsWith('/_expo/static/') || url.startsWith('/assets/'));
+
+  const cache = await caches.open(SHELL_CACHE);
+  await Promise.all(Array.from(new Set([...SHELL_URLS, ...assetUrls])).map(async (url) => {
+    const item = url === '/' ? response.clone() : await fetchWithTimeout(url, 12000);
+    if (!item.ok) throw new Error(url + ' HTTP ' + item.status);
+    await cache.put(url, item);
+  }));
+}
+
+self.addEventListener('install', (event) => {
+  // If the new release is incomplete or the network drops, installation fails
+  // and the previous worker/cache keeps serving the working application.
+  event.waitUntil(cacheCompleteShell().then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
-  // Принудительную перезагрузку открытых окон при активации (client.navigate)
-  // пришлось убрать: на нестабильной/фильтруемой сети она навязывала окну
-  // навигацию, а обработчик fetch отдаёт навигацию только из сети без запасного
-  // варианта — навигация зависала, и сайт переставал грузиться вообще. Свежую
-  // оболочку в застрявшую PWA будем доставлять безопаснее, не перебивая уже
-  // идущую загрузку. Здесь — только берём управление.
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async () => {
+    await Promise.all(
+      (await caches.keys())
+        .filter((name) => name.startsWith('jobtoo-app-shell-') && name !== SHELL_CACHE)
+        .map((name) => caches.delete(name))
+    );
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener('fetch', (event) => {
-  // HTML-навигация всегда идёт в сеть. Статические bundle-файлы имеют хеши и
-  // кэшируются nginx надолго, но устаревший index.html может ссылаться на уже
-  // удалённый bundle — результатом был вечный белый экран в установленной PWA.
-  if (event.request.mode !== 'navigate') return;
-  event.respondWith(fetch(event.request, { cache: 'no-store' }));
+  const request = event.request;
+  if (request.method !== 'GET') return;
+
+  if (request.mode === 'navigate') {
+    event.respondWith((async () => {
+      const cache = await caches.open(SHELL_CACHE);
+      try {
+        const fresh = await fetchWithTimeout(request, 6000);
+        if (!fresh.ok) throw new Error('navigation HTTP ' + fresh.status);
+        // Keep the last fully received HTML as an offline/failed-deploy fallback.
+        await cache.put('/', fresh.clone());
+        await cache.put('/index.html', fresh.clone());
+        return fresh;
+      } catch {
+        return (await cache.match(request))
+          || (await cache.match('/'))
+          || (await cache.match('/index.html'))
+          || new Response(
+            '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>JobToo</title><style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f7fa;color:#172033;display:grid;place-items:center;min-height:100vh;margin:0}.c{max-width:320px;text-align:center;padding:28px}button{border:0;border-radius:14px;background:#ff6b1a;color:#fff;padding:14px 22px;font-weight:700}</style><div class="c"><h1>JobToo</h1><p>Не удалось подключиться. Рабочая версия сохранена и откроется, когда сеть восстановится.</p><button onclick="location.reload()">Повторить</button></div>',
+            { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+          );
+      }
+    })());
+    return;
+  }
+
+  const url = new URL(request.url);
+  if (url.origin === self.location.origin
+      && (url.pathname.startsWith('/_expo/static/') || url.pathname.startsWith('/assets/'))) {
+    event.respondWith((async () => {
+      const cached = await caches.match(request);
+      if (cached) return cached;
+      const fresh = await fetch(request);
+      if (fresh.ok) {
+        const cache = await caches.open(SHELL_CACHE);
+        await cache.put(request, fresh.clone());
+      }
+      return fresh;
+    })());
+  }
 });
 
 self.addEventListener('push', (event) => {
   if (!event.data) return;
   const data = event.data.json();
-
-  event.waitUntil(
-    (async () => {
-      // Не показываем уведомление о сообщении, если эта же переписка открыта и
-      // вкладка активна — человек и так видит сообщение на экране. Спрашиваем
-      // не страницу, а список окон: service worker выгружается между
-      // уведомлениями и любое запомненное им состояние теряется, а адрес
-      // открытой вкладки доступен всегда.
-      const chatId = (data.data || {}).chatId;
-      if (chatId) {
-        const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true });
-        const reading = wins.some(
-          (c) => c.focused && String(c.url).indexOf('chatId=' + chatId) !== -1
-        );
-        if (reading) return;
-      }
-
-      await self.registration.showNotification(data.title || 'JobToo', {
-        body: data.body || '',
-        icon: '/jt-logo.jpg',
-        badge: '/favicon.ico',
-        data: data.data || {},
-        vibrate: [200, 100, 200],
-      });
-    })()
-  );
+  event.waitUntil((async () => {
+    const chatId = (data.data || {}).chatId;
+    if (chatId) {
+      const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const reading = wins.some((c) => c.focused && String(c.url).indexOf('chatId=' + chatId) !== -1);
+      if (reading) return;
+    }
+    await self.registration.showNotification(data.title || 'JobToo', {
+      body: data.body || '',
+      icon: '/jt-logo.jpg',
+      badge: '/favicon.ico',
+      data: data.data || {},
+      vibrate: [200, 100, 200],
+    });
+  })());
 });
 
 self.addEventListener('notificationclick', (event) => {

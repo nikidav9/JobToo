@@ -42,6 +42,12 @@ jobs:
       - name: PHP syntax
         run: find php-proxy -name '*.php' -print0 | xargs -0 -n1 php -l
 
+      - name: Service worker and infrastructure syntax
+        run: |
+          node --check public/sw.js
+          bash -n infra/bootstrap.sh
+          find infra -maxdepth 1 -name '*.sh' -print0 | xargs -0 -n1 bash -n
+
       - name: Web build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
@@ -51,6 +57,36 @@ jobs:
           EXPO_PUBLIC_APP_SECRET: ci-placeholder
           EXPO_PUBLIC_DASHBOARD_URL: https://example.invalid
         run: npx expo export --platform web --max-workers 2
+
+      - name: Verify complete app shell
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          class Assets(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.urls = []
+              def handle_starttag(self, tag, attrs):
+                  values = dict(attrs)
+                  for key in ('src', 'href'):
+                      value = values.get(key, '')
+                      if value.startswith('/_expo/static/') or value.startswith('/assets/'):
+                          self.urls.append(urlparse(value).path.lstrip('/'))
+
+          root = Path('dist')
+          html = (root / 'index.html').read_text()
+          parser = Assets()
+          parser.feed(html)
+          missing = [url for url in parser.urls if not (root / url).is_file()]
+          if not parser.urls:
+              raise SystemExit('index.html has no app assets')
+          if missing:
+              raise SystemExit('missing app assets: ' + ', '.join(missing))
+          print(f'complete shell: {len(parser.urls)} referenced assets')
+          PY
 
   dashboard:
     name: Dashboard build
