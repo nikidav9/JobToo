@@ -2681,7 +2681,7 @@ try {
             $rows = sb_select('jm_ext_sources', ['order' => 'created_at.desc'],
                 'id,name,url,enabled,period_min,last_run_at,last_status,last_count,'
                 . 'last_success_at,consecutive_failures,last_duration_ms,last_pages,'
-                . 'last_skipped,last_deactivated,created_at,auth_header');
+                . 'last_skipped,last_deactivated,created_at,auth_header,environment,notifications_enabled');
             foreach ($rows as &$source) {
                 $source['auth_configured'] = !empty($source['auth_header']);
                 unset($source['auth_header']);
@@ -2705,6 +2705,14 @@ try {
                 'period_min' => max(5, (int)($v['period_min'] ?? 30)),
                 'enabled' => array_key_exists('enabled', $v) ? (bool)$v['enabled'] : true,
             ];
+            // Новые источники всегда начинаются в sandbox. Продвижение в production
+            // должно быть явным; в sandbox уведомления невозможно включить даже ошибочно.
+            if ($isNew || array_key_exists('environment', $v)) {
+                $environment = (($v['environment'] ?? 'sandbox') === 'production') ? 'production' : 'sandbox';
+                $row['environment'] = $environment;
+                $row['notifications_enabled'] = $environment === 'production'
+                    && !empty($v['notifications_enabled']);
+            }
             // При переключении enabled браузер не знает секрет и не должен
             // стирать его. Меняем доступ только когда поля присланы явно.
             if ($isNew || array_key_exists('auth_header', $v)) {
