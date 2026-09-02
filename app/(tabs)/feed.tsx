@@ -1700,7 +1700,6 @@ function WorkerFeed() {
         title="Отклик на смену"
         info={applyFor ? vacancyInfoLines(applyFor) : []}
         chips={getChatSuggestions('worker', applyFor)}
-        responsibilityNotice="JobToo — информационная платформа, не работодатель и не заказчик смены. За условия, безопасность на объекте и оплату отвечает указанная в карточке компания или заказчик."
       />
     </View>
   );
