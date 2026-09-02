@@ -51,7 +51,7 @@ interface Trigger {
   id: string
   label: string
   desc: string
-  target: 'all' | 'workers' | 'employers' | 'metro'
+  target: Target
   title: string
   body: string
 }
@@ -61,9 +61,9 @@ const TRIGGERS: Trigger[] = [
     id: 'inactive_workers',
     label: 'Неактивные работники',
     desc: 'Работники без активности 30+ дней — напомнить о себе',
-    target: 'workers',
-    title: '👋 Новые подработки рядом!',
-    body: 'Давно не заходили? Посмотрите свежие вакансии в вашем районе — уже сегодня!',
+    target: 'telegram_reactivation_workers',
+    title: '👋 Возвращайтесь в JobToo',
+    body: 'Вы давно не заходили в JobToo. Откройте приложение и проверьте доступные предложения. Если сообщения больше не нужны, напишите «Не присылать».',
   },
   {
     id: 'new_week',
@@ -112,9 +112,6 @@ export default function BroadcastPage() {
   const [body, setBody] = useState('')
   const [st, setSt] = useState<St>('idle')
   const [result, setResult] = useState('')
-
-  // trigger states
-  const [triggerSt, setTriggerSt] = useState<Record<string, St>>({})
 
   // per-user send
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null)
@@ -181,20 +178,6 @@ export default function BroadcastPage() {
       setSt('err'); setResult('Не отправилось: ' + e.message)
     }
     setTimeout(() => setSt('idle'), 5000)
-  }
-
-  async function handleTrigger(t: Trigger) {
-    setTriggerSt(prev => ({ ...prev, [t.id]: 'loading' }))
-    try {
-      const { pushCount, inappCount } = await broadcastBoth(t.target, t.title, t.body)
-      logActivity('Рассылка (авто)', `Триггер: "${t.label}", push: ${pushCount}, inapp: ${inappCount}`)
-      setTriggerSt(prev => ({ ...prev, [t.id]: 'ok' }))
-      load()
-      setTimeout(() => setTriggerSt(prev => ({ ...prev, [t.id]: 'idle' })), 3000)
-    } catch {
-      setTriggerSt(prev => ({ ...prev, [t.id]: 'err' }))
-      setTimeout(() => setTriggerSt(prev => ({ ...prev, [t.id]: 'idle' })), 3000)
-    }
   }
 
   function applyTemplate(t: Trigger) {
@@ -287,7 +270,6 @@ export default function BroadcastPage() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {TRIGGERS.map(t => {
-                  const tst = triggerSt[t.id] ?? 'idle'
                   return (
                     <div key={t.id} style={{
                       padding: '10px 12px', borderRadius: 8,
@@ -302,13 +284,9 @@ export default function BroadcastPage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
-                        <button onClick={() => handleTrigger(t)} disabled={tst === 'loading'}
-                          style={{ height: 28, padding: '0 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11.5, fontWeight: 500, background: tst === 'ok' ? 'var(--positive)' : tst === 'err' ? 'var(--negative)' : 'var(--ink)', color: '#fff', whiteSpace: 'nowrap' }}>
-                          {tst === 'loading' ? '…' : tst === 'ok' ? 'Отправлено' : tst === 'err' ? 'Ошибка' : 'Отправить'}
-                        </button>
                         <button onClick={() => applyTemplate(t)}
                           style={{ height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid var(--line)', cursor: 'pointer', fontSize: 11.5, background: 'var(--bg-elev)', color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>
-                          Изменить
+                          Подготовить
                         </button>
                       </div>
                     </div>
