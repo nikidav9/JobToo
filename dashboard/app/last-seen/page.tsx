@@ -126,10 +126,11 @@ export default function LastSeenPage() {
   }, [])
 
   const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { all: rows.length, online: 0, today: 0, week: 0, month: 0, stale: 0, never: 0 }
-    for (const r of rows) c[bucketOf(r.last_seen_at, now)]++
+    const selectedRows = role === 'all' ? rows : rows.filter(r => r.role === role)
+    const c: Record<Bucket, number> = { all: selectedRows.length, online: 0, today: 0, week: 0, month: 0, stale: 0, never: 0 }
+    for (const r of selectedRows) c[bucketOf(r.last_seen_at, now)]++
     return c
-  }, [rows, now])
+  }, [rows, role, now])
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -181,6 +182,7 @@ alter table jm_users add column if not exists last_seen_at timestamptz;
           <KpiCard label="Заходили за неделю" value={counts.online + counts.today + counts.week} sub="включая сутки" />
           <KpiCard label="Не заходили 30+ дней" value={counts.stale} sub="но хоть раз заходили" color="var(--negative)" />
           <KpiCard label="Ни разу не заходили" value={counts.never} sub="с момента регистрации" color="var(--ink-3)" />
+          <KpiCard label="К реактивации" value={counts.stale + counts.never} sub="30+ дней или ни разу" color="var(--negative)" />
         </div>
 
         {/* Фильтры */}
