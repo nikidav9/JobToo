@@ -42,6 +42,9 @@ jobs:
       - name: PHP syntax
         run: find php-proxy -name '*.php' -print0 | xargs -0 -n1 php -l
 
+      - name: Partner gateway state machine
+        run: php tests/partner_core_test.php
+
       - name: Service worker and infrastructure syntax
         run: |
           node --check public/sw.js
