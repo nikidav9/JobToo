@@ -1,0 +1,89 @@
+name: Dependency security audit
+
+on:
+  pull_request:
+    paths:
+      - package.json
+      - package-lock.json
+      - dashboard/package.json
+      - dashboard/package-lock.json
+      - .github/workflows/dependency-audit.yml
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - package-lock.json
+      - dashboard/package.json
+      - dashboard/package-lock.json
+      - .github/workflows/dependency-audit.yml
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  app-production:
+    name: App production dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+      - run: npm ci
+      - name: Build machine-readable report
+        run: |
+          npm audit --omit=dev --json > app-production-audit.json || true
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const report = JSON.parse(fs.readFileSync('app-production-audit.json', 'utf8'))
+          const meta = report.metadata?.vulnerabilities ?? {}
+          console.log('Production vulnerabilities:', JSON.stringify(meta))
+          for (const [name, item] of Object.entries(report.vulnerabilities ?? {})) {
+            console.log(`${item.severity}\t${name}\tdirect=${Boolean(item.isDirect)}\tfix=${JSON.stringify(item.fixAvailable)}`)
+          }
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-production-audit
+          path: app-production-audit.json
+          retention-days: 30
+      - name: Block critical production vulnerabilities
+        run: npm audit --omit=dev --audit-level=critical
+
+  dashboard-production:
+    name: Dashboard production dependencies
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+      - name: Build machine-readable report
+        run: |
+          npm audit --omit=dev --json > dashboard-production-audit.json || true
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const report = JSON.parse(fs.readFileSync('dashboard-production-audit.json', 'utf8'))
+          const meta = report.metadata?.vulnerabilities ?? {}
+          console.log('Production vulnerabilities:', JSON.stringify(meta))
+          for (const [name, item] of Object.entries(report.vulnerabilities ?? {})) {
+            console.log(`${item.severity}\t${name}\tdirect=${Boolean(item.isDirect)}\tfix=${JSON.stringify(item.fixAvailable)}`)
+          }
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-production-audit
+          path: dashboard/dashboard-production-audit.json
+          retention-days: 30
+      - name: Block critical production vulnerabilities
+        run: npm audit --omit=dev --audit-level=critical
