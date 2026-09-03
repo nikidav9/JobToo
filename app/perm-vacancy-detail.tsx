@@ -25,6 +25,7 @@ import {
   dbRemovePermSaved,
   dbGetPermVacancies,
   dbRecordGuestEvent,
+  dbStartGuestRegistration,
 } from '@/services/db';
 import { METRO_LINES } from '@/constants/metro';
 
@@ -67,6 +68,18 @@ export default function PermVacancyDetailScreen() {
     } else {
       router.replace('/');
     }
+  };
+
+  const startWorkerRegistration = () => {
+    void dbStartGuestRegistration({
+      vacancyId,
+      vacancyKind: 'permanent',
+      campaignId: campaignId ?? null,
+    });
+    router.push({
+      pathname: '/register-worker',
+      params: { returnTo: `perm-vacancy-detail?vacancyId=${vacancyId}` },
+    });
   };
 
   const vacancy = permVacancies.find(v => v.id === vacancyId) ?? guestVacancy;
@@ -123,7 +136,7 @@ export default function PermVacancyDetailScreen() {
             <Text style={styles.authDividerTxt}>или</Text>
             <View style={styles.authDividerLine} />
           </View>
-          <TouchableOpacity style={styles.authBtnSecondary} onPress={() => router.push({ pathname: '/register-worker', params: { returnTo: `perm-vacancy-detail?vacancyId=${vacancyId}` } })} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.authBtnSecondary} onPress={startWorkerRegistration} activeOpacity={0.85}>
             <Text style={styles.authBtnSecondaryTxt}>Ищу работу — Зарегистрироваться</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.authBtnSecondary, { marginTop: 8 }]} onPress={() => router.push('/register-employer')} activeOpacity={0.85}>
@@ -519,7 +532,7 @@ export default function PermVacancyDetailScreen() {
           <TouchableOpacity
             style={styles.guestBtnSecondary}
             activeOpacity={0.85}
-            onPress={() => router.push({ pathname: '/register-worker', params: { returnTo: `perm-vacancy-detail?vacancyId=${vacancyId}` } })}
+            onPress={startWorkerRegistration}
           >
             <Text style={styles.guestBtnSecondaryTxt}>Зарегистрироваться</Text>
           </TouchableOpacity>
