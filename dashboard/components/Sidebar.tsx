@@ -83,9 +83,24 @@ export default function Sidebar() {
                 textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)',
               }}>{group}</div>
 
-              {items.map(({ href, label, icon }) => {
+              {items.map(({ href, label, icon, locked }) => {
                 const Icon = ICONS[icon] ?? IconGrid
                 const active = path === href
+                if (locked) {
+                  return (
+                    <div
+                      key={href}
+                      className="jt-nav is-locked"
+                      aria-disabled="true"
+                      title="Раздел станет доступен после запуска оплаты"
+                    >
+                      <span className="jt-nav-rail" aria-hidden="true" />
+                      <Icon style={{ width: 16, height: 16, flexShrink: 0 }} />
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+                      <IconLock style={{ width: 14, height: 14, marginLeft: 'auto', flexShrink: 0 }} />
+                    </div>
+                  )
+                }
                 return (
                   <Link key={href} href={href} className={`jt-nav${active ? ' is-active' : ''}`}>
                     <span className="jt-nav-rail" aria-hidden="true" />
@@ -102,6 +117,9 @@ export default function Sidebar() {
   )
 }
 
+function IconLock({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>
+}
 function IconGrid({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.3"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
 }
