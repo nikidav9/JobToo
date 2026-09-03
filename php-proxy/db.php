@@ -3512,16 +3512,23 @@ try {
             $kind = isset($args[3]) ? (string)$args[3] : '';
             $sourceId = isset($args[4]) ? trim((string)$args[4]) : '';
             $platform = isset($args[5]) ? (string)$args[5] : '';
+            $campaignId = isset($args[6]) ? trim((string)$args[6]) : '';
+            $channel = isset($args[7]) ? (string)$args[7] : '';
 
             $events = ['guest_started', 'vacancy_impression', 'apply_intent',
-                'registration_started', 'registration_completed', 'external_click'];
+                'registration_started', 'registration_completed', 'external_click',
+                'campaign_published', 'campaign_open', 'campaign_apply'];
             $kinds = ['', 'shift', 'permanent', 'external'];
             $platforms = ['', 'web', 'ios', 'android', 'windows', 'macos'];
+            $channels = ['', 'telegram_group', 'telegram_dm'];
             if ($anon === '' || strlen($anon) > 128 || !preg_match('/^[A-Za-z0-9._:-]+$/', $anon)
                 || !in_array($event, $events, true)
                 || !in_array($kind, $kinds, true)
                 || !in_array($platform, $platforms, true)
-                || strlen($vacancyId) > 160 || strlen($sourceId) > 160) {
+                || !in_array($channel, $channels, true)
+                || strlen($vacancyId) > 160 || strlen($sourceId) > 160
+                || strlen($campaignId) > 64
+                || ($campaignId !== '' && !preg_match('/^[A-Za-z0-9-]+$/', $campaignId))) {
                 jt_respond(['error' => 'Invalid guest analytics event'], 400); exit;
             }
 
@@ -3533,6 +3540,8 @@ try {
                 'vacancy_kind' => $kind !== '' ? $kind : null,
                 'source_id' => $sourceId !== '' ? $sourceId : null,
                 'platform' => $platform !== '' ? $platform : null,
+                'campaign_id' => $campaignId !== '' ? $campaignId : null,
+                'channel' => $channel !== '' ? $channel : null,
                 'occurred_at' => now_iso(),
             ], ['Prefer: return=minimal']);
             $data = true;
@@ -4259,8 +4268,15 @@ try {
             @ignore_user_abort(true);
 
             $vacancyId = (string)($args[5] ?? '');
+            $dataType = (string)($args[3] ?? 'nearby_shift');
+            $deepKind = $dataType === 'nearby_perm' ? 'perm' : 'shift';
+            $dmCampaign = bin2hex(random_bytes(8));
+            $groupCampaign = bin2hex(random_bytes(8));
             $btnUrl = $vacancyId !== ''
-                ? 'https://t.me/JobToo_bot/app?startapp=vacancy_' . $vacancyId
+                ? 'https://t.me/JobToo_bot/app?startapp=' . $deepKind . '_' . $vacancyId . '_' . $dmCampaign
+                : true;
+            $groupBtnUrl = $vacancyId !== ''
+                ? 'https://t.me/JobToo_bot/app?startapp=' . $deepKind . '_' . $vacancyId . '_' . $groupCampaign
                 : true;
 
             // Пост в группу — ПЕРВЫМ (одна быстрая операция): длинные циклы
@@ -4274,7 +4290,7 @@ try {
             }
             $groupOk = false;
             if ($groupHtml !== '' && TG_GROUP_CHAT_ID !== 0) {
-                $groupOk = tg_send_message(TG_GROUP_CHAT_ID, $groupHtml, $btnUrl);
+                $groupOk = tg_send_message(TG_GROUP_CHAT_ID, $groupHtml, $groupBtnUrl);
             }
             // Итог публикации сохраняем: иначе он теряется, а следующий раз
             // выяснять причину снова будет нечем.
@@ -4285,12 +4301,36 @@ try {
                         'ok' => $groupOk,
                         'когда' => now_iso(),
                         'длина_текста' => strlen($groupHtml),
-                        'кнопка' => is_string($btnUrl) ? $btnUrl : 'по умолчанию',
+                        'кнопка' => is_string($groupBtnUrl) ? $groupBtnUrl : 'по умолчанию',
                         'отказ' => $GLOBALS['jt_last_tg_error'] ?? null,
                     ], JSON_UNESCAPED_UNICODE),
                     'updated_at' => now_iso(),
                 ], 'key');
             } catch (Throwable $e) { /* запись отчёта не должна ломать рассылку */ }
+
+            // Фиксируем факт публикации отдельно от открытий. Никаких данных
+            // Telegram-пользователя в этой строке нет.
+            if ($vacancyId !== '') {
+                foreach ([
+                    [$groupCampaign, 'telegram_group', $groupOk],
+                    [$dmCampaign, 'telegram_dm', true],
+                ] as [$campaignId, $channel, $published]) {
+                    if (!$published) continue;
+                    try {
+                        sb('POST', 'jm_guest_events', [], [
+                            'id' => uid(),
+                            'anon_id' => 'campaign:' . $campaignId,
+                            'event_type' => 'campaign_published',
+                            'vacancy_id' => $vacancyId,
+                            'vacancy_kind' => $deepKind === 'perm' ? 'permanent' : 'shift',
+                            'platform' => 'web',
+                            'campaign_id' => $campaignId,
+                            'channel' => $channel,
+                            'occurred_at' => now_iso(),
+                        ], ['Prefer: return=minimal']);
+                    } catch (Throwable $e) { /* аналитика не блокирует рассылку */ }
+                }
+            }
 
             // Станция приходит в $args[6] и больше ни на что не влияет: делить
             // рассылку по географии мы перестали, и от старых версий
