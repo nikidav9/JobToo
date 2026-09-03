@@ -1002,6 +1002,7 @@ function WorkerFeed() {
     vacancyId?: string | null;
     vacancyKind?: 'shift' | 'permanent' | 'external' | null;
     sourceId?: string | null;
+    campaignId?: string | null;
   } = {}) => {
     void dbStartGuestRegistration(context);
     exitGuest();
