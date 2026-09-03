@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { ExternalVacancy, Like, User, Vacancy, PermVacancy } from '@/constants/types';
@@ -972,6 +972,10 @@ function partnerShiftToCard(v: ExternalVacancy): PartnerShiftCard | null {
 
 function WorkerFeed() {
   const router = useRouter();
+  const deepLinkParams = useLocalSearchParams<{ vacancyId?: string; campaignId?: string }>();
+  const deepLinkVacancyId = typeof deepLinkParams.vacancyId === 'string' ? deepLinkParams.vacancyId : '';
+  const campaignId = typeof deepLinkParams.campaignId === 'string' ? deepLinkParams.campaignId : '';
+  const deepLinkOpened = useRef(false);
   const {
     currentUser, users, vacancies, likes, chats,
     refreshAll, refreshLikes, refreshChats,
@@ -1095,6 +1099,11 @@ function WorkerFeed() {
         return true;
       })
       .sort((a, b) => {
+        // Диплинк из Telegram всегда поднимает нужную смену первой.
+        if (deepLinkVacancyId) {
+          if (a.id === deepLinkVacancyId) return -1;
+          if (b.id === deepLinkVacancyId) return 1;
+        }
         // Подбор, а не только метро: подтверждённый навык, срочность,
         // знакомый работодатель и его рейтинг тоже двигают карточку вверх.
         // Работодателя ищем среди уже загруженных — недостающий просто не
@@ -1111,10 +1120,19 @@ function WorkerFeed() {
       pan.flattenOffset();
       pan.setValue({ x: 0, y: 0 });
     }
-  }, [selectedDate, vacancies, partnerShifts, likes, myLikes, users, currentUser, filterStation]);
+  }, [selectedDate, vacancies, partnerShifts, likes, myLikes, users, currentUser, filterStation, deepLinkVacancyId]);
 
   const currentCard = cards[0];
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;
+
+  // После загрузки ленты сразу показываем карточку из Telegram-публикации.
+  // Флаг защищает от повторного открытия при каждом realtime-обновлении.
+  useEffect(() => {
+    if (deepLinkOpened.current || !deepLinkVacancyId || currentCard?.id !== deepLinkVacancyId) return;
+    deepLinkOpened.current = true;
+    setDetailVacancy(currentCard);
+    setDetailEmployer(currentEmployer ?? null);
+  }, [deepLinkVacancyId, currentCard, currentEmployer]);
   // Онбордингу: есть ли реальная карточка (иначе он покажет демо-карточку)
   useEffect(() => { setOnboardingFlag('hasShiftCard', !!currentCard); }, [currentCard]);
   const dateHistory = history[selectedDate] ?? [];
@@ -1192,6 +1210,13 @@ function WorkerFeed() {
 
   const doWant = useCallback((vx = 0.5) => {
     if (!currentCard || !currentUser || swiping) return;
+    if (campaignId && currentCard.id === deepLinkVacancyId) {
+      void dbRecordGuestEvent('campaign_apply', {
+        vacancyId: currentCard.id,
+        vacancyKind: 'shift',
+        campaignId,
+      });
+    }
     if (currentUser.isGuest) {
       const isExternal = 'external' in currentCard;
       const ext = isExternal ? (currentCard as PartnerShiftCard).external : null;
@@ -1241,7 +1266,7 @@ function WorkerFeed() {
         }
       })();
     });
-  }, [currentCard, currentUser, swiping, selectedDate, animateCard, refreshLikes, router, showToast, promptRegister]);
+  }, [currentCard, currentUser, swiping, selectedDate, animateCard, refreshLikes, router, showToast, promptRegister, campaignId, deepLinkVacancyId]);
 
   const doUndo = useCallback(() => {
     if (!dateHistory.length || !currentUser || swiping) return;
@@ -1290,6 +1315,13 @@ function WorkerFeed() {
   const sendApply = useCallback(async (message: string) => {
     const card = applyFor;
     if (!card || !currentUser || messagingRef.current) return;
+    if (campaignId && card.id === deepLinkVacancyId) {
+      void dbRecordGuestEvent('campaign_apply', {
+        vacancyId: card.id,
+        vacancyKind: 'shift',
+        campaignId,
+      });
+    }
     if (currentUser.isGuest) {
       promptRegister({ vacancyId: card.id, vacancyKind: 'shift' });
       return;

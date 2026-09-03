@@ -376,7 +376,7 @@ export default function CreateVacancy() {
         if (metroStation) {
           notifyWorkersNewVacancy({
             metroStation, title: meta.label, company: base.company, type: 'shift',
-            date: vacs[0]?.date, daysCount: vacs.length,
+            date: vacs[0]?.date, daysCount: vacs.length, vacancyId: vacs[0]?.id,
             timeStart: base.timeStart, timeEnd: base.timeEnd, salary: base.salary,
             estimated: isStorcker,
           }).catch(() => {});
@@ -396,7 +396,7 @@ export default function CreateVacancy() {
         if (metroStation) {
           notifyWorkersNewVacancy({
             metroStation, title: meta.label, company: base.company, type: 'shift',
-            date: vac.date, timeStart: base.timeStart, timeEnd: base.timeEnd, salary: base.salary,
+            date: vac.date, vacancyId: vac.id, timeStart: base.timeStart, timeEnd: base.timeEnd, salary: base.salary,
             estimated: isStorcker,
           }).catch(() => {});
         }

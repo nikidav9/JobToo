@@ -23,6 +23,7 @@ import {
   dbAddPermSaved,
   dbRemovePermSaved,
   dbGetPermVacancies,
+  dbRecordGuestEvent,
 } from '@/services/db';
 import { METRO_LINES } from '@/constants/metro';
 
@@ -34,7 +35,7 @@ import { getChatSuggestions } from '@/constants/chatSuggestions';
 export default function PermVacancyDetailScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const { vacancyId } = useLocalSearchParams<{ vacancyId: string }>();
+  const { vacancyId, campaignId } = useLocalSearchParams<{ vacancyId: string; campaignId?: string }>();
   const {
     currentUser, loading, users, permVacancies, permApplications,
     permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved,
@@ -184,6 +185,13 @@ export default function PermVacancyDetailScreen() {
 
   const sendApply = async (message: string) => {
     if (!currentUser) return;
+    if (campaignId) {
+      void dbRecordGuestEvent('campaign_apply', {
+        vacancyId,
+        vacancyKind: 'permanent',
+        campaignId,
+      });
+    }
     setApplying(true);
     try {
       await dbApplyPermVacancy(vacancy.id, currentUser.id, vacancy.employerId, message);

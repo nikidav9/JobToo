@@ -687,12 +687,17 @@ export type GuestEventType =
   | 'apply_intent'
   | 'registration_started'
   | 'registration_completed'
-  | 'external_click';
+  | 'external_click'
+  | 'campaign_published'
+  | 'campaign_open'
+  | 'campaign_apply';
 
 export interface GuestEventContext {
   vacancyId?: string | null;
   vacancyKind?: 'shift' | 'permanent' | 'external' | null;
   sourceId?: string | null;
+  campaignId?: string | null;
+  channel?: 'telegram_group' | 'telegram_dm' | null;
 }
 
 const GUEST_REGISTRATION_PENDING_KEY = 'jt-guest-registration-pending';
@@ -712,6 +717,8 @@ export async function dbRecordGuestEvent(
       context.vacancyKind ?? null,
       context.sourceId ?? null,
       Platform.OS,
+      context.campaignId ?? null,
+      context.channel ?? null,
     ]);
   } catch {
     /* аналитика не должна мешать просмотру и регистрации */

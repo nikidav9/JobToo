@@ -1021,7 +1021,7 @@ export async function fetchFunnel() {
     supabase.from('jm_users').select('id,role,created_at'),
     supabase.from('jm_likes').select('id,worker_id,is_match,worker_liked,worker_confirmed,employer_confirmed,shift_completed,created_at'),
     supabase.from('jm_perm_applications').select('id,worker_id,status,created_at'),
-    supabase.from('jm_guest_events').select('anon_id,event_type,vacancy_kind,occurred_at'),
+    supabase.from('jm_guest_events').select('anon_id,event_type,vacancy_kind,campaign_id,channel,occurred_at'),
   ])
 
   const u = users ?? []
@@ -1127,6 +1127,23 @@ export async function fetchFunnel() {
     { name: 'Зарегистрировались', value: guestCompleted30, fill: PALETTE.green },
   ]
 
+  // Канал открытия восстанавливаем по campaign_id публикации: в самой
+  // startapp-ссылке нет пользовательских данных и названия Telegram-чата.
+  const telegramPublished30 = ge.filter((e: any) =>
+    e.event_type === 'campaign_published' && e.campaign_id && e.occurred_at >= guestSince30
+  )
+  const telegramCampaigns = new Set(telegramPublished30.map((e: any) => e.campaign_id))
+  const telegramEvents30 = ge.filter((e: any) =>
+    e.campaign_id && telegramCampaigns.has(e.campaign_id) && e.occurred_at >= guestSince30
+  )
+  const telegramOpens30 = telegramEvents30.filter((e: any) => e.event_type === 'campaign_open').length
+  const telegramApplies30 = telegramEvents30.filter((e: any) => e.event_type === 'campaign_apply').length
+  const telegramFunnel = [
+    { name: 'Публикации', value: telegramPublished30.length, fill: PALETTE.blue },
+    { name: 'Открытия', value: telegramOpens30, fill: PALETTE.cyan },
+    { name: 'Намерения откликнуться', value: telegramApplies30, fill: PALETTE.orange },
+  ]
+
   const mainFunnel = [
     { name: 'Зарегистрировались', value: workers.length, fill: PALETTE.blue },
     { name: 'Лайкнули (уник.)', value: workersWhoLiked, fill: PALETTE.cyan },
@@ -1170,9 +1187,17 @@ export async function fetchFunnel() {
       guestRegistrations30: guestCompleted30,
       guestRegistrationRate30: guestStarted30 > 0
         ? ((guestCompleted30 / guestStarted30) * 100).toFixed(1) : '0',
+      telegramPublished30: telegramPublished30.length,
+      telegramOpens30,
+      telegramApplies30,
+      telegramOpenRate30: telegramPublished30.length > 0
+        ? ((telegramOpens30 / telegramPublished30.length) * 100).toFixed(1) : '0',
+      telegramApplyRate30: telegramOpens30 > 0
+        ? ((telegramApplies30 / telegramOpens30) * 100).toFixed(1) : '0',
     },
     guestFunnel,
     guestDaily30,
+    telegramFunnel,
     mainFunnel,
     eventFunnel,
     daily30,
