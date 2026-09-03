@@ -106,8 +106,8 @@ export default function FunnelPage() {
             sub={`${d.kpi.telegramOpenRate30}% на публикацию`} sparkColor={PALETTE.cyan} />
           <KpiCard label="Намерений откликнуться" value={d.kpi.telegramApplies30}
             sub={`${d.kpi.telegramApplyRate30}% от открытий`} sparkColor={PALETTE.orange} />
-          <KpiCard label="Атрибуция" value="Включена"
-            sub="campaign_id без персональных данных" sparkColor={PALETTE.green} />
+          <KpiCard label="Регистраций" value={d.kpi.telegramRegistrations30}
+            sub={`${d.kpi.telegramRegistrationRate30}% от открытий · анонимная атрибуция`} sparkColor={PALETTE.green} />
         </div>
         <ChartCard title="Telegram-воронка" sub="Публикация → открытие конкретной вакансии → намерение откликнуться">
           <FunnelBar items={d.telegramFunnel} />
@@ -124,8 +124,8 @@ export default function FunnelPage() {
             sub={`${d.kpi.referralOpenRate30}% на рекомендацию`} sparkColor={PALETTE.cyan} />
           <KpiCard label="Намерений откликнуться" value={d.kpi.referralApplies30}
             sub={`${d.kpi.referralApplyRate30}% от открытий`} sparkColor={PALETTE.orange} />
-          <KpiCard label="Стоимость канала" value="0 ₽"
-            sub="органические рекомендации работников" sparkColor={PALETTE.green} />
+          <KpiCard label="Регистраций" value={d.kpi.referralRegistrations30}
+            sub={`${d.kpi.referralRegistrationRate30}% от открытий · стоимость канала 0 ₽`} sparkColor={PALETTE.green} />
         </div>
         <ChartCard title="Реферальная воронка" sub="Поделились вакансией → получатель открыл → захотел откликнуться">
           <FunnelBar items={d.referralFunnel} />

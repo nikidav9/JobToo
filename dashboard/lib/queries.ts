@@ -1138,10 +1138,15 @@ export async function fetchFunnel() {
   )
   const telegramOpens30 = telegramEvents30.filter((e: any) => e.event_type === 'campaign_open').length
   const telegramApplies30 = telegramEvents30.filter((e: any) => e.event_type === 'campaign_apply').length
+  const telegramRegistrations30 = new Set(
+    telegramEvents30.filter((e: any) => e.event_type === 'registration_completed')
+      .map((e: any) => e.anon_id)
+  ).size
   const telegramFunnel = [
     { name: 'Публикации', value: telegramPublished30.length, fill: PALETTE.blue },
     { name: 'Открытия', value: telegramOpens30, fill: PALETTE.cyan },
     { name: 'Намерения откликнуться', value: telegramApplies30, fill: PALETTE.orange },
+    { name: 'Регистрации', value: telegramRegistrations30, fill: PALETTE.green },
   ]
 
   // Органические рекомендации пользователей считаем отдельно от наших
@@ -1157,10 +1162,15 @@ export async function fetchFunnel() {
   )
   const referralOpens30 = referralEvents30.filter((e: any) => e.event_type === 'campaign_open').length
   const referralApplies30 = referralEvents30.filter((e: any) => e.event_type === 'campaign_apply').length
+  const referralRegistrations30 = new Set(
+    referralEvents30.filter((e: any) => e.event_type === 'registration_completed')
+      .map((e: any) => e.anon_id)
+  ).size
   const referralFunnel = [
     { name: 'Поделились', value: referralShared30.length, fill: PALETTE.purple },
     { name: 'Открытия', value: referralOpens30, fill: PALETTE.cyan },
     { name: 'Намерения откликнуться', value: referralApplies30, fill: PALETTE.orange },
+    { name: 'Регистрации', value: referralRegistrations30, fill: PALETTE.green },
   ]
 
   const mainFunnel = [
@@ -1209,17 +1219,23 @@ export async function fetchFunnel() {
       telegramPublished30: telegramPublished30.length,
       telegramOpens30,
       telegramApplies30,
+      telegramRegistrations30,
       telegramOpenRate30: telegramPublished30.length > 0
         ? ((telegramOpens30 / telegramPublished30.length) * 100).toFixed(1) : '0',
       telegramApplyRate30: telegramOpens30 > 0
         ? ((telegramApplies30 / telegramOpens30) * 100).toFixed(1) : '0',
+      telegramRegistrationRate30: telegramOpens30 > 0
+        ? ((telegramRegistrations30 / telegramOpens30) * 100).toFixed(1) : '0',
       referralShared30: referralShared30.length,
       referralOpens30,
       referralApplies30,
+      referralRegistrations30,
       referralOpenRate30: referralShared30.length > 0
         ? ((referralOpens30 / referralShared30.length) * 100).toFixed(1) : '0',
       referralApplyRate30: referralOpens30 > 0
         ? ((referralApplies30 / referralOpens30) * 100).toFixed(1) : '0',
+      referralRegistrationRate30: referralOpens30 > 0
+        ? ((referralRegistrations30 / referralOpens30) * 100).toFixed(1) : '0',
     },
     guestFunnel,
     guestDaily30,

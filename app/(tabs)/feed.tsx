@@ -1002,6 +1002,7 @@ function WorkerFeed() {
     vacancyId?: string | null;
     vacancyKind?: 'shift' | 'permanent' | 'external' | null;
     sourceId?: string | null;
+    campaignId?: string | null;
   } = {}) => {
     void dbStartGuestRegistration(context);
     exitGuest();
@@ -1252,6 +1253,7 @@ function WorkerFeed() {
         vacancyId: ext?.id ?? currentCard.id,
         vacancyKind: isExternal ? 'external' : 'shift',
         sourceId: ext?.sourceId ?? null,
+        campaignId: currentCard.id === deepLinkVacancyId ? campaignId || null : null,
       });
       return;
     }
@@ -1321,6 +1323,7 @@ function WorkerFeed() {
         vacancyId: ext?.id ?? currentCard.id,
         vacancyKind: isExternal ? 'external' : 'shift',
         sourceId: ext?.sourceId ?? null,
+        campaignId: currentCard.id === deepLinkVacancyId ? campaignId || null : null,
       });
       return;
     }
@@ -1351,7 +1354,11 @@ function WorkerFeed() {
       });
     }
     if (currentUser.isGuest) {
-      promptRegister({ vacancyId: card.id, vacancyKind: 'shift' });
+      promptRegister({
+        vacancyId: card.id,
+        vacancyKind: 'shift',
+        campaignId: card.id === deepLinkVacancyId ? campaignId || null : null,
+      });
       return;
     }
     messagingRef.current = true;
