@@ -95,6 +95,24 @@ export default function FunnelPage() {
           </ChartCard>
         </div>
 
+        {/* Telegram-привлечение */}
+        <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', fontWeight: 500, fontFamily: 'Geist Mono, monospace', paddingBottom: 2 }}>
+          Telegram · 30 дней
+        </div>
+        <div className="g-4">
+          <KpiCard label="Публикаций" value={d.kpi.telegramPublished30}
+            sub="группа и личные уведомления" sparkColor={PALETTE.blue} />
+          <KpiCard label="Открытий" value={d.kpi.telegramOpens30}
+            sub={`${d.kpi.telegramOpenRate30}% на публикацию`} sparkColor={PALETTE.cyan} />
+          <KpiCard label="Намерений откликнуться" value={d.kpi.telegramApplies30}
+            sub={`${d.kpi.telegramApplyRate30}% от открытий`} sparkColor={PALETTE.orange} />
+          <KpiCard label="Атрибуция" value="Включена"
+            sub="campaign_id без персональных данных" sparkColor={PALETTE.green} />
+        </div>
+        <ChartCard title="Telegram-воронка" sub="Публикация → открытие конкретной вакансии → намерение откликнуться">
+          <FunnelBar items={d.telegramFunnel} />
+        </ChartCard>
+
         {/* Активация */}
         <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', fontWeight: 500, fontFamily: 'Geist Mono, monospace', paddingBottom: 2 }}>
           Активация
