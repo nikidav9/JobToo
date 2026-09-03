@@ -1125,6 +1125,34 @@ function WorkerFeed() {
   const currentCard = cards[0];
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;
 
+  const shareShiftVacancy = useCallback(async (v: Vacancy) => {
+    // В идентификаторе нет user_id: ссылка измеряет эффективность самой
+    // рекомендации, но не раскрывает, кто и кому её переслал.
+    const shareCampaignId = Crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+    const url = `https://t.me/JobToo_bot/app?startapp=share_shift_${v.id}_${shareCampaignId}`;
+    const message = [
+      `${v.title} — ${v.company}`,
+      v.metroStation ? `м. ${v.metroStation}` : '',
+      v.salary ? `${v.salary.toLocaleString('ru-RU')} ₽ за смену` : '',
+      url,
+    ].filter(Boolean).join('\n');
+    try {
+      const result = await Share.share(
+        Platform.OS === 'ios' ? { message: message.replace(`\n${url}`, ''), url } : { message },
+      );
+      if (result.action !== Share.dismissedAction) {
+        void dbRecordGuestEvent('campaign_shared', {
+          vacancyId: v.id,
+          vacancyKind: 'shift',
+          campaignId: shareCampaignId,
+          channel: 'user_share',
+        });
+      }
+    } catch {
+      // Отмена системного окна «Поделиться» не должна показывать ошибку.
+    }
+  }, []);
+
   // После загрузки ленты сразу показываем карточку из Telegram-публикации.
   // Флаг защищает от повторного открытия при каждом realtime-обновлении.
   useEffect(() => {
@@ -1701,6 +1729,16 @@ function WorkerFeed() {
         onClose={() => { setDetailVacancy(null); setDetailEmployer(null); }}
         actions={
           <View style={{ flexDirection: 'row', gap: 10 }}>
+            {detailVacancy && !('external' in detailVacancy) ? (
+              <TouchableOpacity
+                accessibilityLabel="Поделиться вакансией"
+                style={{ width: 46, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.divider, alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => { void shareShiftVacancy(detailVacancy); }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="share-outline" size={19} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            ) : null}
             <TouchableOpacity
               style={styles.detailSkipBtn}
               onPress={() => { setDetailVacancy(null); doSkip(0.5); }}
@@ -2006,21 +2044,29 @@ function WorkerPermMode() {
   };
 
   const shareVacancy = async (v: PermVacancy) => {
-    // Ссылку строим от того адреса, с которого открыто приложение (в вебе):
-    // если раздаём с «чистого» имени, то и ссылка «поделиться» должна вести на
-    // него, а не на зашитый jobtoo.ru, который у получателя в РФ режет фильтр.
-    const base =
-      Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin
-        ? window.location.origin
-        : (process.env.EXPO_PUBLIC_API_URL || 'https://jobtoo.ru').trim().replace(/\/+$/, '');
-    const url = `${base}/perm-vacancy-detail?vacancyId=${v.id}`;
+    const shareCampaignId = Crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+    const url = `https://t.me/JobToo_bot/app?startapp=share_perm_${v.id}_${shareCampaignId}`;
+    const message = [
+      `${v.title} — ${v.company}`,
+      v.metroStation ? `м. ${v.metroStation}` : '',
+      `${v.salary.toLocaleString('ru-RU')} ₽/мес`,
+      url,
+    ].filter(Boolean).join('\n');
     try {
-      // iOS: pass url only — system appends it cleanly, no duplicate text
-      // Android: url param is ignored, pass as message
-      await Share.share(
-        Platform.OS === 'ios' ? { url } : { message: url }
+      const result = await Share.share(
+        Platform.OS === 'ios' ? { message: message.replace(`\n${url}`, ''), url } : { message },
       );
-    } catch {}
+      if (result.action !== Share.dismissedAction) {
+        void dbRecordGuestEvent('campaign_shared', {
+          vacancyId: v.id,
+          vacancyKind: 'permanent',
+          campaignId: shareCampaignId,
+          channel: 'user_share',
+        });
+      }
+    } catch {
+      // Отмена системного окна «Поделиться» не должна показывать ошибку.
+    }
   };
 
   const renderPerm = ({ item: v }: { item: PermVacancy | ExternalVacancy }) => {
