@@ -728,7 +728,18 @@ export async function dbRecordGuestEvent(
 
 export async function dbStartGuestRegistration(context: GuestEventContext = {}): Promise<void> {
   try {
-    await AsyncStorage.setItem(GUEST_REGISTRATION_PENDING_KEY, '1');
+    // Храним только технический контекст источника. Имя, телефон и будущий
+    // user_id сюда не попадают, поэтому атрибуция остаётся анонимной.
+    await AsyncStorage.setItem(
+      GUEST_REGISTRATION_PENDING_KEY,
+      JSON.stringify({
+        vacancyId: context.vacancyId ?? null,
+        vacancyKind: context.vacancyKind ?? null,
+        sourceId: context.sourceId ?? null,
+        campaignId: context.campaignId ?? null,
+        channel: context.channel ?? null,
+      }),
+    );
   } catch {}
   await Promise.all([
     dbRecordGuestEvent('apply_intent', context),
@@ -739,8 +750,20 @@ export async function dbStartGuestRegistration(context: GuestEventContext = {}):
 export async function dbCompleteGuestRegistration(): Promise<void> {
   try {
     const pending = await AsyncStorage.getItem(GUEST_REGISTRATION_PENDING_KEY);
-    if (pending !== '1') return;
-    await dbRecordGuestEvent('registration_completed');
+    if (!pending) return;
+
+    // Значение '1' оставалось у пользователей старой версии. Принимаем его
+    // как пустой контекст, чтобы их завершённая регистрация не потерялась.
+    let context: GuestEventContext = {};
+    if (pending !== '1') {
+      try {
+        const parsed = JSON.parse(pending);
+        if (parsed && typeof parsed === 'object') context = parsed as GuestEventContext;
+      } catch {
+        context = {};
+      }
+    }
+    await dbRecordGuestEvent('registration_completed', context);
     await AsyncStorage.removeItem(GUEST_REGISTRATION_PENDING_KEY);
   } catch {
     /* повторим при следующей успешной регистрации, если хранилище доступно */
