@@ -690,14 +690,15 @@ export type GuestEventType =
   | 'external_click'
   | 'campaign_published'
   | 'campaign_open'
-  | 'campaign_apply';
+  | 'campaign_apply'
+  | 'campaign_shared';
 
 export interface GuestEventContext {
   vacancyId?: string | null;
   vacancyKind?: 'shift' | 'permanent' | 'external' | null;
   sourceId?: string | null;
   campaignId?: string | null;
-  channel?: 'telegram_group' | 'telegram_dm' | null;
+  channel?: 'telegram_group' | 'telegram_dm' | 'user_share' | null;
 }
 
 const GUEST_REGISTRATION_PENDING_KEY = 'jt-guest-registration-pending';
