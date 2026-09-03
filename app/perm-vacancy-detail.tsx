@@ -5,13 +5,14 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Modal, Platform, Linking, Animated,
+  TouchableOpacity, ActivityIndicator, Modal, Platform, Linking, Animated, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { ReplyBadge } from '@/components/feature/ReplyBadge';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Crypto from 'expo-crypto';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
@@ -175,6 +176,33 @@ export default function PermVacancyDetailScreen() {
     );
   }
 
+  const shareVacancy = async () => {
+    if (!vacancy) return;
+    const shareCampaignId = Crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+    const url = `https://t.me/JobToo_bot/app?startapp=share_perm_${vacancy.id}_${shareCampaignId}`;
+    const message = [
+      `${vacancy.title} — ${vacancy.company}`,
+      vacancy.metroStation ? `м. ${vacancy.metroStation}` : '',
+      `${vacancy.salary.toLocaleString('ru-RU')} ₽/мес`,
+      url,
+    ].filter(Boolean).join('\n');
+    try {
+      const result = await Share.share(
+        Platform.OS === 'ios' ? { message: message.replace(`\n${url}`, ''), url } : { message },
+      );
+      if (result.action !== Share.dismissedAction) {
+        void dbRecordGuestEvent('campaign_shared', {
+          vacancyId: vacancy.id,
+          vacancyKind: 'permanent',
+          campaignId: shareCampaignId,
+          channel: 'user_share',
+        });
+      }
+    } catch {
+      // Отмена системного окна «Поделиться» не должна мешать просмотру.
+    }
+  };
+
   // Сначала спрашиваем пару слов о себе — отклик уходит первым сообщением от
   // имени человека и открывает переписку. Молчаливый отклик работодатель
   // видел строкой в списке и решал вслепую.
@@ -238,6 +266,14 @@ export default function PermVacancyDetailScreen() {
           <Text style={styles.backTxt}>← Назад</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }} />
+        <TouchableOpacity
+          accessibilityLabel="Поделиться вакансией"
+          onPress={() => { void shareVacancy(); }}
+          style={styles.saveHeaderBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="share-outline" size={23} color={Colors.textMuted} />
+        </TouchableOpacity>
         {currentUser?.role === 'worker' ? (
           <TouchableOpacity
             onPress={toggleSave}
