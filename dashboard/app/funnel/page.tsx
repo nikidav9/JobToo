@@ -136,13 +136,14 @@ export default function FunnelPage() {
           Активация
         </div>
         <div className="g-4">
-          <KpiCard label="Работников всего" value={d.kpi.workers} sub="в базе" sparkColor={PALETTE.blue} />
-          <KpiCard label="Лайкнули хоть раз" value={d.kpi.activatedWorkers}
-            sub={`из ${d.kpi.workers} работников`} sparkColor={PALETTE.cyan} />
-          <KpiCard label="Активация" value={`${d.kpi.activationRate}%`}
-            sub="дошли до первого лайка" sparkColor={PALETTE.cyan} />
-          <KpiCard label="Активация за 7 дней" value={`${d.kpi.activation7d}%`}
-            sub="успели лайкнуть в первую неделю" sparkColor={PALETTE.purple} />
+          <KpiCard label="Заполнили профиль" value={d.kpi.profileCompleteWorkers}
+            sub={`${d.kpi.profileCompleteRate}% от работников`} sparkColor={PALETTE.cyan} />
+          <KpiCard label="Посмотрели вакансии" value={d.kpi.viewedWorkers}
+            sub={`${d.kpi.viewedRate}% от работников`} sparkColor={PALETTE.purple} />
+          <KpiCard label="Откликнулись" value={d.kpi.activatedWorkers}
+            sub={`${d.kpi.activationRate}% от работников · смены и работа`} sparkColor={PALETTE.orange} />
+          <KpiCard label="Первый отклик ≤ 7 дней" value={`${d.kpi.activation7d}%`}
+            sub="скорость активации после регистрации" sparkColor={PALETTE.green} />
         </div>
 
         {/* Конверсия */}
@@ -175,7 +176,7 @@ export default function FunnelPage() {
 
         {/* Воронки */}
         <div className="g-2">
-          <ChartCard title="Воронка по людям" sub="Уникальные работники на каждом шаге · справа доля от предыдущего">
+          <ChartCard title="Полная активационная воронка" sub="Регистрация → профиль → просмотр → отклик → одобрение → завершённая смена">
             <FunnelBar items={d.mainFunnel} />
           </ChartCard>
 

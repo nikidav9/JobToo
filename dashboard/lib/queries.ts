@@ -1017,17 +1017,23 @@ export async function fetchFunnel() {
     { data: likes },
     { data: permApps },
     { data: guestEvents },
+    { data: shiftViews },
+    { data: permViews },
   ] = await Promise.all([
-    supabase.from('jm_users').select('id,role,created_at'),
+    supabase.from('jm_users').select('id,role,created_at,first_name,last_name,metro_station,work_types'),
     supabase.from('jm_likes').select('id,worker_id,is_match,worker_liked,worker_confirmed,employer_confirmed,shift_completed,created_at'),
     supabase.from('jm_perm_applications').select('id,worker_id,status,created_at'),
     supabase.from('jm_guest_events').select('anon_id,event_type,vacancy_kind,campaign_id,channel,occurred_at'),
+    supabase.from('jm_vacancy_views').select('worker_id'),
+    supabase.from('jm_perm_vacancy_views').select('worker_id'),
   ])
 
   const u = users ?? []
   const lk = likes ?? []
   const ap = permApps ?? []
   const ge = guestEvents ?? []
+  const sv = shiftViews ?? []
+  const pv = permViews ?? []
 
   const workers = u.filter((x: any) => x.role === 'worker')
 
@@ -1040,18 +1046,45 @@ export async function fetchFunnel() {
   const workersWithMatch = new Set(matchedLk.map((l: any) => l.worker_id)).size
   const workersWithShiftSet = new Set(completedLk.map((l: any) => l.worker_id))
 
+  const profileCompleteWorkers = workers.filter((w: any) => {
+    const types = Array.isArray(w.work_types) ? w.work_types : []
+    return Boolean(
+      String(w.first_name ?? '').trim()
+      && String(w.last_name ?? '').trim()
+      && String(w.metro_station ?? '').trim()
+      && types.length > 0
+    )
+  })
+  const viewedWorkerIds = new Set([
+    ...sv.map((v: any) => v.worker_id),
+    ...pv.map((v: any) => v.worker_id),
+  ].filter(Boolean))
+  const applicantWorkerIds = new Set([
+    ...likedLk.map((l: any) => l.worker_id),
+    ...ap.map((a: any) => a.worker_id),
+  ].filter(Boolean))
+  const acceptedWorkerIds = new Set([
+    ...matchedLk.map((l: any) => l.worker_id),
+    ...ap.filter((a: any) => ['approved', 'hired'].includes(a.status))
+      .map((a: any) => a.worker_id),
+  ].filter(Boolean))
+
   const workerRegMap: Record<string, string> = {}
   for (const usr of workers) workerRegMap[(usr as any).id] = (usr as any).created_at
-  const firstLike: Record<string, string> = {}
-  for (const l of likedLk) {
-    const wid = (l as any).worker_id
-    if (!firstLike[wid] || (l as any).created_at < firstLike[wid]) firstLike[wid] = (l as any).created_at
+  const firstApplication: Record<string, string> = {}
+  for (const event of [...likedLk, ...ap]) {
+    const wid = (event as any).worker_id
+    const at = (event as any).created_at
+    if (wid && at && (!firstApplication[wid] || at < firstApplication[wid])) {
+      firstApplication[wid] = at
+    }
   }
   let activated7d = 0
-  for (const wid of Object.keys(firstLike)) {
+  for (const wid of Object.keys(firstApplication)) {
     const reg = workerRegMap[wid]
     if (!reg) continue
-    if (new Date(firstLike[wid]).getTime() - new Date(reg).getTime() <= 7 * 86400_000) activated7d++
+    const elapsed = new Date(firstApplication[wid]).getTime() - new Date(reg).getTime()
+    if (elapsed >= 0 && elapsed <= 7 * 86400_000) activated7d++
   }
 
   const shiftsByWorker: Record<string, number> = {}
@@ -1175,8 +1208,10 @@ export async function fetchFunnel() {
 
   const mainFunnel = [
     { name: 'Зарегистрировались', value: workers.length, fill: PALETTE.blue },
-    { name: 'Лайкнули (уник.)', value: workersWhoLiked, fill: PALETTE.cyan },
-    { name: 'Получили матч', value: workersWithMatch, fill: PALETTE.purple },
+    { name: 'Заполнили профиль', value: profileCompleteWorkers.length, fill: PALETTE.cyan },
+    { name: 'Посмотрели вакансию', value: viewedWorkerIds.size, fill: PALETTE.purple },
+    { name: 'Откликнулись', value: applicantWorkerIds.size, fill: PALETTE.orange },
+    { name: 'Получили одобрение', value: acceptedWorkerIds.size, fill: PALETTE.amber },
     { name: 'Завершили смену', value: workersWithShiftSet.size, fill: PALETTE.green },
   ]
 
@@ -1196,8 +1231,15 @@ export async function fetchFunnel() {
   return {
     kpi: {
       workers: workers.length,
-      activatedWorkers: workersWhoLiked,
-      activationRate: workers.length > 0 ? ((workersWhoLiked / workers.length) * 100).toFixed(1) : '0',
+      profileCompleteWorkers: profileCompleteWorkers.length,
+      profileCompleteRate: workers.length > 0
+        ? ((profileCompleteWorkers.length / workers.length) * 100).toFixed(1) : '0',
+      viewedWorkers: viewedWorkerIds.size,
+      viewedRate: workers.length > 0
+        ? ((viewedWorkerIds.size / workers.length) * 100).toFixed(1) : '0',
+      activatedWorkers: applicantWorkerIds.size,
+      activationRate: workers.length > 0
+        ? ((applicantWorkerIds.size / workers.length) * 100).toFixed(1) : '0',
       activation7d: workers.length > 0 ? ((activated7d / workers.length) * 100).toFixed(1) : '0',
       totalLikes: likedLk.length,
       totalMatches: matchedLk.length,
