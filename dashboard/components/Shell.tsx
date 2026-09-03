@@ -47,7 +47,7 @@ const ICONS: Record<string, any> = {
   geo: IconGeo,
 }
 
-const NAV = NAV_ITEMS.map(n => ({ href: n.href, label: n.short ?? n.label, icon: ICONS[n.icon] }))
+const NAV = NAV_ITEMS.map(n => ({ href: n.href, label: n.short ?? n.label, icon: ICONS[n.icon], locked: n.locked }))
 export default function Shell({ children }: { children: React.ReactNode }) {
   const rawPath = usePathname()
   const path = rawPath.replace(/\/$/, '') || '/'
@@ -88,8 +88,28 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="mobile-nav" style={{ overflowX: 'auto', justifyContent: 'flex-start' }}>
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.map(({ href, label, icon: Icon, locked }) => {
           const active = path === href
+          if (locked) {
+            return (
+              <div
+                key={href}
+                className="mobile-nav-item is-locked"
+                aria-disabled="true"
+                title="Раздел станет доступен после запуска оплаты"
+                style={{ flexShrink: 0 }}
+              >
+                <span style={{
+                  position: 'relative', display: 'grid', placeItems: 'center',
+                  width: 36, height: 26, borderRadius: 8,
+                }}>
+                  <Icon style={{ width: 18, height: 18, color: 'var(--ink-4)' }} />
+                  <IconLock style={{ position: 'absolute', right: 1, top: 0, width: 11, height: 11, color: 'var(--ink-2)', background: 'var(--bg-elev)', borderRadius: 3 }} />
+                </span>
+                {label}
+              </div>
+            )
+          }
           return (
             <Link
               key={href}
@@ -114,6 +134,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   )
 }
 
+function IconLock({ style }: { style?: React.CSSProperties }) {
+  return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>
+}
 function IconSummary({ style }: { style?: React.CSSProperties }) {
   return <svg viewBox="0 0 16 16" style={style} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M2.5 13.5v-4M6.2 13.5V6.5M9.8 13.5V9M13.5 13.5v-9"/></svg>
 }
