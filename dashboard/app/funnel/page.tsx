@@ -113,6 +113,24 @@ export default function FunnelPage() {
           <FunnelBar items={d.telegramFunnel} />
         </ChartCard>
 
+        {/* Органические рекомендации */}
+        <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', fontWeight: 500, fontFamily: 'Geist Mono, monospace', paddingBottom: 2 }}>
+          Рекомендации пользователей · 30 дней
+        </div>
+        <div className="g-4">
+          <KpiCard label="Поделились" value={d.kpi.referralShared30}
+            sub="открыли системное меню и отправили ссылку" sparkColor={PALETTE.purple} />
+          <KpiCard label="Открытий" value={d.kpi.referralOpens30}
+            sub={`${d.kpi.referralOpenRate30}% на рекомендацию`} sparkColor={PALETTE.cyan} />
+          <KpiCard label="Намерений откликнуться" value={d.kpi.referralApplies30}
+            sub={`${d.kpi.referralApplyRate30}% от открытий`} sparkColor={PALETTE.orange} />
+          <KpiCard label="Стоимость канала" value="0 ₽"
+            sub="органические рекомендации работников" sparkColor={PALETTE.green} />
+        </div>
+        <ChartCard title="Реферальная воронка" sub="Поделились вакансией → получатель открыл → захотел откликнуться">
+          <FunnelBar items={d.referralFunnel} />
+        </ChartCard>
+
         {/* Активация */}
         <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--ink-3)', fontWeight: 500, fontFamily: 'Geist Mono, monospace', paddingBottom: 2 }}>
           Активация
