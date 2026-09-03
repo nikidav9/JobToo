@@ -56,13 +56,14 @@ function TelegramMiniAppController() {
       initTelegramMiniApp();
 
       const startParam = getTelegramStartParam();
-      const campaignLink = startParam?.match(/^(shift|perm)_(.+)_([a-f0-9]{16})$/);
+      const campaignLink = startParam?.match(/^(?:(share)_)?(shift|perm)_(.+)_([a-f0-9]{16})$/);
       if (campaignLink) {
-        const [, kind, vacancyId, campaignId] = campaignLink;
+        const [, shareMarker, kind, vacancyId, campaignId] = campaignLink;
         void dbRecordGuestEvent('campaign_open', {
           vacancyId,
           vacancyKind: kind === 'perm' ? 'permanent' : 'shift',
           campaignId,
+          channel: shareMarker ? 'user_share' : null,
         });
         setTimeout(() => {
           if (cancelled) return;

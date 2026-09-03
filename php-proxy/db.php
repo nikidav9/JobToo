@@ -3545,10 +3545,10 @@ try {
 
             $events = ['guest_started', 'vacancy_impression', 'apply_intent',
                 'registration_started', 'registration_completed', 'external_click',
-                'campaign_published', 'campaign_open', 'campaign_apply'];
+                'campaign_published', 'campaign_open', 'campaign_apply', 'campaign_shared'];
             $kinds = ['', 'shift', 'permanent', 'external'];
             $platforms = ['', 'web', 'ios', 'android', 'windows', 'macos'];
-            $channels = ['', 'telegram_group', 'telegram_dm'];
+            $channels = ['', 'telegram_group', 'telegram_dm', 'user_share'];
             if ($anon === '' || strlen($anon) > 128 || !preg_match('/^[A-Za-z0-9._:-]+$/', $anon)
                 || !in_array($event, $events, true)
                 || !in_array($kind, $kinds, true)
