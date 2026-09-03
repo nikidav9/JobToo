@@ -18,6 +18,8 @@ export type NavItem = {
   icon: string
   /** Группа в боковом меню. Двадцать два пункта подряд не читаются. */
   group: Group
+  /** Раздел виден в меню, но недоступен до запуска монетизации. */
+  locked?: boolean
 }
 
 export type Group = 'Обзор' | 'Люди' | 'Работа' | 'Общение' | 'Аналитика' | 'Система'
@@ -44,7 +46,7 @@ export const NAV: NavItem[] = [
   { href: '/broadcast',   label: 'Рассылка',                                icon: 'bell',    group: 'Общение' },
   { href: '/sources',     label: 'Источники вакансий',   short: 'Фиды',     icon: 'jobs',    group: 'Система' },
   { href: '/api-keys',    label: 'Ключи API',            short: 'API',      icon: 'shield',  group: 'Система' },
-  { href: '/billing',     label: 'К счёту',              short: 'Счёт',     icon: 'summary', group: 'Аналитика' },
+  { href: '/billing',     label: 'К счёту',              short: 'Счёт',     icon: 'summary', group: 'Аналитика', locked: true },
   { href: '/partner-billing', label: 'Биллинг партнёров',  short: 'Партнёры', icon: 'summary', group: 'Аналитика' },
   { href: '/funnel',      label: 'Воронка',                                 icon: 'funnel',  group: 'Аналитика' },
   { href: '/cohorts',     label: 'Когорты',                                 icon: 'cohort',  group: 'Аналитика' },
