@@ -1445,9 +1445,10 @@ function plural_vac(int $n): string {
 const NEARBY_MAX_PER_DAY = 4;
 
 function notify_workers(string $title, string $body,
-                        string $tgHtml, string $dataType, bool|string $btnUrl = true): array {
+                        string $tgHtml, string $dataType, bool|string $btnUrl = true,
+                        string $vacancyMetro = '', string $vacancyWorkType = ''): array {
     $all = sb_select('jm_users', ['role' => 'eq.worker'],
-        'id,metro_station,telegram_id,push_token,is_blocked,nudge_off');
+        'id,metro_station,work_types,telegram_id,push_token,is_blocked,nudge_off,vacancy_delivery_mode');
 
     // Колокольчик — всем.
     $bell = array_map(fn($w) => ['user_id' => $w['id'], 'title' => $title,
@@ -1470,9 +1471,36 @@ function notify_workers(string $title, string $body,
         $seen[$r['user_id']] = ($seen[$r['user_id']] ?? 0) + 1;
     }
 
-    $pushMsgs = []; $tgOk = 0; $mute = 0; $capped = 0; $webIds = [];
+    $pushMsgs = []; $tgOk = 0; $mute = 0; $capped = 0; $filtered = 0; $webIds = [];
     foreach ($all as $w) {
-        if (!empty($w['is_blocked']) || !empty($w['nudge_off'])) { $mute++; continue; }
+        $mode = (string)($w['vacancy_delivery_mode'] ?? 'all');
+        if ($mode === '') $mode = 'all';
+        if (!empty($w['is_blocked']) || !empty($w['nudge_off']) || $mode === 'off') {
+            $mute++; continue;
+        }
+
+        // Персонализация добровольная: пока человек ничего не выбрал, он
+        // получает всё как раньше. Фильтры относятся только к внешним
+        // Telegram/push сообщениям; колокольчик и общий канал сохраняют
+        // полную ленту, поэтому пользователь ничего не теряет.
+        $needsMetro = in_array($mode, ['metro', 'work_types_metro'], true);
+        $needsWork = in_array($mode, ['work_types', 'work_types_metro'], true);
+        $profileMetro = mb_strtolower(trim((string)($w['metro_station'] ?? '')));
+        $targetMetro = mb_strtolower(trim($vacancyMetro));
+        if ($needsMetro && ($profileMetro === '' || $targetMetro === '' || $profileMetro !== $targetMetro)) {
+            $filtered++; continue;
+        }
+        if ($needsWork) {
+            $types = $w['work_types'] ?? [];
+            if (is_string($types)) {
+                $decoded = json_decode($types, true);
+                $types = is_array($decoded) ? $decoded : [];
+            }
+            $types = array_map(fn($v) => mb_strtolower(trim((string)$v)), is_array($types) ? $types : []);
+            if ($vacancyWorkType === '' || !in_array(mb_strtolower(trim($vacancyWorkType)), $types, true)) {
+                $filtered++; continue;
+            }
+        }
         // Запись про эту самую смену уже лежит в колокольчике, поэтому
         // сравниваем со строгим «больше», а не «больше или равно».
         if (($seen[$w['id']] ?? 0) > NEARBY_MAX_PER_DAY) { $capped++; continue; }
@@ -1493,7 +1521,7 @@ function notify_workers(string $title, string $body,
     $webOk = web_push_to($webIds, $title, $body, $dataType);
 
     return ['telegram' => $tgOk, 'push' => count($pushMsgs), 'webpush' => $webOk,
-            'muted' => $mute, 'capped' => $capped, 'bell' => count($bell)];
+            'muted' => $mute, 'filtered' => $filtered, 'capped' => $capped, 'bell' => count($bell)];
 }
 
 /**
@@ -4311,34 +4339,49 @@ try {
             // Фиксируем факт публикации отдельно от открытий. Никаких данных
             // Telegram-пользователя в этой строке нет.
             if ($vacancyId !== '') {
-                foreach ([
-                    [$groupCampaign, 'telegram_group', $groupOk],
-                    [$dmCampaign, 'telegram_dm', true],
-                ] as [$campaignId, $channel, $published]) {
-                    if (!$published) continue;
+                if ($groupOk) {
                     try {
                         sb('POST', 'jm_guest_events', [], [
                             'id' => uid(),
-                            'anon_id' => 'campaign:' . $campaignId,
+                            'anon_id' => 'campaign:' . $groupCampaign,
                             'event_type' => 'campaign_published',
                             'vacancy_id' => $vacancyId,
                             'vacancy_kind' => $deepKind === 'perm' ? 'permanent' : 'shift',
                             'platform' => 'web',
-                            'campaign_id' => $campaignId,
-                            'channel' => $channel,
+                            'campaign_id' => $groupCampaign,
+                            'channel' => 'telegram_group',
                             'occurred_at' => now_iso(),
                         ], ['Prefer: return=minimal']);
                     } catch (Throwable $e) { /* аналитика не блокирует рассылку */ }
                 }
             }
 
-            // Станция приходит в $args[6] и больше ни на что не влияет: делить
-            // рассылку по географии мы перестали, и от старых версий
-            // приложения, которые станцию не присылают, теперь ничего не
-            // отличается. Название станции и так стоит в тексте сообщения.
+            // Старые клиенты не передают тип работы: для пользователей без
+            // выбранного фильтра поведение всё равно остаётся прежним.
+            $vacancyMetro = (string)($args[6] ?? '');
+            $vacancyWorkType = (string)($args[7] ?? '');
             $data = notify_workers((string)$args[0], (string)$args[1], (string)$args[2],
-                                   (string)($args[3] ?? 'nearby_shift'), $btnUrl);
+                                   (string)($args[3] ?? 'nearby_shift'), $btnUrl,
+                                   $vacancyMetro, $vacancyWorkType);
             $data['group'] = $groupOk;
+
+            // DM-публикация существует только если Telegram действительно
+            // доставил хотя бы одно сообщение. Так отчёт не завышает охват.
+            if ($vacancyId !== '' && ($data['telegram'] ?? 0) > 0) {
+                try {
+                    sb('POST', 'jm_guest_events', [], [
+                        'id' => uid(),
+                        'anon_id' => 'campaign:' . $dmCampaign,
+                        'event_type' => 'campaign_published',
+                        'vacancy_id' => $vacancyId,
+                        'vacancy_kind' => $deepKind === 'perm' ? 'permanent' : 'shift',
+                        'platform' => 'web',
+                        'campaign_id' => $dmCampaign,
+                        'channel' => 'telegram_dm',
+                        'occurred_at' => now_iso(),
+                    ], ['Prefer: return=minimal']);
+                } catch (Throwable $e) { /* аналитика не блокирует рассылку */ }
+            }
             break;
         }
 

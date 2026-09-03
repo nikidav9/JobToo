@@ -90,6 +90,7 @@ export default function CreatePermVacancy() {
       if (!isEdit && metroStation) {
         notifyWorkersNewVacancy({
           metroStation, title: title.trim(), company: vac.company, type: 'permanent',
+          workType: vac.workType,
           salary: vac.salary, schedule: vac.schedule, vacancyId: vac.id,
         }).catch(() => {});
       }
