@@ -17,6 +17,7 @@ import { setupAndroidChannels } from '@/services/notifications';
 import { routeForNotification } from '@/services/notificationRoute';
 import { hideWebSplash, markWebBundleMounted } from '@/lib/webSplash';
 import { getSessionUser } from '@/services/storage';
+import { dbRecordGuestEvent } from '@/services/db';
 import { initTelegramMiniApp, isTelegramMiniApp, getTelegramStartParam, waitForTelegramMiniApp } from '@/lib/telegram';
 
 // Keep the web/native splash visible until hideAsync() is called from the tabs layout or index screen.
@@ -55,7 +56,24 @@ function TelegramMiniAppController() {
       initTelegramMiniApp();
 
       const startParam = getTelegramStartParam();
-      if (startParam?.startsWith('vacancy_')) {
+      const campaignLink = startParam?.match(/^(shift|perm)_(.+)_([a-f0-9]{16})$/);
+      if (campaignLink) {
+        const [, kind, vacancyId, campaignId] = campaignLink;
+        void dbRecordGuestEvent('campaign_open', {
+          vacancyId,
+          vacancyKind: kind === 'perm' ? 'permanent' : 'shift',
+          campaignId,
+        });
+        setTimeout(() => {
+          if (cancelled) return;
+          if (kind === 'perm') {
+            router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId, campaignId } });
+          } else {
+            router.push({ pathname: '/feed', params: { vacancyId, campaignId } });
+          }
+        }, 300);
+      } else if (startParam?.startsWith('vacancy_')) {
+        // Старые опубликованные ссылки продолжают работать.
         const vacancyId = startParam.slice('vacancy_'.length);
         if (vacancyId) {
           setTimeout(() => {
