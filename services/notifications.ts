@@ -486,11 +486,12 @@ export async function notifyWorkersNewVacancy(params: {
   timeEnd?: string;
   salary?: number;
   schedule?: string;   // для постоянных
-  vacancyId?: string;  // перм. вакансии: кнопка ведёт прямо на неё
+  vacancyId?: string;  // кнопка ведёт прямо на вакансию
+  workType?: string;   // для добровольного фильтра по профессиям
   estimated?: boolean; // сдельная оплата: сумма — ориентир, а не обещание
 }): Promise<void> {
   try {
-    const { metroStation, title, company, type, date, daysCount, timeStart, timeEnd, salary, schedule, vacancyId, estimated } = params;
+    const { metroStation, title, company, type, date, daysCount, timeStart, timeEnd, salary, schedule, vacancyId, workType, estimated } = params;
 
     const dateLabel = formatDateRu(date) + (daysCount && daysCount > 1 ? ` (+${daysCount - 1} дн.)` : '');
     const timeLabel = timeStart ? `${timeStart}${timeEnd ? `–${timeEnd}` : ''}` : '';
@@ -533,11 +534,9 @@ export async function notifyWorkersNewVacancy(params: {
       headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
       body: JSON.stringify({
         fn: 'dbNotifyAllWorkersNewVacancy',
-        // Станция всё ещё уходит седьмым аргументом, но сервер её больше не
-        // использует для отбора получателей. Оставлена, чтобы не ломать
-        // старые версии приложения, которые её присылают.
+        // Новые поля добавлены в конец: старые клиенты остаются совместимыми.
         args: [notifTitle, body, tgHtml, type === 'permanent' ? 'nearby_perm' : 'nearby_shift',
-               groupHtml, vacancyId ?? '', metroStation ?? ''],
+               groupHtml, vacancyId ?? '', metroStation ?? '', workType ?? ''],
       }),
     });
   } catch {
