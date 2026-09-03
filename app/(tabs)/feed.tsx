@@ -54,6 +54,7 @@ import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
 import { TabHeader } from '@/components/ui/TabHeader';
+import { DataStatusBanner } from '@/components/ui/DataStatusBanner';
 import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import { MetroMap, MapListItem } from '@/components/feature/MetroMap';
 import { PermApplicationsSheet } from '@/components/feature/PermApplicationsSheet';
@@ -980,16 +981,20 @@ function WorkerFeed() {
     currentUser, users, vacancies, likes, chats,
     refreshAll, refreshLikes, refreshChats,
     showToast, vacanciesLoading, vacancyStatsMap, exitGuest,
+    networkOnline, vacanciesError,
   } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const [partnerShifts, setPartnerShifts] = useState<PartnerShiftCard[]>([]);
+  const [partnerLoadFailed, setPartnerLoadFailed] = useState(false);
 
   const loadPartnerShifts = useCallback(async () => {
     try {
       const rows = await dbGetExternalVacancies();
       setPartnerShifts(rows.map(partnerShiftToCard).filter((v): v is PartnerShiftCard => !!v));
+      setPartnerLoadFailed(false);
     } catch {
       // Свои смены остаются доступны при временной ошибке партнёрского фида.
+      setPartnerLoadFailed(true);
     }
   }, []);
 
@@ -1012,8 +1017,11 @@ function WorkerFeed() {
   const onRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
-    await Promise.all([refreshAll(), loadPartnerShifts()]);
-    setRefreshing(false);
+    try {
+      await Promise.allSettled([refreshAll(), loadPartnerShifts()]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const [dates, setDates] = useState(() => getTodayDates());
@@ -1463,6 +1471,13 @@ function WorkerFeed() {
           <Text style={gB.bannerCta}>Войти</Text>
         </TouchableOpacity>
       )}
+      <DataStatusBanner
+        offline={networkOnline === false}
+        failed={vacanciesError || partnerLoadFailed}
+        hasCachedData={vacancies.length > 0 || partnerShifts.length > 0}
+        retrying={refreshing || vacanciesLoading}
+        onRetry={onRefresh}
+      />
       {/* Date strip + inline filter button */}
       <View style={styles.dateStrip}>
         <View style={styles.dateStripInner}>
@@ -1803,6 +1818,7 @@ function WorkerPermMode() {
     chats, refreshChats,
     showToast, permVacancyViewsMap, refreshPermVacancyViews,
     permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved, exitGuest,
+    networkOnline,
   } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
 
@@ -1831,14 +1847,17 @@ function WorkerPermMode() {
   const [chatLoading, setChatLoading] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [externalVacancies, setExternalVacancies] = useState<ExternalVacancy[]>([]);
+  const [externalLoadFailed, setExternalLoadFailed] = useState(false);
 
   const loadExternalVacancies = useCallback(async () => {
     try {
       const rows = await dbGetExternalVacancies();
       setExternalVacancies(rows.filter(v => v.kind === 'permanent'));
+      setExternalLoadFailed(false);
     } catch {
       // Свои вакансии должны продолжить работать, даже если партнёрский фид
       // временно недоступен.
+      setExternalLoadFailed(true);
     }
   }, []);
 
@@ -1902,12 +1921,16 @@ function WorkerPermMode() {
   });
 
   const onRefresh = async () => {
+    if (refreshing) return;
     setRefreshing(true);
-    await Promise.all([
-      refreshPermVacancies(), refreshPermApplications(), refreshPermVacancyViews(),
-      loadExternalVacancies(),
-    ]);
-    setRefreshing(false);
+    try {
+      await Promise.allSettled([
+        refreshPermVacancies(), refreshPermApplications(), refreshPermVacancyViews(),
+        loadExternalVacancies(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
@@ -2273,6 +2296,13 @@ function WorkerPermMode() {
 
   return (
     <View style={{ flex: 1 }}>
+      <DataStatusBanner
+        offline={networkOnline === false}
+        failed={externalLoadFailed}
+        hasCachedData={shownVacancies.length > 0}
+        retrying={refreshing}
+        onRetry={onRefresh}
+      />
       {/* Search + Filters */}
       <View style={pS.searchRow}>
         <View style={pS.searchBox}>
@@ -2437,8 +2467,11 @@ function EmployerHome() {
   const onRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
-    await refreshAll();
-    setRefreshing(false);
+    try {
+      await refreshAll();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   useFocusEffect(
