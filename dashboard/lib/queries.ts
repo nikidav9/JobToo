@@ -1071,16 +1071,20 @@ export async function fetchFunnel() {
 
   const workerRegMap: Record<string, string> = {}
   for (const usr of workers) workerRegMap[(usr as any).id] = (usr as any).created_at
-  const firstLike: Record<string, string> = {}
-  for (const l of likedLk) {
-    const wid = (l as any).worker_id
-    if (!firstLike[wid] || (l as any).created_at < firstLike[wid]) firstLike[wid] = (l as any).created_at
+  const firstApplication: Record<string, string> = {}
+  for (const event of [...likedLk, ...ap]) {
+    const wid = (event as any).worker_id
+    const at = (event as any).created_at
+    if (wid && at && (!firstApplication[wid] || at < firstApplication[wid])) {
+      firstApplication[wid] = at
+    }
   }
   let activated7d = 0
-  for (const wid of Object.keys(firstLike)) {
+  for (const wid of Object.keys(firstApplication)) {
     const reg = workerRegMap[wid]
     if (!reg) continue
-    if (new Date(firstLike[wid]).getTime() - new Date(reg).getTime() <= 7 * 86400_000) activated7d++
+    const elapsed = new Date(firstApplication[wid]).getTime() - new Date(reg).getTime()
+    if (elapsed >= 0 && elapsed <= 7 * 86400_000) activated7d++
   }
 
   const shiftsByWorker: Record<string, number> = {}
