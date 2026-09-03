@@ -1144,6 +1144,25 @@ export async function fetchFunnel() {
     { name: 'Намерения откликнуться', value: telegramApplies30, fill: PALETTE.orange },
   ]
 
+  // Органические рекомендации пользователей считаем отдельно от наших
+  // публикаций: это самостоятельный канал привлечения с нулевой закупочной
+  // стоимостью, и смешивание скрыло бы его реальную эффективность.
+  const referralShared30 = ge.filter((e: any) =>
+    e.event_type === 'campaign_shared' && e.channel === 'user_share'
+      && e.campaign_id && e.occurred_at >= guestSince30
+  )
+  const referralCampaigns = new Set(referralShared30.map((e: any) => e.campaign_id))
+  const referralEvents30 = ge.filter((e: any) =>
+    e.campaign_id && referralCampaigns.has(e.campaign_id) && e.occurred_at >= guestSince30
+  )
+  const referralOpens30 = referralEvents30.filter((e: any) => e.event_type === 'campaign_open').length
+  const referralApplies30 = referralEvents30.filter((e: any) => e.event_type === 'campaign_apply').length
+  const referralFunnel = [
+    { name: 'Поделились', value: referralShared30.length, fill: PALETTE.purple },
+    { name: 'Открытия', value: referralOpens30, fill: PALETTE.cyan },
+    { name: 'Намерения откликнуться', value: referralApplies30, fill: PALETTE.orange },
+  ]
+
   const mainFunnel = [
     { name: 'Зарегистрировались', value: workers.length, fill: PALETTE.blue },
     { name: 'Лайкнули (уник.)', value: workersWhoLiked, fill: PALETTE.cyan },
@@ -1194,10 +1213,18 @@ export async function fetchFunnel() {
         ? ((telegramOpens30 / telegramPublished30.length) * 100).toFixed(1) : '0',
       telegramApplyRate30: telegramOpens30 > 0
         ? ((telegramApplies30 / telegramOpens30) * 100).toFixed(1) : '0',
+      referralShared30: referralShared30.length,
+      referralOpens30,
+      referralApplies30,
+      referralOpenRate30: referralShared30.length > 0
+        ? ((referralOpens30 / referralShared30.length) * 100).toFixed(1) : '0',
+      referralApplyRate30: referralOpens30 > 0
+        ? ((referralApplies30 / referralOpens30) * 100).toFixed(1) : '0',
     },
     guestFunnel,
     guestDaily30,
     telegramFunnel,
+    referralFunnel,
     mainFunnel,
     eventFunnel,
     daily30,
