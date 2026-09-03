@@ -321,6 +321,44 @@ if ($cb) {
     $msgId = $cb['message']['message_id'] ?? null;
     $origText = $cb['message']['text'] ?? '';
 
+    // Настройки рекламных уведомлений о вакансиях. По умолчанию остаётся
+    // прежний режим «все»: фильтрация включается только явным выбором человека.
+    if (preg_match('/^vacnotif_(all|work_types|metro|work_types_metro|off)$/', $data, $nm)) {
+        $mode = $nm[1];
+        $u = $chatId ? sb_one('jm_users', ['telegram_id' => 'eq.' . $chatId], 'id') : null;
+        if (!$u) {
+            tg('answerCallbackQuery', ['callback_query_id' => $cbId,
+                'text' => 'Сначала подключите Telegram в профиле JobToo']);
+            echo json_encode(['ok' => true]); exit;
+        }
+        sb('PATCH', 'jm_users', ['id' => 'eq.' . $u['id']], [
+            'vacancy_delivery_mode' => $mode,
+            // Старое «не писать» относится к тем же рекламным сообщениям.
+            'nudge_off' => $mode === 'off',
+        ]);
+        $labels = [
+            'all' => 'Все вакансии',
+            'work_types' => 'Только мои профессии',
+            'metro' => 'Только у моего метро',
+            'work_types_metro' => 'Мои профессии у моего метро',
+            'off' => 'Рассылка выключена',
+        ];
+        tg('answerCallbackQuery', ['callback_query_id' => $cbId,
+            'text' => 'Сохранено: ' . $labels[$mode]]);
+        if ($chatId) {
+            tg('sendMessage', [
+                'chat_id' => $chatId,
+                'text' => "✅ <b>Настройки сохранены</b>\n\n" . $labels[$mode]
+                    . "\n\nПрофессии и метро берутся из вашего профиля JobToo.",
+                'parse_mode' => 'HTML',
+                'reply_markup' => ['inline_keyboard' => [[
+                    ['text' => '🚀 Открыть профиль', 'url' => 'https://t.me/JobToo_bot/app?startapp=profile'],
+                ]]],
+            ]);
+        }
+        echo json_encode(['ok' => true]); exit;
+    }
+
     // «💬 Написать кандидату» — создаёт чат (без смены статуса заявки) и даёт кнопку в него
     if (preg_match('/^appmsg_(.+)$/', $data, $mm)) {
         $appId = $mm[1];
@@ -517,6 +555,45 @@ if (preg_match('/^\/start\s*$/', $text)) {
         }
         tg_pending_write($pending);             // мусор из мёртвых заявок не копим
     }
+}
+
+if (preg_match('/^\/(settings|notifications)(?:@\\w+)?$/i', $text)) {
+    $u = sb_one('jm_users', ['telegram_id' => 'eq.' . $chatId],
+        'id,metro_station,work_types,vacancy_delivery_mode');
+    if (!$u) {
+        tg('sendMessage', [
+            'chat_id' => $chatId,
+            'text' => "Сначала подключите Telegram в профиле JobToo — после этого я смогу сохранить ваши настройки.",
+            'reply_markup' => ['inline_keyboard' => [[
+                ['text' => '🚀 Открыть JobToo', 'url' => 'https://t.me/JobToo_bot/app'],
+            ]]],
+        ]);
+        echo json_encode(['ok' => true]); exit;
+    }
+    $mode = (string)($u['vacancy_delivery_mode'] ?? 'all');
+    $metro = trim((string)($u['metro_station'] ?? ''));
+    $workTypes = $u['work_types'] ?? [];
+    if (is_string($workTypes)) {
+        $decoded = json_decode($workTypes, true);
+        $workTypes = is_array($decoded) ? $decoded : [];
+    }
+    $profile = "Метро: " . ($metro !== '' ? $metro : 'не указано')
+        . "\nПрофессий в профиле: " . count(is_array($workTypes) ? $workTypes : []);
+    tg('sendMessage', [
+        'chat_id' => $chatId,
+        'text' => "🔔 <b>Какие вакансии присылать?</b>\n\n" . $profile
+            . "\n\nПо умолчанию JobToo присылает все вакансии. Выберите фильтр:",
+        'parse_mode' => 'HTML',
+        'reply_markup' => ['inline_keyboard' => [
+            [['text' => ($mode === 'all' ? '✓ ' : '') . 'Все вакансии', 'callback_data' => 'vacnotif_all']],
+            [['text' => ($mode === 'work_types' ? '✓ ' : '') . 'Только мои профессии', 'callback_data' => 'vacnotif_work_types']],
+            [['text' => ($mode === 'metro' ? '✓ ' : '') . 'Только у моего метро', 'callback_data' => 'vacnotif_metro']],
+            [['text' => ($mode === 'work_types_metro' ? '✓ ' : '') . 'Профессия + метро', 'callback_data' => 'vacnotif_work_types_metro']],
+            [['text' => ($mode === 'off' ? '✓ ' : '') . 'Не присылать вакансии', 'callback_data' => 'vacnotif_off']],
+            [['text' => '✏️ Изменить профиль', 'url' => 'https://t.me/JobToo_bot/app?startapp=profile']],
+        ]],
+    ]);
+    echo json_encode(['ok' => true]); exit;
 }
 
 if (str_starts_with($text, '/start')) {
