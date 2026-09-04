@@ -1826,6 +1826,10 @@ function WorkerPermMode() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [filterStation, setFilterStation] = useState<string | null>(null);
+  // Какие карточки развёрнуты (описание «Читать ещё»). По id вакансии.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) =>
+    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const [filterPicker, setFilterPicker] = useState(false);
   const [minSalary, setMinSalary] = useState(0);
   const [applying, setApplying] = useState<string | null>(null);
@@ -2201,19 +2205,33 @@ function WorkerPermMode() {
           </View>
         ) : null}
 
-        {/* Schedule */}
+        {/* Раздел «Условия» */}
         {v.schedule ? (
-          <View style={pS.scheduleRow}>
-            <View style={pS.locationItem}>
+          <View style={pS.section}>
+            <Text style={pS.sectionHead}>Условия</Text>
+            <View style={pS.sectionRow}>
               <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
-              <Text style={pS.locationTxt}>{v.schedule}</Text>
+              <Text style={pS.sectionRowTxt}>{v.schedule}</Text>
             </View>
           </View>
         ) : null}
 
-        {/* Description */}
+        {/* Раздел «Описание» с «Читать ещё» */}
         {v.description ? (
-          <Text style={pS.desc} numberOfLines={2}>{v.description}</Text>
+          <View style={pS.section}>
+            <Text style={pS.sectionHead}>Описание</Text>
+            <Text style={pS.desc} numberOfLines={expanded.has(v.id) ? undefined : 3}>{v.description}</Text>
+            {v.description.length > 120 ? (
+              <TouchableOpacity
+                style={pS.readMore}
+                onPress={(e) => { e.stopPropagation?.(); toggleExpanded(v.id); }}
+                activeOpacity={0.7}
+              >
+                <Text style={pS.readMoreTxt}>{expanded.has(v.id) ? 'Свернуть' : 'Читать ещё'}</Text>
+                <Ionicons name={expanded.has(v.id) ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.primary} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
         ) : null}
 
         {/* Views */}
@@ -2960,6 +2978,20 @@ const swS = StyleSheet.create({
 });
 
 const pS = StyleSheet.create({
+  // — разделы карточки —
+  section: {
+    marginTop: rs(12), padding: rs(12),
+    backgroundColor: Colors.surface, borderRadius: rs(12),
+    borderWidth: 1, borderColor: Colors.divider,
+  },
+  sectionHead: {
+    fontSize: rf(13), fontWeight: '700', color: Colors.textPrimary, marginBottom: rs(8),
+  },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: rs(8), marginBottom: rs(6) },
+  sectionRowTxt: { flex: 1, fontSize: rf(13), color: Colors.textSecondary },
+  readMore: { flexDirection: 'row', alignItems: 'center', gap: rs(4), marginTop: rs(6) },
+  readMoreTxt: { fontSize: rf(13), fontWeight: '700', color: Colors.primary },
+
   // — search row —
   searchRow: {
     flexDirection: 'row', alignItems: 'center', gap: rs(8),
