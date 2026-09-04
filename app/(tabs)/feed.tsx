@@ -1415,7 +1415,10 @@ function WorkerFeed() {
         pan.setOffset({ x: (pan.x as any)._value, y: (pan.y as any)._value });
         pan.setValue({ x: 0, y: 0 });
       },
-      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+      // Тащим карточку только по горизонтали: решение — влево/вправо, а
+      // вертикаль людей путала (можно было увести вверх-вниз). Наклон и «улёт»
+      // в сторону при отпускании остаются — их задаёт animateCard.
+      onPanResponderMove: Animated.event([null, { dx: pan.x }], { useNativeDriver: false }),
       onPanResponderRelease: (_, { dx, vx }) => {
         pan.flattenOffset();
         if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) {
