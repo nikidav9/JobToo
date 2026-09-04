@@ -2274,6 +2274,72 @@ function WorkerPermMode() {
     saved:    { icon: 'heart-outline', title: 'Пока пусто', sub: 'Нажмите ♥ на вакансии — она сохранится здесь' },
   };
 
+  // ── Свайп-колода для вкладки «Открытые» ────────────────────────────────────
+  // Верхняя открытая вакансия — карточка, которую листают, как смены: вправо —
+  // откликнуться, влево — пропустить. Поиск и вкладки «Отклики»/«Избранное»
+  // остаются обычным списком. Карточку берём ту же (renderPerm), поэтому вид
+  // один в один со списком, только сверху свайп-слой.
+  const swPan = useRef(new Animated.ValueXY()).current;
+  const [swSkipped, setSwSkipped] = useState<Set<string>>(new Set());
+  const swBusy = useRef(false);
+  const openDeck = tab === 'open' ? shownVacancies.filter(v => !swSkipped.has(v.id)) : [];
+  const swTop = openDeck[0];
+  const swRotate = swPan.x.interpolate({ inputRange: [-SW / 2, 0, SW / 2], outputRange: ['-8deg', '0deg', '8deg'], extrapolate: 'clamp' });
+  const swWantOp = swPan.x.interpolate({ inputRange: [0, SWIPE_THRESHOLD], outputRange: [0, 1], extrapolate: 'clamp' });
+  const swSkipOp = swPan.x.interpolate({ inputRange: [-SWIPE_THRESHOLD, 0], outputRange: [1, 0], extrapolate: 'clamp' });
+
+  const swSnapBack = () => {
+    swBusy.current = false;
+    Animated.spring(swPan, { toValue: { x: 0, y: 0 }, useNativeDriver: false, friction: 6, tension: 60 }).start();
+  };
+  const swFly = (dir: 'left' | 'right', vx: number, after: () => void) => {
+    if (swBusy.current) return;
+    swBusy.current = true;
+    const duration = Math.max(180, Math.min(300, 250 / (Math.abs(vx) + 0.5)));
+    Animated.parallel([
+      Animated.timing(swPan.x, { toValue: (dir === 'right' ? SW : -SW) * 1.5, duration, useNativeDriver: false }),
+      Animated.timing(swPan.y, { toValue: dir === 'right' ? -40 : 40, duration, useNativeDriver: false }),
+    ]).start(() => {
+      swPan.setValue({ x: 0, y: 0 });
+      swBusy.current = false;
+      after();
+    });
+  };
+  const swWant = (vx = 0.5) => {
+    const c = swTop;
+    if (!c) return;
+    // Партнёрские (внешние) — не наш отклик, их просто листаем дальше.
+    swFly('right', vx, () => {
+      setSwSkipped(s => new Set(s).add(c.id));
+      if (!('sourceId' in c)) applyTo(c as PermVacancy);
+    });
+  };
+  const swSkip = (vx = 0.5) => {
+    const c = swTop;
+    if (!c) return;
+    swFly('left', vx, () => setSwSkipped(s => new Set(s).add(c.id)));
+  };
+  const swWantRef = useRef(swWant); swWantRef.current = swWant;
+  const swSkipRef = useRef(swSkip); swSkipRef.current = swSkip;
+  const swPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > Math.abs(g.dy) * 1.2 && Math.abs(g.dx) > 8,
+      onPanResponderGrant: () => {
+        swPan.setOffset({ x: (swPan.x as any)._value, y: (swPan.y as any)._value });
+        swPan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event([null, { dx: swPan.x }], { useNativeDriver: false }),
+      onPanResponderRelease: (_, { dx, vx }) => {
+        swPan.flattenOffset();
+        if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) swWantRef.current(Math.abs(vx));
+        else if (dx < -SWIPE_THRESHOLD || vx < -VELOCITY_THRESHOLD) swSkipRef.current(Math.abs(vx));
+        else swSnapBack();
+      },
+      onPanResponderTerminate: () => swSnapBack(),
+    })
+  ).current;
+
   return (
     <View style={{ flex: 1 }}>
       {/* Search + Filters */}
@@ -2356,7 +2422,45 @@ function WorkerPermMode() {
         })}
       </ScrollView>
 
-      {shownVacancies.length === 0 ? (
+      {tab === 'open' ? (
+        // Открытые — свайп-колода (карточки, как в сменах и матчах).
+        !swTop ? (
+          <View style={styles.emptyState}>
+            <Ionicons name={emptyMessages.open.icon} size={48} color={Colors.textMuted} />
+            <Text style={styles.emptyTitle}>{emptyMessages.open.title}</Text>
+            <Text style={styles.emptySubtitle}>{emptyMessages.open.sub}</Text>
+          </View>
+        ) : (
+          <View style={{ flex: 1 }}>
+            <ScrollView
+              contentContainerStyle={{ padding: 16, paddingBottom: tabBarHeight + 96 }}
+              showsVerticalScrollIndicator={false}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
+            >
+              <Animated.View
+                style={{ transform: [{ translateX: swPan.x }, { translateY: swPan.y }, { rotate: swRotate }] }}
+                {...swPanResponder.panHandlers}
+              >
+                <Animated.View style={[swS.wantOverlay, { opacity: swWantOp }]} pointerEvents="none">
+                  <Text style={swS.wantTxt}>ОТКЛИК ♥</Text>
+                </Animated.View>
+                <Animated.View style={[swS.skipOverlay, { opacity: swSkipOp }]} pointerEvents="none">
+                  <Text style={swS.skipTxt}>НЕТ ✕</Text>
+                </Animated.View>
+                {renderPerm({ item: swTop })}
+              </Animated.View>
+            </ScrollView>
+            <View style={swS.actions} pointerEvents="box-none">
+              <TouchableOpacity style={[swS.actBtn, swS.actSkip]} onPress={() => swSkip()} activeOpacity={0.85}>
+                <Ionicons name="close" size={26} color={Colors.red} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[swS.actBtn, swS.actWant]} onPress={() => swWant()} activeOpacity={0.85}>
+                <Ionicons name="heart" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )
+      ) : shownVacancies.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name={emptyMessages[tab].icon} size={48} color={Colors.textMuted} />
           <Text style={styles.emptyTitle}>{emptyMessages[tab].title}</Text>
@@ -2828,6 +2932,33 @@ export default function HomeScreen() {
 // ─────────────────────────────────────────────────
 // Permanent mode styles
 // ─────────────────────────────────────────────────
+const swS = StyleSheet.create({
+  wantOverlay: {
+    position: 'absolute', top: 18, left: 16, zIndex: 5,
+    borderWidth: 3, borderColor: Colors.primary, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 4, transform: [{ rotate: '-12deg' }],
+  },
+  wantTxt: { color: Colors.primary, fontWeight: '900', fontSize: rf(18) },
+  skipOverlay: {
+    position: 'absolute', top: 18, right: 16, zIndex: 5,
+    borderWidth: 3, borderColor: Colors.red, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 4, transform: [{ rotate: '12deg' }],
+  },
+  skipTxt: { color: Colors.red, fontWeight: '900', fontSize: rf(18) },
+  actions: {
+    position: 'absolute', bottom: 20, left: 0, right: 0,
+    flexDirection: 'row', justifyContent: 'center', gap: rs(28),
+  },
+  actBtn: {
+    width: rs(56), height: rs(56), borderRadius: rs(28),
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#fff', borderWidth: 1, borderColor: Colors.divider,
+    ...Shadow.card,
+  },
+  actSkip: {},
+  actWant: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+});
+
 const pS = StyleSheet.create({
   // — search row —
   searchRow: {
