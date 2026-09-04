@@ -152,7 +152,8 @@ if (!$fn) { jt_respond(['error' => 'Missing fn'], 400); exit; }
 $adminFns = [
     'dbKeyKind', 'adminResetPassword', 'dbMigrateChatMedia', 'dbDeleteUser',
     'cronEveningDigest', 'cronDailyNudges', 'cronShiftNudge',
-    'tgBroadcast', 'tgSendToUsers', 'scoreRecalcAll', 'billingReport',
+    'tgBroadcast', 'tgSendToUsers', 'surveyDormantSend', 'surveyResults',
+    'scoreRecalcAll', 'billingReport',
     'extSourcesList', 'extSourceSave', 'extSourceDelete', 'extStats',
     'partnerTariffsList', 'partnerTariffSave', 'partnerBillableEventRecord',
     'partnerReconciliationRecord', 'partnerBillingReport', 'partnerReportSnapshotSave',
@@ -2565,6 +2566,53 @@ try {
                 } else $skipped[] = $uid;
             }
             $data = ['sent' => count($sent), 'skipped' => $skipped];
+            break;
+        }
+
+        // Опрос спящих соискателей «почему не пользуетесь» — в один тап.
+        // Шлём только тем, у кого есть телеграм и кто спит: last_seen пусто
+        // или старше 30 дней. Кнопки-ответы уходят в jm_survey_responses через
+        // обработчик бота (php-proxy/tg.php).
+        case 'surveyDormantSend': {
+            @set_time_limit(300);
+            @ignore_user_abort(true);
+            $surveyKey = 'dormant_worker_v1';
+            $cutoff = time() - 30 * 86400;
+            $rows = sb_select('jm_users',
+                ['role' => 'eq.worker', 'telegram_id' => 'not.is.null'],
+                'telegram_id,last_seen_at');
+            $text = "Привет! Вы заводили <b>JobToo</b>, но давно не заходили 👀\n\n"
+                  . "Помогите одним касанием — <b>почему пока не пользуетесь?</b>";
+            $kb = [
+                [['text' => 'Не нашёл смен рядом',        'callback_data' => 'survey_' . $surveyKey . '_no_shifts']],
+                [['text' => 'Не было времени / забыл',     'callback_data' => 'survey_' . $surveyKey . '_no_time']],
+                [['text' => 'Непонятно, как пользоваться', 'callback_data' => 'survey_' . $surveyKey . '_confusing']],
+                [['text' => 'Уже нашёл работу',            'callback_data' => 'survey_' . $surveyKey . '_found_job']],
+                [['text' => 'Другое',                      'callback_data' => 'survey_' . $surveyKey . '_other']],
+            ];
+            $sent = 0; $total = 0;
+            foreach ($rows as $r) {
+                $ls = $r['last_seen_at'] ?? null;
+                $dormant = ($ls === null) || (strtotime((string)$ls) < $cutoff);
+                if (!$dormant) continue;
+                $total++;
+                if (tg_send_message((int)$r['telegram_id'], $text, false, '', $kb)) $sent++;
+            }
+            $data = ['sent' => $sent, 'total' => $total, 'survey_key' => $surveyKey];
+            break;
+        }
+
+        // Итоги опроса: сколько какой ответ выбрали. args: [survey_key?]
+        case 'surveyResults': {
+            $key = (string)($args[0] ?? 'dormant_worker_v1');
+            $rows = sb_select('jm_survey_responses', ['survey_key' => 'eq.' . $key], 'answer');
+            $tally = [];
+            foreach ($rows as $r) {
+                $a = (string)($r['answer'] ?? '');
+                if ($a === '') continue;
+                $tally[$a] = ($tally[$a] ?? 0) + 1;
+            }
+            $data = ['survey_key' => $key, 'total' => count($rows), 'tally' => $tally];
             break;
         }
 

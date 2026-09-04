@@ -379,3 +379,32 @@ export async function sendTelegramToUsers(
   logActivity('Сообщение боту по списку', `Адресатов: ${ids.length}, доставлено: ${sent}`)
   return { sent, skipped }
 }
+
+// Опрос спящих соискателей «почему не пользуетесь».
+export async function sendDormantSurvey(): Promise<{ sent: number; total: number }> {
+  const res = await fetch('/api/admin/survey-dormant', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getToken() },
+    body: JSON.stringify({ mode: 'send' }),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) throw new Error(data.error ?? 'Ошибка опроса')
+  const sent = (data.data?.sent ?? 0) as number
+  const total = (data.data?.total ?? 0) as number
+  logActivity('Опрос спящих', `Отправлено: ${sent} из ${total}`)
+  return { sent, total }
+}
+
+export async function getDormantSurveyResults(): Promise<{ total: number; tally: Record<string, number> }> {
+  const res = await fetch('/api/admin/survey-dormant', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getToken() },
+    body: JSON.stringify({ mode: 'results' }),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) throw new Error(data.error ?? 'Ошибка опроса')
+  return {
+    total: (data.data?.total ?? 0) as number,
+    tally: (data.data?.tally ?? {}) as Record<string, number>,
+  }
+}

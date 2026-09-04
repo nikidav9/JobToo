@@ -321,6 +321,32 @@ if ($cb) {
     $msgId = $cb['message']['message_id'] ?? null;
     $origText = $cb['message']['text'] ?? '';
 
+    // Ответ на опрос в один тап (первый опрос — «почему не пользуетесь» для
+    // спящих). Записываем выбор, благодарим и мягко зовём обратно кнопкой.
+    // callback_data вида survey_<ключ>_<ответ>.
+    if (preg_match('/^survey_([a-z0-9_]+)_(no_shifts|no_time|confusing|found_job|other)$/', $data, $sm)) {
+        $surveyKey = $sm[1];
+        $answer = $sm[2];
+        $u = $chatId ? sb_one('jm_users', ['telegram_id' => 'eq.' . $chatId], 'id') : null;
+        // Один ответ на человека на опрос: повтор обновляет прежний выбор.
+        sb('POST', 'jm_survey_responses', ['on_conflict' => 'survey_key,user_id'], [
+            'survey_key' => $surveyKey,
+            'user_id'    => $u['id'] ?? null,
+            'answer'     => $answer,
+            'created_at' => now_iso(),
+        ], ['Prefer: resolution=merge-duplicates,return=minimal']);
+        tg('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => 'Спасибо! 🙏']);
+        tg('editMessageText', [
+            'chat_id' => $chatId,
+            'message_id' => $msgId,
+            'text' => 'Спасибо — это правда помогает нам стать лучше 🙏',
+            'reply_markup' => ['inline_keyboard' => [[
+                ['text' => '🔎 Посмотреть смены рядом', 'url' => 'https://t.me/JobToo_bot/app'],
+            ]]],
+        ]);
+        echo json_encode(['ok' => true]); exit;
+    }
+
     // Настройки рекламных уведомлений о вакансиях. По умолчанию остаётся
     // прежний режим «все»: фильтрация включается только явным выбором человека.
     if (preg_match('/^vacnotif_(all|work_types|metro|work_types_metro|off)$/', $data, $nm)) {

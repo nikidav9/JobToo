@@ -4,7 +4,7 @@ import PageHeader from '@/components/PageHeader'
 import KpiCard from '@/components/KpiCard'
 import Chip from '@/components/Chip'
 import { IconApp, IconBell } from '@/components/icons'
-import { broadcastBoth, broadcastWebPush, broadcastTelegram, sendTelegramToUsers, sendBothToUser, sendInAppToUser } from '@/lib/admin-actions'
+import { broadcastBoth, broadcastWebPush, broadcastTelegram, sendTelegramToUsers, sendBothToUser, sendInAppToUser, sendDormantSurvey, getDormantSurveyResults } from '@/lib/admin-actions'
 import { supabaseAdmin } from '@/lib/supabase'
 import { logActivity } from '@/lib/activity-log'
 
@@ -243,6 +243,8 @@ export default function BroadcastPage() {
           <KpiCard label="Веб-пуш · iPhone" value={dataLoading ? null : webPushCount}
             sub="подписаны из Safari" />
         </div>
+
+        <DormantSurveyCard />
 
         {/* Вкладки. Активная подчёркивалась чёрным — тем самым чёрно-белым,
             от которого отказались; акцент здесь и означает «вы тут». */}
@@ -525,6 +527,93 @@ export default function BroadcastPage() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Опрос спящих соискателей «почему не пользуетесь» ──────────────────────────
+// Отправка строго по кнопке и с подтверждением: это сообщение уходит реальным
+// людям. Ответы (в один тап) копятся в jm_survey_responses, итоги — тут же.
+const SURVEY_LABELS: Record<string, string> = {
+  no_shifts: 'Не нашёл смен рядом',
+  no_time: 'Не было времени / забыл',
+  confusing: 'Непонятно, как пользоваться',
+  found_job: 'Уже нашёл работу',
+  other: 'Другое',
+}
+
+function DormantSurveyCard() {
+  const [sending, setSending] = useState(false)
+  const [loadingRes, setLoadingRes] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [res, setRes] = useState<{ total: number; tally: Record<string, number> } | null>(null)
+
+  const loadResults = useCallback(async () => {
+    setLoadingRes(true)
+    try {
+      setRes(await getDormantSurveyResults())
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Ошибка загрузки итогов')
+    } finally {
+      setLoadingRes(false)
+    }
+  }, [])
+
+  useEffect(() => { loadResults() }, [loadResults])
+
+  const send = async () => {
+    if (!confirm('Отправить опрос всем спящим соискателям (не заходили 30+ дней) с подключённым Telegram? Сообщение уйдёт реальным людям.')) return
+    setSending(true)
+    setMsg('')
+    try {
+      const { sent, total } = await sendDormantSurvey()
+      setMsg(`Отправлено ${sent} из ${total} спящих.`)
+      loadResults()
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Ошибка отправки')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 16, margin: '16px 0' }}>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Опрос спящих: «почему не пользуетесь»</div>
+      <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12 }}>
+        Один тап-опрос спящим соискателям (не заходили 30+ дней) с Telegram. Ответы копятся ниже.
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="jt-btn" onClick={send} disabled={sending}
+          style={{ background: 'var(--accent, #FF6B1A)', color: '#fff', border: 'none', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          {sending ? 'Отправляю…' : 'Отправить опрос спящим'}
+        </button>
+        <button onClick={loadResults} disabled={loadingRes}
+          style={{ background: 'transparent', border: '1px solid var(--line)', borderRadius: 10, padding: '9px 14px', fontSize: 13, cursor: 'pointer' }}>
+          Обновить итоги
+        </button>
+        {msg ? <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{msg}</span> : null}
+      </div>
+
+      {res && res.total > 0 ? (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 6 }}>Ответов всего: {res.total}</div>
+          {Object.keys(SURVEY_LABELS).map((k) => {
+            const n = res.tally[k] ?? 0
+            const pct = res.total ? Math.round((n / res.total) * 100) : 0
+            return (
+              <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <div style={{ width: 190, fontSize: 12.5 }}>{SURVEY_LABELS[k]}</div>
+                <div style={{ flex: 1, height: 8, background: 'var(--line)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent, #FF6B1A)' }} />
+                </div>
+                <div style={{ width: 56, textAlign: 'right', fontSize: 12.5, color: 'var(--muted)' }}>{n} · {pct}%</div>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--muted)' }}>Ответов пока нет.</div>
+      )}
     </div>
   )
 }
