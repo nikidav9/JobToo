@@ -566,7 +566,7 @@ function DormantSurveyCard() {
   useEffect(() => { loadResults() }, [loadResults])
 
   const send = async () => {
-    if (!confirm('Отправить опрос спящим соискателям (не заходили 30+ дней) с Telegram? Уходит порцией до 40 за раз; кому уже слали — не повторяем. Сообщение получают реальные люди.')) return
+    if (!confirm('Отправить опрос спящим соискателям (не заходили 14+ дней) с Telegram? Уходит порцией до 20 за раз; кому уже слали — не повторяем. Сообщение получают реальные люди.')) return
     setSending(true)
     setMsg('')
     try {
@@ -588,7 +588,7 @@ function DormantSurveyCard() {
     <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 16, margin: '16px 0' }}>
       <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Опрос спящих: «почему не пользуетесь»</div>
       <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12 }}>
-        Один тап-опрос спящим соискателям (не заходили 30+ дней) с Telegram. Ответы копятся ниже.
+        Один тап-опрос спящим соискателям (не заходили 14+ дней) с Telegram. Ответы копятся ниже.
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="jt-btn" onClick={send} disabled={sending}

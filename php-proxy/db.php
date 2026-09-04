@@ -2578,7 +2578,7 @@ try {
             @ignore_user_abort(true);
             $surveyKey = 'dormant_worker_v1';
             $batch = 20;                 // за один тап — не больше, чтобы уложиться в таймаут роута
-            $cutoff = time() - 30 * 86400;
+            $cutoff = time() - 14 * 86400;   // спящий = не заходил 14+ дней (или ни разу)
             // Кому уже слали — тем не шлём повторно (идемпотентность по логу).
             $sentRows = sb_select('jm_survey_sends', ['survey_key' => 'eq.' . $surveyKey], 'user_id');
             $already = [];
