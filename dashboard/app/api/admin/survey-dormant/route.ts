@@ -37,15 +37,29 @@ export async function POST(req: Request) {
   const { mode = 'results' } = await req.json().catch(() => ({}))
   const fn = mode === 'send' ? 'surveyDormantSend' : 'surveyResults'
 
-  const res = await fetch('https://jobtoo.ru/api/db.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-App-Secret': appSecret, 'X-Admin-Token': process.env.ADMIN_API_TOKEN ?? '' },
-    body: JSON.stringify({ fn, args: [] }),
-  })
-  const data = await res.json()
-  if (!res.ok || data.error) {
+  // Ошибку прокси/сети возвращаем текстом, а не роняем роут: иначе в браузере
+  // видно лишь «Load failed», по которому не понять, что случилось.
+  let res: Response
+  let raw = ''
+  try {
+    res = await fetch('https://jobtoo.ru/api/db.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': appSecret, 'X-Admin-Token': process.env.ADMIN_API_TOKEN ?? '' },
+      body: JSON.stringify({ fn, args: [] }),
+    })
+    raw = await res.text()
+  } catch (e) {
     return NextResponse.json(
-      { error: data.error ?? 'Ошибка опроса' },
+      { error: 'Не дозвонились до прокси: ' + (e instanceof Error ? e.message : String(e)) },
+      { status: 502, headers: CORS }
+    )
+  }
+
+  let data: any = null
+  try { data = raw ? JSON.parse(raw) : null } catch { /* ниже отдадим сырой текст */ }
+  if (!res.ok || !data || data.error) {
+    return NextResponse.json(
+      { error: (data && data.error) ? data.error : `Прокси ответил ${res.status}: ${raw.slice(0, 300)}` },
       { status: 502, headers: CORS }
     )
   }

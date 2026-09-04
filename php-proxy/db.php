@@ -2577,10 +2577,16 @@ try {
             @set_time_limit(300);
             @ignore_user_abort(true);
             $surveyKey = 'dormant_worker_v1';
+            $batch = 40;                 // за один тап — не больше, чтобы не ловить таймаут
             $cutoff = time() - 30 * 86400;
+            // Кому уже слали — тем не шлём повторно (идемпотентность по логу).
+            $sentRows = sb_select('jm_survey_sends', ['survey_key' => 'eq.' . $surveyKey], 'user_id');
+            $already = [];
+            foreach ($sentRows as $s) { $already[(string)$s['user_id']] = true; }
+
             $rows = sb_select('jm_users',
                 ['role' => 'eq.worker', 'telegram_id' => 'not.is.null'],
-                'telegram_id,last_seen_at');
+                'id,telegram_id,last_seen_at');
             $text = "Привет! Вы заводили <b>JobToo</b>, но давно не заходили 👀\n\n"
                   . "Помогите одним касанием — <b>почему пока не пользуетесь?</b>";
             $kb = [
@@ -2590,19 +2596,28 @@ try {
                 [['text' => 'Уже нашёл работу',            'callback_data' => 'survey_' . $surveyKey . '_found_job']],
                 [['text' => 'Другое',                      'callback_data' => 'survey_' . $surveyKey . '_other']],
             ];
-            $sent = 0; $total = 0;
+            $sent = 0; $eligible = 0; $remaining = 0;
             foreach ($rows as $r) {
                 $ls = $r['last_seen_at'] ?? null;
                 $dormant = ($ls === null) || (strtotime((string)$ls) < $cutoff);
                 if (!$dormant) continue;
-                $total++;
-                if (tg_send_message((int)$r['telegram_id'], $text, false, '', $kb)) $sent++;
+                $eligible++;
+                if (isset($already[(string)$r['id']])) continue;   // уже получил
+                if ($sent >= $batch) { $remaining++; continue; }   // на следующий тап
+                if (tg_send_message((int)$r['telegram_id'], $text, false, '', $kb)) {
+                    $sent++;
+                    sb('POST', 'jm_survey_sends', ['on_conflict' => 'survey_key,user_id'],
+                        ['survey_key' => $surveyKey, 'user_id' => $r['id'], 'sent_at' => now_iso()],
+                        ['Prefer: resolution=ignore-duplicates,return=minimal']);
+                }
             }
-            $data = ['sent' => $sent, 'total' => $total, 'survey_key' => $surveyKey];
+            $sentTotal = count($already) + $sent;
+            $data = ['sent' => $sent, 'sent_total' => $sentTotal, 'remaining' => $remaining,
+                     'eligible' => $eligible, 'survey_key' => $surveyKey];
             break;
         }
 
-        // Итоги опроса: сколько какой ответ выбрали. args: [survey_key?]
+        // Итоги опроса: охват (кому ушло) и ответы. args: [survey_key?]
         case 'surveyResults': {
             $key = (string)($args[0] ?? 'dormant_worker_v1');
             $rows = sb_select('jm_survey_responses', ['survey_key' => 'eq.' . $key], 'answer');
@@ -2612,7 +2627,9 @@ try {
                 if ($a === '') continue;
                 $tally[$a] = ($tally[$a] ?? 0) + 1;
             }
-            $data = ['survey_key' => $key, 'total' => count($rows), 'tally' => $tally];
+            $sentTotal = count(sb_select('jm_survey_sends', ['survey_key' => 'eq.' . $key], 'user_id'));
+            $data = ['survey_key' => $key, 'total' => count($rows), 'tally' => $tally,
+                     'sent_total' => $sentTotal];
             break;
         }
 

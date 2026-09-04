@@ -380,8 +380,9 @@ export async function sendTelegramToUsers(
   return { sent, skipped }
 }
 
-// Опрос спящих соискателей «почему не пользуетесь».
-export async function sendDormantSurvey(): Promise<{ sent: number; total: number }> {
+// Опрос спящих соискателей «почему не пользуетесь». Шлём порциями и с логом —
+// повторный вызов продолжает с тех, кому ещё не слали.
+export async function sendDormantSurvey(): Promise<{ sent: number; sentTotal: number; remaining: number; eligible: number }> {
   const res = await fetch('/api/admin/survey-dormant', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getToken() },
@@ -390,12 +391,14 @@ export async function sendDormantSurvey(): Promise<{ sent: number; total: number
   const data = await res.json()
   if (!res.ok || data.error) throw new Error(data.error ?? 'Ошибка опроса')
   const sent = (data.data?.sent ?? 0) as number
-  const total = (data.data?.total ?? 0) as number
-  logActivity('Опрос спящих', `Отправлено: ${sent} из ${total}`)
-  return { sent, total }
+  const sentTotal = (data.data?.sent_total ?? 0) as number
+  const remaining = (data.data?.remaining ?? 0) as number
+  const eligible = (data.data?.eligible ?? 0) as number
+  logActivity('Опрос спящих', `Отправлено ещё ${sent}, всего ${sentTotal}, осталось ${remaining}`)
+  return { sent, sentTotal, remaining, eligible }
 }
 
-export async function getDormantSurveyResults(): Promise<{ total: number; tally: Record<string, number> }> {
+export async function getDormantSurveyResults(): Promise<{ total: number; sentTotal: number; tally: Record<string, number> }> {
   const res = await fetch('/api/admin/survey-dormant', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getToken() },
@@ -405,6 +408,7 @@ export async function getDormantSurveyResults(): Promise<{ total: number; tally:
   if (!res.ok || data.error) throw new Error(data.error ?? 'Ошибка опроса')
   return {
     total: (data.data?.total ?? 0) as number,
+    sentTotal: (data.data?.sent_total ?? 0) as number,
     tally: (data.data?.tally ?? {}) as Record<string, number>,
   }
 }

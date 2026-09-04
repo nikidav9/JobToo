@@ -546,14 +546,18 @@ function DormantSurveyCard() {
   const [sending, setSending] = useState(false)
   const [loadingRes, setLoadingRes] = useState(false)
   const [msg, setMsg] = useState('')
-  const [res, setRes] = useState<{ total: number; tally: Record<string, number> } | null>(null)
+  const [res, setRes] = useState<{ total: number; sentTotal: number; tally: Record<string, number> } | null>(null)
+
+  const [resErr, setResErr] = useState('')
 
   const loadResults = useCallback(async () => {
     setLoadingRes(true)
+    setResErr('')
     try {
       setRes(await getDormantSurveyResults())
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Ошибка загрузки итогов')
+      // Ошибку итогов держим отдельно, чтобы не затирать результат отправки.
+      setResErr(e instanceof Error ? e.message : 'Ошибка загрузки итогов')
     } finally {
       setLoadingRes(false)
     }
@@ -562,12 +566,16 @@ function DormantSurveyCard() {
   useEffect(() => { loadResults() }, [loadResults])
 
   const send = async () => {
-    if (!confirm('Отправить опрос всем спящим соискателям (не заходили 30+ дней) с подключённым Telegram? Сообщение уйдёт реальным людям.')) return
+    if (!confirm('Отправить опрос спящим соискателям (не заходили 30+ дней) с Telegram? Уходит порцией до 40 за раз; кому уже слали — не повторяем. Сообщение получают реальные люди.')) return
     setSending(true)
     setMsg('')
     try {
-      const { sent, total } = await sendDormantSurvey()
-      setMsg(`Отправлено ${sent} из ${total} спящих.`)
+      const { sent, sentTotal, remaining } = await sendDormantSurvey()
+      setMsg(
+        remaining > 0
+          ? `Отправлено ещё ${sent} (всего ${sentTotal}). Осталось ${remaining} — нажмите ещё раз.`
+          : `Отправлено ещё ${sent}. Всего охвачено ${sentTotal}. Больше спящих без опроса нет.`
+      )
       loadResults()
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Ошибка отправки')
@@ -591,12 +599,19 @@ function DormantSurveyCard() {
           style={{ background: 'transparent', border: '1px solid var(--line)', borderRadius: 10, padding: '9px 14px', fontSize: 13, cursor: 'pointer' }}>
           Обновить итоги
         </button>
-        {msg ? <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{msg}</span> : null}
+        {msg ? <span style={{ fontSize: 12.5, color: 'var(--fg, #1c1e21)', fontWeight: 600 }}>{msg}</span> : null}
+        {resErr ? <span style={{ fontSize: 12.5, color: 'var(--bad, #c62828)' }}>Итоги: {resErr}</span> : null}
       </div>
 
+      {res ? (
+        <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--muted)' }}>
+          Охват: <b>{res.sentTotal}</b> отправлено · <b>{res.total}</b> ответили
+          {res.sentTotal > 0 ? ` (${Math.round((res.total / res.sentTotal) * 100)}%)` : ''}
+        </div>
+      ) : null}
+
       {res && res.total > 0 ? (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 6 }}>Ответов всего: {res.total}</div>
+        <div style={{ marginTop: 12 }}>
           {Object.keys(SURVEY_LABELS).map((k) => {
             const n = res.tally[k] ?? 0
             const pct = res.total ? Math.round((n / res.total) * 100) : 0
