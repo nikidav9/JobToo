@@ -37,6 +37,7 @@
 
 const OPERATOR_NAME = 'Давыдов Никита Сергеевич';
 const OPERATOR_INN = '773423983287';
+const OPERATOR_ADDRESS = 'г. Москва, ул. Исаковского, д. 28, корп. 2';
 export const OPERATOR_EMAIL = 'support@jobtoo.ru';
 
 export type LegalDocKey = 'terms' | 'privacy' | 'consent';
@@ -67,11 +68,11 @@ export type LegalDoc = {
 export const LEGAL_DOCS: Record<LegalDocKey, LegalDoc> = {
   terms: {
     title: 'Пользовательское соглашение',
-    version: '2026-09-02',
+    version: '2026-09-05',
     consentVersion: '2026-09-02',
     sections: [
       {
-        body: `Пользовательское соглашение сервиса JobToo\n\nОператор: ${OPERATOR_NAME}\nИНН: ${OPERATOR_INN}\nEmail: ${OPERATOR_EMAIL}`,
+        body: `Пользовательское соглашение сервиса JobToo\n\nОператор: ${OPERATOR_NAME}\nИНН: ${OPERATOR_INN}\nАдрес: ${OPERATOR_ADDRESS}\nEmail: ${OPERATOR_EMAIL}`,
       },
       {
         heading: '1. Общие положения',
@@ -113,7 +114,7 @@ export const LEGAL_DOCS: Record<LegalDocKey, LegalDoc> = {
     consentVersion: '2026-09-01',
     sections: [
       {
-        body: `Политика конфиденциальности сервиса JobToo\n\nОператор: ${OPERATOR_NAME}\nИНН: ${OPERATOR_INN}\nEmail: ${OPERATOR_EMAIL}`,
+        body: `Политика конфиденциальности сервиса JobToo\n\nОператор: ${OPERATOR_NAME}\nИНН: ${OPERATOR_INN}\nАдрес: ${OPERATOR_ADDRESS}\nEmail: ${OPERATOR_EMAIL}`,
       },
       {
         heading: 'Собираемые данные',
@@ -159,7 +160,7 @@ export const LEGAL_DOCS: Record<LegalDocKey, LegalDoc> = {
     consentVersion: '2026-09-01',
     sections: [
       {
-        body: `Настоящим пользователь даёт согласие оператору ${OPERATOR_NAME} (ИНН: ${OPERATOR_INN}) на обработку своих персональных данных.`,
+        body: `Настоящим пользователь даёт согласие оператору ${OPERATOR_NAME} (ИНН: ${OPERATOR_INN}, адрес: ${OPERATOR_ADDRESS}) на обработку своих персональных данных.`,
       },
       {
         heading: 'Перечень обрабатываемых данных',
