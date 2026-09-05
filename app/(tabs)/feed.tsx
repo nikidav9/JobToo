@@ -56,6 +56,7 @@ import { LavkaLogo } from '@/components/ui/LavkaLogo';
 import { TabHeader } from '@/components/ui/TabHeader';
 import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import { MetroMap, MapListItem } from '@/components/feature/MetroMap';
+import { WORK_TYPE_META } from '@/components/feature/WorkTypeSelector';
 import { PermApplicationsSheet } from '@/components/feature/PermApplicationsSheet';
 import { setOnboardingTarget, setOnboardingFlag, registerOnboardingMeasurer } from '@/lib/onboardingTargets';
 import { registerWebPush, isWebPushRegistered, getWebPushDebug } from '@/lib/webPush';
@@ -2403,7 +2404,9 @@ function WorkerPermMode() {
     const salary = typeof v.salary === 'number' ? v.salary : 0;
     const views = permVacancyViewsMap[v.id] ?? 0;
     const schedule = isExternal ? v.schedule : (v as PermVacancy).schedule;
-    const workType = isExternal ? undefined : (v as PermVacancy).workType;
+    const workTypeRaw = isExternal ? undefined : (v as PermVacancy).workType;
+    // Профессия хранится кодом (stocker/cook/…) — показываем русское название.
+    const workType = workTypeRaw ? (WORK_TYPE_META[workTypeRaw]?.label ?? workTypeRaw) : undefined;
     const description = isExternal ? undefined : (v as PermVacancy).description;
     const isOpen = expanded.has(v.id);
     return (
