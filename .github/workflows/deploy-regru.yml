@@ -120,6 +120,7 @@ jobs:
           APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
           APP_SECRET_PREV: ${{ secrets.APP_SECRET_PREV }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          YANDEX_GEOCODER_KEY: ${{ secrets.YANDEX_GEOCODER_KEY }}
           DASHBOARD_LOGIN: ${{ secrets.DASHBOARD_LOGIN }}
           DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
           STUDIO_LOGIN: ${{ secrets.STUDIO_LOGIN }}
@@ -139,9 +140,10 @@ jobs:
           e = os.environ.get
           print(json.dumps({
               "app": {
-                  "APP_SECRET":      e("APP_SECRET", ""),
-                  "APP_SECRET_PREV": e("APP_SECRET_PREV", ""),
-                  "TG_BOT_TOKEN":    e("TG_BOT_TOKEN", ""),
+                  "APP_SECRET":          e("APP_SECRET", ""),
+                  "APP_SECRET_PREV":     e("APP_SECRET_PREV", ""),
+                  "TG_BOT_TOKEN":        e("TG_BOT_TOKEN", ""),
+                  "YANDEX_GEOCODER_KEY": e("YANDEX_GEOCODER_KEY", ""),
               },
               "admin": {
                   "login":    e("DASHBOARD_LOGIN", ""),

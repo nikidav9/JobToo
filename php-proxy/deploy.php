@@ -83,12 +83,12 @@ if (is_array($app)) {
         $v = @include __DIR__ . '/app_secrets.php';
         if (is_array($v)) $cur = $v;
     }
-    foreach (['APP_SECRET', 'APP_SECRET_PREV', 'TG_BOT_TOKEN'] as $k) {
+    foreach (['APP_SECRET', 'APP_SECRET_PREV', 'TG_BOT_TOKEN', 'YANDEX_GEOCODER_KEY'] as $k) {
         $x = $app[$k] ?? '';
         if (is_string($x) && $x !== '') $cur[$k] = $x;
     }
     $parts = [];
-    foreach (['APP_SECRET', 'APP_SECRET_PREV', 'TG_BOT_TOKEN'] as $k) {
+    foreach (['APP_SECRET', 'APP_SECRET_PREV', 'TG_BOT_TOKEN', 'YANDEX_GEOCODER_KEY'] as $k) {
         $parts[] = "'$k' => " . literal((string) ($cur[$k] ?? ''));
     }
     if (put(__DIR__ . '/app_secrets.php', "<?php return [" . implode(', ', $parts) . "];\n")) {

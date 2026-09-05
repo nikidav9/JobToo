@@ -747,9 +747,11 @@ function vacancy_card_text(string $vid): ?string {
 }
 
 // ─── Адреса и координаты ──────────────────────────────────────────────────────
-// Ищем через OpenStreetMap/Nominatim: бесплатно, без ключа и работает с
-// сервера — в отличие от Яндекса, у которого наш ключ умеет только рисовать
-// карту.
+// Основной геокодер — Яндекс (сервер в РФ: 152-ФЗ, локализация данных). Ключ
+// серверный, лежит в app_secrets.php (YANDEX_GEOCODER_KEY) — это отдельный ключ
+// «HTTP Геокодер», не тот, что рисует карту в приложении. Пока ключ не задан
+// или Яндекс промолчал — падаем на OpenStreetMap/Nominatim, чтобы поиск адреса
+// не пропал совсем. См. geo_search() ниже: все вызовы идут через неё.
 
 function nominatim_search(string $q, int $timeout = 8): array {
     $url = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
@@ -789,6 +791,72 @@ function nominatim_search(string $q, int $timeout = 8): array {
         ];
     }
     return $out;
+}
+
+// Серверный ключ Яндекс.Геокодера. Пусто — работаем на OpenStreetMap.
+function yandex_geocoder_key(): string {
+    return jt_secret('YANDEX_GEOCODER_KEY');
+}
+
+// Геокодер Яндекса (HTTP API). Сервер в РФ. Формат ответа:
+// response.GeoObjectCollection.featureMember[].GeoObject, координаты в
+// Point.pos как «lon lat». Возвращаем ту же форму, что и nominatim_search:
+// [ ['name'=>..., 'lat'=>float, 'lng'=>float], ... ].
+function yandex_geocode_search(string $q, int $timeout = 6): array {
+    $key = yandex_geocoder_key();
+    if ($key === '') return [];
+    $url = 'https://geocode-maps.yandex.ru/1.x/?' . http_build_query([
+        'apikey'  => $key,
+        'format'  => 'json',
+        'geocode' => $q,
+        'lang'    => 'ru_RU',
+        'results' => 7,
+        // Смещаем выдачу к Москве и области, но не жёстко (rspn=0).
+        'll'   => '37.62,55.75',
+        'spn'  => '1.30,0.80',
+        'rspn' => 0,
+    ]);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => $timeout,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+    ]);
+    $resp = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $dec = json_decode($resp ?: 'null', true);
+    if ($code !== 200 || !is_array($dec)) return [];
+
+    $members = $dec['response']['GeoObjectCollection']['featureMember'] ?? null;
+    if (!is_array($members)) return [];
+
+    $out = [];
+    foreach ($members as $m) {
+        $obj = $m['GeoObject'] ?? null;
+        if (!is_array($obj)) continue;
+        $pos = trim((string)($obj['Point']['pos'] ?? '')); // «lon lat»
+        if ($pos === '') continue;
+        $parts = explode(' ', $pos);
+        if (count($parts) < 2) continue;
+        $lon = (float)$parts[0];
+        $lat = (float)$parts[1];
+        // Полный адрес: metaDataProperty.GeocoderMetaData.text, без «Россия,».
+        $text = $obj['metaDataProperty']['GeocoderMetaData']['text']
+            ?? trim(((string)($obj['description'] ?? '')) . ', ' . ((string)($obj['name'] ?? '')), ', ');
+        $text = preg_replace('/^\s*Россия,\s*/u', '', (string)$text);
+        $out[] = ['name' => $text, 'lat' => $lat, 'lng' => $lon];
+    }
+    return $out;
+}
+
+// Единая точка поиска адреса: сначала Яндекс (если задан ключ), затем — как
+// запасной путь — Nominatim. До появления ключа поведение ровно прежнее.
+function geo_search(string $q, int $timeout = 6): array {
+    if (yandex_geocoder_key() !== '') {
+        $hits = yandex_geocode_search($q, $timeout);
+        if (!empty($hits)) return $hits;
+    }
+    return nominatim_search($q, $timeout);
 }
 
 // Работодатели пишут адрес как придётся. Готовим несколько написаний одного
@@ -838,7 +906,7 @@ function geocode_address(string $address, int $timeout = 4, float $budget = 6.0)
         // времени раньше, чем дойдёт до записи. Дороже координат.
         if (microtime(true) >= $deadline) break;
         $full = $outsideMoscow ? $q . ', Московская область' : $q . ', Москва';
-        foreach (nominatim_search($full, $timeout) as $hit) {
+        foreach (geo_search($full, $timeout) as $hit) {
             if ($hit['lat'] !== null && $hit['lng'] !== null) {
                 return [$hit['lat'], $hit['lng']];
             }
@@ -4452,7 +4520,7 @@ try {
 
         case 'addressSuggest': {
             $text = trim((string)($args[0] ?? ''));
-            $data = mb_strlen($text) >= 3 ? nominatim_search($text . ', Москва') : [];
+            $data = mb_strlen($text) >= 3 ? geo_search($text . ', Москва') : [];
             break;
         }
 

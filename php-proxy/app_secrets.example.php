@@ -23,4 +23,9 @@ return [
 
     // Токен бота из @BotFather.
     'TG_BOT_TOKEN'    => '',
+
+    // Ключ «HTTP Геокодер» Яндекса (developer.tech.yandex.ru → Геокодер).
+    // Сервер в РФ — нужен для локализации данных по 152-ФЗ. Пусто — адреса
+    // ищутся через OpenStreetMap/Nominatim (запасной путь).
+    'YANDEX_GEOCODER_KEY' => '',
 ];
