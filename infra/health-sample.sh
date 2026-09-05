@@ -137,3 +137,16 @@ if [ "$(wc -l < "$OUT" 2>/dev/null || echo 0)" -gt "$KEEP" ]; then
   tail -n "$KEEP" "$OUT" > "$tmp" 2>/dev/null && mv -f "$tmp" "$OUT" 2>/dev/null || rm -f "$tmp"
 fi
 chmod 644 "$OUT" 2>/dev/null || true
+
+# Копия рядом с кодом прокси — для раздела «Доступность» в дашборде.
+#
+# nginx этот файл наружу не отдаёт (на всех vhost он return 404: телеметрия
+# внутренняя). Дашборд берёт историю через admin.php?action=health, за тем же
+# токеном, что и остальную админку. Но контейнер php читает только свой каталог
+# (/var/www/api = /opt/jobtoo-proxy) и до /var/www/html не дотягивается —
+# поэтому кладём копию туда, откуда admin.php её прочитает. 644, чтобы php
+# (uid 33) мог читать; секретов в истории нет.
+if [ -d /opt/jobtoo-proxy ]; then
+  cp -f "$OUT" /opt/jobtoo-proxy/health-history.ndjson 2>/dev/null || true
+  chmod 644 /opt/jobtoo-proxy/health-history.ndjson 2>/dev/null || true
+fi

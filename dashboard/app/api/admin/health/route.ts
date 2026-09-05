@@ -1,22 +1,19 @@
 import { NextResponse } from 'next/server'
-import { isAdmin } from '@/lib/requireAdmin'
 
 /**
  * Доступность сайта — для раздела «Доступность» в дашборде.
  *
- * Источник данных уже есть на сервере: health-sample.sh раз в минуту
- * дописывает строку NDJSON в /var/www/html/health-history.ndjson (окно 30
- * суток), а nginx её отдаёт. Здесь мы её только читаем и превращаем в сводку.
- *
- * Читаем через INTERNAL_API_ORIGIN (адрес по IP через sslip), а НЕ через
- * jobtoo.ru: обращение московской машины к своему же публичному имени по 443
- * периодически виснет на TSPU/SNI-фильтре — тот самый «дашборд долго грузится».
- * sslip ведёт на тот же nginx, но мимо фильтра. Плюс жёсткий таймаут, чтобы
- * зависший запрос не держал страницу.
+ * Источник данных уже есть на сервере: health-sample.sh раз в минуту пишет
+ * строку NDJSON с состоянием (окно 30 суток). Сам файл nginx наружу не отдаёт
+ * (на всех vhost return 404: телеметрия внутренняя), поэтому берём его через
+ * admin.php?action=health — за тем же токеном дашборда, что и остальную
+ * админку, и по тому же «чистому» адресу (sslip, мимо TSPU-фильтра, с
+ * таймаутом). Здесь мы историю только разбираем и превращаем в сводку.
  */
 
-const ORIGIN =
-  process.env.INTERNAL_API_ORIGIN || 'https://147.45.184.99.sslip.io'
+// Тот же адрес, что и в requireAdmin: проверенный путь дашборда к admin.php.
+const ADMIN_API =
+  process.env.ADMIN_API_URL || 'https://jobtoo.ru/api/admin.php'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -82,7 +79,8 @@ function dayTime(iso?: string): string {
 }
 
 export async function GET(req: Request) {
-  if (!(await isAdmin(req))) {
+  const token = req.headers.get('x-admin-token') ?? ''
+  if (!token) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS })
   }
 
@@ -90,11 +88,14 @@ export async function GET(req: Request) {
   const timer = setTimeout(() => ac.abort(), 8000)
   let text = ''
   try {
-    const res = await fetch(`${ORIGIN}/health-history.ndjson`, {
+    const res = await fetch(`${ADMIN_API}?action=health`, {
       cache: 'no-store',
       signal: ac.signal,
-      headers: { Accept: 'application/x-ndjson, text/plain' },
+      headers: { 'X-Admin-Token': token, Accept: 'application/x-ndjson, text/plain' },
     })
+    if (res.status === 401) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS })
+    }
     if (!res.ok) {
       return NextResponse.json(
         { error: `История здоровья недоступна (${res.status})` },
