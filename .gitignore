@@ -57,3 +57,7 @@ php-proxy/sb_service_key.php
 php-proxy/admin_credentials.php
 php-proxy/app_secrets.php
 php-proxy/sb_url.php
+php-proxy/deploy_token.php
+php-proxy/studio_credentials.php
+php-proxy/gh_token.php
+php-proxy/backup_s3.php
