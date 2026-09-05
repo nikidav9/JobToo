@@ -89,17 +89,10 @@ jobs:
       # На московский сервер секреты уходят ниже, шагом «Deliver secrets»:
       # не файлами в сборке, а отдельным запросом к deploy.php.
 
-      - name: Inject Yandex Metrika into index.html
-        run: |
-          python3 - <<'PYEOF'
-          metrika = """<!-- Yandex.Metrika counter --><script type="text/javascript">(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};m[i].l=1*new Date();for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})(window,document,"script","https://mc.yandex.ru/metrika/tag.js?id=109805381","ym");ym(109805381,"init",{ssr:true,webvisor:true,clickmap:true,ecommerce:"dataLayer",referrer:document.referrer,url:location.href,accurateTrackBounce:true,trackLinks:true});</script><noscript><div><img src="https://mc.yandex.ru/watch/109805381" style="position:absolute;left:-9999px;" alt=""/></div></noscript><!-- /Yandex.Metrika counter -->"""
-          with open("dist/index.html", "r") as f:
-              html = f.read()
-          html = html.replace("</head>", metrika + "</head>", 1)
-          with open("dist/index.html", "w") as f:
-              f.write(html)
-          print("Metrika injected OK")
-          PYEOF
+      # Яндекс.Метрику больше НЕ вставляем в index.html: она грузилась бы до
+      # согласия посетителя. Теперь её подключает компонент CookieConsent
+      # (components/CookieConsent.tsx) — только после нажатия «Принять» в баннере
+      # про cookie. Счётчик тот же (109805381).
 
       # Секреты — на московский сервер.
       #

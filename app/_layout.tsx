@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AlertProvider } from '@/template';
 import { AppProvider, AppContext } from '@/contexts/AppContext';
 import ConsentGate from '@/components/ConsentGate';
+import CookieConsent from '@/components/CookieConsent';
 import { ToastLayer } from '@/components/ui/ToastLayer';
 import { setupAndroidChannels } from '@/services/notifications';
 import { routeForNotification } from '@/services/notificationRoute';
@@ -240,6 +241,8 @@ export default function RootLayout() {
               приложение до принятия документов, а сообщения о неудачной
               записи должны быть видны и над ним. */}
           <ConsentGate />
+          {/* Баннер cookie/Метрики — только веб; грузит аналитику после согласия. */}
+          <CookieConsent />
           <ToastLayer />
         </AppProvider>
       </SafeAreaProvider>
