@@ -8,6 +8,7 @@ export interface AppNotification {
   createdAt: string;
 }
 import { Platform, AppState, AppStateStatus } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { getSupabaseClient } from '@/template';
 import { User, Vacancy, Like, Chat, PermVacancy, PermApplication } from '@/constants/types';
@@ -91,6 +92,8 @@ export interface AppContextValue {
   currentUser: User | null;
   loading: boolean;
   vacanciesLoading: boolean;
+  networkOnline: boolean | null;
+  vacanciesError: boolean;
   toast: ToastMessage | null;
   showToast: (message: string, type?: ToastType) => void;
   users: User[];
@@ -154,6 +157,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [loading, setLoading] = useState(true);
   const [dataReady, setDataReady] = useState(false);
   const [vacanciesLoading, setVacanciesLoading] = useState(false);
+  const [networkOnline, setNetworkOnline] = useState<boolean | null>(null);
+  const [vacanciesError, setVacanciesError] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -176,6 +181,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [vacancyStatsMap, setVacancyStatsMap] = useState<Record<string, VacancyStats>>({});
   const [responsivenessMap, setResponsivenessMap] = useState<Record<string, Responsiveness>>({});
   const [permVacancyViewsMap, setPermVacancyViewsMap] = useState<Record<string, number>>({});
+
+  // One shared connectivity signal prevents an empty response from looking like
+  // a genuinely empty vacancy feed. Cached data remains visible while offline.
+  useEffect(() => {
+    return NetInfo.addEventListener(state => {
+      if (state.isConnected === false || state.isInternetReachable === false) {
+        setNetworkOnline(false);
+      } else if (state.isConnected === true) {
+        setNetworkOnline(true);
+      } else {
+        setNetworkOnline(null);
+      }
+    });
+  }, []);
 
   const unreadNotifCount = notifications.filter(n => !n.isRead).length;
 
@@ -779,7 +798,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       const data = await dbGetVacancies();
       setVacancies(data);
+      setVacanciesError(false);
       saveCache(CACHE_KEYS.vacancies, data).catch(() => {});
+    } catch (error) {
+      // Do not clear the previous list: it is the usable offline fallback.
+      setVacanciesError(true);
+      throw error;
     } finally {
       if (!silent) setVacanciesLoading(false);
     }
@@ -893,6 +917,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         loading,
         dataReady,
         vacanciesLoading,
+        networkOnline,
+        vacanciesError,
         toast,
         showToast,
         users,
