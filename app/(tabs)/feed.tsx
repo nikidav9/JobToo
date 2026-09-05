@@ -1415,10 +1415,9 @@ function WorkerFeed() {
         pan.setOffset({ x: (pan.x as any)._value, y: (pan.y as any)._value });
         pan.setValue({ x: 0, y: 0 });
       },
-      // Тащим карточку только по горизонтали: решение — влево/вправо, а
-      // вертикаль людей путала (можно было увести вверх-вниз). Наклон и «улёт»
-      // в сторону при отпускании остаются — их задаёт animateCard.
-      onPanResponderMove: Animated.event([null, { dx: pan.x }], { useNativeDriver: false }),
+      // Карточка свободно следует за пальцем в любую сторону (без рывков), а
+      // решение — по горизонтали: вправо — отклик, влево — отказ.
+      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
       onPanResponderRelease: (_, { dx, vx }) => {
         pan.flattenOffset();
         if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) {
@@ -2083,7 +2082,7 @@ function WorkerPermMode() {
     }
   };
 
-  const renderPerm = ({ item: v }: { item: PermVacancy | ExternalVacancy }) => {
+  const renderPerm = ({ item: v, deck = false }: { item: PermVacancy | ExternalVacancy; deck?: boolean }) => {
     const isExternal = 'sourceId' in v;
     if (isExternal) {
       const company = v.company ?? v.sourceName ?? 'Компания';
@@ -2145,12 +2144,12 @@ function WorkerPermMode() {
 
     const displayCompany = normalizeCompany(v.company);
 
-    return (
-      <TouchableOpacity
-        style={pS.card}
-        onPress={() => router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId: v.id } })}
-        activeOpacity={0.92}
-      >
+    // Содержимое карточки. В режиме колоды (deck) оно прокручивается внутри
+    // самой карточки — если вакансия большая (длинное описание и т.д.), её
+    // листаешь по разделам, а рамка карточки остаётся на месте и её можно
+    // свайпать вправо/влево.
+    const cardBody = (
+      <>
         {statusInfo ? (
           <View style={[pS.statusBadge, { backgroundColor: statusInfo.bg }]}>
             <Ionicons name={statusInfo.icon} size={rf(12)} color={statusInfo.color} />
@@ -2240,48 +2239,77 @@ function WorkerPermMode() {
           <Text style={pS.viewsTxt}>{permVacancyViewsMap[v.id] ?? 0} просмотрели</Text>
         </View>
 
-        {/* Actions */}
-        <View style={pS.actionRow}>
-          <TouchableOpacity
-            style={[pS.applyBtn, isApplied && pS.applyBtnDone, isApplying && { opacity: 0.6 }]}
-            onPress={(e) => { e.stopPropagation?.(); applyTo(v); }}
-            disabled={isApplied || isApplying}
-            activeOpacity={0.8}
+        {/* Actions — в режиме колоды скрыты: приём/отказ делаются свайпом или
+            круглыми кнопками ✕/♥ под карточкой (без дублирования). */}
+        {!deck ? (
+          <View style={pS.actionRow}>
+            <TouchableOpacity
+              style={[pS.applyBtn, isApplied && pS.applyBtnDone, isApplying && { opacity: 0.6 }]}
+              onPress={(e) => { e.stopPropagation?.(); applyTo(v); }}
+              disabled={isApplied || isApplying}
+              activeOpacity={0.8}
+            >
+              <Text style={[pS.applyBtnTxt, isApplied && { color: Colors.green }]}>
+                {isApplied ? '✓ Отклик отправлен' : 'Откликнуться'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[pS.actionIconBtn, chatLoading === v.id && { opacity: 0.5 }]}
+              onPress={(e) => { e.stopPropagation?.(); openPermChat(v, displayCompany); }}
+              disabled={chatLoading === v.id}
+              activeOpacity={0.8}
+            >
+              {chatLoading === v.id
+                ? <ActivityIndicator size={14} color={Colors.textSecondary} />
+                : <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
+              }
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={pS.actionIconBtn}
+              onPress={(e) => { e.stopPropagation?.(); shareVacancy(v); }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="share-outline" size={17} color={Colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[pS.actionIconBtn, isSaved && pS.actionIconBtnSaved]}
+              onPress={(e) => { e.stopPropagation?.(); toggleSaved(v); }}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={isSaved ? 'heart' : 'heart-outline'}
+                size={17}
+                color={isSaved ? Colors.red : Colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+      </>
+    );
+
+    if (deck) {
+      // Карточка заполняет доступную высоту; содержимое листается внутри неё,
+      // рамка остаётся на месте (её свайпают вправо/влево).
+      return (
+        <View style={[pS.card, pS.deckCard]}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={pS.deckCardContent}
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={[pS.applyBtnTxt, isApplied && { color: Colors.green }]}>
-              {isApplied ? '✓ Отклик отправлен' : 'Откликнуться'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[pS.actionIconBtn, chatLoading === v.id && { opacity: 0.5 }]}
-            onPress={(e) => { e.stopPropagation?.(); openPermChat(v, displayCompany); }}
-            disabled={chatLoading === v.id}
-            activeOpacity={0.8}
-          >
-            {chatLoading === v.id
-              ? <ActivityIndicator size={14} color={Colors.textSecondary} />
-              : <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
-            }
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={pS.actionIconBtn}
-            onPress={(e) => { e.stopPropagation?.(); shareVacancy(v); }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="share-outline" size={17} color={Colors.textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[pS.actionIconBtn, isSaved && pS.actionIconBtnSaved]}
-            onPress={(e) => { e.stopPropagation?.(); toggleSaved(v); }}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name={isSaved ? 'heart' : 'heart-outline'}
-              size={17}
-              color={isSaved ? Colors.red : Colors.textSecondary}
-            />
-          </TouchableOpacity>
+            {cardBody}
+          </ScrollView>
         </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={pS.card}
+        onPress={() => router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId: v.id } })}
+        activeOpacity={0.92}
+      >
+        {cardBody}
       </TouchableOpacity>
     );
   };
@@ -2300,8 +2328,10 @@ function WorkerPermMode() {
   const swPan = useRef(new Animated.ValueXY()).current;
   const [swSkipped, setSwSkipped] = useState<Set<string>>(new Set());
   const swBusy = useRef(false);
-  const openDeck = tab === 'open' ? shownVacancies.filter(v => !swSkipped.has(v.id)) : [];
-  const swTop = openDeck[0];
+  // Колода-свайп для «Открытых» и «Избранного». «Отклики» остаются списком.
+  const deckActive = tab === 'open' || tab === 'saved';
+  const deckCards = deckActive ? shownVacancies.filter(v => !swSkipped.has(v.id)) : [];
+  const swTop = deckCards[0];
   const swRotate = swPan.x.interpolate({ inputRange: [-SW / 2, 0, SW / 2], outputRange: ['-8deg', '0deg', '8deg'], extrapolate: 'clamp' });
   const swWantOp = swPan.x.interpolate({ inputRange: [0, SWIPE_THRESHOLD], outputRange: [0, 1], extrapolate: 'clamp' });
   const swSkipOp = swPan.x.interpolate({ inputRange: [-SWIPE_THRESHOLD, 0], outputRange: [1, 0], extrapolate: 'clamp' });
@@ -2323,19 +2353,28 @@ function WorkerPermMode() {
       after();
     });
   };
+  // Вправо — принять: отклик (уходит в «Отклики» → матчи, ждёт ответа). В
+  // «Избранном» вдобавок убираем из избранного. Партнёрские (внешние) — не наш
+  // отклик, их просто листаем дальше.
   const swWant = (vx = 0.5) => {
     const c = swTop;
     if (!c) return;
-    // Партнёрские (внешние) — не наш отклик, их просто листаем дальше.
     swFly('right', vx, () => {
       setSwSkipped(s => new Set(s).add(c.id));
-      if (!('sourceId' in c)) applyTo(c as PermVacancy);
+      if (!('sourceId' in c)) {
+        if (tab === 'saved' && permSavedIds.includes(c.id)) toggleSaved(c as PermVacancy);
+        applyTo(c as PermVacancy);
+      }
     });
   };
+  // Влево — отказ: листаем дальше. В «Избранном» отказ убирает из избранного.
   const swSkip = (vx = 0.5) => {
     const c = swTop;
     if (!c) return;
-    swFly('left', vx, () => setSwSkipped(s => new Set(s).add(c.id)));
+    swFly('left', vx, () => {
+      setSwSkipped(s => new Set(s).add(c.id));
+      if (tab === 'saved' && !('sourceId' in c) && permSavedIds.includes(c.id)) toggleSaved(c as PermVacancy);
+    });
   };
   const swWantRef = useRef(swWant); swWantRef.current = swWant;
   const swSkipRef = useRef(swSkip); swSkipRef.current = swSkip;
@@ -2347,7 +2386,7 @@ function WorkerPermMode() {
         swPan.setOffset({ x: (swPan.x as any)._value, y: (swPan.y as any)._value });
         swPan.setValue({ x: 0, y: 0 });
       },
-      onPanResponderMove: Animated.event([null, { dx: swPan.x }], { useNativeDriver: false }),
+      onPanResponderMove: Animated.event([null, { dx: swPan.x, dy: swPan.y }], { useNativeDriver: false }),
       onPanResponderRelease: (_, { dx, vx }) => {
         swPan.flattenOffset();
         if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) swWantRef.current(Math.abs(vx));
@@ -2360,36 +2399,6 @@ function WorkerPermMode() {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Search + Filters */}
-      <View style={pS.searchRow}>
-        <View style={pS.searchBox}>
-          <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
-          <TextInput
-            style={pS.searchInput}
-            value={searchText}
-            onChangeText={setSearchText}
-            placeholder="Поиск вакансий..."
-            placeholderTextColor={Colors.textMuted}
-          />
-          {searchText ? (
-            <TouchableOpacity onPress={() => setSearchText('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={16} color={Colors.textMuted} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-        <TouchableOpacity
-          style={[pS.filtersBtn, filterStation ? pS.filtersBtnActive : null]}
-          onPress={() => (filterStation ? setFilterStation(null) : setMapOpen(true))}
-          activeOpacity={0.8}
-        >
-          <Ionicons
-            name={filterStation ? 'close' : 'map-outline'}
-            size={16}
-            color={filterStation ? '#FFFFFF' : Colors.textSecondary}
-          />
-        </TouchableOpacity>
-      </View>
-
       {filterStation ? (
         <TouchableOpacity style={pS.activeStationChip} onPress={() => setFilterStation(null)} activeOpacity={0.8}>
           <Ionicons name="location" size={13} color={Colors.primary} />
@@ -2406,68 +2415,77 @@ function WorkerPermMode() {
         onClose={() => setMapOpen(false)}
       />
 
-      {/* Tab chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={pS.tabChipsRow}
-        style={pS.tabChipsScroll}
-      >
-        {TAB_CONFIG.map(t => {
-          const isActive = tab === t.key;
-          return (
-            <TouchableOpacity
-              key={t.key}
-              style={[pS.tabChip, isActive && pS.tabChipActive]}
-              onPress={() => setTab(t.key)}
-              activeOpacity={0.8}
-            >
-              {t.key === 'saved' ? (
-                <Ionicons
-                  name="heart"
-                  size={13}
-                  color={isActive ? Colors.primary : Colors.textMuted}
-                />
-              ) : null}
-              <Text style={[pS.tabChipTxt, isActive && pS.tabChipTxtActive]}>
-                {t.label}
-              </Text>
-              <Text style={[pS.tabChipCount, isActive && pS.tabChipCountActive]}>
-                {t.count}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {/* Tab chips + map filter */}
+      <View style={pS.tabsBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={pS.tabChipsRow}
+          style={pS.tabChipsScroll}
+        >
+          {TAB_CONFIG.map(t => {
+            const isActive = tab === t.key;
+            return (
+              <TouchableOpacity
+                key={t.key}
+                style={[pS.tabChip, isActive && pS.tabChipActive]}
+                onPress={() => setTab(t.key)}
+                activeOpacity={0.8}
+              >
+                {t.key === 'saved' ? (
+                  <Ionicons
+                    name="heart"
+                    size={13}
+                    color={isActive ? Colors.primary : Colors.textMuted}
+                  />
+                ) : null}
+                <Text style={[pS.tabChipTxt, isActive && pS.tabChipTxtActive]}>
+                  {t.label}
+                </Text>
+                <Text style={[pS.tabChipCount, isActive && pS.tabChipCountActive]}>
+                  {t.count}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        <TouchableOpacity
+          style={[pS.filtersBtn, filterStation ? pS.filtersBtnActive : null]}
+          onPress={() => (filterStation ? setFilterStation(null) : setMapOpen(true))}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name={filterStation ? 'close' : 'map-outline'}
+            size={16}
+            color={filterStation ? '#FFFFFF' : Colors.textSecondary}
+          />
+        </TouchableOpacity>
+      </View>
 
-      {tab === 'open' ? (
-        // Открытые — свайп-колода (карточки, как в сменах и матчах).
+      {deckActive ? (
+        // «Открытые» и «Избранное» — свайп-колода (как в сменах и матчах).
         !swTop ? (
           <View style={styles.emptyState}>
-            <Ionicons name={emptyMessages.open.icon} size={48} color={Colors.textMuted} />
-            <Text style={styles.emptyTitle}>{emptyMessages.open.title}</Text>
-            <Text style={styles.emptySubtitle}>{emptyMessages.open.sub}</Text>
+            <Ionicons name={emptyMessages[tab].icon} size={48} color={Colors.textMuted} />
+            <Text style={styles.emptyTitle}>{emptyMessages[tab].title}</Text>
+            <Text style={styles.emptySubtitle}>{emptyMessages[tab].sub}</Text>
           </View>
         ) : (
           <View style={{ flex: 1 }}>
-            <ScrollView
-              contentContainerStyle={{ padding: 16, paddingBottom: tabBarHeight + 96 }}
-              showsVerticalScrollIndicator={false}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
+            {/* Рамка карточки заполняет высоту экрана; содержимое листается
+                внутри неё, а саму рамку свайпаешь вправо/влево. */}
+            <Animated.View
+              style={{ flex: 1, margin: 16, marginBottom: tabBarHeight + 96, transform: [{ translateX: swPan.x }, { translateY: swPan.y }, { rotate: swRotate }] }}
+              {...swPanResponder.panHandlers}
             >
-              <Animated.View
-                style={{ transform: [{ translateX: swPan.x }, { translateY: swPan.y }, { rotate: swRotate }] }}
-                {...swPanResponder.panHandlers}
-              >
-                <Animated.View style={[swS.wantOverlay, { opacity: swWantOp }]} pointerEvents="none">
-                  <Text style={swS.wantTxt}>ОТКЛИК ♥</Text>
-                </Animated.View>
-                <Animated.View style={[swS.skipOverlay, { opacity: swSkipOp }]} pointerEvents="none">
-                  <Text style={swS.skipTxt}>НЕТ ✕</Text>
-                </Animated.View>
-                {renderPerm({ item: swTop })}
+              <Animated.View style={[swS.wantOverlay, { opacity: swWantOp }]} pointerEvents="none">
+                <Text style={swS.wantTxt}>ОТКЛИК ♥</Text>
               </Animated.View>
-            </ScrollView>
+              <Animated.View style={[swS.skipOverlay, { opacity: swSkipOp }]} pointerEvents="none">
+                <Text style={swS.skipTxt}>НЕТ ✕</Text>
+              </Animated.View>
+              {renderPerm({ item: swTop, deck: true })}
+            </Animated.View>
             <View style={swS.actions} pointerEvents="box-none">
               <TouchableOpacity style={[swS.actBtn, swS.actSkip]} onPress={() => swSkip()} activeOpacity={0.85}>
                 <Ionicons name="close" size={26} color={Colors.red} />
@@ -3018,9 +3036,13 @@ const pS = StyleSheet.create({
   activeStationTxt: { fontSize: rf(13), fontWeight: '700', color: Colors.primary },
 
   // — tab chips —
-  tabChipsScroll: {
-    flexGrow: 0, flexShrink: 0, alignSelf: 'stretch',
+  tabsBar: {
+    flexDirection: 'row', alignItems: 'center', gap: rs(8),
+    paddingRight: rs(12),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
+  },
+  tabChipsScroll: {
+    flex: 1, flexShrink: 1, alignSelf: 'stretch',
   },
   tabChipsRow: {
     flexDirection: 'row', gap: rs(8),
@@ -3043,6 +3065,10 @@ const pS = StyleSheet.create({
     backgroundColor: Colors.bg, borderRadius: rs(18),
     padding: rs(16), gap: rs(10), ...Shadow.card,
   },
+  // В режиме колоды карточка тянется на всю высоту; вертикальный отступ даёт
+  // ScrollView внутри (deckCardContent), поэтому у самой рамки padding = 0.
+  deckCard: { flex: 1, padding: 0, overflow: 'hidden' },
+  deckCardContent: { padding: rs(16), gap: rs(10) },
   externalHead: { flexDirection: 'row', alignItems: 'flex-start', gap: rs(10) },
   externalBadge: {
     maxWidth: rs(110), paddingHorizontal: rs(8), paddingVertical: rs(4),
