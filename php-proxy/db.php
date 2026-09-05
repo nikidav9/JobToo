@@ -809,11 +809,70 @@ function yandex_geocode_search(string $q, int $timeout = 6): array {
     return $out;
 }
 
-// Единая точка поиска адреса — только Яндекс (сервер в РФ). Иностранных
-// сервисов здесь нет: нет ключа или Яндекс молчит — вернём пусто, но наружу за
-// границу ничего не уйдёт.
+// Серверный ключ Яндекс.Геосаджеста (подсказки адреса). Российский сервис.
+function yandex_suggest_key(): string {
+    return jt_secret('YANDEX_SUGGEST_KEY');
+}
+
+// Яндекс.Геосаджест (suggest-maps.yandex.ru): подсказки адреса при вводе.
+// Возвращаем ту же форму [ ['name'=>..., 'lat'=>float|null, 'lng'=>float|null] ].
+// Координаты достаём из uri (ll=<lon>,<lat>), если Яндекс их отдал; иначе null —
+// поле адреса и без координат работает (просто без метки на карте).
+function yandex_suggest_search(string $q, int $timeout = 6): array {
+    $key = yandex_suggest_key();
+    if ($key === '') return [];
+    $url = 'https://suggest-maps.yandex.ru/v1/suggest?' . http_build_query([
+        'apikey'        => $key,
+        'text'          => $q,
+        'lang'          => 'ru',
+        'results'       => 7,
+        'print_address' => 1,
+        'attrs'         => 'uri',
+        // Смещаем подсказки к Москве и области.
+        'll'  => '37.62,55.75',
+        'spn' => '1.30,0.80',
+    ]);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => $timeout,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+    ]);
+    $resp = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $dec = json_decode($resp ?: 'null', true);
+    if ($code !== 200 || !is_array($dec)) return [];
+
+    $results = $dec['results'] ?? null;
+    if (!is_array($results)) return [];
+
+    $out = [];
+    foreach ($results as $r) {
+        $name = $r['address']['formatted_address']
+            ?? trim(((string)($r['title']['text'] ?? '')) . ', ' . ((string)($r['subtitle']['text'] ?? '')), ', ');
+        $name = preg_replace('/^\s*Россия,\s*/u', '', (string)$name);
+        if ($name === '') continue;
+        $lat = null; $lng = null;
+        $uri = (string)($r['uri'] ?? '');
+        // ymapsbm1://geo?ll=<lon>,<lat>&… — координаты, если пришли.
+        if ($uri !== '' && preg_match('/[?&]ll=([-0-9.]+)(?:,|%2C)([-0-9.]+)/i', $uri, $mm)) {
+            $lng = (float)$mm[1];
+            $lat = (float)$mm[2];
+        }
+        $out[] = ['name' => $name, 'lat' => $lat, 'lng' => $lng];
+    }
+    return $out;
+}
+
+// Единая точка поиска адреса — только российские сервисы Яндекса. Если есть
+// ключ HTTP-геокодера — берём его (даёт координаты точно); иначе — Геосаджест
+// (подсказки, координаты по возможности). Иностранных сервисов здесь нет.
 function geo_search(string $q, int $timeout = 6): array {
-    return yandex_geocode_search($q, $timeout);
+    if (yandex_geocoder_key() !== '') {
+        $hits = yandex_geocode_search($q, $timeout);
+        if (!empty($hits)) return $hits;
+    }
+    return yandex_suggest_search($q, $timeout);
 }
 
 // Работодатели пишут адрес как придётся. Готовим несколько написаний одного
