@@ -827,7 +827,6 @@ function yandex_suggest_search(string $q, int $timeout = 6): array {
         'lang'          => 'ru',
         'results'       => 7,
         'print_address' => 1,
-        'attrs'         => 'uri',
         // Смещаем подсказки к Москве и области.
         'll'  => '37.62,55.75',
         'spn' => '1.30,0.80',
