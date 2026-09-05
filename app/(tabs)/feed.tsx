@@ -1625,12 +1625,15 @@ function WorkerFeed() {
                           </Text>
                         </View>
                       </View>
-                      {currentCard.isUrgent ? (
-                        <View style={styles.urgentTag}>
-                          <Ionicons name="flash" size={11} color="#92400E" />
-                          <Text style={styles.urgentTagTxt}>Срочно</Text>
-                        </View>
-                      ) : null}
+                      <View style={styles.cardBadges}>
+                        {currentCard.isUrgent ? (
+                          <View style={styles.urgentTag}>
+                            <Ionicons name="flash" size={11} color="#92400E" />
+                            <Text style={styles.urgentTagTxt}>Срочно</Text>
+                          </View>
+                        ) : null}
+                        <SourceBadge partnerName={'external' in currentCard ? ((currentCard as PartnerShiftCard).external.sourceName ?? 'Партнёр') : undefined} />
+                      </View>
                     </View>
 
                     <Text style={styles.jobTitle} numberOfLines={2}>{currentCard.title}</Text>
@@ -1799,6 +1802,66 @@ const SALARY_CHIPS = [
   { label: '80 000+', value: 80000 },
   { label: '100 000+', value: 100000 },
 ];
+
+// Значок в углу карточки. У наших вакансий — фирменный вордмарк JobToo (как в
+// шапке, components/ui/TabHeader.tsx), у партнёрских (залитых по API) — название
+// источника. Логотип-картинку партнёра добавим позже отдельным полем.
+function SourceBadge({ partnerName }: { partnerName?: string }) {
+  if (partnerName) {
+    return (
+      <View style={styles.sourceBadge}>
+        <Text style={styles.sourceBadgeTxt} numberOfLines={1}>{partnerName}</Text>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.jtBadge}>
+      <Text style={styles.jtBadgeTxt}>
+        <Text style={styles.jtBadgeB}>Job</Text>
+        <Text style={styles.jtBadgeO}>Too</Text>
+      </Text>
+    </View>
+  );
+}
+
+// Засчитывает просмотр верхней карточки колоды «Работа».
+//
+// Раньше просмотр писался только в списочном режиме (onViewableItemsChanged у
+// FlatList), а «Открытые»/«Избранное» давно стали свайп-колодой — и листание
+// карточек не засчитывалось вовсе, число «Просмотрели» не росло. Здесь
+// повторяем логику колоды смен: гость — событие аналитики, партнёр — внешний
+// импрешн, наша вакансия — запись в jm_perm_vacancy_views (сервер сам
+// схлопывает дубли по паре vacancy_id+worker_id).
+//
+// Отдельным компонентом, а не useEffect в теле WorkerPermMode: там ниже есть
+// ранний return (гость без currentUser), и хук после него нарушил бы порядок
+// хуков.
+function PermDeckViewRecorder({ vacancy, userId, isGuest }: {
+  vacancy: PermVacancy | ExternalVacancy | undefined;
+  userId: string;
+  isGuest: boolean;
+}) {
+  const vid = vacancy?.id;
+  const isExternal = !!vacancy && 'sourceId' in vacancy;
+  const sourceId = isExternal ? (vacancy as ExternalVacancy).sourceId : null;
+  useEffect(() => {
+    if (!vid) return;
+    const t = setTimeout(() => {
+      if (isGuest) {
+        void dbRecordGuestEvent('vacancy_impression', {
+          vacancyId: vid,
+          vacancyKind: isExternal ? 'external' : 'permanent',
+          sourceId,
+        });
+        return;
+      }
+      if (isExternal && sourceId) dbRecordExternalImpression(vid, sourceId).catch(() => {});
+      else if (!isExternal && userId) dbRecordPermVacancyView(vid, userId).catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [vid, userId, isGuest, isExternal, sourceId]);
+  return null;
+}
 
 function WorkerPermMode() {
   const router = useRouter();
@@ -2038,7 +2101,7 @@ function WorkerPermMode() {
 
   const TAB_CONFIG: { key: PermTab; label: string; count: number }[] = [
     { key: 'open',    label: 'Открытые',     count: openVacancies.length + externalOpenVacancies.length },
-    { key: 'applied', label: 'Откликнулись', count: appliedVacancies.length },
+    // «Откликнулись» убрали: отклики и их статусы видны в разделе «Мэтчи».
     { key: 'saved',   label: 'Избранное',    count: savedVacancies.length },
   ];
 
@@ -2441,10 +2504,7 @@ function WorkerPermMode() {
                       </Text>
                     </View>
                   </View>
-                  <View style={styles.urgentTag}>
-                    <Ionicons name="briefcase" size={11} color="#92400E" />
-                    <Text style={styles.urgentTagTxt}>Работа</Text>
-                  </View>
+                  <SourceBadge partnerName={isExternal ? (sourceName ?? 'Партнёр') : undefined} />
                 </View>
 
                 <Text style={styles.jobTitle} numberOfLines={2}>{v.title}</Text>
@@ -2577,8 +2637,8 @@ function WorkerPermMode() {
                 {t.key === 'saved' ? (
                   <Ionicons
                     name="heart"
-                    size={13}
-                    color={isActive ? Colors.primary : Colors.textMuted}
+                    size={15}
+                    color={Colors.red}
                   />
                 ) : null}
                 <Text style={[pS.tabChipTxt, isActive && pS.tabChipTxtActive]}>
@@ -2613,7 +2673,10 @@ function WorkerPermMode() {
             <Text style={styles.emptySubtitle}>{emptyMessages[tab].sub}</Text>
           </View>
         ) : (
-          renderPermDeckCard(swTop)
+          <>
+            <PermDeckViewRecorder vacancy={swTop} userId={currentUser.id} isGuest={isGuest} />
+            {renderPermDeckCard(swTop)}
+          </>
         )
       ) : shownVacancies.length === 0 ? (
         <View style={styles.emptyState}>
@@ -3332,6 +3395,13 @@ const styles = StyleSheet.create({
   metroHint: { fontSize: rf(12), color: Colors.textMuted },
   urgentTag: { flexDirection: 'row', alignItems: 'center', gap: rs(3), backgroundColor: '#FEF3C7', borderRadius: rs(8), paddingHorizontal: rs(8), paddingVertical: rs(4), flexShrink: 0 },
   urgentTagTxt: { fontSize: rf(11), fontWeight: '700', color: '#92400E' },
+  cardBadges: { alignItems: 'flex-end', gap: rs(4), flexShrink: 0 },
+  jtBadge: { backgroundColor: Colors.primaryLight, borderRadius: rs(8), paddingHorizontal: rs(8), paddingVertical: rs(4), flexShrink: 0 },
+  jtBadgeTxt: { fontSize: rf(12.5) },
+  jtBadgeB: { fontWeight: '800', color: Colors.textPrimary },
+  jtBadgeO: { fontWeight: '800', color: Colors.primary },
+  sourceBadge: { backgroundColor: '#EEF1F4', borderRadius: rs(8), paddingHorizontal: rs(8), paddingVertical: rs(4), maxWidth: rs(120), flexShrink: 0 },
+  sourceBadgeTxt: { fontSize: rf(11), fontWeight: '700', color: Colors.textSecondary },
   metroHintRow: { flexDirection: 'row', alignItems: 'center', gap: rs(4), marginTop: rs(2) },
   jobTitle: { fontSize: rf(22), fontWeight: '800', color: Colors.textPrimary, lineHeight: rf(28) },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: rs(6) },
