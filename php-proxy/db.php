@@ -849,12 +849,16 @@ function yandex_geocode_search(string $q, int $timeout = 6): array {
     return $out;
 }
 
-// Единая точка поиска адреса: сначала Яндекс (если задан ключ), затем — как
-// запасной путь — Nominatim. До появления ключа поведение ровно прежнее.
+// Единая точка поиска адреса.
+//
+// Когда задан ключ Яндекса — адреса ищет ТОЛЬКО Яндекс (сервер в РФ), а
+// иностранный OpenStreetMap не вызывается вовсе (отключён по требованию).
+// Nominatim остаётся исключительно как аварийный путь на случай, если ключа
+// нет совсем (окружение без секрета) — иначе при любой заминке с ключом поиск
+// адреса молча перестал бы работать.
 function geo_search(string $q, int $timeout = 6): array {
     if (yandex_geocoder_key() !== '') {
-        $hits = yandex_geocode_search($q, $timeout);
-        if (!empty($hits)) return $hits;
+        return yandex_geocode_search($q, $timeout);
     }
     return nominatim_search($q, $timeout);
 }
