@@ -1418,7 +1418,9 @@ function WorkerFeed() {
       },
       // Карточка свободно следует за пальцем в любую сторону (без рывков), а
       // решение — по горизонтали: вправо — отклик, влево — отказ.
-      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+      // Карточка ходит только по горизонтали (влево/вправо). Вертикаль не
+      // трогаем — она уходит во внутренний скролл содержимого карточки.
+      onPanResponderMove: Animated.event([null, { dx: pan.x }], { useNativeDriver: false }),
       onPanResponderRelease: (_, { dx, vx }) => {
         pan.flattenOffset();
         if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) {
@@ -2383,7 +2385,8 @@ function WorkerPermMode() {
         swPan.setOffset({ x: (swPan.x as any)._value, y: (swPan.y as any)._value });
         swPan.setValue({ x: 0, y: 0 });
       },
-      onPanResponderMove: Animated.event([null, { dx: swPan.x, dy: swPan.y }], { useNativeDriver: false }),
+      // Только горизонталь: вертикальный жест уходит во внутренний скролл.
+      onPanResponderMove: Animated.event([null, { dx: swPan.x }], { useNativeDriver: false }),
       onPanResponderRelease: (_, { dx, vx }) => {
         swPan.flattenOffset();
         if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) swWantRef.current(Math.abs(vx));

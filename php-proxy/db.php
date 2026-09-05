@@ -747,60 +747,20 @@ function vacancy_card_text(string $vid): ?string {
 }
 
 // ─── Адреса и координаты ──────────────────────────────────────────────────────
-// Основной геокодер — Яндекс (сервер в РФ: 152-ФЗ, локализация данных). Ключ
-// серверный, лежит в app_secrets.php (YANDEX_GEOCODER_KEY) — это отдельный ключ
-// «HTTP Геокодер», не тот, что рисует карту в приложении. Пока ключ не задан
-// или Яндекс промолчал — падаем на OpenStreetMap/Nominatim, чтобы поиск адреса
-// не пропал совсем. См. geo_search() ниже: все вызовы идут через неё.
+// Геокодер только один — Яндекс (сервер в РФ: 152-ФЗ, локализация данных). Ключ
+// серверный, лежит в app_secrets.php (YANDEX_GEOCODER_KEY). Иностранных
+// геокодеров в проекте нет: если ключа нет или Яндекс молчит — координаты просто
+// не определяются, но ни один запрос за границу не уходит. Все вызовы идут через
+// geo_search() ниже.
 
-function nominatim_search(string $q, int $timeout = 8): array {
-    $url = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
-        'q' => $q,
-        'format' => 'jsonv2',
-        'addressdetails' => 1,
-        'limit' => 7,
-        'accept-language' => 'ru',
-        'countrycodes' => 'ru',
-        // приоритет Москве и области, но не жёстко (bounded=0)
-        'viewbox' => '36.80,56.02,37.97,55.14',
-        'bounded' => 0,
-    ]);
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => $timeout,
-        CURLOPT_SSL_VERIFYPEER => true,
-        // Nominatim требует идентифицирующий User-Agent
-        CURLOPT_HTTPHEADER => ['User-Agent: JobToo/1.0 (+https://jobtoo.ru)', 'Accept: application/json'],
-    ]);
-    $resp = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-    $dec = json_decode($resp ?: 'null', true);
-    if ($code !== 200 || !is_array($dec)) return [];
-
-    $out = [];
-    foreach ($dec as $r) {
-        $name = $r['display_name'] ?? '';
-        if ($name === '') continue;
-        // Убираем хвост «, Россия» и почтовый индекс — короче и чище
-        $name = preg_replace('/,\s*Россия$/u', '', $name);
-        $name = preg_replace('/,\s*\d{6}(?=,|$)/u', '', $name);
-        $out[] = [
-            'name' => $name,
-            'lat' => isset($r['lat']) ? (float)$r['lat'] : null,
-            'lng' => isset($r['lon']) ? (float)$r['lon'] : null,
-        ];
-    }
-    return $out;
-}
-
-// Серверный ключ Яндекс.Геокодера. Пусто — работаем на OpenStreetMap.
+// Серверный ключ Яндекс.Геокодера. Пусто — координаты не определяются.
 function yandex_geocoder_key(): string {
     return jt_secret('YANDEX_GEOCODER_KEY');
 }
 
 // Геокодер Яндекса (HTTP API). Сервер в РФ. Формат ответа:
 // response.GeoObjectCollection.featureMember[].GeoObject, координаты в
-// Point.pos как «lon lat». Возвращаем ту же форму, что и nominatim_search:
+// Point.pos как «lon lat». Возвращаем список
 // [ ['name'=>..., 'lat'=>float, 'lng'=>float], ... ].
 function yandex_geocode_search(string $q, int $timeout = 6): array {
     $key = yandex_geocoder_key();
@@ -849,18 +809,11 @@ function yandex_geocode_search(string $q, int $timeout = 6): array {
     return $out;
 }
 
-// Единая точка поиска адреса.
-//
-// Когда задан ключ Яндекса — адреса ищет ТОЛЬКО Яндекс (сервер в РФ), а
-// иностранный OpenStreetMap не вызывается вовсе (отключён по требованию).
-// Nominatim остаётся исключительно как аварийный путь на случай, если ключа
-// нет совсем (окружение без секрета) — иначе при любой заминке с ключом поиск
-// адреса молча перестал бы работать.
+// Единая точка поиска адреса — только Яндекс (сервер в РФ). Иностранных
+// сервисов здесь нет: нет ключа или Яндекс молчит — вернём пусто, но наружу за
+// границу ничего не уйдёт.
 function geo_search(string $q, int $timeout = 6): array {
-    if (yandex_geocoder_key() !== '') {
-        return yandex_geocode_search($q, $timeout);
-    }
-    return nominatim_search($q, $timeout);
+    return yandex_geocode_search($q, $timeout);
 }
 
 // Работодатели пишут адрес как придётся. Готовим несколько написаний одного
