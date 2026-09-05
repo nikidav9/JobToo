@@ -262,7 +262,13 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
-      ADMIN_API_URL: https://jobtoo.ru/api/admin.php
+      # Серверные вызовы дашборда идут на «чистый» адрес, а не на публичный
+      # jobtoo.ru: с самой московской машины обращение к своему же имени по 443
+      # периодически виснет (TSPU/SNI-фильтр) — дашборд из-за этого «долго
+      # грузится» и отваливается по таймауту. sslip.io ведёт на тот же nginx,
+      # но мимо фильтра. Переопределяется через секреты (env-file).
+      ADMIN_API_URL: ${ADMIN_API_URL:-https://147.45.184.99.sslip.io/api/admin.php}
+      INTERNAL_API_ORIGIN: ${INTERNAL_API_ORIGIN:-https://147.45.184.99.sslip.io}
       # Секреты подставляются из того же файла, что и всё остальное.
       # Ключей VAPID там пока нет — их надо забрать из Vercel до включения.
       # Пропуск приложения: по нему дашборд отличает рассылку от сервера от
@@ -288,7 +294,13 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
-      ADMIN_API_URL: https://jobtoo.ru/api/admin.php
+      # Серверные вызовы дашборда идут на «чистый» адрес, а не на публичный
+      # jobtoo.ru: с самой московской машины обращение к своему же имени по 443
+      # периодически виснет (TSPU/SNI-фильтр) — дашборд из-за этого «долго
+      # грузится» и отваливается по таймауту. sslip.io ведёт на тот же nginx,
+      # но мимо фильтра. Переопределяется через секреты (env-file).
+      ADMIN_API_URL: ${ADMIN_API_URL:-https://147.45.184.99.sslip.io/api/admin.php}
+      INTERNAL_API_ORIGIN: ${INTERNAL_API_ORIGIN:-https://147.45.184.99.sslip.io}
       EXPO_PUBLIC_APP_SECRET: ${EXPO_PUBLIC_APP_SECRET:-}
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}

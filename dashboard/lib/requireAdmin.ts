@@ -20,14 +20,21 @@ const ADMIN_API =
 export async function isAdmin(req: Request): Promise<boolean> {
   const token = req.headers.get('x-admin-token')
   if (!token) return false
+  // Таймаут обязателен: без него зависший запрос к прокси держит загрузку
+  // страницы бесконечно — дашборд «долго грузится» и отваливается. Лучше
+  // быстро вернуть «не админ», чем повесить весь ответ.
+  const ac = new AbortController()
+  const t = setTimeout(() => ac.abort(), 8000)
   try {
     // Самый дешёвый запрос, какой пропускает admin.php: одна строка, одно поле.
     const res = await fetch(
       `${ADMIN_API}?path=${encodeURIComponent('/rest/v1/jm_users?select=id&limit=1')}`,
-      { headers: { 'X-Admin-Token': token }, cache: 'no-store' }
+      { headers: { 'X-Admin-Token': token }, cache: 'no-store', signal: ac.signal }
     )
     return res.ok
   } catch {
     return false
+  } finally {
+    clearTimeout(t)
   }
 }
