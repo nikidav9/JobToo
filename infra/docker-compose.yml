@@ -144,6 +144,12 @@ services:
   imgproxy:
     image: darthsim/imgproxy:v3.30.1
     restart: unless-stopped
+    # Приоритет для OOM-killer. На 4 ГБ без лимитов ядро при всплеске убивало
+    # самый крупный процесс — а это часто сам Postgres, и тогда разом ложились
+    # и сайт, и дашборд. Положительное значение делает контейнер «первым в
+    # очереди на убийство»: под давлением ядро возьмёт imgproxy/studio/дашборд,
+    # а базу не тронет. Сам imgproxy без состояния и поднимется сам.
+    oom_score_adj: 500
     environment:
       IMGPROXY_BIND: ":5001"
       IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
@@ -159,6 +165,8 @@ services:
     restart: unless-stopped
     depends_on:
       db: {condition: service_healthy}
+    # Некритичный (нужен только studio) — жертвуем им раньше базы. См. imgproxy.
+    oom_score_adj: 700
     environment:
       PG_META_PORT: 8080
       PG_META_DB_HOST: db
@@ -174,6 +182,9 @@ services:
     restart: unless-stopped
     depends_on: [meta]
     ports: ["127.0.0.1:3001:3000"]
+    # Смотрелка базы, а не боевой путь: под давлением памяти отдаём её первой
+    # (кроме дашборда). Открывается редко, поднимется сама. См. imgproxy.
+    oom_score_adj: 800
     environment:
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -253,6 +264,15 @@ services:
     image: node:22-alpine
     profiles: ["dashboard"]
     restart: unless-stopped
+    # Дашборд — главный источник всплеска: при blue/green-обновлении оба слота
+    # какое-то время держатся в памяти одновременно (новый проверяется, пока
+    # старый ещё обслуживает). Два Node на 4 ГБ и сваливали машину в swap →
+    # OOM → падал Postgres. Теперь: (1) самый высокий приоритет на убийство —
+    # если память кончается, ядро берёт дашборд, а не базу; (2) жёсткий предел
+    # на слот, чтобы удвоение не уходило в бесконечность. 768 МБ с запасом
+    # хватает Next.js-панели; при превышении перезапустится сам этот слот.
+    oom_score_adj: 900
+    mem_limit: 768m
     ports: ["127.0.0.1:3002:3000"]
     working_dir: /app
     command: ["node", "server.js"]
@@ -285,6 +305,10 @@ services:
     image: node:22-alpine
     profiles: ["dashboard"]
     restart: unless-stopped
+    # Второй слот дашборда — те же меры, что и у blue (см. выше): высокий
+    # приоритет на убийство и предел памяти на слот.
+    oom_score_adj: 900
+    mem_limit: 768m
     ports: ["127.0.0.1:3003:3000"]
     working_dir: /app
     command: ["node", "server.js"]
