@@ -149,7 +149,9 @@ npm run web
 
 **Переменные окружения** (`.env.local`):
 ```
-EXPO_PUBLIC_SUPABASE_URL=https://bbiqmkeysalwdonlnylb.supabase.co
+# Бэкенд self-hosted в Москве (РФ). Клиент ходит на свой домен —
+# nginx проксирует /rest, /realtime, /storage в контейнеры (infra/docker-compose.yml).
+EXPO_PUBLIC_SUPABASE_URL=https://jobtoo.ru
 EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 EXPO_PUBLIC_API_URL=https://jobtoo.ru
 ```
