@@ -2082,7 +2082,7 @@ function WorkerPermMode() {
     }
   };
 
-  const renderPerm = ({ item: v, deck = false }: { item: PermVacancy | ExternalVacancy; deck?: boolean }) => {
+  const renderPerm = ({ item: v }: { item: PermVacancy | ExternalVacancy }) => {
     const isExternal = 'sourceId' in v;
     if (isExternal) {
       const company = v.company ?? v.sourceName ?? 'Компания';
@@ -2239,9 +2239,8 @@ function WorkerPermMode() {
           <Text style={pS.viewsTxt}>{permVacancyViewsMap[v.id] ?? 0} просмотрели</Text>
         </View>
 
-        {/* Actions — в режиме колоды скрыты: приём/отказ делаются свайпом или
-            круглыми кнопками ✕/♥ под карточкой (без дублирования). */}
-        {!deck ? (
+        {/* Actions (в списках «Отклики»/«Избранное»). В колоде «Открытые» —
+            отдельная карточка renderPermDeckCard со свайпом, как в сменах. */}
           <View style={pS.actionRow}>
             <TouchableOpacity
               style={[pS.applyBtn, isApplied && pS.applyBtnDone, isApplying && { opacity: 0.6 }]}
@@ -2283,25 +2282,8 @@ function WorkerPermMode() {
               />
             </TouchableOpacity>
           </View>
-        ) : null}
       </>
     );
-
-    if (deck) {
-      // Карточка заполняет доступную высоту; содержимое листается внутри неё,
-      // рамка остаётся на месте (её свайпают вправо/влево).
-      return (
-        <View style={[pS.card, pS.deckCard]}>
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={pS.deckCardContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {cardBody}
-          </ScrollView>
-        </View>
-      );
-    }
 
     return (
       <TouchableOpacity
@@ -2327,6 +2309,8 @@ function WorkerPermMode() {
   // один в один со списком, только сверху свайп-слой.
   const swPan = useRef(new Animated.ValueXY()).current;
   const [swSkipped, setSwSkipped] = useState<Set<string>>(new Set());
+  // Порядок пролистанных карточек — чтобы кнопка «назад» вернула последнюю.
+  const [swHistory, setSwHistory] = useState<string[]>([]);
   const swBusy = useRef(false);
   // Колода-свайп для «Открытых» и «Избранного». «Отклики» остаются списком.
   const deckActive = tab === 'open' || tab === 'saved';
@@ -2361,6 +2345,7 @@ function WorkerPermMode() {
     if (!c) return;
     swFly('right', vx, () => {
       setSwSkipped(s => new Set(s).add(c.id));
+      setSwHistory(h => [...h, c.id]);
       if (!('sourceId' in c)) {
         if (tab === 'saved' && permSavedIds.includes(c.id)) toggleSaved(c as PermVacancy);
         applyTo(c as PermVacancy);
@@ -2373,7 +2358,18 @@ function WorkerPermMode() {
     if (!c) return;
     swFly('left', vx, () => {
       setSwSkipped(s => new Set(s).add(c.id));
+      setSwHistory(h => [...h, c.id]);
       if (tab === 'saved' && !('sourceId' in c) && permSavedIds.includes(c.id)) toggleSaved(c as PermVacancy);
+    });
+  };
+  // «Назад»: вернуть последнюю пролистанную карточку наверх колоды. Отклик,
+  // если он уже ушёл, не отзываем — как в сменах кнопка просто возвращает вид.
+  const swUndo = () => {
+    setSwHistory(h => {
+      if (!h.length) return h;
+      const last = h[h.length - 1];
+      setSwSkipped(s => { const n = new Set(s); n.delete(last); return n; });
+      return h.slice(0, -1);
     });
   };
   const swWantRef = useRef(swWant); swWantRef.current = swWant;
@@ -2396,6 +2392,146 @@ function WorkerPermMode() {
       onPanResponderTerminate: () => swSnapBack(),
     })
   ).current;
+
+  // Карточка колоды «Работа» — тот же макет, что у смены: рамка во весь экран,
+  // чипы с иконками, снизу футер undo / ✕ / чат / ♥. Отличается только данными
+  // (зарплата, график, описание вместо времени смены).
+  const renderPermDeckCard = (v: PermVacancy | ExternalVacancy) => {
+    const isExternal = 'sourceId' in v;
+    const sourceName = isExternal ? (v as ExternalVacancy).sourceName : undefined;
+    const displayCompany = isExternal ? (v.company ?? sourceName ?? 'Компания') : normalizeCompany(v.company);
+    const salary = typeof v.salary === 'number' ? v.salary : 0;
+    const views = permVacancyViewsMap[v.id] ?? 0;
+    const schedule = isExternal ? v.schedule : (v as PermVacancy).schedule;
+    const workType = isExternal ? undefined : (v as PermVacancy).workType;
+    const description = isExternal ? undefined : (v as PermVacancy).description;
+    const isOpen = expanded.has(v.id);
+    return (
+      <View style={styles.cardArea}>
+        {deckCards[2] ? <View style={styles.ghost2} /> : null}
+        {deckCards[1] ? <View style={styles.ghost1} /> : null}
+        <Animated.View
+          style={[styles.cardAnimated, { transform: [{ translateX: swPan.x }, { translateY: swPan.y }, { rotate: swRotate }] }]}
+          {...swPanResponder.panHandlers}
+        >
+          <View style={styles.card}>
+            <Animated.View style={[styles.wantOverlay, { opacity: swWantOp }]}>
+              <Text style={styles.wantText}>ОТКЛИК ♥</Text>
+            </Animated.View>
+            <Animated.View style={[styles.skipOverlay, { opacity: swSkipOp }]}>
+              <Text style={styles.skipText}>НЕТ ✕</Text>
+            </Animated.View>
+
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} bounces={false} overScrollMode="never">
+              <View style={styles.cardTop}>
+                <View style={styles.companyRow}>
+                  <CompanyMark company={v.company ?? sourceName} size={44} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.companyName} numberOfLines={1}>{displayCompany}</Text>
+                    <View style={styles.metroHintRow}>
+                      <Ionicons name={isExternal ? 'open-outline' : 'subway-outline'} size={12} color={Colors.textMuted} />
+                      <Text style={styles.metroHint} numberOfLines={1}>
+                        {isExternal ? `Источник: ${sourceName ?? 'партнёр'}` : (v.metroStation ?? 'Постоянная вакансия')}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.urgentTag}>
+                    <Ionicons name="briefcase" size={11} color="#92400E" />
+                    <Text style={styles.urgentTagTxt}>Работа</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.jobTitle} numberOfLines={2}>{v.title}</Text>
+
+                <View style={styles.chipsRow}>
+                  {salary > 0 ? <Chip label={`${salary.toLocaleString('ru-RU')} ₽/мес`} variant="salary" icon="wallet-outline" /> : null}
+                  <Chip label="На руки" variant="exp" icon="checkmark-circle-outline" />
+                  {schedule ? <Chip label={schedule} variant="time" icon="calendar-outline" /> : null}
+                  {workType ? <Chip label={workType} variant="work" icon="briefcase-outline" /> : null}
+                </View>
+
+                {(v.metroStation || v.address) ? (
+                  <View style={styles.addressChip}>
+                    <Ionicons name="location-outline" size={15} color="#92400E" style={{ marginTop: 1 }} />
+                    <Text style={styles.addressChipText} numberOfLines={2}>
+                      {[v.metroStation, v.address].filter(Boolean).join(' · ')}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <View style={styles.cardDivider} />
+
+              <View style={styles.cardMiddle}>
+                {description ? (
+                  <View style={{ gap: rs(6) }}>
+                    <Text style={pS.sectionHead}>Описание</Text>
+                    <Text style={pS.desc} numberOfLines={isOpen ? undefined : 5}>{description}</Text>
+                    {description.length > 140 ? (
+                      <TouchableOpacity style={pS.readMore} onPress={() => toggleExpanded(v.id)} activeOpacity={0.7}>
+                        <Text style={pS.readMoreTxt}>{isOpen ? 'Свернуть' : 'Читать ещё'}</Text>
+                        <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.primary} />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                <View style={styles.slotsRow}>
+                  <View style={styles.slotInfo}>
+                    <Ionicons name="eye-outline" size={20} color={Colors.green} />
+                    <Text style={[styles.slotValue, { color: Colors.green }]}>{views}</Text>
+                    <Text style={styles.slotLabel}>Просмотрели</Text>
+                  </View>
+                  <View style={styles.slotInfo}>
+                    <Ionicons name="briefcase-outline" size={20} color={Colors.blue} />
+                    <Text style={[styles.slotValue, { color: Colors.blue }]}>{isExternal ? 'Партнёр' : 'Постоянно'}</Text>
+                    <Text style={styles.slotLabel}>Формат</Text>
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.detailHintRow}
+              activeOpacity={0.7}
+              onPress={() => { if (!isExternal) router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId: v.id } }); }}
+            >
+              <Text style={styles.detailHintText}>{isExternal ? 'Открыть у источника' : 'Подробнее о вакансии'}</Text>
+              <Text style={styles.detailHintArrow}>→</Text>
+            </TouchableOpacity>
+
+            <View style={styles.cardActionsRow}>
+              <TouchableOpacity
+                style={[styles.cardActionItem, !swHistory.length && { opacity: 0.3 }]}
+                onPress={swUndo}
+                disabled={!swHistory.length}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="arrow-undo" size={20} color={Colors.textMuted} />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.cardActionItem, styles.cardActionSkip]} onPress={() => swSkip(0.5)} activeOpacity={0.7}>
+                <Ionicons name="close" size={24} color={Colors.red} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.cardActionItem}
+                onPress={() => { if (!isExternal) openPermChat(v as PermVacancy, displayCompany); }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={isExternal ? 'open-outline' : 'chatbubble-outline'} size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.cardActionItem, styles.cardActionWant]} onPress={() => swWant(0.5)} activeOpacity={0.7}>
+                <Ionicons name="heart" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      </View>
+    );
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -2471,30 +2607,7 @@ function WorkerPermMode() {
             <Text style={styles.emptySubtitle}>{emptyMessages[tab].sub}</Text>
           </View>
         ) : (
-          <View style={{ flex: 1 }}>
-            {/* Рамка карточки заполняет высоту экрана; содержимое листается
-                внутри неё, а саму рамку свайпаешь вправо/влево. */}
-            <Animated.View
-              style={{ flex: 1, margin: 16, marginBottom: tabBarHeight + 96, transform: [{ translateX: swPan.x }, { translateY: swPan.y }, { rotate: swRotate }] }}
-              {...swPanResponder.panHandlers}
-            >
-              <Animated.View style={[swS.wantOverlay, { opacity: swWantOp }]} pointerEvents="none">
-                <Text style={swS.wantTxt}>ОТКЛИК ♥</Text>
-              </Animated.View>
-              <Animated.View style={[swS.skipOverlay, { opacity: swSkipOp }]} pointerEvents="none">
-                <Text style={swS.skipTxt}>НЕТ ✕</Text>
-              </Animated.View>
-              {renderPerm({ item: swTop, deck: true })}
-            </Animated.View>
-            <View style={swS.actions} pointerEvents="box-none">
-              <TouchableOpacity style={[swS.actBtn, swS.actSkip]} onPress={() => swSkip()} activeOpacity={0.85}>
-                <Ionicons name="close" size={26} color={Colors.red} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[swS.actBtn, swS.actWant]} onPress={() => swWant()} activeOpacity={0.85}>
-                <Ionicons name="heart" size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </View>
+          renderPermDeckCard(swTop)
         )
       ) : shownVacancies.length === 0 ? (
         <View style={styles.emptyState}>
@@ -2968,33 +3081,6 @@ export default function HomeScreen() {
 // ─────────────────────────────────────────────────
 // Permanent mode styles
 // ─────────────────────────────────────────────────
-const swS = StyleSheet.create({
-  wantOverlay: {
-    position: 'absolute', top: 18, left: 16, zIndex: 5,
-    borderWidth: 3, borderColor: Colors.primary, borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 4, transform: [{ rotate: '-12deg' }],
-  },
-  wantTxt: { color: Colors.primary, fontWeight: '900', fontSize: rf(18) },
-  skipOverlay: {
-    position: 'absolute', top: 18, right: 16, zIndex: 5,
-    borderWidth: 3, borderColor: Colors.red, borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 4, transform: [{ rotate: '12deg' }],
-  },
-  skipTxt: { color: Colors.red, fontWeight: '900', fontSize: rf(18) },
-  actions: {
-    position: 'absolute', bottom: 20, left: 0, right: 0,
-    flexDirection: 'row', justifyContent: 'center', gap: rs(28),
-  },
-  actBtn: {
-    width: rs(56), height: rs(56), borderRadius: rs(28),
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#fff', borderWidth: 1, borderColor: Colors.divider,
-    ...Shadow.card,
-  },
-  actSkip: {},
-  actWant: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-});
-
 const pS = StyleSheet.create({
   // — разделы карточки —
   section: {
@@ -3065,10 +3151,6 @@ const pS = StyleSheet.create({
     backgroundColor: Colors.bg, borderRadius: rs(18),
     padding: rs(16), gap: rs(10), ...Shadow.card,
   },
-  // В режиме колоды карточка тянется на всю высоту; вертикальный отступ даёт
-  // ScrollView внутри (deckCardContent), поэтому у самой рамки padding = 0.
-  deckCard: { flex: 1, padding: 0, overflow: 'hidden' },
-  deckCardContent: { padding: rs(16), gap: rs(10) },
   externalHead: { flexDirection: 'row', alignItems: 'flex-start', gap: rs(10) },
   externalBadge: {
     maxWidth: rs(110), paddingHorizontal: rs(8), paddingVertical: rs(4),
