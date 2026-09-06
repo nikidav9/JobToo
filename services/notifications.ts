@@ -529,16 +529,42 @@ export async function notifyWorkersNewVacancy(params: {
     const groupHtml = headHtml + detailsHtml
       + '\n\n⚡ В приложении смены появляются раньше — откликайся первым 👇';
 
-    await fetch(PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
-      body: JSON.stringify({
-        fn: 'dbNotifyAllWorkersNewVacancy',
-        // Новые поля добавлены в конец: старые клиенты остаются совместимыми.
-        args: [notifTitle, body, tgHtml, type === 'permanent' ? 'nearby_perm' : 'nearby_shift',
-               groupHtml, vacancyId ?? '', metroStation ?? '', workType ?? ''],
-      }),
+    const notifyPayload = JSON.stringify({
+      fn: 'dbNotifyAllWorkersNewVacancy',
+      // Новые поля добавлены в конец: старые клиенты остаются совместимыми.
+      args: [notifTitle, body, tgHtml, type === 'permanent' ? 'nearby_perm' : 'nearby_shift',
+             groupHtml, vacancyId ?? '', metroStation ?? '', workType ?? ''],
     });
+
+    // Рассылка — отдельный вызов, и раньше он был «выстрелил и забыл», одна
+    // попытка без срока. Стоило сети моргнуть при публикации — и объявление в
+    // группу «ПОДРАБОТКИ» молча терялось (вакансия в ленте есть, сообщения нет).
+    //
+    // Теперь до трёх попыток с таймаутом. Повтор безопасен, потому что сервер
+    // идемпотентен по vacancyId: дважды одну вакансию он не разошлёт. Без
+    // vacancyId (нечем застолбить) оставляем одну попытку, чтобы не поймать
+    // дубли у старого пути.
+    const canRetry = !!vacancyId;
+    for (let attempt = 0; attempt < (canRetry ? 3 : 1); attempt++) {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 25000);
+        try {
+          const res = await fetch(PROXY_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
+            body: notifyPayload,
+            signal: ctrl.signal,
+          });
+          if (res.ok) break;
+        } finally {
+          clearTimeout(timer);
+        }
+      } catch {
+        // Сетевой сбой/таймаут — попробуем ещё раз (если есть vacancyId).
+      }
+      if (canRetry && attempt < 2) await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+    }
   } catch {
     // Never crash the app due to a notification failure
   }

@@ -4446,6 +4446,25 @@ try {
             $vacancyId = (string)($args[5] ?? '');
             $dataType = (string)($args[3] ?? 'nearby_shift');
             $deepKind = $dataType === 'nearby_perm' ? 'perm' : 'shift';
+
+            // Идемпотентность по вакансии. Рассылка — отдельный вызов с клиента,
+            // и при обрыве сети он молча терялся: вакансия в ленте есть, а
+            // объявление в группе «ПОДРАБОТКИ» не пришло. Теперь клиент вправе
+            // повторить вызов, но повтор НЕ должен разослать пуши всем повторно
+            // и запостить в группу дважды. Поэтому «столбим» вакансию заранее:
+            // если по ней уже начинали рассылку — сразу выходим. Отметку ставим
+            // ДО работы (claim), чтобы гонка повторов не дала дублей.
+            if ($vacancyId !== '') {
+                if (sb_single('jm_settings', ['key' => 'eq.bcast:' . $vacancyId], 'key')) {
+                    $data = ['ok' => true, 'skipped' => 'already_sent'];
+                    break;
+                }
+                sb_upsert('jm_settings', [
+                    'key' => 'bcast:' . $vacancyId,
+                    'value' => now_iso(),
+                    'updated_at' => now_iso(),
+                ], 'key');
+            }
             $dmCampaign = bin2hex(random_bytes(8));
             $groupCampaign = bin2hex(random_bytes(8));
             $btnUrl = $vacancyId !== ''
