@@ -352,6 +352,92 @@ const ms = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────
+// Разовая / Регулярная — панель над лентой смен
+// ─────────────────────────────────────────────────
+function ShiftSubTabs({ value, onChange }: {
+  value: 'once' | 'regular';
+  onChange: (v: 'once' | 'regular') => void;
+}) {
+  return (
+    <View style={sst.container}>
+      <TouchableOpacity
+        style={[sst.btn, value === 'once' && sst.btnActive]}
+        onPress={() => onChange('once')}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="flash" size={14} color={value === 'once' ? Colors.textPrimary : Colors.textMuted} />
+        <Text style={[sst.txt, value === 'once' && sst.txtActive]}>Разовая</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[sst.btn, value === 'regular' && sst.btnActive]}
+        onPress={() => onChange('regular')}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="lock-closed" size={13} color={Colors.textMuted} />
+        <Text style={[sst.txt, sst.txtLocked]}>Регулярная</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// Заглушка «Регулярной»: раздел ещё готовим — вместо ленты замок и «Скоро».
+function RegularLocked() {
+  return (
+    <View style={rl.wrap}>
+      <View style={rl.ring}>
+        <Ionicons name="lock-closed" size={30} color={Colors.primary} />
+      </View>
+      <Text style={rl.title}>Регулярные подработки</Text>
+      <Text style={rl.desc}>
+        Постоянные смены у одного работодателя — график на неделю вперёд.
+        Готовим этот раздел.
+      </Text>
+      <View style={rl.soon}>
+        <Text style={rl.soonTxt}>СКОРО</Text>
+      </View>
+    </View>
+  );
+}
+
+const sst = StyleSheet.create({
+  container: {
+    flexDirection: 'row', gap: rs(4),
+    backgroundColor: Colors.surface,
+    borderRadius: rs(100), padding: rs(4),
+    borderWidth: 1, borderColor: Colors.divider,
+    marginHorizontal: rs(16), marginTop: rs(8), marginBottom: rs(2),
+  },
+  btn: {
+    flex: 1, borderRadius: rs(100), paddingVertical: rs(9),
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(6),
+  },
+  btnActive: {
+    backgroundColor: Colors.card,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08, shadowRadius: 3, elevation: 2,
+  },
+  txt: { fontSize: rf(13), fontWeight: '700', color: Colors.textMuted },
+  txtActive: { color: Colors.textPrimary },
+  txtLocked: { color: Colors.textMuted },
+});
+
+const rl = StyleSheet.create({
+  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: rs(40), gap: rs(12) },
+  ring: {
+    width: rs(74), height: rs(74), borderRadius: rs(37),
+    backgroundColor: Colors.primaryLight, borderWidth: 1, borderColor: Colors.primaryBorder,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  title: { fontSize: rf(18), fontWeight: '800', color: Colors.textPrimary },
+  desc: { fontSize: rf(13.5), color: Colors.textSecondary, textAlign: 'center', lineHeight: rf(20) },
+  soon: {
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.divider,
+    borderRadius: rs(100), paddingHorizontal: rs(14), paddingVertical: rs(6),
+  },
+  soonTxt: { fontSize: rf(12), fontWeight: '800', color: Colors.textSecondary, letterSpacing: 0.5 },
+});
+
+// ─────────────────────────────────────────────────
 // Vacancy Viewers Modal
 // ─────────────────────────────────────────────────
 function VacancyViewersModal({ vacancyId, kind = 'shift', onClose }: { vacancyId: string; kind?: 'shift' | 'perm'; onClose: () => void }) {
@@ -999,6 +1085,10 @@ function WorkerFeed() {
   // Гость смотрит ленту, но откликнуться/написать не может — любое такое
   // действие ведёт на выбор роли и регистрацию.
   const isGuest = !!currentUser?.isGuest;
+  // Разовая / Регулярная. Разовая — обычные смены директоров и партнёров
+  // (как сейчас). Регулярная — постоянные смены у одного работодателя,
+  // раздел ещё готовится: показываем замок вместо ленты.
+  const [subMode, setSubMode] = useState<'once' | 'regular'>('once');
   const promptRegister = useCallback((context: {
     vacancyId?: string | null;
     vacancyKind?: 'shift' | 'permanent' | 'external' | null;
@@ -1468,6 +1558,12 @@ function WorkerFeed() {
           <Text style={gB.bannerCta}>Войти</Text>
         </TouchableOpacity>
       )}
+      {/* Разовая / Регулярная */}
+      <ShiftSubTabs value={subMode} onChange={setSubMode} />
+      {subMode === 'regular' ? (
+        <RegularLocked />
+      ) : (
+      <>
       {/* Date strip + inline filter button */}
       <View style={styles.dateStrip}>
         <View style={styles.dateStripInner}>
@@ -1788,6 +1884,8 @@ function WorkerFeed() {
         info={applyFor ? vacancyInfoLines(applyFor) : []}
         chips={getChatSuggestions('worker', applyFor)}
       />
+      </>
+      )}
     </View>
   );
 }
