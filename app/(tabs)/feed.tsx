@@ -290,6 +290,167 @@ const metroPickerSt = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────
+// Фильтр смен: город / удобно начать / закончить / метро
+// ─────────────────────────────────────────────────
+type TimeRange = { id: string; label: string; from: string; to: string };
+
+const START_RANGES: TimeRange[] = [
+  { id: 's1', label: '07:00–09:00', from: '07:00', to: '09:00' },
+  { id: 's2', label: '09:00–12:00', from: '09:00', to: '12:00' },
+  { id: 's3', label: '12:00–16:00', from: '12:00', to: '16:00' },
+  { id: 's4', label: '16:00–21:00', from: '16:00', to: '21:00' },
+  { id: 's5', label: '21:00–23:00', from: '21:00', to: '23:00' },
+  { id: 's6', label: '23:00–07:00', from: '23:00', to: '07:00' },
+];
+const END_RANGES: TimeRange[] = [
+  { id: 'e1', label: '09:00–14:00', from: '09:00', to: '14:00' },
+  { id: 'e2', label: '14:00–17:00', from: '14:00', to: '17:00' },
+  { id: 'e3', label: '17:00–20:00', from: '17:00', to: '20:00' },
+  { id: 'e4', label: '20:00–22:00', from: '20:00', to: '22:00' },
+  { id: 'e5', label: '22:00–00:00', from: '22:00', to: '24:00' },
+  { id: 'e6', label: '00:00–05:00', from: '00:00', to: '05:00' },
+  { id: 'e7', label: '05:00–09:00', from: '05:00', to: '09:00' },
+];
+
+export type ShiftFilters = { station: string | null; start: string[]; end: string[] };
+export const EMPTY_SHIFT_FILTERS: ShiftFilters = { station: null, start: [], end: [] };
+
+const toMin = (t: string) => {
+  const [h, m] = t.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+// Время в диапазоне; если диапазон переходит через полночь (from > to) —
+// подходит и «поздний вечер», и «раннее утро».
+const inRange = (time: string, r: TimeRange) => {
+  const t = toMin(time), f = toMin(r.from), to = toMin(r.to);
+  return f <= to ? t >= f && t <= to : t >= f || t <= to;
+};
+// Смена проходит фильтр по времени, если её начало попадает в один из
+// выбранных «начать»-диапазонов, а конец — в один из «закончить». Пустой
+// набор диапазонов ничего не ограничивает.
+function shiftMatchesTime(timeStart: string | undefined, timeEnd: string | undefined, f: ShiftFilters): boolean {
+  const startRanges = START_RANGES.filter(r => f.start.includes(r.id));
+  const endRanges = END_RANGES.filter(r => f.end.includes(r.id));
+  if (startRanges.length) {
+    if (!timeStart || !startRanges.some(r => inRange(timeStart, r))) return false;
+  }
+  if (endRanges.length) {
+    if (!timeEnd || !endRanges.some(r => inRange(timeEnd, r))) return false;
+  }
+  return true;
+}
+
+function ShiftFilterSheet({
+  initial, count, onApply, onClose,
+}: {
+  initial: ShiftFilters;
+  count: (f: ShiftFilters) => number;
+  onApply: (f: ShiftFilters) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<ShiftFilters>(initial);
+  const [metroOpen, setMetroOpen] = useState(false);
+
+  const toggle = (key: 'start' | 'end', id: string) => setDraft(d => ({
+    ...d,
+    [key]: d[key].includes(id) ? d[key].filter(x => x !== id) : [...d[key], id],
+  }));
+
+  const stationLine = draft.station
+    ? METRO_LINES.find(l => l.stations.includes(draft.station!)) ?? null
+    : null;
+  const n = count(draft);
+
+  return (
+    <View style={styles.filterOverlay}>
+      <View style={[styles.filterSheet, { maxHeight: '90%' }]}>
+        <View style={styles.filterSheetHeader}>
+          <Text style={styles.filterSheetTitle}>Фильтры</Text>
+          <TouchableOpacity onPress={() => setDraft(EMPTY_SHIFT_FILTERS)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={fst.reset}>Сбросить</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.filterClose}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: rs(12) }}>
+          <Text style={fst.label}>Город</Text>
+          <View style={[fst.rowSel, { opacity: 0.6 }]}>
+            <Text style={fst.rowSelName}>Москва</Text>
+            <Text style={fst.rowSelHint}>единственный город</Text>
+          </View>
+
+          <Text style={fst.label}>Удобно начать</Text>
+          <View style={fst.chipsWrap}>
+            {START_RANGES.map(r => {
+              const on = draft.start.includes(r.id);
+              return (
+                <TouchableOpacity key={r.id} style={[fst.chip, on && fst.chipOn]} onPress={() => toggle('start', r.id)} activeOpacity={0.8}>
+                  <Text style={[fst.chipTxt, on && fst.chipTxtOn]}>{r.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={fst.label}>Удобно закончить</Text>
+          <View style={fst.chipsWrap}>
+            {END_RANGES.map(r => {
+              const on = draft.end.includes(r.id);
+              return (
+                <TouchableOpacity key={r.id} style={[fst.chip, on && fst.chipOn]} onPress={() => toggle('end', r.id)} activeOpacity={0.8}>
+                  <Text style={[fst.chipTxt, on && fst.chipTxtOn]}>{r.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={fst.label}>Метро</Text>
+          <TouchableOpacity style={fst.rowSel} onPress={() => setMetroOpen(true)} activeOpacity={0.8}>
+            {draft.station && stationLine ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: rs(8), flex: 1 }}>
+                <View style={[fst.lineDot, { backgroundColor: stationLine.color }]} />
+                <Text style={fst.rowSelName} numberOfLines={1}>м. {draft.station}</Text>
+              </View>
+            ) : (
+              <Text style={fst.rowSelName}>Все станции</Text>
+            )}
+            <Text style={fst.rowSelHint}>{draft.station ? 'изменить ›' : 'выбрать ›'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        <TouchableOpacity style={fst.cta} activeOpacity={0.85} onPress={() => { onApply(draft); onClose(); }}>
+          <Text style={fst.ctaTxt}>{n > 0 ? `Показать ${n}` : 'Показать смены'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <MetroStationPicker
+        visible={metroOpen}
+        selectedStation={draft.station}
+        onSelect={s => setDraft(d => ({ ...d, station: s }))}
+        onClose={() => setMetroOpen(false)}
+      />
+    </View>
+  );
+}
+
+const fst = StyleSheet.create({
+  reset: { fontSize: rf(14), fontWeight: '600', color: Colors.textMuted, marginLeft: 'auto', marginRight: rs(14) },
+  label: { fontSize: rf(13.5), fontWeight: '800', color: Colors.textMuted, paddingHorizontal: rs(16), paddingTop: rs(14), paddingBottom: rs(8) },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: rs(8), paddingHorizontal: rs(16) },
+  chip: { paddingHorizontal: rs(13), paddingVertical: rs(9), borderRadius: rs(100), backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.divider },
+  chipOn: { backgroundColor: Colors.primaryLight, borderColor: Colors.primaryBorder },
+  chipTxt: { fontSize: rf(13), fontWeight: '600', color: Colors.textPrimary },
+  chipTxtOn: { color: Colors.primary },
+  rowSel: { marginHorizontal: rs(16), borderWidth: 1, borderColor: Colors.inputBorder, borderRadius: rs(14), paddingHorizontal: rs(14), paddingVertical: rs(13), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  rowSelName: { fontSize: rf(14.5), fontWeight: '600', color: Colors.textPrimary },
+  rowSelHint: { fontSize: rf(13), color: Colors.textMuted, fontWeight: '600' },
+  lineDot: { width: rs(10), height: rs(10), borderRadius: rs(5) },
+  cta: { margin: rs(16), backgroundColor: Colors.primary, borderRadius: rs(16), alignItems: 'center', paddingVertical: rs(15) },
+  ctaTxt: { color: '#fff', fontSize: rf(15), fontWeight: '800' },
+});
+
+// ─────────────────────────────────────────────────
 // Mode switcher
 // ─────────────────────────────────────────────────
 type AppMode = 'shift' | 'perm';
@@ -1117,6 +1278,11 @@ function WorkerFeed() {
   const [filterStation, setFilterStation] = useState<string | null>(null);
   const [filterPicker, setFilterPicker] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  // Фильтр по времени смены (начать/закончить). Метро храним отдельно в
+  // filterStation — оно и раньше жило само по себе.
+  const [timeFilters, setTimeFilters] = useState<{ start: string[]; end: string[] }>({ start: [], end: [] });
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filtersActive = !!filterStation || timeFilters.start.length > 0 || timeFilters.end.length > 0;
 
   // Смены для карты: метки ставятся по адресу, поэтому кроме станции
   // передаём адрес и координаты — по ним карта и группирует точки.
@@ -1188,6 +1354,8 @@ function WorkerFeed() {
         const liked = likes.find(l => l.vacancyId === v.id && l.workerId === currentUser.id);
         if (liked) return false;
         if (filterStation && v.metroStation !== filterStation) return false;
+        if (!shiftMatchesTime((v as { timeStart?: string }).timeStart, (v as { timeEnd?: string }).timeEnd,
+          { station: filterStation, start: timeFilters.start, end: timeFilters.end })) return false;
         return true;
       })
       .sort((a, b) => {
@@ -1212,7 +1380,7 @@ function WorkerFeed() {
       pan.flattenOffset();
       pan.setValue({ x: 0, y: 0 });
     }
-  }, [selectedDate, vacancies, partnerShifts, likes, myLikes, users, currentUser, filterStation, deepLinkVacancyId]);
+  }, [selectedDate, vacancies, partnerShifts, likes, myLikes, users, currentUser, filterStation, timeFilters, deepLinkVacancyId]);
 
   const currentCard = cards[0];
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;
@@ -1525,7 +1693,7 @@ function WorkerFeed() {
     })
   ).current;
 
-  const getDateCount = (d: string) => {
+  const countShifts = (d: string, f: ShiftFilters) => {
     if (!currentUser) return 0;
     return [...vacancies, ...partnerShifts].filter(v => {
       if (v.status !== 'open') return false;
@@ -1534,15 +1702,14 @@ function WorkerFeed() {
         && !currentUser.workTypes?.includes(v.workType)) return false;
       const alreadySwiped = likes.find(l => l.vacancyId === v.id && l.workerId === currentUser.id);
       if (alreadySwiped) return false;
-      if (filterStation && v.metroStation !== filterStation) return false;
+      if (f.station && v.metroStation !== f.station) return false;
+      if (!shiftMatchesTime((v as { timeStart?: string }).timeStart, (v as { timeEnd?: string }).timeEnd, f)) return false;
       return true;
     }).length;
   };
+  const getDateCount = (d: string) => countShifts(d, { station: filterStation, start: timeFilters.start, end: timeFilters.end });
 
   const visibleDates = dates;
-  const activeStationLine = filterStation
-    ? METRO_LINES.find(l => l.stations.includes(filterStation)) ?? null
-    : null;
 
   const getRuDay = (iso: string) => {
     const d = new Date(iso + 'T00:00:00');
@@ -1586,15 +1753,11 @@ function WorkerFeed() {
             })}
           </ScrollView>
           <TouchableOpacity
-            style={[pS.inlineFilter, filterStation ? pS.inlineFilterActive : null]}
-            onPress={() => setMapOpen(true)}
+            style={[pS.inlineFilter, filtersActive ? pS.inlineFilterActive : null]}
+            onPress={() => setFilterOpen(true)}
             activeOpacity={0.8}
           >
-            {filterStation && activeStationLine ? (
-              <View style={[pS.filterLineDot, { backgroundColor: activeStationLine.color }]} />
-            ) : (
-              <Ionicons name="options-outline" size={20} color={Colors.textSecondary} />
-            )}
+            <Ionicons name="options-outline" size={20} color={filtersActive ? Colors.primary : Colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -1606,6 +1769,15 @@ function WorkerFeed() {
           <Ionicons name="close" size={14} color={Colors.textMuted} />
         </TouchableOpacity>
       ) : null}
+
+      {filterOpen && (
+        <ShiftFilterSheet
+          initial={{ station: filterStation, start: timeFilters.start, end: timeFilters.end }}
+          count={(f) => countShifts(selectedDate, f)}
+          onApply={(f) => { setFilterStation(f.station); setTimeFilters({ start: f.start, end: f.end }); }}
+          onClose={() => setFilterOpen(false)}
+        />
+      )}
 
       <MetroMap
         visible={mapOpen}
