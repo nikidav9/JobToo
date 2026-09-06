@@ -1661,11 +1661,13 @@ function WorkerFeed() {
                         <Text style={[styles.slotValue, { color: Colors.blue }]}>{vacancyStats.applicants}</Text>
                         <Text style={styles.slotLabel}>Отклики</Text>
                       </View>
-                      <View style={styles.slotInfo}>
-                        <Ionicons name="eye-outline" size={20} color={Colors.green} />
-                        <Text style={[styles.slotValue, { color: Colors.green }]}>{vacancyStats.views}</Text>
-                        <Text style={styles.slotLabel}>Просмотрели</Text>
-                      </View>
+                      {!isGuest && (
+                        <View style={styles.slotInfo}>
+                          <Ionicons name="eye-outline" size={20} color={Colors.green} />
+                          <Text style={[styles.slotValue, { color: Colors.green }]}>{vacancyStats.views}</Text>
+                          <Text style={styles.slotLabel}>Просмотрели</Text>
+                        </View>
+                      )}
                     </View>
                   </View>
                 </ScrollView>
@@ -2544,11 +2546,13 @@ function WorkerPermMode() {
                 ) : null}
 
                 <View style={styles.slotsRow}>
-                  <View style={styles.slotInfo}>
-                    <Ionicons name="eye-outline" size={20} color={Colors.green} />
-                    <Text style={[styles.slotValue, { color: Colors.green }]}>{views}</Text>
-                    <Text style={styles.slotLabel}>Просмотрели</Text>
-                  </View>
+                  {!isGuest && (
+                    <View style={styles.slotInfo}>
+                      <Ionicons name="eye-outline" size={20} color={Colors.green} />
+                      <Text style={[styles.slotValue, { color: Colors.green }]}>{views}</Text>
+                      <Text style={styles.slotLabel}>Просмотрели</Text>
+                    </View>
+                  )}
                   <View style={styles.slotInfo}>
                     <Ionicons name="briefcase-outline" size={20} color={Colors.blue} />
                     <Text style={[styles.slotValue, { color: Colors.blue }]}>{isExternal ? 'Партнёр' : 'Постоянно'}</Text>
