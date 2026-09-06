@@ -380,6 +380,21 @@ export async function sendTelegramToUsers(
   return { sent, skipped }
 }
 
+// Ручная публикация в общую группу «ПОДРАБОТКИ». Нужна, когда авторассылка
+// при создании вакансии не дошла (у клиента оборвалась сеть): объявление в
+// ленте есть, а в группе нет. Кнопка досылает тот же пост.
+export async function postToGroup(text: string): Promise<{ sent: boolean; chat: number | string }> {
+  const res = await fetch('/api/admin/tg-post-group', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': getToken() },
+    body: JSON.stringify({ text }),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) throw new Error(data.error ?? 'Не удалось опубликовать в группу')
+  logActivity('Пост в группу ПОДРАБОТКИ', `Длина текста: ${text.length}`)
+  return { sent: data.sent as boolean, chat: data.chat }
+}
+
 // Опрос спящих соискателей «почему не пользуетесь». Шлём порциями и с логом —
 // повторный вызов продолжает с тех, кому ещё не слали.
 export async function sendDormantSurvey(): Promise<{ sent: number; sentTotal: number; remaining: number; eligible: number }> {

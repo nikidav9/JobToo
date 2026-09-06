@@ -4,7 +4,7 @@ import PageHeader from '@/components/PageHeader'
 import KpiCard from '@/components/KpiCard'
 import Chip from '@/components/Chip'
 import { IconApp, IconBell } from '@/components/icons'
-import { broadcastBoth, broadcastWebPush, broadcastTelegram, sendTelegramToUsers, sendBothToUser, sendInAppToUser, sendDormantSurvey, getDormantSurveyResults } from '@/lib/admin-actions'
+import { broadcastBoth, broadcastWebPush, broadcastTelegram, sendTelegramToUsers, sendBothToUser, sendInAppToUser, sendDormantSurvey, getDormantSurveyResults, postToGroup } from '@/lib/admin-actions'
 import { supabaseAdmin } from '@/lib/supabase'
 import { logActivity } from '@/lib/activity-log'
 
@@ -260,6 +260,8 @@ export default function BroadcastPage() {
             }}>{label}</button>
           ))}
         </div>
+
+        {tab === 'send' && <GroupPostCard />}
 
         {/* ── Send tab ── */}
         {tab === 'send' && (
@@ -526,6 +528,57 @@ export default function BroadcastPage() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── Пост в общую группу «ПОДРАБОТКИ» ─────────────────────────────────────────
+// Отдельная кнопка на случай, когда авторассылка при создании вакансии не
+// дошла (у автора оборвалась сеть): вакансия в ленте есть, а объявления в
+// группе нет. Здесь пишем тот же пост руками. Текст — с HTML-разметкой
+// Telegram (<b>, <a href>), поэтому ссылку на вакансию можно вставить прямо
+// в текст. Отправка — по кнопке и с подтверждением: пост уходит в живую
+// группу и не отзывается.
+function GroupPostCard() {
+  const [text, setText] = useState('')
+  const [st, setSt] = useState<St>('idle')
+  const [msg, setMsg] = useState('')
+
+  const send = async () => {
+    if (!text.trim()) return
+    if (!confirm('Опубликовать это сообщение в группе «ПОДРАБОТКИ»? Пост уходит всем участникам и не отзывается.')) return
+    setSt('loading'); setMsg('')
+    try {
+      await postToGroup(text)
+      setSt('ok'); setMsg('Опубликовано в группе'); setText('')
+    } catch (e) {
+      setSt('err'); setMsg(e instanceof Error ? e.message : 'Ошибка публикации')
+    }
+    setTimeout(() => setSt('idle'), 5000)
+  }
+
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 16, margin: '16px 0' }}>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Опубликовать в группу «ПОДРАБОТКИ»</div>
+      <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12 }}>
+        Одним постом всем участникам группы. Пригодится, если объявление о вакансии не ушло в группу автоматически.
+        Можно с разметкой Telegram: <code>&lt;b&gt;жирный&lt;/b&gt;</code>, <code>&lt;a href="ссылка"&gt;текст&lt;/a&gt;</code>.
+      </div>
+      <textarea
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder={'Например:\n<b>🚚 Кладовщик — 3500 ₽/смена</b>\nм. Тульская, сегодня 09:00–18:00\nОткликайтесь в приложении 👇'}
+        rows={5}
+        className="jt-input"
+        style={{ width: '100%', boxSizing: 'border-box', marginBottom: 10 }}
+      />
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button onClick={send} disabled={!text.trim() || st === 'loading'}
+          style={{ background: st === 'ok' ? 'var(--positive, #2e7d32)' : st === 'err' ? 'var(--negative, #c62828)' : 'var(--accent, #FF6B1A)', color: '#fff', border: 'none', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: !text.trim() ? 0.45 : 1 }}>
+          {st === 'loading' ? 'Публикую…' : 'Опубликовать в группу'}
+        </button>
+        {msg ? <span style={{ fontSize: 12.5, fontWeight: 600, color: st === 'err' ? 'var(--bad, #c62828)' : 'var(--fg, #1c1e21)' }}>{msg}</span> : null}
       </div>
     </div>
   )
