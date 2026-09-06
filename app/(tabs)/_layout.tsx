@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Tabs } from 'expo-router';
 import {
-  Platform, View, Text, StyleSheet, PanResponder, Dimensions, Animated,
+  Platform, View, Text, StyleSheet, TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { bottomSafe } from '@/lib/androidInsets';
@@ -34,9 +34,6 @@ interface TabDef {
   badge?: number;
 }
 
-const PILL_PADDING = 6;   // paddingHorizontal on the pill
-const INDICATOR_MARGIN = 4; // gap between indicator and tab slot edge
-
 function FloatingTabBar({
   state,
   navigation,
@@ -51,81 +48,16 @@ function FloatingTabBar({
   // есть — меряем её отдельно, иначе плашка вкладок садится под
   // системные «назад/домой».
   const safeBottom = bottomSafe(insets.bottom);
-  const screenWidth = Dimensions.get('window').width;
-  const [pillWidth, setPillWidth] = useState(0);
 
-  // Animated value = floating-point tab index (e.g. 1.5 while sliding)
-  const animIndex = useRef(new Animated.Value(0)).current;
-
-  // Вкладка «Мэтчи» — цель подсветки в обучении. Меряем по ссылке, а не по
-  // событию раскладки: e.currentTarget в onLayout не всегда умеет
-  // measureInWindow, и вызов молча пропускался — подсветка оставалась без
-  // координат. И оставляем способ перемерить: первый замер на iOS часто
-  // возвращает нули, а второй попытки раньше не было.
-  const matchesTabRef = useRef<View>(null);
+  // Вкладка «Мэтчи» — цель подсветки в обучении. Меряем по ссылке: первый
+  // замер на iOS часто возвращает нули, поэтому оставляем способ перемерить.
+  const matchesCellRef = useRef<View>(null);
   const measureMatchesTab = useCallback(() => {
-    matchesTabRef.current?.measureInWindow((x, y, w, h) => {
+    matchesCellRef.current?.measureInWindow((x, y, w, h) => {
       if (w > 0 && h > 0) setOnboardingTarget('matchesTab', { x, y, w, h });
     });
   }, []);
   useEffect(() => registerOnboardingMeasurer('matchesTab', measureMatchesTab), [measureMatchesTab]);
-
-  // Which of our tabs is currently focused
-  const focusedTabIdx = Math.max(0, tabs.findIndex(t => {
-    const ri = state.routes.findIndex((r: any) => r.name === t.route);
-    return ri === state.index;
-  }));
-
-  useEffect(() => {
-    Animated.spring(animIndex, {
-      toValue: focusedTabIdx,
-      tension: 85,
-      friction: 11,
-      useNativeDriver: true,
-    }).start();
-  }, [focusedTabIdx]);
-
-  // Indicator geometry
-  const tabSlotWidth = pillWidth > 0
-    ? (pillWidth - PILL_PADDING * 2) / tabs.length
-    : 80;
-  const indicatorW = tabSlotWidth - INDICATOR_MARGIN * 2;
-
-  const indicatorX = animIndex.interpolate({
-    inputRange: tabs.map((_, i) => i),
-    outputRange: tabs.map((_, i) => PILL_PADDING + INDICATOR_MARGIN + i * tabSlotWidth),
-    extrapolate: 'clamp',
-  });
-
-  // Always-fresh pointer handler (PanResponder closure is stale by design)
-  const handleRef = useRef<(pageX: number) => void>(() => {});
-  handleRef.current = (pageX: number) => {
-    const pillLeft = 16 + PILL_PADDING;
-    const pillInnerWidth = screenWidth - pillLeft * 2;
-    const relX = pageX - pillLeft;
-    const idx = Math.max(0, Math.min(tabs.length - 1, Math.floor(relX / (pillInnerWidth / tabs.length))));
-    const routeIdx = state.routes.findIndex((r: any) => r.name === tabs[idx]?.route);
-    if (routeIdx >= 0 && state.index !== routeIdx) {
-      navigation.navigate(state.routes[routeIdx].name);
-    }
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => handleRef.current(e.nativeEvent.pageX),
-      onPanResponderMove: (e) => handleRef.current(e.nativeEvent.pageX),
-    }),
-  ).current;
-
-  // Web: PanResponder doesn't intercept mouse — add explicit handlers
-  const webHandlers = Platform.OS === 'web' ? {
-    onMouseDown: (e: any) => handleRef.current(e.pageX ?? e.clientX ?? 0),
-    onMouseMove: (e: any) => { if (e.buttons > 0) handleRef.current(e.pageX ?? e.clientX ?? 0); },
-    onTouchStart: (e: any) => handleRef.current(e.touches?.[0]?.pageX ?? 0),
-    onTouchMove: (e: any) => handleRef.current(e.touches?.[0]?.pageX ?? 0),
-  } : {};
 
   return (
     <>
@@ -137,54 +69,51 @@ function FloatingTabBar({
       }} />
     )}
     {/* Outer: shadow (overflow:hidden would clip Android elevation) */}
-    <View
-      style={[fS.pillShadow, { bottom: safeBottom + 12 }]}
-      onLayout={(e) => setPillWidth(e.nativeEvent.layout.width)}
-      {...panResponder.panHandlers}
-      {...webHandlers}
-    >
-      {/* Inner: clips blur + indicator to rounded shape */}
+    <View style={[fS.pillShadow, { bottom: safeBottom + 12 }]}>
+      {/* Inner: clips blur to rounded shape */}
       <View style={fS.pillClip}>
         {/* Frosted glass background */}
         <BlurView intensity={72} tint="light" style={StyleSheet.absoluteFill} />
         {/* Semi-transparent overlay for contrast on dark content */}
         <View style={fS.pillTint} />
 
-        {/* Sliding active indicator */}
-        {pillWidth > 0 && (
-          <Animated.View
-            style={[fS.indicator, { width: indicatorW, transform: [{ translateX: indicatorX }] }]}
-          />
-        )}
-
-        {/* Tab items — rendered on top of indicator */}
+        {/* Вкладки: простое нажатие. Активная выделяется цветом иконки и
+            подписи — без плашки-подсветки вокруг кнопки и без плавного
+            «переезда» индикатора. */}
         <View style={fS.tabsRow}>
           {tabs.map((tab) => {
             const routeIndex = state.routes.findIndex((r: any) => r.name === tab.route);
             const focused = routeIndex >= 0 && state.index === routeIndex;
             return (
-              <View
+              <TouchableOpacity
                 key={tab.route}
                 style={fS.tabItem}
-                ref={tab.route === 'matches' ? matchesTabRef : undefined}
-                onLayout={tab.route === 'matches' ? measureMatchesTab : undefined}
+                activeOpacity={0.7}
+                onPress={() => { if (!focused) navigation.navigate(tab.route); }}
               >
-                <View>
-                  <Ionicons
-                    name={focused ? tab.iconFilled : tab.iconOutline}
-                    size={22}
-                    color={Colors.primary}
-                  />
-                  {tab.badge && tab.badge > 0 ? (
-                    <View style={fS.badge}>
-                      <Text style={fS.badgeText}>{tab.badge > 9 ? '9+' : tab.badge}</Text>
-                    </View>
-                  ) : null}
+                <View
+                  style={fS.tabCell}
+                  ref={tab.route === 'matches' ? matchesCellRef : undefined}
+                  onLayout={tab.route === 'matches' ? measureMatchesTab : undefined}
+                >
+                  <View>
+                    <Ionicons
+                      name={focused ? tab.iconFilled : tab.iconOutline}
+                      size={22}
+                      color={Colors.primary}
+                      style={focused ? undefined : fS.iconIdle}
+                    />
+                    {tab.badge && tab.badge > 0 ? (
+                      <View style={fS.badge}>
+                        <Text style={fS.badgeText}>{tab.badge > 9 ? '9+' : tab.badge}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[fS.label, focused && fS.labelActive]}>
+                    {tab.label}
+                  </Text>
                 </View>
-                <Text style={[fS.label, focused && fS.labelActive]}>
-                  {tab.label}
-                </Text>
-              </View>
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -244,7 +173,7 @@ export default function TabLayout() {
   const tabs: TabDef[] = isWorker
     ? [
         { route: 'feed', iconFilled: 'time', iconOutline: 'time-outline', label: 'Подработка' },
-        { route: 'career', iconFilled: 'briefcase', iconOutline: 'briefcase-outline', label: 'Карьера' },
+        { route: 'career', iconFilled: 'briefcase', iconOutline: 'briefcase-outline', label: 'Работа' },
         { route: 'matches', iconFilled: 'people', iconOutline: 'people-outline', label: 'Мэтчи', badge: matchBadge },
         { route: 'chats', iconFilled: 'chatbubble', iconOutline: 'chatbubble-outline', label: 'Общение', badge: unreadCount },
         { route: 'profile', iconFilled: 'person', iconOutline: 'person-outline', label: 'Профиль' },
@@ -330,27 +259,26 @@ const fS = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(255, 255, 255, 0.82)',
   },
-  // Sliding orange indicator
-  indicator: {
-    position: 'absolute',
-    top: rs(10),     // (64 - 44) / 2
-    height: rs(44),
-    borderRadius: rs(20),
-    backgroundColor: Colors.primaryLight,
-  },
-  // Row of tab items, laid on top of the indicator
+  // Row of tab items
   tabsRow: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: PILL_PADDING,
+    paddingHorizontal: rs(6),
   },
   tabItem: {
     flex: 1,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabCell: {
     alignItems: 'center',
     justifyContent: 'center',
     gap: rs(3),
   },
+  // Неактивная иконка притушена — так активная читается без плашки-подсветки.
+  iconIdle: { opacity: 0.4 },
   label: {
     fontSize: rf(10),
     fontWeight: '600',

@@ -52,8 +52,8 @@ const h = StyleSheet.create({
   },
   left: { flexDirection: 'row', alignItems: 'center', gap: rs(8), flexShrink: 1 },
   right: { flexDirection: 'row', alignItems: 'center', gap: rs(6) },
-  title: { fontSize: rf(22), fontWeight: '800', color: Colors.textPrimary },
-  logo: { fontSize: rf(22) },
+  title: { fontSize: rf(18), fontWeight: '800', color: Colors.textPrimary },
+  logo: { fontSize: rf(18) },
   logoB: { fontWeight: '800', color: Colors.textPrimary },
   logoO: { fontWeight: '800', color: Colors.primary },
 });

@@ -1593,9 +1593,7 @@ function WorkerFeed() {
             {filterStation && activeStationLine ? (
               <View style={[pS.filterLineDot, { backgroundColor: activeStationLine.color }]} />
             ) : (
-              <View style={pS.metroIconWrap}>
-                <Ionicons name="map-outline" size={18} color={Colors.textSecondary} />
-              </View>
+              <Ionicons name="options-outline" size={20} color={Colors.textSecondary} />
             )}
           </TouchableOpacity>
         </View>
@@ -1628,7 +1626,11 @@ function WorkerFeed() {
         }}
       >
         {!currentCard ? (
-          <View style={styles.emptyState}>
+          <ScrollView
+            contentContainerStyle={[styles.emptyState, { flexGrow: 1 }]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
+          >
             <View style={styles.emptyCharContainer} pointerEvents="none">
               <Image
                 source={require('../../assets/images/char-seeker-empty.png')}
@@ -1677,7 +1679,7 @@ function WorkerFeed() {
                 </>
               );
             })()}
-          </View>
+          </ScrollView>
         ) : (
           <>
             {cards[2] ? <View style={styles.ghost2} /> : null}
@@ -2777,11 +2779,17 @@ function WorkerPermMode() {
       {deckActive ? (
         // «Открытые» и «Избранное» — свайп-колода (как в сменах и матчах).
         !swTop ? (
-          <View style={styles.emptyState}>
+          // Пустое состояние делаем прокручиваемым, иначе «потяните вниз»
+          // некуда тянуть — жест обновления не срабатывал (особенно офлайн).
+          <ScrollView
+            contentContainerStyle={[styles.emptyState, { flexGrow: 1 }]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
+          >
             <Ionicons name={backendOffline ? 'cloud-offline-outline' : emptyMessages[tab].icon} size={48} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>{backendOffline ? 'Нет связи с сервером' : emptyMessages[tab].title}</Text>
             <Text style={styles.emptySubtitle}>{backendOffline ? 'Показаны последние данные. Потяните вниз, чтобы обновить.' : emptyMessages[tab].sub}</Text>
-          </View>
+          </ScrollView>
         ) : (
           <>
             <PermDeckViewRecorder vacancy={swTop} userId={currentUser.id} isGuest={isGuest} />
@@ -2789,11 +2797,15 @@ function WorkerPermMode() {
           </>
         )
       ) : shownVacancies.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name={emptyMessages[tab].icon} size={48} color={Colors.textMuted} />
-          <Text style={styles.emptyTitle}>{emptyMessages[tab].title}</Text>
-          <Text style={styles.emptySubtitle}>{emptyMessages[tab].sub}</Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={[styles.emptyState, { flexGrow: 1 }]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
+        >
+          <Ionicons name={backendOffline ? 'cloud-offline-outline' : emptyMessages[tab].icon} size={48} color={Colors.textMuted} />
+          <Text style={styles.emptyTitle}>{backendOffline ? 'Нет связи с сервером' : emptyMessages[tab].title}</Text>
+          <Text style={styles.emptySubtitle}>{backendOffline ? 'Показаны последние данные. Потяните вниз, чтобы обновить.' : emptyMessages[tab].sub}</Text>
+        </ScrollView>
       ) : (
         <FlatList
           data={shownVacancies}
@@ -3253,7 +3265,7 @@ function WorkerCareer() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <TabHeader title="Карьера" />
+      <TabHeader title="Работа" />
       <WorkerPermMode />
     </SafeAreaView>
   );
@@ -3508,15 +3520,15 @@ const styles = StyleSheet.create({
   },
   activeStationTxt: { fontSize: rf(13), fontWeight: '700', color: Colors.primary },
   dateStripInner: { flexDirection: 'row', alignItems: 'center' },
-  dateRow: { paddingHorizontal: rs(12), paddingVertical: rs(10), gap: rs(8), flexDirection: 'row' },
+  dateRow: { paddingHorizontal: rs(12), paddingVertical: rs(7), gap: rs(6), flexDirection: 'row' },
   modeSwitcherRow: { paddingHorizontal: rs(16), paddingVertical: rs(10), borderBottomWidth: 1, borderBottomColor: Colors.divider },
-  dateChip: { width: rs(48), height: rs(64), borderRadius: rs(14), alignItems: 'center', justifyContent: 'center' },
-  dateChipActive: { backgroundColor: Colors.primary, borderRadius: rs(14) },
-  dcDay: { fontSize: rf(10), fontWeight: '600', textTransform: 'uppercase', color: Colors.textMuted },
+  dateChip: { width: rs(40), height: rs(50), borderRadius: rs(12), alignItems: 'center', justifyContent: 'center', gap: rs(1) },
+  dateChipActive: { backgroundColor: Colors.primary, borderRadius: rs(12) },
+  dcDay: { fontSize: rf(9.5), fontWeight: '600', textTransform: 'uppercase', color: Colors.textMuted },
   dcDayActive: { color: '#fff' },
-  dcNum: { fontSize: rf(20), fontWeight: '800', color: Colors.textPrimary },
+  dcNum: { fontSize: rf(16), fontWeight: '800', color: Colors.textPrimary },
   dcNumActive: { color: '#fff' },
-  dcCnt: { fontSize: rf(10), fontWeight: '700', color: Colors.primary },
+  dcCnt: { fontSize: rf(9.5), fontWeight: '700', color: Colors.primary },
   dcCntActive: { color: 'rgba(255,255,255,0.8)' },
   cardArea: { flex: 1, flexDirection: 'column', paddingHorizontal: rs(10), paddingTop: rs(10), paddingBottom: rs(80) },
   ghost1: { position: 'absolute', left: rs(10), right: rs(10), top: rs(10), bottom: rs(80), backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.97 }, { translateY: 6 }], opacity: 0.5, zIndex: 0, ...Shadow.card },
