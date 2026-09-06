@@ -1114,9 +1114,11 @@ const styles = StyleSheet.create({
   logo: { fontSize: rf(26), fontWeight: '800' },
   logoBlack: { color: '#111111' },
   logoOrange: { color: Colors.primary },
-  headerActions: { flexDirection: 'row', gap: rs(8) },
-  headerBtn: { position: 'relative', padding: rs(6) },
-  notifBadge: { position: 'absolute', top: rs(2), right: rs(2), backgroundColor: Colors.primary, borderRadius: rs(8), minWidth: rs(16), height: rs(16), alignItems: 'center', justifyContent: 'center', paddingHorizontal: rs(3) },
+  // Те же отступы, что у стандартной шапки (TabHeader → h.right и NotifBell),
+  // чтобы в профиле значки стояли ровно там же, а не сдвигались.
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: rs(6) },
+  headerBtn: { position: 'relative', padding: rs(4) },
+  notifBadge: { position: 'absolute', top: 0, right: 0, backgroundColor: Colors.primary, borderRadius: rs(10), minWidth: rs(16), height: rs(16), alignItems: 'center', justifyContent: 'center', paddingHorizontal: rs(3) },
   notifBadgeText: { color: '#fff', fontSize: rf(9), fontWeight: '700' },
   // User card
   userCard: { backgroundColor: Colors.bg, borderRadius: rs(16), padding: rs(16), flexDirection: 'row', alignItems: 'center', gap: rs(14), ...Shadow.card },
