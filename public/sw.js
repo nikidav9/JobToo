@@ -1,5 +1,5 @@
 // App-shell cache. Bump on every behavioral change; hashed Expo assets remain immutable.
-const SHELL_CACHE = 'jobtoo-app-shell-v3';
+const SHELL_CACHE = 'jobtoo-app-shell-v4';
 const SHELL_URLS = ['/', '/index.html', '/manifest.json', '/favicon.ico', '/jt-logo.jpg'];
 
 async function fetchWithTimeout(request, timeoutMs) {
@@ -55,22 +55,45 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
       const cache = await caches.open(SHELL_CACHE);
-      try {
-        const fresh = await fetchWithTimeout(request, 6000);
-        if (!fresh.ok) throw new Error('navigation HTTP ' + fresh.status);
-        // Keep the last fully received HTML as an offline/failed-deploy fallback.
-        await cache.put('/', fresh.clone());
-        await cache.put('/index.html', fresh.clone());
+      const cached = (await cache.match(request))
+        || (await cache.match('/'))
+        || (await cache.match('/index.html'));
+
+      // Свежую версию тянем всегда, но НЕ заставляем человека её ждать.
+      //
+      // Раньше здесь была строгая «сначала сеть»: до 6 секунд ждали ответ и
+      // только потом показывали сохранённое. На моргающей мобильной сети это и
+      // был тот самый «через раз, долго открывается» — секунды белого экрана,
+      // хотя рабочая версия уже лежала в кэше. Перезагрузка телефона сбрасывала
+      // сетевое состояние, и на время становилось быстро.
+      //
+      // Теперь наоборот: есть оболочка в кэше — показываем её сразу, как
+      // нативное приложение, а сеть догоняет в фоне и обновляет кэш к
+      // следующему открытию. Файлы сборки помечены отпечатком и лежат в кэше
+      // отдельно, поэтому мгновенно показанная оболочка ссылается на уже
+      // сохранённые скрипты. Само лечится: медленная сеть больше не тормозит
+      // запуск, а свежесть подтягивается незаметно.
+      const fromNetwork = fetchWithTimeout(request, 6000).then(async (fresh) => {
+        if (fresh && fresh.ok) {
+          await cache.put('/', fresh.clone());
+          await cache.put('/index.html', fresh.clone());
+        }
         return fresh;
-      } catch {
-        return (await cache.match(request))
-          || (await cache.match('/'))
-          || (await cache.match('/index.html'))
-          || new Response(
-            '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>JobToo</title><style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f7fa;color:#172033;display:grid;place-items:center;min-height:100vh;margin:0}.c{max-width:320px;text-align:center;padding:28px}button{border:0;border-radius:14px;background:#ff6b1a;color:#fff;padding:14px 22px;font-weight:700}</style><div class="c"><h1>JobToo</h1><p>Не удалось подключиться. Рабочая версия сохранена и откроется, когда сеть восстановится.</p><button onclick="location.reload()">Повторить</button></div>',
-            { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-          );
+      }).catch(() => null);
+
+      if (cached) {
+        // Фоновое обновление не должно всплыть необработанной ошибкой.
+        fromNetwork.catch(() => {});
+        return cached;
       }
+
+      // Кэша ещё нет — самый первый заход. Тут без сети никак: ждём её, а если
+      // и она молчит — отдаём понятную заглушку вместо зависания.
+      const fresh = await fromNetwork;
+      return fresh || new Response(
+        '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>JobToo</title><style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f7fa;color:#172033;display:grid;place-items:center;min-height:100vh;margin:0}.c{max-width:320px;text-align:center;padding:28px}button{border:0;border-radius:14px;background:#ff6b1a;color:#fff;padding:14px 22px;font-weight:700}</style><div class="c"><h1>JobToo</h1><p>Не удалось подключиться. Рабочая версия сохранена и откроется, когда сеть восстановится.</p><button onclick="location.reload()">Повторить</button></div>',
+        { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+      );
     })());
     return;
   }
