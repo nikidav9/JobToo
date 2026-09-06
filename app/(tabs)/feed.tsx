@@ -3228,25 +3228,39 @@ function EmployerHome() {
 // ─────────────────────────────────────────────────
 // Worker Home (wrapper with mode switcher)
 // ─────────────────────────────────────────────────
+// Вкладка «Подработка» — только смены (свайп-лента). Переключатель
+// Смены/Работа убран: постоянная работа теперь отдельная вкладка «Карьера».
+// title='Подработка' убирает логотип JobToo и подписывает раздел.
 function WorkerHome() {
-  const [mode, setMode] = useState<AppMode>('shift');
   const { currentUser } = useApp();
 
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <TabHeader tgAnchor />
-      <View style={styles.modeSwitcherRow}>
-        <ModeSwitcher mode={mode} onChange={setMode} modes={['shift', 'perm']} />
-      </View>
-      {mode === 'shift' ? <WorkerFeed /> : <WorkerPermMode />}
+      <TabHeader title="Подработка" tgAnchor />
+      <WorkerFeed />
+    </SafeAreaView>
+  );
+}
+
+// Вкладка «Карьера» — постоянная работа (та же свайп-колода, что была под
+// переключателем «Работа»).
+function WorkerCareer() {
+  const { currentUser } = useApp();
+
+  if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+      <TabHeader title="Карьера" />
+      <WorkerPermMode />
     </SafeAreaView>
   );
 }
 
 // ─────────────────────────────────────────────────
-// Root export
+// Root exports (routes)
 // ─────────────────────────────────────────────────
 export default function HomeScreen() {
   const app = useApp();
@@ -3255,6 +3269,18 @@ export default function HomeScreen() {
     return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
   }
   return currentUser.role === 'worker' ? <WorkerHome /> : <EmployerHome />;
+}
+
+// Экран вкладки «Карьера». У работника — постоянная работа; у директора
+// этой вкладки в меню нет, поэтому запасной вариант ведёт на его домашний
+// экран (не отображается, но безопасен, если сюда как-то попасть).
+export function CareerScreen() {
+  const app = useApp();
+  const currentUser = app?.currentUser ?? null;
+  if (!currentUser) {
+    return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
+  }
+  return currentUser.role === 'worker' ? <WorkerCareer /> : <EmployerHome />;
 }
 
 // ─────────────────────────────────────────────────
