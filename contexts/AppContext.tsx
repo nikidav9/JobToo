@@ -145,6 +145,12 @@ export interface AppContextValue {
   refreshPermVacancyViews: () => Promise<void>;
   /** true once the initial fresh-data fetch (vacancies, …) has completed */
   dataReady: boolean;
+  /**
+   * true, когда обновление данных не дошло до сервера (сеть/маршрут упал).
+   * Приложение показывает последние сохранённые данные, а экран — плашку
+   * «нет связи», чтобы пустой список не читался как «вакансий нет».
+   */
+  backendOffline: boolean;
 }
 
 export const AppContext = createContext<AppContextValue | null>(null);
@@ -153,6 +159,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [currentUser, _setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [dataReady, setDataReady] = useState(false);
+  const [backendOffline, setBackendOffline] = useState(false);
   const [vacanciesLoading, setVacanciesLoading] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -780,6 +787,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const data = await dbGetVacancies();
       setVacancies(data);
       saveCache(CACHE_KEYS.vacancies, data).catch(() => {});
+      setBackendOffline(false);
+    } catch (e) {
+      // Сеть/маршрут до сервера упал: список НЕ трогаем (остаются последние
+      // данные из кэша), только помечаем, что связи нет. Ошибку пробрасываем —
+      // вызывающие её и так глотают через .catch.
+      setBackendOffline(true);
+      throw e;
     } finally {
       if (!silent) setVacanciesLoading(false);
     }
@@ -835,11 +849,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const refreshPermVacancies = async (u?: User) => {
     const user = u ?? currentUser;
     if (!user) return;
-    const data = user.role === 'employer'
-      ? await dbGetPermVacanciesByEmployer(user.id)
-      : await dbGetPermVacancies();
-    setPermVacancies(data);
-    saveCache(CACHE_KEYS.permVac(user.id), data).catch(() => {});
+    try {
+      const data = user.role === 'employer'
+        ? await dbGetPermVacanciesByEmployer(user.id)
+        : await dbGetPermVacancies();
+      setPermVacancies(data);
+      saveCache(CACHE_KEYS.permVac(user.id), data).catch(() => {});
+      setBackendOffline(false);
+    } catch (e) {
+      // Не затираем список при сбое сети — остаются последние данные.
+      setBackendOffline(true);
+      throw e;
+    }
   };
 
   const refreshPermApplications = async (u?: User) => {
@@ -892,6 +913,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         currentUser,
         loading,
         dataReady,
+        backendOffline,
         vacanciesLoading,
         toast,
         showToast,

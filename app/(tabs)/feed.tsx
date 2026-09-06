@@ -1871,6 +1871,7 @@ function WorkerPermMode() {
     chats, refreshChats,
     showToast, permVacancyViewsMap, refreshPermVacancyViews,
     permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved, exitGuest,
+    backendOffline,
   } = useApp();
   const tabBarHeight = useBottomTabBarHeight();
 
@@ -2617,6 +2618,13 @@ function WorkerPermMode() {
         onClose={() => setMapOpen(false)}
       />
 
+      {backendOffline ? (
+        <View style={pS.offlineBar}>
+          <Ionicons name="cloud-offline-outline" size={14} color="#92400E" />
+          <Text style={pS.offlineTxt}>Нет связи с сервером — показаны последние данные. Потяните вниз, чтобы обновить.</Text>
+        </View>
+      ) : null}
+
       {/* Tab chips + map filter */}
       <View style={pS.tabsBar}>
         <ScrollView
@@ -2668,9 +2676,9 @@ function WorkerPermMode() {
         // «Открытые» и «Избранное» — свайп-колода (как в сменах и матчах).
         !swTop ? (
           <View style={styles.emptyState}>
-            <Ionicons name={emptyMessages[tab].icon} size={48} color={Colors.textMuted} />
-            <Text style={styles.emptyTitle}>{emptyMessages[tab].title}</Text>
-            <Text style={styles.emptySubtitle}>{emptyMessages[tab].sub}</Text>
+            <Ionicons name={backendOffline ? 'cloud-offline-outline' : emptyMessages[tab].icon} size={48} color={Colors.textMuted} />
+            <Text style={styles.emptyTitle}>{backendOffline ? 'Нет связи с сервером' : emptyMessages[tab].title}</Text>
+            <Text style={styles.emptySubtitle}>{backendOffline ? 'Показаны последние данные. Потяните вниз, чтобы обновить.' : emptyMessages[tab].sub}</Text>
           </View>
         ) : (
           <>
@@ -3196,6 +3204,11 @@ const pS = StyleSheet.create({
     paddingRight: rs(12),
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
+  offlineBar: {
+    flexDirection: 'row', alignItems: 'center', gap: rs(6),
+    backgroundColor: '#FEF3C7', paddingHorizontal: rs(14), paddingVertical: rs(8),
+  },
+  offlineTxt: { flex: 1, fontSize: rf(12), color: '#92400E', lineHeight: rf(16) },
   tabChipsScroll: {
     flex: 1, flexShrink: 1, alignSelf: 'stretch',
   },
