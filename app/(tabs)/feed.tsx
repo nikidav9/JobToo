@@ -451,6 +451,182 @@ const fst = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────
+// Фильтр постоянной работы: поиск / где искать / время публикации /
+// регион+метро / доход / график. Только поля, что реально есть у вакансий.
+// ─────────────────────────────────────────────────
+export type PermFilters = {
+  query: string;
+  searchIn: ('title' | 'desc')[]; // пусто = и там, и там
+  posted: 'all' | 'week' | '3days';
+  station: string | null;
+  salaryFrom: string; // сырой ввод из поля «От»
+  schedules: string[];
+};
+export const EMPTY_PERM_FILTERS: PermFilters = { query: '', searchIn: [], posted: 'all', station: null, salaryFrom: '', schedules: [] };
+
+const SCHEDULE_OPTIONS = ['2/2', '5/2', '6/1', '3/3', 'По выходным', 'Полный день', 'Сменный', 'Вахтовый', 'Гибкий'];
+
+const postedWithin = (iso: string | undefined, p: PermFilters['posted']) => {
+  if (p === 'all' || !iso) return true;
+  const days = p === 'week' ? 7 : 3;
+  return Date.now() - new Date(iso).getTime() <= days * 86400000;
+};
+
+function PermFilterSheet({
+  initial, count, onApply, onClose,
+}: {
+  initial: PermFilters;
+  count: (f: PermFilters) => number;
+  onApply: (f: PermFilters) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<PermFilters>(initial);
+  const [metroOpen, setMetroOpen] = useState(false);
+
+  const toggleSearchIn = (id: 'title' | 'desc') => setDraft(d => ({
+    ...d, searchIn: d.searchIn.includes(id) ? d.searchIn.filter(x => x !== id) : [...d.searchIn, id],
+  }));
+  const toggleSchedule = (s: string) => setDraft(d => ({
+    ...d, schedules: d.schedules.includes(s) ? d.schedules.filter(x => x !== s) : [...d.schedules, s],
+  }));
+
+  const stationLine = draft.station
+    ? METRO_LINES.find(l => l.stations.includes(draft.station!)) ?? null
+    : null;
+  const n = count(draft);
+
+  return (
+    <View style={styles.filterOverlay}>
+      <View style={[styles.filterSheet, { maxHeight: '92%' }]}>
+        <View style={styles.filterSheetHeader}>
+          <Text style={styles.filterSheetTitle}>Фильтры</Text>
+          <TouchableOpacity onPress={() => setDraft(EMPTY_PERM_FILTERS)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={fst.reset}>Сбросить</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.filterClose}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: rs(12) }}>
+          <View style={pfl.searchWrap}>
+            <Ionicons name="search" size={rf(16)} color={Colors.textMuted} />
+            <TextInput
+              style={pfl.searchInput}
+              placeholder="Должность, ключевые слова"
+              placeholderTextColor={Colors.textMuted}
+              value={draft.query}
+              onChangeText={t => setDraft(d => ({ ...d, query: t }))}
+              returnKeyType="search"
+            />
+          </View>
+
+          <Text style={fst.label}>Искать только</Text>
+          <View style={fst.chipsWrap}>
+            {([['title', 'В названии вакансии'], ['desc', 'В описании вакансии']] as const).map(([id, lbl]) => {
+              const on = draft.searchIn.includes(id);
+              return (
+                <TouchableOpacity key={id} style={[fst.chip, on && fst.chipOn]} onPress={() => toggleSearchIn(id)} activeOpacity={0.8}>
+                  <Text style={[fst.chipTxt, on && fst.chipTxtOn]}>{lbl}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={fst.label}>Время публикации</Text>
+          <View style={fst.chipsWrap}>
+            {([['all', 'За всё время'], ['week', 'За неделю'], ['3days', 'За три дня']] as const).map(([id, lbl]) => {
+              const on = draft.posted === id;
+              return (
+                <TouchableOpacity key={id} style={[fst.chip, on && fst.chipOn]} onPress={() => setDraft(d => ({ ...d, posted: id }))} activeOpacity={0.8}>
+                  <Text style={[fst.chipTxt, on && fst.chipTxtOn]}>{lbl}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={fst.label}>Регион</Text>
+          <View style={[fst.rowSel, { opacity: 0.6 }]}>
+            <Text style={fst.rowSelName}>Москва</Text>
+            <Text style={fst.rowSelHint}>единственный регион</Text>
+          </View>
+          <TouchableOpacity style={[fst.rowSel, { marginTop: rs(8) }]} onPress={() => setMetroOpen(true)} activeOpacity={0.8}>
+            {draft.station && stationLine ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: rs(8), flex: 1 }}>
+                <View style={[fst.lineDot, { backgroundColor: stationLine.color }]} />
+                <Text style={fst.rowSelName} numberOfLines={1}>м. {draft.station}</Text>
+              </View>
+            ) : (
+              <Text style={fst.rowSelName}>Добавить метро</Text>
+            )}
+            <Text style={fst.rowSelHint}>{draft.station ? 'изменить ›' : '+'}</Text>
+          </TouchableOpacity>
+
+          <Text style={fst.label}>Уровень дохода</Text>
+          <View style={pfl.salaryRow}>
+            <TextInput
+              style={pfl.salaryInput}
+              placeholder="От"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+              value={draft.salaryFrom}
+              onChangeText={t => setDraft(d => ({ ...d, salaryFrom: t.replace(/[^0-9]/g, '') }))}
+            />
+            <View style={pfl.rub}><Text style={pfl.rubTxt}>₽</Text></View>
+          </View>
+
+          <Text style={fst.label}>График работы</Text>
+          <View style={fst.chipsWrap}>
+            {SCHEDULE_OPTIONS.map(s => {
+              const on = draft.schedules.includes(s);
+              return (
+                <TouchableOpacity key={s} style={[fst.chip, on && fst.chipOn]} onPress={() => toggleSchedule(s)} activeOpacity={0.8}>
+                  <Text style={[fst.chipTxt, on && fst.chipTxtOn]}>{s}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+
+        <TouchableOpacity style={fst.cta} activeOpacity={0.85} onPress={() => { onApply(draft); onClose(); }}>
+          <Text style={fst.ctaTxt}>{n > 0 ? `Показать ${n}` : 'Показать вакансии'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <MetroStationPicker
+        visible={metroOpen}
+        selectedStation={draft.station}
+        onSelect={s => setDraft(d => ({ ...d, station: s }))}
+        onClose={() => setMetroOpen(false)}
+      />
+    </View>
+  );
+}
+
+const pfl = StyleSheet.create({
+  searchWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: rs(8),
+    marginHorizontal: rs(16), marginTop: rs(12),
+    backgroundColor: Colors.surface, borderRadius: rs(12),
+    paddingHorizontal: rs(12), paddingVertical: rs(11),
+    borderWidth: 1, borderColor: Colors.inputBorder,
+  },
+  searchInput: { flex: 1, fontSize: rf(15), color: Colors.textPrimary, padding: 0 },
+  salaryRow: { flexDirection: 'row', alignItems: 'center', gap: rs(8), paddingHorizontal: rs(16) },
+  salaryInput: {
+    flex: 1, fontSize: rf(15), color: Colors.textPrimary,
+    backgroundColor: Colors.surface, borderRadius: rs(12), borderWidth: 1, borderColor: Colors.inputBorder,
+    paddingHorizontal: rs(14), paddingVertical: rs(12),
+  },
+  rub: {
+    width: rs(48), alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.surface, borderRadius: rs(12), borderWidth: 1, borderColor: Colors.inputBorder,
+    paddingVertical: rs(12),
+  },
+  rubTxt: { fontSize: rf(16), fontWeight: '700', color: Colors.textSecondary },
+});
+
+// ─────────────────────────────────────────────────
 // Mode switcher
 // ─────────────────────────────────────────────────
 type AppMode = 'shift' | 'perm';
@@ -2166,6 +2342,11 @@ function WorkerPermMode() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [filterStation, setFilterStation] = useState<string | null>(null);
+  // Доп. фильтры постоянной работы (см. PermFilterSheet).
+  const [searchIn, setSearchIn] = useState<('title' | 'desc')[]>([]);
+  const [posted, setPosted] = useState<'all' | 'week' | '3days'>('all');
+  const [schedules, setSchedules] = useState<string[]>([]);
+  const [permFilterOpen, setPermFilterOpen] = useState(false);
   // Какие карточки развёрнуты (описание «Читать ещё»). По id вакансии.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleExpanded = (id: string) =>
@@ -2263,30 +2444,49 @@ function WorkerPermMode() {
   const myAppVacIds = new Set(myApps.map(a => a.vacancyId));
   const getAppStatus = (vacId: string) => myApps.find(a => a.vacancyId === vacId)?.status ?? null;
 
-  const matchesSearch = (v: PermVacancy) => {
-    if (!searchText) return true;
-    const q = searchText.toLowerCase();
-    return v.title.toLowerCase().includes(q) || v.company.toLowerCase().includes(q);
+  // Текущие применённые фильтры одним объектом — так их удобно и применять,
+  // и считать «Показать N» для черновика в шторке.
+  const permF: PermFilters = { query: searchText, searchIn, posted, station: filterStation, salaryFrom: minSalary > 0 ? String(minSalary) : '', schedules };
+  const permFiltersActive = !!filterStation || !!searchText || minSalary > 0 || searchIn.length > 0 || posted !== 'all' || schedules.length > 0;
+
+  const permMatchesQuery = (title: string, company: string, desc: string, f: PermFilters) => {
+    if (!f.query) return true;
+    const q = f.query.toLowerCase();
+    const inTitle = title.toLowerCase().includes(q) || company.toLowerCase().includes(q);
+    const inDesc = desc.toLowerCase().includes(q);
+    if (f.searchIn.length === 0) return inTitle || inDesc;
+    return (f.searchIn.includes('title') && inTitle) || (f.searchIn.includes('desc') && inDesc);
   };
-  const matchesFilters = (v: PermVacancy) => {
-    if (filterStation && v.metroStation !== filterStation) return false;
-    if (minSalary > 0 && v.salary < minSalary) return false;
+  const permMatchesMeta = (station: string | undefined, salary: number, created: string | undefined, schedule: string | undefined, f: PermFilters) => {
+    if (f.station && station !== f.station) return false;
+    const from = parseInt(f.salaryFrom || '0', 10);
+    if (from > 0 && salary < from) return false;
+    if (!postedWithin(created, f.posted)) return false;
+    if (f.schedules.length && !f.schedules.some(s => (schedule ?? '').toLowerCase().includes(s.toLowerCase()))) return false;
     return true;
   };
 
+  const matchesSearch = (v: PermVacancy) => permMatchesQuery(v.title, v.company, v.description ?? '', permF);
+  const matchesFilters = (v: PermVacancy) => permMatchesMeta(v.metroStation, v.salary, v.createdAt, v.schedule, permF);
+
   const openVacancies    = permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id) && matchesSearch(v) && matchesFilters(v));
-  const externalOpenVacancies = externalVacancies.filter(v => {
-    if (filterStation && v.metroStation !== filterStation) return false;
-    if (minSalary > 0 && (v.salary ?? 0) < minSalary) return false;
-    if (!searchText) return true;
-    const q = searchText.toLowerCase();
-    return v.title.toLowerCase().includes(q)
-      || (v.company ?? v.sourceName ?? '').toLowerCase().includes(q);
-  });
+  const externalOpenVacancies = externalVacancies.filter(v =>
+    permMatchesQuery(v.title, v.company ?? v.sourceName ?? '', (v as { description?: string }).description ?? '', permF)
+    && permMatchesMeta(v.metroStation, v.salary ?? 0, (v as { createdAt?: string }).createdAt, (v as { schedule?: string }).schedule, permF));
   // Отказ больше не прячется в отдельную вкладку: отклик остаётся здесь,
   // просто с красной плашкой «✕ Отказ» — иначе вакансия исчезала без объяснений
   const appliedVacancies = permVacancies.filter(v => myAppVacIds.has(v.id) && matchesSearch(v) && matchesFilters(v));
   const savedVacancies   = permVacancies.filter(v => permSavedIds.includes(v.id) && matchesSearch(v) && matchesFilters(v));
+
+  // «Показать N» в шторке фильтров: открытые (не откликнутые) + внешние
+  // под выбранный черновик фильтров.
+  const countPerm = (f: PermFilters) =>
+    permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id)
+      && permMatchesQuery(v.title, v.company, v.description ?? '', f)
+      && permMatchesMeta(v.metroStation, v.salary, v.createdAt, v.schedule, f)).length
+    + externalVacancies.filter(v =>
+      permMatchesQuery(v.title, v.company ?? v.sourceName ?? '', (v as { description?: string }).description ?? '', f)
+      && permMatchesMeta(v.metroStation, v.salary ?? 0, (v as { createdAt?: string }).createdAt, (v as { schedule?: string }).schedule, f)).length;
 
   const shownVacancies: (PermVacancy | ExternalVacancy)[] =
     tab === 'open'     ? [...openVacancies, ...externalOpenVacancies] :
@@ -2936,17 +3136,36 @@ function WorkerPermMode() {
           })}
         </ScrollView>
         <TouchableOpacity
-          style={[pS.filtersBtn, filterStation ? pS.filtersBtnActive : null]}
-          onPress={() => (filterStation ? setFilterStation(null) : setMapOpen(true))}
+          style={[pS.filtersBtn, permFiltersActive ? pS.filtersBtnActive : null]}
+          onPress={() => setPermFilterOpen(true)}
           activeOpacity={0.8}
         >
-          <Ionicons
-            name={filterStation ? 'close' : 'map-outline'}
-            size={16}
-            color={filterStation ? '#FFFFFF' : Colors.textSecondary}
-          />
+          <Ionicons name="options-outline" size={16} color={permFiltersActive ? '#FFFFFF' : Colors.textSecondary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[pS.filtersBtn, { marginLeft: rs(6) }]}
+          onPress={() => setMapOpen(true)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="map-outline" size={16} color={Colors.textSecondary} />
         </TouchableOpacity>
       </View>
+
+      {permFilterOpen && (
+        <PermFilterSheet
+          initial={permF}
+          count={countPerm}
+          onApply={(f) => {
+            setSearchText(f.query);
+            setSearchIn(f.searchIn);
+            setPosted(f.posted);
+            setFilterStation(f.station);
+            setMinSalary(parseInt(f.salaryFrom || '0', 10) || 0);
+            setSchedules(f.schedules);
+          }}
+          onClose={() => setPermFilterOpen(false)}
+        />
+      )}
 
       {deckActive ? (
         // «Открытые» и «Избранное» — свайп-колода (как в сменах и матчах).
