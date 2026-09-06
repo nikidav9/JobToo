@@ -102,14 +102,32 @@ self.addEventListener('fetch', (event) => {
   if (url.origin === self.location.origin
       && (url.pathname.startsWith('/_expo/static/') || url.pathname.startsWith('/assets/'))) {
     event.respondWith((async () => {
-      const cached = await caches.match(request);
+      const cache = await caches.open(SHELL_CACHE);
+      const cached = await cache.match(request);
+      // Уже в кэше — отдаём мгновенно. Файлы Expo неизменяемые (отпечаток в
+      // имени), так что кэш здесь никогда не устаревает.
       if (cached) return cached;
-      const fresh = await fetch(request);
-      if (fresh.ok) {
-        const cache = await caches.open(SHELL_CACHE);
-        await cache.put(request, fresh.clone());
+
+      // Нет в кэше — обычно это новый бандл после выкладки. Раньше здесь был
+      // голый fetch без срока: на капризном Wi-Fi запрос мог висеть
+      // бесконечно, приложению нечем отрисоваться — тот самый «чёрный экран,
+      // загрузка не движется». Теперь тянем с таймаутом и парой повторов:
+      // зависшую попытку обрываем и пробуем снова (на потерях это часто
+      // проходит со второго раза), успех кэшируем.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const fresh = await fetchWithTimeout(request, 8000);
+          // Успех кэшируем; не-200 (например 404 у выпиленного файла) не
+          // повторяем — это не сетевой сбой, а осмысленный ответ.
+          if (fresh.ok) await cache.put(request, fresh.clone());
+          return fresh;
+        } catch {
+          if (attempt < 2) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+        }
       }
-      return fresh;
+      // Три попытки впустую — отдаём сетевую ошибку, чтобы страница не висела
+      // вечно, а могла показать сбой и перезагрузиться, а не морозить загрузку.
+      return Response.error();
     })());
   }
 });
