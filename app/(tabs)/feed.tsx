@@ -4,7 +4,7 @@ import {
   Animated, PanResponder, Dimensions, RefreshControl, Modal, FlatList,
   TextInput, ActivityIndicator, Share, Platform, Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
@@ -301,6 +301,7 @@ function MetroPicker({ visible, selected, onChange, onClose }: {
   const [draft, setDraft] = useState<string[]>(selected);
   const [query, setQuery] = useState('');
   const [line, setLine] = useState<(typeof METRO_LINES)[number] | null>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (visible) { setDraft(selected); setQuery(''); setLine(null); }
@@ -412,7 +413,7 @@ function MetroPicker({ visible, selected, onChange, onClose }: {
           />
         )}
 
-        <View style={mp.footer}>
+        <View style={[mp.footer, { paddingBottom: insets.bottom + rs(84) }]}>
           <TouchableOpacity style={mp.save} onPress={() => { onChange(draft); onClose(); }} activeOpacity={0.85}>
             <Text style={mp.saveTxt}>Сохранить{draft.length ? ` · ${draft.length}` : ''}</Text>
           </TouchableOpacity>
@@ -511,6 +512,7 @@ function ShiftFilterSheet({
 }) {
   const [draft, setDraft] = useState<ShiftFilters>(initial);
   const [metroOpen, setMetroOpen] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const toggle = (key: 'start' | 'end', id: string) => setDraft(d => ({
     ...d,
@@ -574,7 +576,7 @@ function ShiftFilterSheet({
           </TouchableOpacity>
         </ScrollView>
 
-        <TouchableOpacity style={fst.cta} activeOpacity={0.85} onPress={() => { onApply(draft); onClose(); }}>
+        <TouchableOpacity style={[fst.cta, { marginBottom: insets.bottom + rs(80) }]} activeOpacity={0.85} onPress={() => { onApply(draft); onClose(); }}>
           <Text style={fst.ctaTxt}>{n > 0 ? `Показать ${n}` : 'Показать смены'}</Text>
         </TouchableOpacity>
       </View>
@@ -619,8 +621,6 @@ export type PermFilters = {
 };
 export const EMPTY_PERM_FILTERS: PermFilters = { query: '', searchIn: [], posted: 'all', stations: [], salaryFrom: '', schedules: [] };
 
-const SCHEDULE_OPTIONS = ['2/2', '5/2', '6/1', '3/3', 'По выходным', 'Полный день', 'Сменный', 'Вахтовый', 'Гибкий'];
-
 const postedWithin = (iso: string | undefined, p: PermFilters['posted']) => {
   if (p === 'all' || !iso) return true;
   const days = p === 'week' ? 7 : 3;
@@ -637,12 +637,10 @@ function PermFilterSheet({
 }) {
   const [draft, setDraft] = useState<PermFilters>(initial);
   const [metroOpen, setMetroOpen] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const toggleSearchIn = (id: 'title' | 'desc') => setDraft(d => ({
     ...d, searchIn: d.searchIn.includes(id) ? d.searchIn.filter(x => x !== id) : [...d.searchIn, id],
-  }));
-  const toggleSchedule = (s: string) => setDraft(d => ({
-    ...d, schedules: d.schedules.includes(s) ? d.schedules.filter(x => x !== s) : [...d.schedules, s],
   }));
 
   const n = count(draft);
@@ -723,21 +721,9 @@ function PermFilterSheet({
             />
             <View style={pfl.rub}><Text style={pfl.rubTxt}>₽</Text></View>
           </View>
-
-          <Text style={fst.label}>График работы</Text>
-          <View style={fst.chipsWrap}>
-            {SCHEDULE_OPTIONS.map(s => {
-              const on = draft.schedules.includes(s);
-              return (
-                <TouchableOpacity key={s} style={[fst.chip, on && fst.chipOn]} onPress={() => toggleSchedule(s)} activeOpacity={0.8}>
-                  <Text style={[fst.chipTxt, on && fst.chipTxtOn]}>{s}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
         </ScrollView>
 
-        <TouchableOpacity style={fst.cta} activeOpacity={0.85} onPress={() => { onApply(draft); onClose(); }}>
+        <TouchableOpacity style={[fst.cta, { marginBottom: insets.bottom + rs(80) }]} activeOpacity={0.85} onPress={() => { onApply(draft); onClose(); }}>
           <Text style={fst.ctaTxt}>{n > 0 ? `Показать ${n}` : 'Показать вакансии'}</Text>
         </TouchableOpacity>
       </View>
@@ -3285,14 +3271,14 @@ function WorkerPermMode() {
           })}
         </ScrollView>
         <TouchableOpacity
-          style={[pS.filtersBtn, permFiltersActive ? pS.filtersBtnActive : null]}
+          style={[pS.filtersBtn, { marginLeft: rs(10) }, permFiltersActive ? pS.filtersBtnActive : null]}
           onPress={() => setPermFilterOpen(true)}
           activeOpacity={0.8}
         >
           <Ionicons name="options-outline" size={16} color={permFiltersActive ? '#FFFFFF' : Colors.textSecondary} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[pS.filtersBtn, { marginLeft: rs(6) }]}
+          style={pS.filtersBtn}
           onPress={() => setMapOpen(true)}
           activeOpacity={0.8}
         >
