@@ -2202,8 +2202,7 @@ function WorkerFeed() {
                 <ScrollView
                   style={{ flex: 1 }}
                   showsVerticalScrollIndicator={false}
-                  bounces={false}
-                  overScrollMode="never"
+                  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
                 >
                   <View style={styles.cardTop}>
                     <View style={styles.companyRow}>
@@ -3115,7 +3114,11 @@ function WorkerPermMode() {
               <Text style={styles.skipText}>НЕТ ✕</Text>
             </Animated.View>
 
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} bounces={false} overScrollMode="never">
+            <ScrollView
+              style={{ flex: 1 }}
+              showsVerticalScrollIndicator={false}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
+            >
               <View style={styles.cardTop}>
                 <View style={styles.companyRow}>
                   <CompanyMark company={v.company ?? sourceName} size={44} />
