@@ -183,6 +183,23 @@ const ALL_STATIONS = METRO_LINES.flatMap(l =>
   l.stations.map(s => ({ station: s, lineId: l.id, lineColor: l.color, lineName: l.name }))
 ).sort((a, b) => a.station.localeCompare(b.station, 'ru'));
 
+// Часть описаний приходит с продублированным английским переводом после
+// разделителя из тире. Показываем только исходный текст: режем хвост, если
+// после строки-разделителя идёт преимущественно латиница.
+function cleanDescription(text?: string): string {
+  if (!text) return '';
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (/^[\s—–_-]{3,}$/.test(lines[i].trim())) {
+      const tail = lines.slice(i + 1).join(' ');
+      const latin = (tail.match(/[A-Za-z]/g) || []).length;
+      const cyr = (tail.match(/[А-Яа-яЁё]/g) || []).length;
+      if (latin > 20 && latin > cyr) return lines.slice(0, i).join('\n').trimEnd();
+    }
+  }
+  return text;
+}
+
 function MetroStationPicker({
   visible,
   selectedStation,
@@ -3076,12 +3093,11 @@ function WorkerPermMode() {
     const sourceName = isExternal ? (v as ExternalVacancy).sourceName : undefined;
     const displayCompany = isExternal ? (v.company ?? sourceName ?? 'Компания') : normalizeCompany(v.company);
     const salary = typeof v.salary === 'number' ? v.salary : 0;
-    const views = permVacancyViewsMap[v.id] ?? 0;
     const schedule = isExternal ? v.schedule : (v as PermVacancy).schedule;
     const workTypeRaw = isExternal ? undefined : (v as PermVacancy).workType;
     // Профессия хранится кодом (stocker/cook/…) — показываем русское название.
     const workType = workTypeRaw ? (WORK_TYPE_META[workTypeRaw]?.label ?? workTypeRaw) : undefined;
-    const description = isExternal ? undefined : (v as PermVacancy).description;
+    const description = isExternal ? '' : cleanDescription((v as PermVacancy).description);
     const isOpen = expanded.has(v.id);
     return (
       <View style={styles.cardArea}>
@@ -3150,31 +3166,17 @@ function WorkerPermMode() {
                   </View>
                 ) : null}
 
-                <View style={styles.slotsRow}>
-                  {!isGuest && (
-                    <View style={styles.slotInfo}>
-                      <Ionicons name="eye-outline" size={20} color={Colors.green} />
-                      <Text style={[styles.slotValue, { color: Colors.green }]}>{views}</Text>
-                      <Text style={styles.slotLabel}>Просмотрели</Text>
-                    </View>
-                  )}
-                  <View style={styles.slotInfo}>
-                    <Ionicons name="briefcase-outline" size={20} color={Colors.blue} />
-                    <Text style={[styles.slotValue, { color: Colors.blue }]}>{isExternal ? 'Партнёр' : 'Постоянно'}</Text>
-                    <Text style={styles.slotLabel}>Формат</Text>
-                  </View>
-                </View>
               </View>
             </ScrollView>
 
-            <TouchableOpacity
-              style={styles.detailHintRow}
-              activeOpacity={0.7}
-              onPress={() => { if (!isExternal) router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId: v.id } }); }}
-            >
-              <Text style={styles.detailHintText}>{isExternal ? 'Открыть у источника' : 'Подробнее о вакансии'}</Text>
-              <Text style={styles.detailHintArrow}>→</Text>
-            </TouchableOpacity>
+            {/* «Подробнее о вакансии» убрали: всё описание уже в карточке
+                («Читать ещё»). Для партнёрских оставляем переход к источнику. */}
+            {isExternal ? (
+              <TouchableOpacity style={styles.detailHintRow} activeOpacity={0.7} onPress={() => {}}>
+                <Text style={styles.detailHintText}>Открыть у источника</Text>
+                <Text style={styles.detailHintArrow}>→</Text>
+              </TouchableOpacity>
+            ) : null}
 
             <View style={styles.cardActionsRow}>
               <TouchableOpacity
