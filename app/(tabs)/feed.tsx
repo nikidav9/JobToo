@@ -2668,6 +2668,34 @@ function WorkerPermMode() {
     setRefreshing(false);
   };
 
+  // Все hooks свайп-колоды объявлены до раннего возврата: порядок hooks
+  // остаётся одинаковым и при выходе пользователя, и при загрузке сессии.
+  const swPan = useRef(new Animated.ValueXY()).current;
+  const [swSkipped, setSwSkipped] = useState<Set<string>>(new Set());
+  const [swHistory, setSwHistory] = useState<string[]>([]);
+  const swBusy = useRef(false);
+  const swWantRef = useRef<(vx?: number) => void>(() => {});
+  const swSkipRef = useRef<(vx?: number) => void>(() => {});
+  const swSnapBackRef = useRef<() => void>(() => {});
+  const swPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > Math.abs(g.dy) * 1.2 && Math.abs(g.dx) > 8,
+      onPanResponderGrant: () => {
+        swPan.setOffset({ x: (swPan.x as any)._value, y: (swPan.y as any)._value });
+        swPan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event([null, { dx: swPan.x }], { useNativeDriver: false }),
+      onPanResponderRelease: (_, { dx, vx }) => {
+        swPan.flattenOffset();
+        if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) swWantRef.current(Math.abs(vx));
+        else if (dx < -SWIPE_THRESHOLD || vx < -VELOCITY_THRESHOLD) swSkipRef.current(Math.abs(vx));
+        else swSnapBackRef.current();
+      },
+      onPanResponderTerminate: () => swSnapBackRef.current(),
+    })
+  ).current;
+
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
   const myApps = permApplications.filter(a => a.workerId === currentUser.id);
@@ -3077,11 +3105,8 @@ function WorkerPermMode() {
   // откликнуться, влево — пропустить. Поиск и вкладки «Отклики»/«Избранное»
   // остаются обычным списком. Карточку берём ту же (renderPerm), поэтому вид
   // один в один со списком, только сверху свайп-слой.
-  const swPan = useRef(new Animated.ValueXY()).current;
-  const [swSkipped, setSwSkipped] = useState<Set<string>>(new Set());
-  // Порядок пролистанных карточек — чтобы кнопка «назад» вернула последнюю.
-  const [swHistory, setSwHistory] = useState<string[]>([]);
-  const swBusy = useRef(false);
+  // Порядок пролистанных карточек хранится в swHistory, чтобы кнопка
+  // «назад» вернула последнюю карточку.
   // Колода-свайп для «Открытых» и «Избранного». «Отклики» остаются списком.
   const deckActive = tab === 'open' || tab === 'saved';
   const deckCards = deckActive ? shownVacancies.filter(v => !swSkipped.has(v.id)) : [];
@@ -3142,27 +3167,9 @@ function WorkerPermMode() {
       return h.slice(0, -1);
     });
   };
-  const swWantRef = useRef(swWant); swWantRef.current = swWant;
-  const swSkipRef = useRef(swSkip); swSkipRef.current = swSkip;
-  const swPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > Math.abs(g.dy) * 1.2 && Math.abs(g.dx) > 8,
-      onPanResponderGrant: () => {
-        swPan.setOffset({ x: (swPan.x as any)._value, y: (swPan.y as any)._value });
-        swPan.setValue({ x: 0, y: 0 });
-      },
-      // Только горизонталь: вертикальный жест уходит во внутренний скролл.
-      onPanResponderMove: Animated.event([null, { dx: swPan.x }], { useNativeDriver: false }),
-      onPanResponderRelease: (_, { dx, vx }) => {
-        swPan.flattenOffset();
-        if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) swWantRef.current(Math.abs(vx));
-        else if (dx < -SWIPE_THRESHOLD || vx < -VELOCITY_THRESHOLD) swSkipRef.current(Math.abs(vx));
-        else swSnapBack();
-      },
-      onPanResponderTerminate: () => swSnapBack(),
-    })
-  ).current;
+  swWantRef.current = swWant;
+  swSkipRef.current = swSkip;
+  swSnapBackRef.current = swSnapBack;
 
   // Карточка колоды «Работа» — тот же макет, что у смены: рамка во весь экран,
   // чипы с иконками, снизу футер undo / ✕ / чат / ♥. Отличается только данными
