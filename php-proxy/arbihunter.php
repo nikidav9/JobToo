@@ -41,7 +41,10 @@ function arbi_cfg(string $name, string $default): string
 }
 
 $API_BASE   = arbi_cfg('ARBIHUNTER_API_BASE',    'https://api.arbihunter.com/v2/api/vacancy/');
-$VAC_URL    = arbi_cfg('ARBIHUNTER_VACANCY_URL', 'https://arbihunter.com/vacancy/{id}');
+// Публичная страница вакансии. У arbihunter в API есть готовый slug
+// («targetologist-3063»), подставляем его в {slug}. {id} оставлен как
+// запасной токен на случай смены схемы адресов.
+$VAC_URL    = arbi_cfg('ARBIHUNTER_VACANCY_URL', 'https://arbihunter.com/ru/jobs/{slug}');
 $SELF_URL   = arbi_cfg('ARBIHUNTER_SELF_URL',    'https://jobtoo.ru/api/arbihunter.php');
 $TOKEN      = arbi_cfg('ARBIHUNTER_TOKEN',       '');   // Bearer к arbihunter, если фид закрыт
 $FEED_TOKEN = arbi_cfg('ARBIHUNTER_FEED_TOKEN',  '');   // защита нашего адаптера, если нужна
@@ -101,6 +104,22 @@ if (!is_array($dec)) { http_response_code(502); echo json_encode(['error' => 'ar
 // У arbihunter массив вакансий в поле data; на всякий случай примем и голый список.
 $data = is_array($dec['data'] ?? null) ? $dec['data'] : (array_is_list($dec) ? $dec : []);
 
+// ── HTML-описание arbihunter → читаемый текст ─────────────────────────────
+// В фиде description приходит разметкой (<p>…</p>, <strong>, <ul><li>…).
+// Отдать это как есть — значит показать теги прямо в карточке. Абзацы и
+// пункты превращаем в переносы, теги вырезаем, сущности раскрываем.
+function arbi_text(string $html): string
+{
+    $s = preg_replace('~<\s*li[^>]*>~i', '• ', $html);
+    $s = preg_replace('~<\s*(br|/p|/div|/li|/ul|/h[1-6])\s*/?\s*>~i', "\n", $s);
+    $s = strip_tags($s);
+    $s = html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $s = preg_replace('~[ \t]+~', ' ', $s);
+    $s = preg_replace('~[ \t]*\n[ \t]*~', "\n", $s);
+    $s = preg_replace('~\n{3,}~', "\n\n", $s);
+    return trim($s);
+}
+
 // ── Перевод графика в человеческую подпись ────────────────────────────────
 function arbi_schedule(?string $s): ?string
 {
@@ -140,17 +159,26 @@ foreach ($data as $v) {
         if ($from !== null && $type === 'MONTHLY') { $pay = (float)$from; $payPeriod = 'month'; }
     }
 
+    // Ссылку строим из готового slug (в API он есть: «targetologist-3063»);
+    // если его нет — по id. Без ссылки наш конвейер вакансию отбросит.
+    $slug = trim((string)($v['slug'] ?? ''));
+    $urlToken = $slug !== '' ? $slug : $id;
+    $url = str_replace('{slug}', rawurlencode($urlToken), $VAC_URL);
+    $url = str_replace('{id}', rawurlencode($id), $url);
+
     $item = [
         'id'     => $id,
         'title'  => $title,
         'kind'   => 'permanent',
-        // Ссылка на вакансию из шаблона по id — без неё наш конвейер вакансию отбросит.
-        'url'    => str_replace('{id}', rawurlencode($id), $VAC_URL),
+        'url'    => $url,
         'active' => $active,
     ];
     if ($company !== '') $item['company'] = $company;
     if ($city !== '')    $item['address'] = $city;
-    if (isset($v['description'])) $item['description'] = (string)$v['description'];
+    if (isset($v['description'])) {
+        $desc = arbi_text((string)$v['description']);
+        if ($desc !== '') $item['description'] = $desc;
+    }
     $sch = arbi_schedule($v['schedule'] ?? null);
     if ($sch !== null) $item['schedule'] = $sch;
     if ($pay !== null) { $item['pay'] = $pay; $item['pay_period'] = $payPeriod; }
