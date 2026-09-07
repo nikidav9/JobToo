@@ -491,8 +491,27 @@ const END_RANGES: TimeRange[] = [
   { id: 'e7', label: '05:00–09:00', from: '05:00', to: '09:00' },
 ];
 
-export type ShiftFilters = { stations: string[]; start: string[]; end: string[] };
-export const EMPTY_SHIFT_FILTERS: ShiftFilters = { stations: [], start: [], end: [] };
+type VacancySourceOption = { id: string; label: string };
+
+const JOBTOO_SOURCE_FILTER_ID = 'jobtoo';
+const partnerSourceFilterId = (sourceId: string) => `partner:${sourceId}`;
+const sourceFilterMatches = (selected: string[], sourceId?: string) =>
+  selected.length === 0 || selected.includes(sourceId ? partnerSourceFilterId(sourceId) : JOBTOO_SOURCE_FILTER_ID);
+
+const buildSourceOptions = (externalVacancies: ExternalVacancy[]): VacancySourceOption[] => {
+  const partners = new Map<string, string>();
+  externalVacancies.forEach(v => {
+    partners.set(partnerSourceFilterId(v.sourceId), v.sourceName?.trim() || v.sourceId);
+  });
+  return [
+    { id: JOBTOO_SOURCE_FILTER_ID, label: 'JobToo' },
+    ...Array.from(partners, ([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'ru')),
+  ];
+};
+
+export type ShiftFilters = { stations: string[]; start: string[]; end: string[]; sources: string[] };
+export const EMPTY_SHIFT_FILTERS: ShiftFilters = { stations: [], start: [], end: [], sources: [] };
 
 const toMin = (t: string) => {
   const [h, m] = t.split(':').map(Number);
@@ -520,9 +539,10 @@ function shiftMatchesTime(timeStart: string | undefined, timeEnd: string | undef
 }
 
 function ShiftFilterSheet({
-  initial, count, onApply, onClose,
+  initial, sourceOptions, count, onApply, onClose,
 }: {
   initial: ShiftFilters;
+  sourceOptions: VacancySourceOption[];
   count: (f: ShiftFilters) => number;
   onApply: (f: ShiftFilters) => void;
   onClose: () => void;
@@ -531,7 +551,7 @@ function ShiftFilterSheet({
   const [metroOpen, setMetroOpen] = useState(false);
   const insets = useSafeAreaInsets();
 
-  const toggle = (key: 'start' | 'end', id: string) => setDraft(d => ({
+  const toggle = (key: 'start' | 'end' | 'sources', id: string) => setDraft(d => ({
     ...d,
     [key]: d[key].includes(id) ? d[key].filter(x => x !== id) : [...d[key], id],
   }));
@@ -552,6 +572,25 @@ function ShiftFilterSheet({
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: rs(12) }}>
+          <Text style={fst.label}>Источник вакансии</Text>
+          <View style={fst.chipsWrap}>
+            <TouchableOpacity
+              style={[fst.chip, draft.sources.length === 0 && fst.chipOn]}
+              onPress={() => setDraft(d => ({ ...d, sources: [] }))}
+              activeOpacity={0.8}
+            >
+              <Text style={[fst.chipTxt, draft.sources.length === 0 && fst.chipTxtOn]}>Все источники</Text>
+            </TouchableOpacity>
+            {sourceOptions.map(source => {
+              const on = draft.sources.includes(source.id);
+              return (
+                <TouchableOpacity key={source.id} style={[fst.chip, on && fst.chipOn]} onPress={() => toggle('sources', source.id)} activeOpacity={0.8}>
+                  <Text style={[fst.chipTxt, on && fst.chipTxtOn]}>{source.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           <Text style={fst.label}>Город</Text>
           <View style={[fst.rowSel, { opacity: 0.6 }]}>
             <Text style={fst.rowSelName}>Москва</Text>
@@ -635,8 +674,9 @@ export type PermFilters = {
   stations: string[];
   salaryFrom: string; // сырой ввод из поля «От»
   schedules: string[];
+  sources: string[];
 };
-export const EMPTY_PERM_FILTERS: PermFilters = { query: '', searchIn: [], posted: 'all', stations: [], salaryFrom: '', schedules: [] };
+export const EMPTY_PERM_FILTERS: PermFilters = { query: '', searchIn: [], posted: 'all', stations: [], salaryFrom: '', schedules: [], sources: [] };
 
 const postedWithin = (iso: string | undefined, p: PermFilters['posted']) => {
   if (p === 'all' || !iso) return true;
@@ -645,9 +685,10 @@ const postedWithin = (iso: string | undefined, p: PermFilters['posted']) => {
 };
 
 function PermFilterSheet({
-  initial, count, onApply, onClose,
+  initial, sourceOptions, count, onApply, onClose,
 }: {
   initial: PermFilters;
+  sourceOptions: VacancySourceOption[];
   count: (f: PermFilters) => number;
   onApply: (f: PermFilters) => void;
   onClose: () => void;
@@ -676,6 +717,33 @@ function PermFilterSheet({
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: rs(12) }}>
+          <Text style={fst.label}>Источник вакансии</Text>
+          <View style={fst.chipsWrap}>
+            <TouchableOpacity
+              style={[fst.chip, draft.sources.length === 0 && fst.chipOn]}
+              onPress={() => setDraft(d => ({ ...d, sources: [] }))}
+              activeOpacity={0.8}
+            >
+              <Text style={[fst.chipTxt, draft.sources.length === 0 && fst.chipTxtOn]}>Все источники</Text>
+            </TouchableOpacity>
+            {sourceOptions.map(source => {
+              const on = draft.sources.includes(source.id);
+              return (
+                <TouchableOpacity
+                  key={source.id}
+                  style={[fst.chip, on && fst.chipOn]}
+                  onPress={() => setDraft(d => ({
+                    ...d,
+                    sources: on ? d.sources.filter(id => id !== source.id) : [...d.sources, source.id],
+                  }))}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[fst.chipTxt, on && fst.chipTxtOn]}>{source.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           <View style={pfl.searchWrap}>
             <Ionicons name="search" size={rf(16)} color={Colors.textMuted} />
             <TextInput
@@ -1609,8 +1677,10 @@ function WorkerFeed() {
   // Фильтр по времени смены (начать/закончить). Метро (мультивыбор) храним
   // отдельно в filterStations.
   const [timeFilters, setTimeFilters] = useState<{ start: string[]; end: string[] }>({ start: [], end: [] });
+  const [filterSources, setFilterSources] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
-  const filtersActive = filterStations.length > 0 || timeFilters.start.length > 0 || timeFilters.end.length > 0;
+  const shiftSourceOptions = buildSourceOptions(partnerShifts.map(v => v.external));
+  const filtersActive = filterStations.length > 0 || timeFilters.start.length > 0 || timeFilters.end.length > 0 || filterSources.length > 0;
 
   // Смены для карты: метки ставятся по адресу, поэтому кроме станции
   // передаём адрес и координаты — по ним карта и группирует точки.
@@ -1620,6 +1690,7 @@ function WorkerFeed() {
       .filter((v: Vacancy) =>
         v.status === 'open' &&
         v.date === selectedDate &&
+        sourceFilterMatches(filterSources, 'external' in v ? (v as PartnerShiftCard).external.sourceId : undefined) &&
         (!!v.metroStation || !!v.address) &&
         (('external' in v && !(v as PartnerShiftCard).external.workType)
           || currentUser.workTypes?.includes(v.workType)))
@@ -1634,7 +1705,7 @@ function WorkerFeed() {
         lat: v.lat,
         lng: v.lng,
       }));
-  }, [vacancies, partnerShifts, selectedDate, currentUser]);
+  }, [vacancies, partnerShifts, selectedDate, currentUser, filterSources]);
 
   const pan = useRef(new Animated.ValueXY()).current;
   const cardAreaRef = useRef<View>(null);
@@ -1676,6 +1747,7 @@ function WorkerFeed() {
       .filter(v => {
         if (v.status !== 'open') return false;
         if (v.date !== selectedDate) return false;
+        if (!sourceFilterMatches(filterSources, 'external' in v ? (v as PartnerShiftCard).external.sourceId : undefined)) return false;
         if (!('external' in v && !(v as PartnerShiftCard).external.workType)
           && !currentUser.workTypes?.includes(v.workType)) return false;
         if (pendingLikeIds.current.has(v.id)) return false;
@@ -1683,7 +1755,7 @@ function WorkerFeed() {
         if (liked) return false;
         if (filterStations.length && !filterStations.includes(v.metroStation ?? '')) return false;
         if (!shiftMatchesTime((v as { timeStart?: string }).timeStart, (v as { timeEnd?: string }).timeEnd,
-          { stations: filterStations, start: timeFilters.start, end: timeFilters.end })) return false;
+          { stations: filterStations, start: timeFilters.start, end: timeFilters.end, sources: filterSources })) return false;
         return true;
       })
       .sort((a, b) => {
@@ -1708,7 +1780,7 @@ function WorkerFeed() {
       pan.flattenOffset();
       pan.setValue({ x: 0, y: 0 });
     }
-  }, [selectedDate, vacancies, partnerShifts, likes, myLikes, users, currentUser, filterStations, timeFilters, deepLinkVacancyId]);
+  }, [selectedDate, vacancies, partnerShifts, likes, myLikes, users, currentUser, filterStations, timeFilters, filterSources, deepLinkVacancyId]);
 
   const currentCard = cards[0];
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;
@@ -2026,6 +2098,7 @@ function WorkerFeed() {
     return [...vacancies, ...partnerShifts].filter(v => {
       if (v.status !== 'open') return false;
       if (v.date !== d) return false;
+      if (!sourceFilterMatches(f.sources, 'external' in v ? (v as PartnerShiftCard).external.sourceId : undefined)) return false;
       if (!('external' in v && !(v as PartnerShiftCard).external.workType)
         && !currentUser.workTypes?.includes(v.workType)) return false;
       const alreadySwiped = likes.find(l => l.vacancyId === v.id && l.workerId === currentUser.id);
@@ -2035,7 +2108,7 @@ function WorkerFeed() {
       return true;
     }).length;
   };
-  const getDateCount = (d: string) => countShifts(d, { stations: filterStations, start: timeFilters.start, end: timeFilters.end });
+  const getDateCount = (d: string) => countShifts(d, { stations: filterStations, start: timeFilters.start, end: timeFilters.end, sources: filterSources });
 
   const visibleDates = dates;
 
@@ -2102,9 +2175,10 @@ function WorkerFeed() {
 
       {filterOpen && (
         <ShiftFilterSheet
-          initial={{ stations: filterStations, start: timeFilters.start, end: timeFilters.end }}
+          initial={{ stations: filterStations, start: timeFilters.start, end: timeFilters.end, sources: filterSources }}
+          sourceOptions={shiftSourceOptions}
           count={(f) => countShifts(selectedDate, f)}
-          onApply={(f) => { setFilterStations(f.stations); setTimeFilters({ start: f.start, end: f.end }); }}
+          onApply={(f) => { setFilterStations(f.stations); setTimeFilters({ start: f.start, end: f.end }); setFilterSources(f.sources); }}
           onClose={() => setFilterOpen(false)}
         />
       )}
@@ -2499,6 +2573,7 @@ function WorkerPermMode() {
   const [searchIn, setSearchIn] = useState<('title' | 'desc')[]>([]);
   const [posted, setPosted] = useState<'all' | 'week' | '3days'>('all');
   const [schedules, setSchedules] = useState<string[]>([]);
+  const [filterSources, setFilterSources] = useState<string[]>([]);
   const [permFilterOpen, setPermFilterOpen] = useState(false);
   // Какие карточки развёрнуты (описание «Читать ещё»). По id вакансии.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -2525,11 +2600,13 @@ function WorkerPermMode() {
 
   useEffect(() => { loadExternalVacancies(); }, [loadExternalVacancies]);
 
+  const permSourceOptions = buildSourceOptions(externalVacancies);
+
   // Вакансии для карты: метка — это адрес, станция остаётся для фильтра
   const permMapItems: MapListItem[] = useMemo(
     () => [
       ...(permVacancies as PermVacancy[])
-      .filter((v: PermVacancy) => v.status === 'open' && (!!v.metroStation || !!v.address))
+      .filter((v: PermVacancy) => v.status === 'open' && sourceFilterMatches(filterSources) && (!!v.metroStation || !!v.address))
       .map((v: PermVacancy) => ({
         id: v.id,
         station: (v.metroStation ?? '') as string,
@@ -2542,7 +2619,7 @@ function WorkerPermMode() {
         lng: v.lng,
       })),
       ...externalVacancies
-        .filter(v => !!v.metroStation || !!v.address)
+        .filter(v => sourceFilterMatches(filterSources, v.sourceId) && (!!v.metroStation || !!v.address))
         .map(v => ({
           id: `external:${v.id}`,
           station: v.metroStation ?? '',
@@ -2555,7 +2632,7 @@ function WorkerPermMode() {
           lng: v.lng,
         })),
     ],
-    [permVacancies, externalVacancies],
+    [permVacancies, externalVacancies, filterSources],
   );
 
   const viewedPermIds = useRef(new Set<string>());
@@ -2591,6 +2668,34 @@ function WorkerPermMode() {
     setRefreshing(false);
   };
 
+  // Все hooks свайп-колоды объявлены до раннего возврата: порядок hooks
+  // остаётся одинаковым и при выходе пользователя, и при загрузке сессии.
+  const swPan = useRef(new Animated.ValueXY()).current;
+  const [swSkipped, setSwSkipped] = useState<Set<string>>(new Set());
+  const [swHistory, setSwHistory] = useState<string[]>([]);
+  const swBusy = useRef(false);
+  const swWantRef = useRef<(vx?: number) => void>(() => {});
+  const swSkipRef = useRef<(vx?: number) => void>(() => {});
+  const swSnapBackRef = useRef<() => void>(() => {});
+  const swPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > Math.abs(g.dy) * 1.2 && Math.abs(g.dx) > 8,
+      onPanResponderGrant: () => {
+        swPan.setOffset({ x: (swPan.x as any)._value, y: (swPan.y as any)._value });
+        swPan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event([null, { dx: swPan.x }], { useNativeDriver: false }),
+      onPanResponderRelease: (_, { dx, vx }) => {
+        swPan.flattenOffset();
+        if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) swWantRef.current(Math.abs(vx));
+        else if (dx < -SWIPE_THRESHOLD || vx < -VELOCITY_THRESHOLD) swSkipRef.current(Math.abs(vx));
+        else swSnapBackRef.current();
+      },
+      onPanResponderTerminate: () => swSnapBackRef.current(),
+    })
+  ).current;
+
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
   const myApps = permApplications.filter(a => a.workerId === currentUser.id);
@@ -2599,8 +2704,8 @@ function WorkerPermMode() {
 
   // Текущие применённые фильтры одним объектом — так их удобно и применять,
   // и считать «Показать N» для черновика в шторке.
-  const permF: PermFilters = { query: searchText, searchIn, posted, stations: filterStations, salaryFrom: minSalary > 0 ? String(minSalary) : '', schedules };
-  const permFiltersActive = filterStations.length > 0 || !!searchText || minSalary > 0 || searchIn.length > 0 || posted !== 'all' || schedules.length > 0;
+  const permF: PermFilters = { query: searchText, searchIn, posted, stations: filterStations, salaryFrom: minSalary > 0 ? String(minSalary) : '', schedules, sources: filterSources };
+  const permFiltersActive = filterStations.length > 0 || !!searchText || minSalary > 0 || searchIn.length > 0 || posted !== 'all' || schedules.length > 0 || filterSources.length > 0;
 
   const permMatchesQuery = (title: string, company: string, desc: string, f: PermFilters) => {
     if (!f.query) return true;
@@ -2622,23 +2727,26 @@ function WorkerPermMode() {
   const matchesSearch = (v: PermVacancy) => permMatchesQuery(v.title, v.company, v.description ?? '', permF);
   const matchesFilters = (v: PermVacancy) => permMatchesMeta(v.metroStation, v.salary, v.createdAt, v.schedule, permF);
 
-  const openVacancies    = permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id) && matchesSearch(v) && matchesFilters(v));
+  const openVacancies    = permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id) && sourceFilterMatches(permF.sources) && matchesSearch(v) && matchesFilters(v));
   const externalOpenVacancies = externalVacancies.filter(v =>
-    permMatchesQuery(v.title, v.company ?? v.sourceName ?? '', (v as { description?: string }).description ?? '', permF)
+    sourceFilterMatches(permF.sources, v.sourceId)
+    && permMatchesQuery(v.title, v.company ?? v.sourceName ?? '', (v as { description?: string }).description ?? '', permF)
     && permMatchesMeta(v.metroStation, v.salary ?? 0, (v as { createdAt?: string }).createdAt, (v as { schedule?: string }).schedule, permF));
   // Отказ больше не прячется в отдельную вкладку: отклик остаётся здесь,
   // просто с красной плашкой «✕ Отказ» — иначе вакансия исчезала без объяснений
-  const appliedVacancies = permVacancies.filter(v => myAppVacIds.has(v.id) && matchesSearch(v) && matchesFilters(v));
-  const savedVacancies   = permVacancies.filter(v => permSavedIds.includes(v.id) && matchesSearch(v) && matchesFilters(v));
+  const appliedVacancies = permVacancies.filter(v => myAppVacIds.has(v.id) && sourceFilterMatches(permF.sources) && matchesSearch(v) && matchesFilters(v));
+  const savedVacancies   = permVacancies.filter(v => permSavedIds.includes(v.id) && sourceFilterMatches(permF.sources) && matchesSearch(v) && matchesFilters(v));
 
   // «Показать N» в шторке фильтров: открытые (не откликнутые) + внешние
   // под выбранный черновик фильтров.
   const countPerm = (f: PermFilters) =>
     permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id)
+      && sourceFilterMatches(f.sources)
       && permMatchesQuery(v.title, v.company, v.description ?? '', f)
       && permMatchesMeta(v.metroStation, v.salary, v.createdAt, v.schedule, f)).length
     + externalVacancies.filter(v =>
-      permMatchesQuery(v.title, v.company ?? v.sourceName ?? '', (v as { description?: string }).description ?? '', f)
+      sourceFilterMatches(f.sources, v.sourceId)
+      && permMatchesQuery(v.title, v.company ?? v.sourceName ?? '', (v as { description?: string }).description ?? '', f)
       && permMatchesMeta(v.metroStation, v.salary ?? 0, (v as { createdAt?: string }).createdAt, (v as { schedule?: string }).schedule, f)).length;
 
   const shownVacancies: (PermVacancy | ExternalVacancy)[] =
@@ -2997,11 +3105,8 @@ function WorkerPermMode() {
   // откликнуться, влево — пропустить. Поиск и вкладки «Отклики»/«Избранное»
   // остаются обычным списком. Карточку берём ту же (renderPerm), поэтому вид
   // один в один со списком, только сверху свайп-слой.
-  const swPan = useRef(new Animated.ValueXY()).current;
-  const [swSkipped, setSwSkipped] = useState<Set<string>>(new Set());
-  // Порядок пролистанных карточек — чтобы кнопка «назад» вернула последнюю.
-  const [swHistory, setSwHistory] = useState<string[]>([]);
-  const swBusy = useRef(false);
+  // Порядок пролистанных карточек хранится в swHistory, чтобы кнопка
+  // «назад» вернула последнюю карточку.
   // Колода-свайп для «Открытых» и «Избранного». «Отклики» остаются списком.
   const deckActive = tab === 'open' || tab === 'saved';
   const deckCards = deckActive ? shownVacancies.filter(v => !swSkipped.has(v.id)) : [];
@@ -3062,27 +3167,9 @@ function WorkerPermMode() {
       return h.slice(0, -1);
     });
   };
-  const swWantRef = useRef(swWant); swWantRef.current = swWant;
-  const swSkipRef = useRef(swSkip); swSkipRef.current = swSkip;
-  const swPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > Math.abs(g.dy) * 1.2 && Math.abs(g.dx) > 8,
-      onPanResponderGrant: () => {
-        swPan.setOffset({ x: (swPan.x as any)._value, y: (swPan.y as any)._value });
-        swPan.setValue({ x: 0, y: 0 });
-      },
-      // Только горизонталь: вертикальный жест уходит во внутренний скролл.
-      onPanResponderMove: Animated.event([null, { dx: swPan.x }], { useNativeDriver: false }),
-      onPanResponderRelease: (_, { dx, vx }) => {
-        swPan.flattenOffset();
-        if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) swWantRef.current(Math.abs(vx));
-        else if (dx < -SWIPE_THRESHOLD || vx < -VELOCITY_THRESHOLD) swSkipRef.current(Math.abs(vx));
-        else swSnapBack();
-      },
-      onPanResponderTerminate: () => swSnapBack(),
-    })
-  ).current;
+  swWantRef.current = swWant;
+  swSkipRef.current = swSkip;
+  swSnapBackRef.current = swSnapBack;
 
   // Карточка колоды «Работа» — тот же макет, что у смены: рамка во весь экран,
   // чипы с иконками, снизу футер undo / ✕ / чат / ♥. Отличается только данными
@@ -3294,6 +3381,7 @@ function WorkerPermMode() {
       {permFilterOpen && (
         <PermFilterSheet
           initial={permF}
+          sourceOptions={permSourceOptions}
           count={countPerm}
           onApply={(f) => {
             setSearchText(f.query);
@@ -3302,6 +3390,7 @@ function WorkerPermMode() {
             setFilterStations(f.stations);
             setMinSalary(parseInt(f.salaryFrom || '0', 10) || 0);
             setSchedules(f.schedules);
+            setFilterSources(f.sources);
           }}
           onClose={() => setPermFilterOpen(false)}
         />
