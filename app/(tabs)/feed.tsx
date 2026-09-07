@@ -1679,7 +1679,7 @@ function WorkerFeed() {
   const [timeFilters, setTimeFilters] = useState<{ start: string[]; end: string[] }>({ start: [], end: [] });
   const [filterSources, setFilterSources] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
-  const shiftSourceOptions = useMemo(() => buildSourceOptions(partnerShifts.map(v => v.external)), [partnerShifts]);
+  const shiftSourceOptions = buildSourceOptions(partnerShifts.map(v => v.external));
   const filtersActive = filterStations.length > 0 || timeFilters.start.length > 0 || timeFilters.end.length > 0 || filterSources.length > 0;
 
   // Смены для карты: метки ставятся по адресу, поэтому кроме станции
@@ -2600,7 +2600,7 @@ function WorkerPermMode() {
 
   useEffect(() => { loadExternalVacancies(); }, [loadExternalVacancies]);
 
-  const permSourceOptions = useMemo(() => buildSourceOptions(externalVacancies), [externalVacancies]);
+  const permSourceOptions = buildSourceOptions(externalVacancies);
 
   // Вакансии для карты: метка — это адрес, станция остаётся для фильтра
   const permMapItems: MapListItem[] = useMemo(
