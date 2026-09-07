@@ -635,8 +635,12 @@ export type PermFilters = {
   stations: string[];
   salaryFrom: string; // сырой ввод из поля «От»
   schedules: string[];
+  // Источник вакансии: 'jobtoo' — наши, иначе id внешнего источника. Пусто =
+  // все. Так человек может смотреть только вакансии JobToo или только
+  // конкретного партнёра; появятся новые партнёры — добавятся сами.
+  sources: string[];
 };
-export const EMPTY_PERM_FILTERS: PermFilters = { query: '', searchIn: [], posted: 'all', stations: [], salaryFrom: '', schedules: [] };
+export const EMPTY_PERM_FILTERS: PermFilters = { query: '', searchIn: [], posted: 'all', stations: [], salaryFrom: '', schedules: [], sources: [] };
 
 const postedWithin = (iso: string | undefined, p: PermFilters['posted']) => {
   if (p === 'all' || !iso) return true;
@@ -645,12 +649,15 @@ const postedWithin = (iso: string | undefined, p: PermFilters['posted']) => {
 };
 
 function PermFilterSheet({
-  initial, count, onApply, onClose,
+  initial, count, onApply, onClose, sources,
 }: {
   initial: PermFilters;
   count: (f: PermFilters) => number;
   onApply: (f: PermFilters) => void;
   onClose: () => void;
+  // Доступные источники: {key,label}. key='jobtoo' — наши вакансии, иначе id
+  // внешнего источника. Секцию показываем, только если источников больше одного.
+  sources: { key: string; label: string }[];
 }) {
   const [draft, setDraft] = useState<PermFilters>(initial);
   const [metroOpen, setMetroOpen] = useState(false);
@@ -658,6 +665,9 @@ function PermFilterSheet({
 
   const toggleSearchIn = (id: 'title' | 'desc') => setDraft(d => ({
     ...d, searchIn: d.searchIn.includes(id) ? d.searchIn.filter(x => x !== id) : [...d.searchIn, id],
+  }));
+  const toggleSource = (key: string) => setDraft(d => ({
+    ...d, sources: d.sources.includes(key) ? d.sources.filter(x => x !== key) : [...d.sources, key],
   }));
 
   const n = count(draft);
@@ -687,6 +697,22 @@ function PermFilterSheet({
               returnKeyType="search"
             />
           </View>
+
+          {sources.length > 1 && (
+            <>
+              <Text style={fst.label}>Компания</Text>
+              <View style={fst.chipsWrap}>
+                {sources.map(({ key, label }) => {
+                  const on = draft.sources.includes(key);
+                  return (
+                    <TouchableOpacity key={key} style={[fst.chip, on && fst.chipOn]} onPress={() => toggleSource(key)} activeOpacity={0.8}>
+                      <Text style={[fst.chipTxt, on && fst.chipTxtOn]}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
 
           <Text style={fst.label}>Искать только</Text>
           <View style={fst.chipsWrap}>
@@ -2499,6 +2525,7 @@ function WorkerPermMode() {
   const [searchIn, setSearchIn] = useState<('title' | 'desc')[]>([]);
   const [posted, setPosted] = useState<'all' | 'week' | '3days'>('all');
   const [schedules, setSchedules] = useState<string[]>([]);
+  const [filterSources, setFilterSources] = useState<string[]>([]);
   const [permFilterOpen, setPermFilterOpen] = useState(false);
   // Какие карточки развёрнуты (описание «Читать ещё»). По id вакансии.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -2558,6 +2585,20 @@ function WorkerPermMode() {
     [permVacancies, externalVacancies],
   );
 
+  // Источники для фильтра «Компания»: наши вакансии + каждый внешний источник
+  // отдельным пунктом. Новый партнёр подключится — появится здесь сам.
+  const availableSources = useMemo(() => {
+    const list: { key: string; label: string }[] = [{ key: 'jobtoo', label: 'JobToo' }];
+    const seen = new Set<string>();
+    for (const v of externalVacancies) {
+      if (v.sourceId && !seen.has(v.sourceId)) {
+        seen.add(v.sourceId);
+        list.push({ key: v.sourceId, label: v.sourceName || 'Партнёр' });
+      }
+    }
+    return list;
+  }, [externalVacancies]);
+
   const viewedPermIds = useRef(new Set<string>());
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 });
   const currentUserRef = useRef(currentUser);
@@ -2599,8 +2640,11 @@ function WorkerPermMode() {
 
   // Текущие применённые фильтры одним объектом — так их удобно и применять,
   // и считать «Показать N» для черновика в шторке.
-  const permF: PermFilters = { query: searchText, searchIn, posted, stations: filterStations, salaryFrom: minSalary > 0 ? String(minSalary) : '', schedules };
-  const permFiltersActive = filterStations.length > 0 || !!searchText || minSalary > 0 || searchIn.length > 0 || posted !== 'all' || schedules.length > 0;
+  const permF: PermFilters = { query: searchText, searchIn, posted, stations: filterStations, salaryFrom: minSalary > 0 ? String(minSalary) : '', schedules, sources: filterSources };
+  const permFiltersActive = filterStations.length > 0 || !!searchText || minSalary > 0 || searchIn.length > 0 || posted !== 'all' || schedules.length > 0 || filterSources.length > 0;
+
+  // Источник: 'jobtoo' — наши вакансии, иначе id внешнего источника. Пусто — все.
+  const permMatchesSource = (key: string, f: PermFilters) => f.sources.length === 0 || f.sources.includes(key);
 
   const permMatchesQuery = (title: string, company: string, desc: string, f: PermFilters) => {
     if (!f.query) return true;
@@ -2622,23 +2666,26 @@ function WorkerPermMode() {
   const matchesSearch = (v: PermVacancy) => permMatchesQuery(v.title, v.company, v.description ?? '', permF);
   const matchesFilters = (v: PermVacancy) => permMatchesMeta(v.metroStation, v.salary, v.createdAt, v.schedule, permF);
 
-  const openVacancies    = permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id) && matchesSearch(v) && matchesFilters(v));
+  const openVacancies    = permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id) && permMatchesSource('jobtoo', permF) && matchesSearch(v) && matchesFilters(v));
   const externalOpenVacancies = externalVacancies.filter(v =>
-    permMatchesQuery(v.title, v.company ?? v.sourceName ?? '', (v as { description?: string }).description ?? '', permF)
+    permMatchesSource(v.sourceId, permF)
+    && permMatchesQuery(v.title, v.company ?? v.sourceName ?? '', (v as { description?: string }).description ?? '', permF)
     && permMatchesMeta(v.metroStation, v.salary ?? 0, (v as { createdAt?: string }).createdAt, (v as { schedule?: string }).schedule, permF));
   // Отказ больше не прячется в отдельную вкладку: отклик остаётся здесь,
   // просто с красной плашкой «✕ Отказ» — иначе вакансия исчезала без объяснений
-  const appliedVacancies = permVacancies.filter(v => myAppVacIds.has(v.id) && matchesSearch(v) && matchesFilters(v));
-  const savedVacancies   = permVacancies.filter(v => permSavedIds.includes(v.id) && matchesSearch(v) && matchesFilters(v));
+  const appliedVacancies = permVacancies.filter(v => myAppVacIds.has(v.id) && permMatchesSource('jobtoo', permF) && matchesSearch(v) && matchesFilters(v));
+  const savedVacancies   = permVacancies.filter(v => permSavedIds.includes(v.id) && permMatchesSource('jobtoo', permF) && matchesSearch(v) && matchesFilters(v));
 
   // «Показать N» в шторке фильтров: открытые (не откликнутые) + внешние
   // под выбранный черновик фильтров.
   const countPerm = (f: PermFilters) =>
     permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id)
+      && permMatchesSource('jobtoo', f)
       && permMatchesQuery(v.title, v.company, v.description ?? '', f)
       && permMatchesMeta(v.metroStation, v.salary, v.createdAt, v.schedule, f)).length
     + externalVacancies.filter(v =>
-      permMatchesQuery(v.title, v.company ?? v.sourceName ?? '', (v as { description?: string }).description ?? '', f)
+      permMatchesSource(v.sourceId, f)
+      && permMatchesQuery(v.title, v.company ?? v.sourceName ?? '', (v as { description?: string }).description ?? '', f)
       && permMatchesMeta(v.metroStation, v.salary ?? 0, (v as { createdAt?: string }).createdAt, (v as { schedule?: string }).schedule, f)).length;
 
   const shownVacancies: (PermVacancy | ExternalVacancy)[] =
@@ -3295,6 +3342,7 @@ function WorkerPermMode() {
         <PermFilterSheet
           initial={permF}
           count={countPerm}
+          sources={availableSources}
           onApply={(f) => {
             setSearchText(f.query);
             setSearchIn(f.searchIn);
@@ -3302,6 +3350,7 @@ function WorkerPermMode() {
             setFilterStations(f.stations);
             setMinSalary(parseInt(f.salaryFrom || '0', 10) || 0);
             setSchedules(f.schedules);
+            setFilterSources(f.sources);
           }}
           onClose={() => setPermFilterOpen(false)}
         />
