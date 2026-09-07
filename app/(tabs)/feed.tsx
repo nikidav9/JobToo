@@ -1581,7 +1581,7 @@ function WorkerFeed() {
   const {
     currentUser, users, vacancies, likes, chats,
     refreshAll, refreshLikes, refreshChats,
-    showToast, vacanciesLoading, vacancyStatsMap, exitGuest,
+    showToast, vacanciesLoading, exitGuest,
   } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const [partnerShifts, setPartnerShifts] = useState<PartnerShiftCard[]>([]);
@@ -1778,9 +1778,10 @@ function WorkerFeed() {
   // Онбордингу: есть ли реальная карточка (иначе он покажет демо-карточку)
   useEffect(() => { setOnboardingFlag('hasShiftCard', !!currentCard); }, [currentCard]);
   const dateHistory = history[selectedDate] ?? [];
-  const vacancyStats = currentCard
-    ? (vacancyStatsMap[currentCard.id] ?? { applicants: 0, rejected: 0, views: 0 })
-    : { applicants: 0, rejected: 0, views: 0 };
+  // Какие карточки развёрнуты (описание «Читать ещё»). По id вакансии — как в «Работе».
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) =>
+    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   useEffect(() => {
     if (!currentCard?.id || !currentUser?.id) return;
@@ -2280,33 +2281,32 @@ function WorkerFeed() {
                   <View style={styles.cardDivider} />
 
                   <View style={styles.cardMiddle}>
-                    <View style={styles.slotsRow}>
-                      <View style={styles.slotInfo}>
-                        <Ionicons name="people-outline" size={20} color={Colors.blue} />
-                        <Text style={[styles.slotValue, { color: Colors.blue }]}>{vacancyStats.applicants}</Text>
-                        <Text style={styles.slotLabel}>Отклики</Text>
+                    {!('external' in currentCard) ? (
+                      <View style={{ gap: rs(12) }}>
+                        {currentCard.conditions ? (
+                          <View style={{ gap: rs(6) }}>
+                            <Text style={pS.sectionHead}>Условия</Text>
+                            <Text style={pS.desc} numberOfLines={expanded.has(currentCard.id) ? undefined : 6}>
+                              {currentCard.conditions}
+                            </Text>
+                            {currentCard.conditions.length > 160 ? (
+                              <TouchableOpacity style={pS.readMore} onPress={() => toggleExpanded(currentCard.id)} activeOpacity={0.7}>
+                                <Text style={pS.readMoreTxt}>{expanded.has(currentCard.id) ? 'Свернуть' : 'Читать ещё'}</Text>
+                                <Ionicons name={expanded.has(currentCard.id) ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.primary} />
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+                        ) : null}
+                        {currentCard.normsAndPay ? (
+                          <View style={{ gap: rs(6) }}>
+                            <Text style={pS.sectionHead}>Нормативы и оплата</Text>
+                            <Text style={pS.desc}>{currentCard.normsAndPay}</Text>
+                          </View>
+                        ) : null}
                       </View>
-                      {!isGuest && (
-                        <View style={styles.slotInfo}>
-                          <Ionicons name="eye-outline" size={20} color={Colors.green} />
-                          <Text style={[styles.slotValue, { color: Colors.green }]}>{vacancyStats.views}</Text>
-                          <Text style={styles.slotLabel}>Просмотрели</Text>
-                        </View>
-                      )}
-                    </View>
+                    ) : null}
                   </View>
                 </ScrollView>
-
-                <TouchableOpacity
-                  style={styles.detailHintRow}
-                  activeOpacity={0.7}
-                  onPress={() => { setDetailVacancy(currentCard); setDetailEmployer(currentEmployer ?? null); }}
-                >
-                  <Text style={styles.detailHintText}>
-                    {'external' in currentCard ? 'Условия и отклик у источника' : 'Подробности и нормативы'}
-                  </Text>
-                  <Text style={styles.detailHintArrow}>→</Text>
-                </TouchableOpacity>
 
                 <View style={styles.cardActionsRow}>
                   <TouchableOpacity
@@ -2539,6 +2539,9 @@ function WorkerPermMode() {
   const [chatLoading, setChatLoading] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [externalVacancies, setExternalVacancies] = useState<ExternalVacancy[]>([]);
+  // Партнёрскую вакансию нельзя «откликнуть» у нас — на неё уходят к источнику.
+  // Свайп вправо неоднозначен, поэтому сначала показываем плашку с подтверждением.
+  const [externalConfirm, setExternalConfirm] = useState<ExternalVacancy | null>(null);
 
   const loadExternalVacancies = useCallback(async () => {
     try {
@@ -2819,30 +2822,33 @@ function WorkerPermMode() {
     }
   };
 
+  // Переход к партнёрской вакансии на сайте источника. Один обработчик на все
+  // места: список, карточка колоды, плашка подтверждения свайпа.
+  const openExternalVacancy = async (v: ExternalVacancy) => {
+    // ID создаётся до сетевого запроса и сразу попадает в URL: переход остаётся
+    // прямым пользовательским жестом, а партнёр может вернуть этот непрозрачный
+    // ID в callback без каких-либо данных человека.
+    const clickId = Crypto.randomUUID().replace(/-/g, '');
+    const targetUrl = partnerAttributionUrl(v.url, clickId, v.sourceId);
+    dbRecordExternalClick(v.id, v.sourceId, currentUser.id, clickId).catch(() => {});
+    if (currentUser.isGuest) {
+      void dbRecordGuestEvent('external_click', {
+        vacancyId: v.id, vacancyKind: 'external', sourceId: v.sourceId,
+      });
+    }
+    try {
+      await Linking.openURL(targetUrl);
+    } catch {
+      showToast('Не удалось открыть вакансию', 'error');
+    }
+  };
+
   const renderPerm = ({ item: v }: { item: PermVacancy | ExternalVacancy }) => {
     const isExternal = 'sourceId' in v;
     if (isExternal) {
       const company = v.company ?? v.sourceName ?? 'Компания';
-      const openExternal = async () => {
-        // ID создаётся до сетевого запроса и сразу попадает в URL: переход
-        // остаётся прямым пользовательским жестом, а партнёр может вернуть
-        // этот непрозрачный ID в callback без каких-либо данных человека.
-        const clickId = Crypto.randomUUID().replace(/-/g, '');
-        const targetUrl = partnerAttributionUrl(v.url, clickId, v.sourceId);
-        dbRecordExternalClick(v.id, v.sourceId, currentUser.id, clickId).catch(() => {});
-        if (currentUser.isGuest) {
-          void dbRecordGuestEvent('external_click', {
-            vacancyId: v.id, vacancyKind: 'external', sourceId: v.sourceId,
-          });
-        }
-        try {
-          await Linking.openURL(targetUrl);
-        } catch {
-          showToast('Не удалось открыть вакансию', 'error');
-        }
-      };
       return (
-        <TouchableOpacity style={pS.card} onPress={openExternal} activeOpacity={0.9}>
+        <TouchableOpacity style={pS.card} onPress={() => openExternalVacancy(v)} activeOpacity={0.9}>
           <View style={pS.externalHead}>
             <View style={{ flex: 1 }}>
               <Text style={pS.jobTitle} numberOfLines={2}>{v.title}</Text>
@@ -3080,13 +3086,14 @@ function WorkerPermMode() {
   const swWant = (vx = 0.5) => {
     const c = swTop;
     if (!c) return;
+    // Партнёрскую вакансию не «откликаем» у нас — на неё уходят к источнику.
+    // Карточку не убираем: показываем плашку-подтверждение, решение за человеком.
+    if ('sourceId' in c) { swSnapBack(); setExternalConfirm(c as ExternalVacancy); return; }
     swFly('right', vx, () => {
       setSwSkipped(s => new Set(s).add(c.id));
       setSwHistory(h => [...h, c.id]);
-      if (!('sourceId' in c)) {
-        if (tab === 'saved' && permSavedIds.includes(c.id)) toggleSaved(c as PermVacancy);
-        applyTo(c as PermVacancy);
-      }
+      if (tab === 'saved' && permSavedIds.includes(c.id)) toggleSaved(c as PermVacancy);
+      applyTo(c as PermVacancy);
     });
   };
   // Влево — отказ: листаем дальше. В «Избранном» отказ убирает из избранного.
@@ -3143,7 +3150,11 @@ function WorkerPermMode() {
     const workTypeRaw = isExternal ? undefined : (v as PermVacancy).workType;
     // Профессия хранится кодом (stocker/cook/…) — показываем русское название.
     const workType = workTypeRaw ? (WORK_TYPE_META[workTypeRaw]?.label ?? workTypeRaw) : undefined;
-    const description = isExternal ? '' : cleanDescription((v as PermVacancy).description);
+    // Описание есть и у внешних (адаптер уже очистил его от HTML) — раньше здесь
+    // стояла пустая строка, и партнёрская карточка выглядела пустой.
+    const description = isExternal
+      ? ((v as ExternalVacancy).description ?? '')
+      : cleanDescription((v as PermVacancy).description);
     const isOpen = expanded.has(v.id);
     return (
       <View style={styles.cardArea}>
@@ -3222,7 +3233,7 @@ function WorkerPermMode() {
             {/* «Подробнее о вакансии» убрали: всё описание уже в карточке
                 («Читать ещё»). Для партнёрских оставляем переход к источнику. */}
             {isExternal ? (
-              <TouchableOpacity style={styles.detailHintRow} activeOpacity={0.7} onPress={() => {}}>
+              <TouchableOpacity style={styles.detailHintRow} activeOpacity={0.7} onPress={() => openExternalVacancy(v as ExternalVacancy)}>
                 <Text style={styles.detailHintText}>Открыть у источника</Text>
                 <Text style={styles.detailHintArrow}>→</Text>
               </TouchableOpacity>
@@ -3415,6 +3426,32 @@ function WorkerPermMode() {
         info={permApplyFor ? permVacancyInfoLines(permApplyFor) : []}
         chips={getChatSuggestions('worker', null)}
       />
+
+      {/* Плашка подтверждения перехода к партнёрской вакансии (свайп вправо). */}
+      {externalConfirm ? (
+        <View style={pS.confirmOverlay}>
+          <View style={pS.confirmCard}>
+            <Text style={pS.confirmTitle}>Открыть сайт вакансии?</Text>
+            <Text style={pS.confirmVacancy} numberOfLines={2}>{externalConfirm.title}</Text>
+            <Text style={pS.confirmHint}>
+              Отклик на эту вакансию — на сайте источника ({externalConfirm.sourceName ?? 'партнёр'}).
+            </Text>
+            <View style={pS.confirmBtns}>
+              <TouchableOpacity style={pS.confirmCancel} onPress={() => setExternalConfirm(null)} activeOpacity={0.8}>
+                <Text style={pS.confirmCancelTxt}>Отмена</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={pS.confirmOpen}
+                onPress={() => { const v = externalConfirm; setExternalConfirm(null); if (v) openExternalVacancy(v); }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="open-outline" size={16} color="#fff" />
+                <Text style={pS.confirmOpenTxt}>Открыть</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -3879,6 +3916,30 @@ export function CareerScreen() {
 // Permanent mode styles
 // ─────────────────────────────────────────────────
 const pS = StyleSheet.create({
+  // — плашка подтверждения перехода к партнёрской вакансии —
+  confirmOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center', padding: rs(24), zIndex: 50,
+  },
+  confirmCard: {
+    width: '100%', maxWidth: rs(360), backgroundColor: Colors.card,
+    borderRadius: rs(18), padding: rs(20), gap: rs(8),
+  },
+  confirmTitle: { fontSize: rf(18), fontWeight: '800', color: Colors.textPrimary },
+  confirmVacancy: { fontSize: rf(15), fontWeight: '600', color: Colors.textPrimary },
+  confirmHint: { fontSize: rf(13), color: Colors.textSecondary, lineHeight: rf(18) },
+  confirmBtns: { flexDirection: 'row', gap: rs(10), marginTop: rs(12) },
+  confirmCancel: {
+    flex: 1, height: rs(48), borderRadius: rs(12), alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.inputBorder,
+  },
+  confirmCancelTxt: { fontSize: rf(15), fontWeight: '600', color: Colors.textSecondary },
+  confirmOpen: {
+    flex: 1, height: rs(48), borderRadius: rs(12), flexDirection: 'row', gap: rs(6),
+    alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary,
+  },
+  confirmOpenTxt: { fontSize: rf(15), fontWeight: '700', color: '#fff' },
   // — разделы карточки —
   section: {
     marginTop: rs(12), padding: rs(12),
