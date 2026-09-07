@@ -30,7 +30,7 @@ const APP_SECRET = (process.env.EXPO_PUBLIC_APP_SECRET ?? '').trim();
 const SESSION_TOKEN_KEY = 'jm_session_token';
 let sessionTokenCache: string | null | undefined;
 
-async function getSessionToken(): Promise<string | null> {
+export async function getSessionToken(): Promise<string | null> {
   if (sessionTokenCache !== undefined) return sessionTokenCache;
   sessionTokenCache = await AsyncStorage.getItem(SESSION_TOKEN_KEY).catch(() => null);
   return sessionTokenCache;

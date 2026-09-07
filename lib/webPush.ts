@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { getSessionToken } from '@/services/db';
 
 // Публичная половина пары, которую сервер создал сам (infra/bootstrap.sh).
 // Прежняя жила в настройках Vercel, и её приватная часть однажды прошла
@@ -112,14 +113,28 @@ export async function registerWebPush(userId: string): Promise<boolean> {
 
     wpDebug('Сохраняем в базу...');
     const subJson = sub.toJSON();
+    // dbSaveWebPushSubscription на сервере — авторизованный метод: ему нужен
+    // токен сессии (Authorization), как и остальным запросам в services/db.ts.
+    // Без него сервер не видит пользователя и отвечает 401 — из-за этого
+    // «подключить уведомления» падало с «Ошибка сервера: HTTP 401».
+    const sessionToken = await getSessionToken();
     const resp = await wpTimeout(fetch(PROXY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Secret': APP_SECRET },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-App-Secret': APP_SECRET,
+        ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+      },
       body: JSON.stringify({
         fn: 'dbSaveWebPushSubscription',
         args: [userId, subJson.endpoint, (subJson.keys as any)?.p256dh, (subJson.keys as any)?.auth],
       }),
     }), 12_000, 'сохранение в базу');
+
+    if (resp.status === 401) {
+      wpDebug('Ошибка 401: сессия не распознана. Выйдите и войдите снова, затем повторите.');
+      return false;
+    }
 
     if (!resp.ok) {
       wpDebug(`Ошибка сервера: HTTP ${resp.status}`);
