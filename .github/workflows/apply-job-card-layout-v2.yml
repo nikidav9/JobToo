@@ -41,3 +41,5 @@ jobs:
           git add 'app/(tabs)/feed.tsx' 'components/ui/TabHeader.tsx'
           git commit -m "feat: refine permanent job card swipe layout"
           git push origin HEAD:main
+
+# trigger
