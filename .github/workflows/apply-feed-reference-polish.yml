@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/apply-feed-reference-polish.yml
       - scripts/apply_feed_reference_polish.py
+      - scripts/apply_shift_readmore.py
   workflow_dispatch:
 
 permissions:
@@ -26,8 +27,10 @@ jobs:
           node-version: 22.13.0
           cache: npm
 
-      - name: Apply UI patch
-        run: python3 scripts/apply_feed_reference_polish.py
+      - name: Apply UI patches
+        run: |
+          python3 scripts/apply_feed_reference_polish.py
+          python3 scripts/apply_shift_readmore.py
 
       - name: Check diff
         run: git diff --check
@@ -47,5 +50,5 @@ jobs:
             echo "No changes"
             exit 0
           fi
-          git commit -m "fix: match swipe controls and descriptions to reference"
+          git commit -m "fix: align shift read-more with rendered text"
           git push origin HEAD:main
