@@ -2306,7 +2306,7 @@ function WorkerFeed() {
                 >
                   <View style={styles.cardTop}>
                     <View style={styles.companyRow}>
-                      <CompanyMark company={currentCard.company} size={44} />
+                      <CompanyMark company={currentCard.company} size={52} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.companyName} numberOfLines={1}>
                           {normalizeCompany(currentCard.company)}
@@ -2388,7 +2388,7 @@ function WorkerFeed() {
                 карточки (отмена/✕/чат/♥) — теперь одинаково с постоянной работой.
                 У партнёрских карточек средняя кнопка ведёт к источнику (в наше
                 избранное их не кладём — нет стабильного id). */}
-            <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents="box-none">
+            <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(54) }]} pointerEvents="box-none">
               <View style={styles.shiftDeckRow}>
                 <TouchableOpacity
                   accessibilityLabel="Отклонить смену"
@@ -3258,7 +3258,7 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
             >
               <View style={styles.cardTop}>
                 <View style={styles.companyRow}>
-                  <CompanyMark company={v.company ?? sourceName} size={44} />
+                  <CompanyMark company={v.company ?? sourceName} size={52} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.companyName} numberOfLines={1}>{displayCompany}</Text>
                     <View style={styles.metroHintRow}>
@@ -3347,7 +3347,7 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
           </View>
         </Animated.View>
 
-        <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents="box-none">
+        <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(54) }]} pointerEvents="box-none">
           <View style={styles.shiftDeckRow}>
           <TouchableOpacity
             accessibilityLabel="Отклонить вакансию"
@@ -4315,9 +4315,9 @@ const styles = StyleSheet.create({
   // Нижний резерв под плавающие кнопки + подсказку «Свайпай»: карточка кончается
   // выше, а в зазоре под ней стоят кнопки — как на референсе. Раньше было 96 и
   // кнопки жались к навбару, подсказка уходила под него.
-  cardArea: { flex: 1, flexDirection: 'column', paddingHorizontal: rs(10), paddingTop: rs(10), paddingBottom: rs(124) },
-  ghost1: { position: 'absolute', left: rs(10), right: rs(10), top: rs(10), bottom: rs(124), backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.97 }, { translateY: 6 }], opacity: 0.5, zIndex: 0, ...Shadow.card },
-  ghost2: { position: 'absolute', left: rs(10), right: rs(10), top: rs(10), bottom: rs(124), backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.94 }, { translateY: 12 }], opacity: 0.3, zIndex: 0, ...Shadow.card },
+  cardArea: { flex: 1, flexDirection: 'column', paddingHorizontal: rs(10), paddingTop: rs(10), paddingBottom: rs(164) },
+  ghost1: { position: 'absolute', left: rs(10), right: rs(10), top: rs(10), bottom: rs(164), backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.97 }, { translateY: 6 }], opacity: 0.5, zIndex: 0, ...Shadow.card },
+  ghost2: { position: 'absolute', left: rs(10), right: rs(10), top: rs(10), bottom: rs(164), backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.94 }, { translateY: 12 }], opacity: 0.3, zIndex: 0, ...Shadow.card },
   cardAnimated: { flex: 1, zIndex: 1, elevation: 10 },
   card: { flex: 1, backgroundColor: Colors.bg, borderRadius: Radius.xl, ...Shadow.strong, overflow: 'hidden', borderWidth: 1, borderColor: Colors.inputBorder },
   wantOverlay: { position: 'absolute', top: rs(20), left: rs(20), zIndex: 10, backgroundColor: Colors.green, borderRadius: rs(10), paddingHorizontal: rs(14), paddingVertical: rs(8), transform: [{ rotate: '-10deg' }] },
@@ -4375,7 +4375,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
   },
   deckFloatingAction: {
-    width: rs(58), height: rs(58), borderRadius: rs(29),
+    width: rs(66), height: rs(66), borderRadius: rs(33),
     alignItems: 'center', justifyContent: 'center',
     // elevation выше карточки (у неё 10), иначе на Android круги уходят ПОД
     // карточку и видны лишь верхушки над её нижним краем.
@@ -4383,7 +4383,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 16,
   },
   deckFloatingSkip: { backgroundColor: '#FFFFFF' },
-  deckFloatingChat: { width: rs(52), height: rs(52), borderRadius: rs(26), backgroundColor: '#FFFFFF' },
+  deckFloatingChat: { width: rs(54), height: rs(54), borderRadius: rs(27), backgroundColor: '#FFFFFF' },
   deckFloatingWant: { width: rs(66), height: rs(66), borderRadius: rs(33), backgroundColor: Colors.primary, borderColor: Colors.primary },
   // Плавающие кнопки сменной колоды + подсказка «Свайпай» — как в «Работе» и на
   // образце. Колонка: ряд кнопок сверху, подсказка снизу, прижата к низу карточки.
