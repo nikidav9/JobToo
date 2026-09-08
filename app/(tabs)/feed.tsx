@@ -83,6 +83,13 @@ function partnerAttributionUrl(raw: string, clickId: string, sourceId: string): 
   }
 }
 
+// Гостю даём несколько бесплатных «отклонить», дальше — стена регистрации.
+// Счётчик модульный: общий для колод «Подработка» и «Работа», чтобы гость не
+// обходил лимит переключением вкладок. Живёт в памяти сессии; после
+// регистрации гость исчезает, и счётчик перестаёт на что-либо влиять.
+const GUEST_SKIP_LIMIT = 3;
+let guestSkipCount = 0;
+
 function CompanyMark({ company, size = 44 }: { company?: string | null; size?: number }) {
   const name = normalizeCompany(company);
   if (isLavkaCompany(name)) return <LavkaLogo size={size} />;
@@ -1885,6 +1892,13 @@ function WorkerFeed() {
     const card = currentCard;
     const date = selectedDate;
     const user = currentUser;
+    // Гость: три «отклонить» бесплатно, дальше — регистрация. Свайп «хочу» у
+    // гостя и так ведёт на регистрацию, так что после лимита оба направления
+    // конвертируют в регистрацию — максимум конверсии из гостевого режима.
+    if (user.isGuest) {
+      if (guestSkipCount >= GUEST_SKIP_LIMIT) { promptRegister({ vacancyKind: 'shift' }); return; }
+      guestSkipCount += 1;
+    }
     pendingLikeIds.current.add(card.id);
     animateCard('left', vx, () => {
       setHistory(h => ({ ...h, [date]: [card, ...(h[date] ?? []).slice(0, 9)] }));
@@ -1895,7 +1909,7 @@ function WorkerFeed() {
         .then(() => refreshLikes(user))
         .catch(() => { pendingLikeIds.current.delete(card.id); });
     });
-  }, [currentCard, currentUser, swiping, selectedDate, animateCard, refreshLikes]);
+  }, [currentCard, currentUser, swiping, selectedDate, animateCard, refreshLikes, promptRegister]);
 
   const doWant = useCallback((vx = 0.5) => {
     if (!currentCard || !currentUser || swiping) return;
@@ -3158,6 +3172,11 @@ function WorkerPermMode() {
   const swSkip = (vx = 0.5) => {
     const c = swTop;
     if (!c) return;
+    // Гость: тот же лимит «отклонить», что и в сменах (счётчик общий).
+    if (isGuest) {
+      if (guestSkipCount >= GUEST_SKIP_LIMIT) { promptRegister({ vacancyKind: 'permanent' }); return; }
+      guestSkipCount += 1;
+    }
     swFly('left', vx, () => {
       setSwSkipped(s => new Set(s).add(c.id));
       setSwHistory(h => [...h, c.id]);
