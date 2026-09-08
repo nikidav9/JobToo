@@ -52,6 +52,7 @@ import {
   dbAutoClosePastVacancies,
   dbRecordConsent,
   dbCompleteGuestRegistration,
+  setSessionExpiredHandler,
 } from '@/services/db';
 import { LEGAL_STAMP, legalVersions } from '@/constants/legal';
 import { registerForPushNotifications, releasePushTokenIfSignedOut } from '@/services/notifications';
@@ -736,6 +737,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSavedIds([]);
     setPermSavedIds([]);
   };
+
+  // Держим ссылку на актуальный logout: обработчик 401 регистрируется один раз
+  // на монтировании, а сам logout пересоздаётся каждый рендер (замыкает свежее
+  // состояние). Через ref обработчик всегда зовёт последнюю версию.
+  const logoutRef = useRef(logout);
+  logoutRef.current = logout;
+
+  // Протухла сессия (сервер ответил 401 на авторизованный вызов, например при
+  // «Опубликовать»): выходим и возвращаемся на вход. db.ts уже почистил токен и
+  // показал понятный текст; сброс currentUser поднимает гейт в app/_layout,
+  // который уводит с защищённого экрана на «/».
+  useEffect(() => {
+    setSessionExpiredHandler(() => { logoutRef.current?.().catch(() => {}); });
+    return () => setSessionExpiredHandler(null);
+  }, []);
 
   const updateUser = async (u: User) => {
     _setCurrentUser(u);

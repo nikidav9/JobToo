@@ -46,6 +46,20 @@ export async function dbClearSession(): Promise<void> {
   await saveSessionToken(null);
 }
 
+// Сессия протухла или отсутствует. Сервер (db.php) на авторизованную функцию
+// без валидной подписи отвечает 401 «Authentication required». Раньше это
+// всплывало как сырая англоязычная плашка прямо на форме (например, при
+// «Опубликовать»), и человек оставался на экране, не понимая, что делать.
+// Теперь на 401 мы чистим битый токен и зовём обработчик, который приложение
+// регистрирует (AppContext → logout + возврат на вход).
+const SESSION_EXPIRED_MESSAGE = 'Сессия истекла. Войдите заново, пожалуйста.';
+let sessionExpiredHandler: (() => void) | null = null;
+
+/** Приложение регистрирует, что делать при протухшей сессии (401). */
+export function setSessionExpiredHandler(cb: (() => void) | null): void {
+  sessionExpiredHandler = cb;
+}
+
 /**
  * Запрос к прокси.
  *
@@ -106,6 +120,13 @@ async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
       // Не JSON — ответила не наша программа. Пробуем ещё раз, один.
       if (attempt === 0) { await new Promise(r => setTimeout(r, 600)); continue; }
       break;
+    }
+    // Сессия недействительна: чистим токен, поднимаем экран входа и отдаём
+    // человеку понятный русский текст вместо «Authentication required».
+    if (status === 401 || parsed?.error === 'Authentication required') {
+      await saveSessionToken(null);
+      sessionExpiredHandler?.();
+      throw new Error(SESSION_EXPIRED_MESSAGE);
     }
     if (parsed?.error) throw new Error(parsed.error);
     return parsed?.data as T;
