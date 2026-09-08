@@ -37,6 +37,10 @@ s = s.replace("<Ionicons name={isExternal ? 'open-outline' : 'chatbubble-outline
 s = s.replace('<Ionicons name="chatbubble-outline" size={23} color={Colors.blue} />', '<Ionicons name="chatbubble-outline" size={24} color={Colors.blue} />')
 
 # Permanent-card read-more is based on the actual full rendered line count.
+perm_start = s.index('function WorkerPermMode(')
+head = s[:perm_start]
+perm = s[perm_start:]
+
 state_old = """  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleExpanded = (id: string) =>
     setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });"""
@@ -53,8 +57,8 @@ state_new = """  const [expanded, setExpanded] = useState<Set<string>>(new Set()
       return next;
     });
   };"""
-if state_old in s:
-    s = s.replace(state_old, state_new, 1)
+if state_old in perm:
+    perm = perm.replace(state_old, state_new, 1)
 
 desc_new = """                    <View style={{ position: 'relative' }}>
                       <Text style={pS.desc} numberOfLines={isOpen ? undefined : 5}>{description}</Text>
@@ -82,8 +86,8 @@ desc_old = """                    <Text style={pS.desc} numberOfLines={isOpen ? 
                         <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.primary} />
                       </TouchableOpacity>
                     ) : null}"""
-if desc_old in s:
-    s = s.replace(desc_old, desc_new, 1)
+if desc_old in perm:
+    perm = perm.replace(desc_old, desc_new, 1)
 
 limited_old = """                    <Text
                       style={pS.desc}
@@ -96,8 +100,10 @@ limited_old = """                    <Text
                         <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.primary} />
                       </TouchableOpacity>
                     ) : null}"""
-if limited_old in s:
-    s = s.replace(limited_old, desc_new, 1)
+if limited_old in perm:
+    perm = perm.replace(limited_old, desc_new, 1)
+
+s = head + perm
 
 # Reference proportions: X and heart equal, chat smaller.
 old_styles = """  deckFloatingAction: {
