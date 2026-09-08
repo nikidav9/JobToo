@@ -1624,6 +1624,7 @@ function partnerShiftToCard(v: ExternalVacancy): PartnerShiftCard | null {
 
 function WorkerFeed() {
   const router = useRouter();
+  const tabBarHeight = useBottomTabBarHeight();
   const deepLinkParams = useLocalSearchParams<{ vacancyId?: string; campaignId?: string }>();
   const deepLinkVacancyId = typeof deepLinkParams.vacancyId === 'string' ? deepLinkParams.vacancyId : '';
   const campaignId = typeof deepLinkParams.campaignId === 'string' ? deepLinkParams.campaignId : '';
@@ -2387,7 +2388,7 @@ function WorkerFeed() {
                 карточки (отмена/✕/чат/♥) — теперь одинаково с постоянной работой.
                 У партнёрских карточек средняя кнопка ведёт к источнику (в наше
                 избранное их не кладём — нет стабильного id). */}
-            <View style={styles.shiftDeckActions} pointerEvents="box-none">
+            <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents="box-none">
               <View style={styles.shiftDeckRow}>
                 <TouchableOpacity
                   accessibilityLabel="Отклонить смену"
@@ -2400,15 +2401,15 @@ function WorkerFeed() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  accessibilityLabel={'external' in currentCard ? 'Открыть у источника' : (isCurrentSaved ? 'Убрать из избранного' : 'В избранное')}
+                  accessibilityLabel={'external' in currentCard ? 'Открыть у источника' : 'Написать работодателю'}
                   style={[styles.deckFloatingAction, styles.deckFloatingChat]}
-                  onPress={() => { if ('external' in currentCard) doMessageRef.current?.(); else toggleSavedShift(); }}
+                  onPress={() => doMessageRef.current?.()}
                   activeOpacity={0.75}
                 >
                   <Ionicons
-                    name={'external' in currentCard ? 'open-outline' : (isCurrentSaved ? 'star' : 'star-outline')}
-                    size={24}
-                    color={'external' in currentCard ? Colors.blue : (isCurrentSaved ? Colors.amber : Colors.textSecondary)}
+                    name={'external' in currentCard ? 'open-outline' : 'chatbubble-outline'}
+                    size={23}
+                    color={Colors.blue}
                   />
                 </TouchableOpacity>
 
@@ -2422,7 +2423,11 @@ function WorkerFeed() {
                   <Ionicons name="heart" size={29} color="#fff" />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.swipeHint}>← Свайпай →</Text>
+              <View style={styles.swipeHintRow}>
+                <Ionicons name="arrow-undo-outline" size={18} color={Colors.textMuted} />
+                <Text style={styles.swipeHint}>Свайпай</Text>
+                <Ionicons name="arrow-redo-outline" size={18} color={Colors.textMuted} />
+              </View>
             </View>
           </>
         )}
@@ -3342,7 +3347,8 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
           </View>
         </Animated.View>
 
-        <View style={styles.deckFloatingActions} pointerEvents="box-none">
+        <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents="box-none">
+          <View style={styles.shiftDeckRow}>
           <TouchableOpacity
             accessibilityLabel="Отклонить вакансию"
             style={[styles.deckFloatingAction, styles.deckFloatingSkip]}
@@ -3369,6 +3375,12 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
           >
             <Ionicons name="heart" size={29} color="#fff" />
           </TouchableOpacity>
+          </View>
+          <View style={styles.swipeHintRow}>
+            <Ionicons name="arrow-undo-outline" size={18} color={Colors.textMuted} />
+            <Text style={styles.swipeHint}>Свайпай</Text>
+            <Ionicons name="arrow-redo-outline" size={18} color={Colors.textMuted} />
+          </View>
         </View>
       </View>
     );
@@ -4382,6 +4394,7 @@ const styles = StyleSheet.create({
   shiftDeckRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(24),
   },
+  swipeHintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(8) },
   swipeHint: { fontSize: rf(12), color: Colors.textMuted, fontWeight: '500' },
   cardActionItem: {
     width: rs(46), height: rs(46), borderRadius: rs(14),
