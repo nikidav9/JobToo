@@ -22,7 +22,6 @@ import { METRO_LINES } from '@/constants/metro';
 import {
   dbUpsertLike,
   dbCheckAndCreateMatch,
-  dbRemoveLike,
   dbUpdateVacancy,
   dbCreateChat,
   dbInsertMessage,
@@ -39,6 +38,8 @@ import {
   dbGetPermVacancyViewers,
   dbAddPermSaved,
   dbRemovePermSaved,
+  dbAddSaved,
+  dbRemoveSaved,
   dbGetExternalVacancies,
   dbRecordExternalImpression,
   dbRecordExternalClick,
@@ -1631,6 +1632,7 @@ function WorkerFeed() {
     currentUser, users, vacancies, likes, chats,
     refreshAll, refreshLikes, refreshChats,
     showToast, vacanciesLoading, exitGuest,
+    savedIds, optimisticAddSaved, optimisticRemoveSaved,
   } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const [partnerShifts, setPartnerShifts] = useState<PartnerShiftCard[]>([]);
@@ -1830,7 +1832,6 @@ function WorkerFeed() {
   }, [deepLinkVacancyId, currentCard, currentEmployer]);
   // Онбордингу: есть ли реальная карточка (иначе он покажет демо-карточку)
   useEffect(() => { setOnboardingFlag('hasShiftCard', !!currentCard); }, [currentCard]);
-  const dateHistory = history[selectedDate] ?? [];
   // Какие карточки развёрнуты (описание «Читать ещё»). По id вакансии — как в «Работе».
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleExpanded = (id: string) =>
@@ -1972,18 +1973,26 @@ function WorkerFeed() {
     });
   }, [currentCard, currentUser, swiping, selectedDate, animateCard, refreshLikes, router, showToast, promptRegister, campaignId, deepLinkVacancyId]);
 
-  const doUndo = useCallback(() => {
-    if (!dateHistory.length || !currentUser || swiping) return;
-    const last = dateHistory[0];
+  // Сохранить смену в «Избранное» (кнопка ★). Партнёрские (внешние) карточки в
+  // наше избранное не кладём — у них нет стабильного id в нашей базе; для них
+  // ★ работает как переход к источнику (см. кнопку). Гостю — предложение
+  // зарегистрироваться, как и на остальных действиях.
+  const isCurrentSaved = !!currentCard && !('external' in currentCard) && savedIds.includes(currentCard.id);
+  const toggleSavedShift = useCallback(() => {
+    if (!currentCard || 'external' in currentCard) return;
     const user = currentUser;
-    pendingLikeIds.current.delete(last.id);
-    setHistory(h => ({ ...h, [selectedDate]: (h[selectedDate] ?? []).slice(1) }));
-    setCards(prev => [last, ...prev]);
-    pan.setValue({ x: -SW, y: 0 });
-    Animated.spring(pan, { toValue: { x: 0, y: 0 }, tension: 200, friction: 20, useNativeDriver: false }).start();
-    if (user.isGuest) return; // гость ничего не писал — откатывать в базе нечего
-    dbRemoveLike(last.id, user.id).then(() => refreshLikes(user)).catch(() => {});
-  }, [dateHistory, selectedDate, currentUser, swiping, refreshLikes, pan]);
+    if (!user) return;
+    if (user.isGuest) { promptRegister({ vacancyKind: 'shift' }); return; }
+    const id = currentCard.id;
+    if (savedIds.includes(id)) {
+      optimisticRemoveSaved(id);
+      dbRemoveSaved(user.id, id).catch(() => {});
+    } else {
+      optimisticAddSaved(id);
+      dbAddSaved(user.id, id).catch(() => {});
+      showToast('Добавлено в избранное', 'success');
+    }
+  }, [currentCard, currentUser, savedIds, optimisticAddSaved, optimisticRemoveSaved, promptRegister, showToast]);
 
   // Отклик на смену. Если переписка с этим работодателем уже есть — просто
   // открываем её. Если нет, сначала спрашиваем у человека пару слов о себе:
@@ -2290,6 +2299,7 @@ function WorkerFeed() {
 
                 <ScrollView
                   style={{ flex: 1 }}
+                  contentContainerStyle={{ paddingBottom: rs(96) }}
                   showsVerticalScrollIndicator={false}
                   refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
                 >
@@ -2335,7 +2345,7 @@ function WorkerFeed() {
                     {currentCard.address ? (
                       <View style={styles.addressChip}>
                         <Ionicons name="location-outline" size={15} color="#92400E" style={{ marginTop: 1 }} />
-                        <Text style={styles.addressChipText} numberOfLines={2}>{currentCard.address}</Text>
+                        <Text style={styles.addressChipText} numberOfLines={3}>{currentCard.address}</Text>
                       </View>
                     ) : null}
                   </View>
@@ -2369,50 +2379,51 @@ function WorkerFeed() {
                     ) : null}
                   </View>
                 </ScrollView>
-
-                <View style={styles.cardActionsRow}>
-                  <TouchableOpacity
-                    style={[styles.cardActionItem, !dateHistory.length && { opacity: 0.3 }]}
-                    onPress={doUndo}
-                    disabled={!dateHistory.length || swiping}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="arrow-undo" size={20} color={Colors.textMuted} />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.cardActionItem, styles.cardActionSkip]}
-                    onPress={() => doSkip(0.5)}
-                    disabled={swiping}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="close" size={24} color={Colors.red} />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.cardActionItem}
-                    onPress={() => doMessageRef.current?.()}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name={'external' in currentCard ? 'open-outline' : 'chatbubble-outline'}
-                      size={20}
-                      color={Colors.textSecondary}
-                    />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.cardActionItem, styles.cardActionWant]}
-                    onPress={() => doWant(0.5)}
-                    disabled={swiping}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="heart" size={22} color="#fff" />
-                  </TouchableOpacity>
-                </View>
               </View>
             </Animated.View>
+
+            {/* Плавающие кнопки как в «Работе» и на образце: ✕ / ★ / ♥ и
+                подсказка «Свайпай». Раньше это была плоская панель внутри
+                карточки (отмена/✕/чат/♥) — теперь одинаково с постоянной работой.
+                У партнёрских карточек средняя кнопка ведёт к источнику (в наше
+                избранное их не кладём — нет стабильного id). */}
+            <View style={styles.shiftDeckActions} pointerEvents="box-none">
+              <View style={styles.shiftDeckRow}>
+                <TouchableOpacity
+                  accessibilityLabel="Отклонить смену"
+                  style={[styles.deckFloatingAction, styles.deckFloatingSkip]}
+                  onPress={() => doSkip(0.5)}
+                  disabled={swiping}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="close" size={30} color={Colors.red} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  accessibilityLabel={'external' in currentCard ? 'Открыть у источника' : (isCurrentSaved ? 'Убрать из избранного' : 'В избранное')}
+                  style={[styles.deckFloatingAction, styles.deckFloatingChat]}
+                  onPress={() => { if ('external' in currentCard) doMessageRef.current?.(); else toggleSavedShift(); }}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons
+                    name={'external' in currentCard ? 'open-outline' : (isCurrentSaved ? 'star' : 'star-outline')}
+                    size={24}
+                    color={'external' in currentCard ? Colors.blue : (isCurrentSaved ? Colors.amber : Colors.textSecondary)}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  accessibilityLabel="Откликнуться на смену"
+                  style={[styles.deckFloatingAction, styles.deckFloatingWant]}
+                  onPress={() => doWant(0.5)}
+                  disabled={swiping}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="heart" size={29} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.swipeHint}>← Свайпай →</Text>
+            </View>
           </>
         )}
       </View>
@@ -3292,7 +3303,7 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
                 {(v.metroStation || v.address) ? (
                   <View style={styles.addressChip}>
                     <Ionicons name="location-outline" size={17} color={Colors.textMuted} />
-                    <Text style={styles.addressChipText} numberOfLines={1}>
+                    <Text style={styles.addressChipText} numberOfLines={2}>
                       {[v.metroStation, v.address].filter(Boolean).join(' · ')}
                     </Text>
                     <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
@@ -4357,6 +4368,16 @@ const styles = StyleSheet.create({
   deckFloatingSkip: { backgroundColor: '#FFFFFF' },
   deckFloatingChat: { width: rs(52), height: rs(52), borderRadius: rs(26), backgroundColor: '#FFFFFF' },
   deckFloatingWant: { width: rs(66), height: rs(66), borderRadius: rs(33), backgroundColor: Colors.primary, borderColor: Colors.primary },
+  // Плавающие кнопки сменной колоды + подсказка «Свайпай» — как в «Работе» и на
+  // образце. Колонка: ряд кнопок сверху, подсказка снизу, прижата к низу карточки.
+  shiftDeckActions: {
+    position: 'absolute', left: rs(24), right: rs(24), bottom: rs(10), zIndex: 20,
+    alignItems: 'center', gap: rs(6),
+  },
+  shiftDeckRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(24),
+  },
+  swipeHint: { fontSize: rf(12), color: Colors.textMuted, fontWeight: '500' },
   cardActionItem: {
     width: rs(46), height: rs(46), borderRadius: rs(14),
     alignItems: 'center', justifyContent: 'center',
