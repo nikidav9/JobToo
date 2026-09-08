@@ -82,6 +82,11 @@ const PROXY_TIMEOUT = 25_000;
 async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
   let status = 0;
   let text = '';
+  // Был ли к запросу приложен токен сессии. Нужен ниже: 401 при наличии токена
+  // — это протухшая/отозванная сессия (разлогиниваем и ведём на вход); 401 без
+  // токена — это гость или незалогиненный, у него нечему истекать, поэтому его
+  // трогать нельзя (иначе гостевой вход тут же выкидывает на экран входа).
+  let hadToken = false;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctl = new AbortController();
@@ -89,6 +94,7 @@ async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
     let res: Response;
     try {
       const sessionToken = await getSessionToken();
+      hadToken = !!sessionToken;
       res = await fetch(`${API_BASE}/api/db.php`, {
         method: 'POST',
         headers: {
@@ -121,12 +127,19 @@ async function proxy<T>(fn: string, args: unknown[] = []): Promise<T> {
       if (attempt === 0) { await new Promise(r => setTimeout(r, 600)); continue; }
       break;
     }
-    // Сессия недействительна: чистим токен, поднимаем экран входа и отдаём
-    // человеку понятный русский текст вместо «Authentication required».
+    // Сессия недействительна.
     if (status === 401 || parsed?.error === 'Authentication required') {
-      await saveSessionToken(null);
-      sessionExpiredHandler?.();
-      throw new Error(SESSION_EXPIRED_MESSAGE);
+      if (hadToken) {
+        // Токен был, но сервер его отверг — сессия протухла/отозвана. Чистим,
+        // поднимаем экран входа, отдаём понятный русский текст.
+        await saveSessionToken(null);
+        sessionExpiredHandler?.();
+        throw new Error(SESSION_EXPIRED_MESSAGE);
+      }
+      // Токена и не было — это гость/незалогиненный дёрнул авторизованную
+      // функцию. Не разлогиниваем (гостя нельзя выкидывать со входа) — просто
+      // сообщаем, что нужна регистрация. Фоновые вызовы это молча проглотят.
+      throw new Error('Для этого действия нужна регистрация.');
     }
     if (parsed?.error) throw new Error(parsed.error);
     return parsed?.data as T;
