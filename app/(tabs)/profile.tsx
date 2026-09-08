@@ -629,6 +629,7 @@ export default function ProfileScreen() {
           {[
             { label: 'Пользовательское соглашение', doc: 'terms' as const },
             { label: 'Политика конфиденциальности', doc: 'privacy' as const },
+            { label: 'Политика обработки персональных данных', doc: 'dataPolicy' as const },
             { label: 'Согласие на обработку данных', doc: 'consent' as const },
           ].map((item) => (
             <TouchableOpacity
