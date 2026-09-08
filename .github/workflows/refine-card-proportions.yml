@@ -1,0 +1,69 @@
+name: Refine card proportions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/refine-card-proportions.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch proportions
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/(tabs)/feed.tsx')
+          s = p.read_text()
+
+          pairs = [
+            ("CompanyMark company={currentCard.company} size={44}", "CompanyMark company={currentCard.company} size={52}"),
+            ("CompanyMark company={v.company ?? sourceName} size={44}", "CompanyMark company={v.company ?? sourceName} size={52}"),
+            ("cardArea: { flex: 1, flexDirection: 'column', paddingHorizontal: rs(10), paddingTop: rs(10), paddingBottom: rs(124) }", "cardArea: { flex: 1, flexDirection: 'column', paddingHorizontal: rs(10), paddingTop: rs(10), paddingBottom: rs(164) }"),
+            ("bottom: rs(124), backgroundColor: Colors.bg", "bottom: rs(164), backgroundColor: Colors.bg"),
+            ("bottom: tabBarHeight + rs(18)", "bottom: tabBarHeight + rs(54)"),
+            ("width: rs(58), height: rs(58), borderRadius: rs(29)", "width: rs(66), height: rs(66), borderRadius: rs(33)"),
+            ("deckFloatingChat: { width: rs(52), height: rs(52), borderRadius: rs(26), backgroundColor: '#FFFFFF' }", "deckFloatingChat: { width: rs(54), height: rs(54), borderRadius: rs(27), backgroundColor: '#FFFFFF' }"),
+            ("deckFloatingWant: { width: rs(66), height: rs(66), borderRadius: rs(33), backgroundColor: Colors.primary, borderColor: Colors.primary }", "deckFloatingWant: { width: rs(66), height: rs(66), borderRadius: rs(33), backgroundColor: Colors.primary, borderColor: Colors.primary }"),
+          ]
+
+          for old, new in pairs:
+            if old == new:
+              continue
+            count = s.count(old)
+            if old.startswith('bottom: rs(124)'):
+              assert count == 2, (old, count)
+              s = s.replace(old, new)
+            elif old.startswith('bottom: tabBarHeight'):
+              assert count == 2, (old, count)
+              s = s.replace(old, new)
+            else:
+              assert count >= 1, (old, count)
+              s = s.replace(old, new)
+
+          p.write_text(s)
+
+      - name: Check
+        run: |
+          git diff --check
+          grep -q "paddingBottom: rs(164)" 'app/(tabs)/feed.tsx'
+          grep -q "bottom: tabBarHeight + rs(54)" 'app/(tabs)/feed.tsx'
+          grep -q "width: rs(66), height: rs(66), borderRadius: rs(33)" 'app/(tabs)/feed.tsx'
+          grep -q "deckFloatingChat: { width: rs(54), height: rs(54)" 'app/(tabs)/feed.tsx'
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'app/(tabs)/feed.tsx'
+          git commit -m "fix: match vacancy card proportions to reference"
+          git push origin HEAD:main
