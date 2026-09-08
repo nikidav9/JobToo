@@ -11,6 +11,7 @@ import { AppInput } from '@/components/ui/AppInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useApp } from '@/hooks/useApp';
 import { isPhoneComplete, extractPhoneDigits } from '@/services/storage';
+import { LegalLinks } from '@/components/LegalLinks';
 
 import { rs, rf } from '@/constants/scale';
 
@@ -117,6 +118,8 @@ export default function Login() {
         <TouchableOpacity style={styles.cancel} onPress={() => router.back()}>
           <Text style={styles.cancelText}>Отмена</Text>
         </TouchableOpacity>
+
+        <LegalLinks style={{ marginTop: rs(4) }} />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

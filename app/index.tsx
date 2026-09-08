@@ -17,6 +17,7 @@ import { hideWebSplash, setWebSplashProgress } from '@/lib/webSplash';
 
 import { rs, rf } from '@/constants/scale';
 import { dbCountUsers, dbRecordGuestEvent } from '@/services/db';
+import { LegalLinks } from '@/components/LegalLinks';
 
 const USER_COUNT_KEY = 'cached_user_count';
 
@@ -255,6 +256,11 @@ export default function RootScreen() {
           <TouchableOpacity onPress={() => router.push('/login')}>
             <Text style={styles.loginLink}>Войти</Text>
           </TouchableOpacity>
+        </Animated.View>
+
+        {/* Документы доступны до регистрации — прямо со стартового экрана. */}
+        <Animated.View style={{ opacity: introFade, marginBottom: r(10) }}>
+          <LegalLinks />
         </Animated.View>
 
         <Animated.Text style={[styles.version, { opacity: introFade }]}>JobToo v{Constants.expoConfig?.version ?? '1.4.0'}</Animated.Text>

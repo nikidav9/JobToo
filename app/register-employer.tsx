@@ -255,6 +255,10 @@ export default function RegisterEmployer() {
                     <Text style={styles.link} onPress={() => router.push({ pathname: '/legal', params: { doc: 'privacy' } })}>
                       Политикой конфиденциальности
                     </Text>
+                    {', '}
+                    <Text style={styles.link} onPress={() => router.push({ pathname: '/legal', params: { doc: 'dataPolicy' } })}>
+                      Политикой обработки персональных данных
+                    </Text>
                     {' и '}
                     <Text style={styles.link} onPress={() => router.push({ pathname: '/legal', params: { doc: 'consent' } })}>
                       Согласием на обработку персональных данных
