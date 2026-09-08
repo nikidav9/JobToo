@@ -2318,9 +2318,7 @@ function WorkerFeed() {
                             color={Colors.textMuted}
                           />
                           <Text style={styles.metroHint}>
-                            {'external' in currentCard
-                              ? `Источник: ${(currentCard as PartnerShiftCard).external.sourceName ?? 'партнёр'} · отклик на его сайте`
-                              : currentCard.metroStation}
+                            {'external' in currentCard ? (currentCard.metroStation ?? '') : currentCard.metroStation}
                           </Text>
                         </View>
                       </View>
@@ -2388,7 +2386,7 @@ function WorkerFeed() {
                 карточки (отмена/✕/чат/♥) — теперь одинаково с постоянной работой.
                 У партнёрских карточек средняя кнопка ведёт к источнику (в наше
                 избранное их не кладём — нет стабильного id). */}
-            <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(54) }]} pointerEvents="box-none">
+            <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents="box-none">
               <View style={styles.shiftDeckRow}>
                 <TouchableOpacity
                   accessibilityLabel="Отклонить смену"
@@ -2397,7 +2395,7 @@ function WorkerFeed() {
                   disabled={swiping}
                   activeOpacity={0.75}
                 >
-                  <Ionicons name="close" size={30} color={Colors.red} />
+                  <Ionicons name="close" size={34} color={Colors.red} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -2407,7 +2405,7 @@ function WorkerFeed() {
                   activeOpacity={0.75}
                 >
                   <Ionicons
-                    name={'external' in currentCard ? 'open-outline' : 'chatbubble-outline'}
+                    name="chatbubble-outline"
                     size={23}
                     color={Colors.blue}
                   />
@@ -2420,13 +2418,13 @@ function WorkerFeed() {
                   disabled={swiping}
                   activeOpacity={0.75}
                 >
-                  <Ionicons name="heart" size={29} color="#fff" />
+                  <Ionicons name="heart" size={31} color="#fff" />
                 </TouchableOpacity>
               </View>
               <View style={styles.swipeHintRow}>
-                <Ionicons name="arrow-undo-outline" size={18} color={Colors.textMuted} />
+                <Ionicons name="arrow-undo-outline" size={20} color="#9AA3B2" />
                 <Text style={styles.swipeHint}>Свайпай</Text>
-                <Ionicons name="arrow-redo-outline" size={18} color={Colors.textMuted} />
+                <Ionicons name="arrow-redo-outline" size={20} color="#9AA3B2" />
               </View>
             </View>
           </>
@@ -2607,8 +2605,18 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
   const [permFilterOpen, setPermFilterOpen] = useState(false);
   // Какие карточки развёрнуты (описание «Читать ещё»). По id вакансии.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [truncatedDescriptions, setTruncatedDescriptions] = useState<Set<string>>(new Set());
   const toggleExpanded = (id: string) =>
     setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const rememberDescriptionLines = (id: string, lines: number) => {
+    setTruncatedDescriptions(prev => {
+      const shouldShow = lines > 5;
+      if (prev.has(id) === shouldShow) return prev;
+      const next = new Set(prev);
+      shouldShow ? next.add(id) : next.delete(id);
+      return next;
+    });
+  };
   const [filterPicker, setFilterPicker] = useState(false);
   const [minSalary, setMinSalary] = useState(0);
   const [applying, setApplying] = useState<string | null>(null);
@@ -3264,7 +3272,7 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
                     <View style={styles.metroHintRow}>
                       <Ionicons name={isExternal ? 'open-outline' : 'subway-outline'} size={12} color={Colors.textMuted} />
                       <Text style={styles.metroHint} numberOfLines={1}>
-                        {isExternal ? `Источник: ${sourceName ?? 'партнёр'}` : (v.metroStation ?? 'Постоянная вакансия')}
+                        {v.metroStation ?? (isExternal ? '' : 'Постоянная вакансия')}
                       </Text>
                     </View>
                   </View>
@@ -3322,8 +3330,19 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
                 {description ? (
                   <View style={{ gap: rs(6) }}>
                     <Text style={pS.sectionHead}>Описание</Text>
-                    <Text style={pS.desc} numberOfLines={isOpen ? undefined : 5}>{description}</Text>
-                    {description.length > 140 ? (
+                    <View style={{ position: 'relative' }}>
+                      <Text style={pS.desc} numberOfLines={isOpen ? undefined : 5}>{description}</Text>
+                      {!isOpen ? (
+                        <Text
+                          accessible={false}
+                          style={[pS.desc, { position: 'absolute', opacity: 0, left: 0, right: 0, top: 0 }]}
+                          onTextLayout={(e) => rememberDescriptionLines(v.id, e.nativeEvent.lines.length)}
+                        >
+                          {description}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {(isOpen || truncatedDescriptions.has(v.id)) ? (
                       <TouchableOpacity style={pS.readMore} onPress={() => toggleExpanded(v.id)} activeOpacity={0.7}>
                         <Text style={pS.readMoreTxt}>{isOpen ? 'Свернуть' : 'Читать ещё'}</Text>
                         <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.primary} />
@@ -3335,19 +3354,10 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
               </View>
             </ScrollView>
 
-            {/* «Подробнее о вакансии» убрали: всё описание уже в карточке
-                («Читать ещё»). Для партнёрских оставляем переход к источнику. */}
-            {isExternal ? (
-              <TouchableOpacity style={styles.detailHintRow} activeOpacity={0.7} onPress={() => openExternalVacancy(v as ExternalVacancy)}>
-                <Text style={styles.detailHintText}>Открыть у источника</Text>
-                <Text style={styles.detailHintArrow}>→</Text>
-              </TouchableOpacity>
-            ) : null}
-
           </View>
         </Animated.View>
 
-        <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(54) }]} pointerEvents="box-none">
+        <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents="box-none">
           <View style={styles.shiftDeckRow}>
           <TouchableOpacity
             accessibilityLabel="Отклонить вакансию"
@@ -3355,7 +3365,7 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
             onPress={() => swSkip(0.5)}
             activeOpacity={0.75}
           >
-            <Ionicons name="close" size={30} color={Colors.red} />
+            <Ionicons name="close" size={34} color={Colors.red} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -3364,7 +3374,7 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
             onPress={() => { if (isExternal) openExternalVacancy(v as ExternalVacancy); else openPermChat(v as PermVacancy, displayCompany); }}
             activeOpacity={0.75}
           >
-            <Ionicons name={isExternal ? 'open-outline' : 'chatbubble-outline'} size={23} color={Colors.blue} />
+            <Ionicons name="chatbubble-outline" size={24} color={Colors.blue} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -3373,13 +3383,13 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
             onPress={() => swWant(0.5)}
             activeOpacity={0.75}
           >
-            <Ionicons name="heart" size={29} color="#fff" />
+            <Ionicons name="heart" size={31} color="#fff" />
           </TouchableOpacity>
           </View>
           <View style={styles.swipeHintRow}>
-            <Ionicons name="arrow-undo-outline" size={18} color={Colors.textMuted} />
+            <Ionicons name="arrow-undo-outline" size={20} color="#9AA3B2" />
             <Text style={styles.swipeHint}>Свайпай</Text>
-            <Ionicons name="arrow-redo-outline" size={18} color={Colors.textMuted} />
+            <Ionicons name="arrow-redo-outline" size={20} color="#9AA3B2" />
           </View>
         </View>
       </View>
@@ -4375,27 +4385,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
   },
   deckFloatingAction: {
-    width: rs(66), height: rs(66), borderRadius: rs(33),
+    width: rs(68), height: rs(68), borderRadius: rs(34),
     alignItems: 'center', justifyContent: 'center',
-    // elevation выше карточки (у неё 10), иначе на Android круги уходят ПОД
-    // карточку и видны лишь верхушки над её нижним краем.
-    backgroundColor: Colors.bg, borderWidth: 1, borderColor: Colors.divider,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 16,
+    backgroundColor: '#FFFFFF', borderWidth: 0.75, borderColor: '#EEF0F3',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.10, shadowRadius: 12, elevation: 16,
   },
   deckFloatingSkip: { backgroundColor: '#FFFFFF' },
   deckFloatingChat: { width: rs(54), height: rs(54), borderRadius: rs(27), backgroundColor: '#FFFFFF' },
-  deckFloatingWant: { width: rs(66), height: rs(66), borderRadius: rs(33), backgroundColor: Colors.primary, borderColor: Colors.primary },
+  deckFloatingWant: { width: rs(68), height: rs(68), borderRadius: rs(34), backgroundColor: Colors.primary, borderColor: Colors.primary },
   // Плавающие кнопки сменной колоды + подсказка «Свайпай» — как в «Работе» и на
   // образце. Колонка: ряд кнопок сверху, подсказка снизу, прижата к низу карточки.
   shiftDeckActions: {
     position: 'absolute', left: rs(24), right: rs(24), bottom: rs(28), zIndex: 20, elevation: 20,
-    alignItems: 'center', gap: rs(8),
+    alignItems: 'center', gap: rs(10),
   },
   shiftDeckRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(24),
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(30),
   },
-  swipeHintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(8) },
-  swipeHint: { fontSize: rf(12), color: Colors.textMuted, fontWeight: '500' },
+  swipeHintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(9), marginTop: rs(1) },
+  swipeHint: { fontSize: rf(12), lineHeight: rf(16), color: '#9AA3B2', fontWeight: '500' },
   cardActionItem: {
     width: rs(46), height: rs(46), borderRadius: rs(14),
     alignItems: 'center', justifyContent: 'center',
