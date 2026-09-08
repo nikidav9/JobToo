@@ -19,131 +19,131 @@ jobs:
           fetch-depth: 0
 
       - name: Patch swipe controls
-        shell: python
+        shell: bash
         run: |
+          python3 - <<'PY'
           from pathlib import Path
           p = Path('app/(tabs)/feed.tsx')
           s = p.read_text()
 
           old = """function WorkerFeed() {
-  const router = useRouter();"""
+            const router = useRouter();"""
           new = """function WorkerFeed() {
-  const router = useRouter();
-  const tabBarHeight = useBottomTabBarHeight();"""
+            const router = useRouter();
+            const tabBarHeight = useBottomTabBarHeight();"""
           assert old in s
           s = s.replace(old, new, 1)
 
           old = """            {/* Плавающие кнопки как в «Работе» и на образце: ✕ / ★ / ♥ и
-                подсказка «Свайпай». Раньше это была плоская панель внутри
-                карточки (отмена/✕/чат/♥) — теперь одинаково с постоянной работой.
-                У партнёрских карточек средняя кнопка ведёт к источнику (в наше
-                избранное их не кладём — нет стабильного id). */}
-            <View style={styles.shiftDeckActions} pointerEvents=\"box-none\">
-              <View style={styles.shiftDeckRow}>"""
-          new = """            {/* Плавающие действия вынесены над нижней навигацией: ✕ / чат / ♥.
-                Под ними отдельная подсказка свайпа, как в референсе. */}
-            <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents=\"box-none\">
-              <View style={styles.shiftDeckRow}>"""
+                        подсказка «Свайпай». Раньше это была плоская панель внутри
+                        карточки (отмена/✕/чат/♥) — теперь одинаково с постоянной работой.
+                        У партнёрских карточек средняя кнопка ведёт к источнику (в наше
+                        избранное их не кладём — нет стабильного id). */}
+                    <View style={styles.shiftDeckActions} pointerEvents=\"box-none\">
+                      <View style={styles.shiftDeckRow}>"""
+          new = """            {/* Плавающие действия: ✕ / чат / ♥. Под ними подсказка свайпа. */}
+                    <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents=\"box-none\">
+                      <View style={styles.shiftDeckRow}>"""
           assert old in s
           s = s.replace(old, new, 1)
 
           old = """                <TouchableOpacity
-                  accessibilityLabel={'external' in currentCard ? 'Открыть у источника' : (isCurrentSaved ? 'Убрать из избранного' : 'В избранное')}
-                  style={[styles.deckFloatingAction, styles.deckFloatingChat]}
-                  onPress={() => { if ('external' in currentCard) doMessageRef.current?.(); else toggleSavedShift(); }}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons
-                    name={'external' in currentCard ? 'open-outline' : (isCurrentSaved ? 'star' : 'star-outline')}
-                    size={24}
-                    color={'external' in currentCard ? Colors.blue : (isCurrentSaved ? Colors.amber : Colors.textSecondary)}
-                  />
-                </TouchableOpacity>"""
+                          accessibilityLabel={'external' in currentCard ? 'Открыть у источника' : (isCurrentSaved ? 'Убрать из избранного' : 'В избранное')}
+                          style={[styles.deckFloatingAction, styles.deckFloatingChat]}
+                          onPress={() => { if ('external' in currentCard) doMessageRef.current?.(); else toggleSavedShift(); }}
+                          activeOpacity={0.75}
+                        >
+                          <Ionicons
+                            name={'external' in currentCard ? 'open-outline' : (isCurrentSaved ? 'star' : 'star-outline')}
+                            size={24}
+                            color={'external' in currentCard ? Colors.blue : (isCurrentSaved ? Colors.amber : Colors.textSecondary)}
+                          />
+                        </TouchableOpacity>"""
           new = """                <TouchableOpacity
-                  accessibilityLabel={'external' in currentCard ? 'Открыть у источника' : 'Написать работодателю'}
-                  style={[styles.deckFloatingAction, styles.deckFloatingChat]}
-                  onPress={() => doMessageRef.current?.()}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons
-                    name={'external' in currentCard ? 'open-outline' : 'chatbubble-outline'}
-                    size={23}
-                    color={Colors.blue}
-                  />
-                </TouchableOpacity>"""
+                          accessibilityLabel={'external' in currentCard ? 'Открыть у источника' : 'Написать работодателю'}
+                          style={[styles.deckFloatingAction, styles.deckFloatingChat]}
+                          onPress={() => doMessageRef.current?.()}
+                          activeOpacity={0.75}
+                        >
+                          <Ionicons
+                            name={'external' in currentCard ? 'open-outline' : 'chatbubble-outline'}
+                            size={23}
+                            color={Colors.blue}
+                          />
+                        </TouchableOpacity>"""
           assert old in s
           s = s.replace(old, new, 1)
 
           old = """              </View>
-              <Text style={styles.swipeHint}>← Свайпай →</Text>
-            </View>"""
+                      <Text style={styles.swipeHint}>← Свайпай →</Text>
+                    </View>"""
           new = """              </View>
-              <View style={styles.swipeHintRow}>
-                <Ionicons name=\"arrow-undo-outline\" size={18} color={Colors.textMuted} />
-                <Text style={styles.swipeHint}>Свайпай</Text>
-                <Ionicons name=\"arrow-redo-outline\" size={18} color={Colors.textMuted} />
-              </View>
-            </View>"""
+                      <View style={styles.swipeHintRow}>
+                        <Ionicons name=\"arrow-undo-outline\" size={18} color={Colors.textMuted} />
+                        <Text style={styles.swipeHint}>Свайпай</Text>
+                        <Ionicons name=\"arrow-redo-outline\" size={18} color={Colors.textMuted} />
+                      </View>
+                    </View>"""
           assert old in s
           s = s.replace(old, new, 1)
 
           old = """        <View style={styles.deckFloatingActions} pointerEvents=\"box-none\">
-          <TouchableOpacity"""
+                  <TouchableOpacity"""
           new = """        <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents=\"box-none\">
-          <View style={styles.shiftDeckRow}>
-          <TouchableOpacity"""
+                  <View style={styles.shiftDeckRow}>
+                  <TouchableOpacity"""
           assert old in s
           s = s.replace(old, new, 1)
 
           old = """          <TouchableOpacity
-            accessibilityLabel=\"Откликнуться на вакансию\"
-            style={[styles.deckFloatingAction, styles.deckFloatingWant]}
-            onPress={() => swWant(0.5)}
-            activeOpacity={0.75}
-          >
-            <Ionicons name=\"heart\" size={29} color=\"#fff\" />
-          </TouchableOpacity>
-        </View>
-      </View>"""
+                    accessibilityLabel=\"Откликнуться на вакансию\"
+                    style={[styles.deckFloatingAction, styles.deckFloatingWant]}
+                    onPress={() => swWant(0.5)}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons name=\"heart\" size={29} color=\"#fff\" />
+                  </TouchableOpacity>
+                </View>
+              </View>"""
           new = """          <TouchableOpacity
-            accessibilityLabel=\"Откликнуться на вакансию\"
-            style={[styles.deckFloatingAction, styles.deckFloatingWant]}
-            onPress={() => swWant(0.5)}
-            activeOpacity={0.75}
-          >
-            <Ionicons name=\"heart\" size={29} color=\"#fff\" />
-          </TouchableOpacity>
-          </View>
-          <View style={styles.swipeHintRow}>
-            <Ionicons name=\"arrow-undo-outline\" size={18} color={Colors.textMuted} />
-            <Text style={styles.swipeHint}>Свайпай</Text>
-            <Ionicons name=\"arrow-redo-outline\" size={18} color={Colors.textMuted} />
-          </View>
-        </View>
-      </View>"""
+                    accessibilityLabel=\"Откликнуться на вакансию\"
+                    style={[styles.deckFloatingAction, styles.deckFloatingWant]}
+                    onPress={() => swWant(0.5)}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons name=\"heart\" size={29} color=\"#fff\" />
+                  </TouchableOpacity>
+                  </View>
+                  <View style={styles.swipeHintRow}>
+                    <Ionicons name=\"arrow-undo-outline\" size={18} color={Colors.textMuted} />
+                    <Text style={styles.swipeHint}>Свайпай</Text>
+                    <Ionicons name=\"arrow-redo-outline\" size={18} color={Colors.textMuted} />
+                  </View>
+                </View>
+              </View>"""
           assert old in s
           s = s.replace(old, new, 1)
 
           old = """  shiftDeckRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(24),
-  },
-  swipeHint: { fontSize: rf(12), color: Colors.textMuted, fontWeight: '500' },"""
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(24),
+          },
+          swipeHint: { fontSize: rf(12), color: Colors.textMuted, fontWeight: '500' },"""
           new = """  shiftDeckRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(24),
-  },
-  swipeHintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(8) },
-  swipeHint: { fontSize: rf(12), color: Colors.textMuted, fontWeight: '500' },"""
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(24),
+          },
+          swipeHintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(8) },
+          swipeHint: { fontSize: rf(12), color: Colors.textMuted, fontWeight: '500' },"""
           assert old in s
           s = s.replace(old, new, 1)
 
           p.write_text(s)
+          PY
 
       - name: Check
         run: |
           git diff --check
-          grep -q 'chatbubble-outline' 'app/(tabs)/feed.tsx'
-          grep -q 'swipeHintRow' 'app/(tabs)/feed.tsx'
           grep -q 'bottom: tabBarHeight + rs(18)' 'app/(tabs)/feed.tsx'
+          grep -q 'swipeHintRow' 'app/(tabs)/feed.tsx'
 
       - name: Commit
         run: |
