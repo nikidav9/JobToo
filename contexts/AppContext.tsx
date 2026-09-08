@@ -287,13 +287,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // подписанную серверную сессию; старые установки без токена один раз
         // вернутся на экран входа, вместо доступа по подставленному user id.
         if (sessionUser && !sessionUser.isGuest) {
-          const restored = await dbRestoreSession().catch(() => null);
-          if (restored && !restored.isBlocked) {
-            sessionUser = restored;
-            await saveSessionUser(restored).catch(() => {});
-          } else {
-            sessionUser = null;
-            await clearSessionUser().catch(() => {});
+          try {
+            const restored = await dbRestoreSession();
+            if (restored && !restored.isBlocked) {
+              sessionUser = restored;
+              await saveSessionUser(restored).catch(() => {});
+            } else {
+              sessionUser = null;
+              await clearSessionUser().catch(() => {});
+            }
+          } catch (e) {
+            // При обновлении сайта/обрыве сети сохраняем локальный вход.
+            // Выход делаем только после подтверждённо недействительной сессии.
+            console.warn('[session] restore unavailable, keeping cached user', e);
+            setBackendOffline(true);
           }
         }
 

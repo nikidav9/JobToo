@@ -317,9 +317,11 @@ export async function dbRestoreSession(): Promise<User | null> {
   try {
     const d = await proxy<{ user?: any } | null>('dbSession');
     return d?.user ? rowToUser(d.user) : null;
-  } catch {
-    await saveSessionToken(null);
-    return null;
+  } catch (e) {
+    // proxy очищает токен только при подтверждённом 401.
+    // Сетевые ошибки не должны превращаться в logout.
+    if (e instanceof Error && e.message === SESSION_EXPIRED_MESSAGE) return null;
+    throw e;
   }
 }
 
