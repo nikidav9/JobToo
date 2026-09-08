@@ -330,26 +330,8 @@ export default function SourcesPage() {
           const money = (v: number | null) => v === null ? 'нет данных' : `${v.toLocaleString('ru-RU')} ₽`
           const regions = Object.entries(p.регионы_активной_аудитории).slice(0, 10)
           return (
-            <div className="jt-card" aria-disabled="true"
+            <div className="jt-card"
               style={{ padding: 16, position: 'relative', overflow: 'hidden' }}>
-              <div aria-label="Раздел временно закрыт"
-                style={{
-                  position: 'absolute', inset: 0, zIndex: 20,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'color-mix(in srgb, var(--bg-elev) 82%, transparent)',
-                  backdropFilter: 'blur(2px)', cursor: 'not-allowed',
-                }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '12px 16px', borderRadius: 14,
-                  border: '1px solid var(--line)', background: 'var(--bg-elev)',
-                  boxShadow: '0 8px 30px rgba(0,0,0,.12)', color: 'var(--ink)',
-                  fontSize: 14, fontWeight: 650,
-                }}>
-                  <span aria-hidden="true" style={{ fontSize: 22 }}>🔒</span>
-                  Партнёрская аналитика откроется после запуска пилота
-                </div>
-              </div>
               <div style={{ fontSize: 17, fontWeight: 650, marginBottom: 4 }}>Отчёт для партнёра · 30 дней</div>
               <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 14 }}>
                 Только production-источники и уникальные незаблокированные работники. Неизвестные значения не заменяются нулями.
