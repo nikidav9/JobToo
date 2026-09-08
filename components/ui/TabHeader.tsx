@@ -10,12 +10,13 @@ import { rs, rf } from '@/constants/scale';
 // title отсутствует → показываем логотип JobToo. badge — доп. плашка слева
 // (например «N ждут»). right — кастомный правый блок (профиль с шестерёнкой).
 export function TabHeader({
-  title, tgAnchor = false, badge, right,
+  title, tgAnchor = false, badge, right, primaryAction,
 }: {
   title?: string;
   tgAnchor?: boolean;
   badge?: React.ReactNode;
   right?: React.ReactNode;
+  primaryAction?: React.ReactNode;
 }) {
   return (
     <View style={h.header}>
@@ -32,7 +33,7 @@ export function TabHeader({
       </View>
       {right ?? (
         <View style={h.right}>
-          <TelegramConnectButton size={22} pad={4} onboardingAnchor={tgAnchor} />
+          {primaryAction ?? <TelegramConnectButton size={22} pad={4} onboardingAnchor={tgAnchor} />}
           <NotifBell />
         </View>
       )}

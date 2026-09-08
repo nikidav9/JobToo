@@ -2554,7 +2554,7 @@ function PermDeckViewRecorder({ vacancy, userId, isGuest }: {
   return null;
 }
 
-function WorkerPermMode() {
+function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void) | null) => void } = {}) {
   const router = useRouter();
   const {
     currentUser, users, permVacancies, permApplications,
@@ -3185,14 +3185,18 @@ function WorkerPermMode() {
   };
   // «Назад»: вернуть последнюю пролистанную карточку наверх колоды. Отклик,
   // если он уже ушёл, не отзываем — как в сменах кнопка просто возвращает вид.
-  const swUndo = () => {
+  const swUndo = useCallback(() => {
     setSwHistory(h => {
       if (!h.length) return h;
       const last = h[h.length - 1];
       setSwSkipped(s => { const n = new Set(s); n.delete(last); return n; });
       return h.slice(0, -1);
     });
-  };
+  }, []);
+  useEffect(() => {
+    onUndoChange?.(swHistory.length ? swUndo : null);
+    return () => onUndoChange?.(null);
+  }, [swHistory.length, swUndo, onUndoChange]);
   swWantRef.current = swWant;
   swSkipRef.current = swSkip;
   swSnapBackRef.current = swSnapBack;
@@ -3287,10 +3291,11 @@ function WorkerPermMode() {
 
                 {(v.metroStation || v.address) ? (
                   <View style={styles.addressChip}>
-                    <Ionicons name="location-outline" size={15} color="#92400E" style={{ marginTop: 1 }} />
-                    <Text style={styles.addressChipText} numberOfLines={2}>
+                    <Ionicons name="location-outline" size={17} color={Colors.textMuted} />
+                    <Text style={styles.addressChipText} numberOfLines={1}>
                       {[v.metroStation, v.address].filter(Boolean).join(' · ')}
                     </Text>
+                    <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
                   </View>
                 ) : null}
               </View>
@@ -3323,35 +3328,37 @@ function WorkerPermMode() {
               </TouchableOpacity>
             ) : null}
 
-            <View style={styles.cardActionsRow}>
-              <TouchableOpacity
-                style={[styles.cardActionItem, !swHistory.length && { opacity: 0.3 }]}
-                onPress={swUndo}
-                disabled={!swHistory.length}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="arrow-undo" size={20} color={Colors.textMuted} />
-              </TouchableOpacity>
-
-              <TouchableOpacity style={[styles.cardActionItem, styles.cardActionSkip]} onPress={() => swSkip(0.5)} activeOpacity={0.7}>
-                <Ionicons name="close" size={24} color={Colors.red} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.cardActionItem}
-                onPress={() => { if (!isExternal) openPermChat(v as PermVacancy, displayCompany); }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name={isExternal ? 'open-outline' : 'chatbubble-outline'} size={20} color={Colors.textSecondary} />
-              </TouchableOpacity>
-
-              <TouchableOpacity style={[styles.cardActionItem, styles.cardActionWant]} onPress={() => swWant(0.5)} activeOpacity={0.7}>
-                <Ionicons name="heart" size={22} color="#fff" />
-              </TouchableOpacity>
-            </View>
           </View>
         </Animated.View>
+
+        <View style={styles.deckFloatingActions} pointerEvents="box-none">
+          <TouchableOpacity
+            accessibilityLabel="Отклонить вакансию"
+            style={[styles.deckFloatingAction, styles.deckFloatingSkip]}
+            onPress={() => swSkip(0.5)}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="close" size={30} color={Colors.red} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            accessibilityLabel={isExternal ? 'Открыть вакансию у источника' : 'Написать работодателю'}
+            style={[styles.deckFloatingAction, styles.deckFloatingChat]}
+            onPress={() => { if (isExternal) openExternalVacancy(v as ExternalVacancy); else openPermChat(v as PermVacancy, displayCompany); }}
+            activeOpacity={0.75}
+          >
+            <Ionicons name={isExternal ? 'open-outline' : 'chatbubble-outline'} size={23} color={Colors.blue} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            accessibilityLabel="Откликнуться на вакансию"
+            style={[styles.deckFloatingAction, styles.deckFloatingWant]}
+            onPress={() => swWant(0.5)}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="heart" size={29} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -3961,13 +3968,29 @@ function WorkerHome() {
 // переключателем «Работа»).
 function WorkerCareer() {
   const { currentUser } = useApp();
+  const [undoAction, setUndoAction] = useState<(() => void) | null>(null);
+  const handleUndoChange = useCallback((action: (() => void) | null) => {
+    setUndoAction(() => action);
+  }, []);
 
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <TabHeader title="Работа" />
-      <WorkerPermMode />
+      <TabHeader
+        title="Работа"
+        primaryAction={undoAction ? (
+          <TouchableOpacity
+            accessibilityLabel="Вернуть предыдущую вакансию"
+            onPress={undoAction}
+            activeOpacity={0.7}
+            style={{ width: rs(30), height: rs(30), alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons name="arrow-undo-outline" size={22} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        ) : undefined}
+      />
+      <WorkerPermMode onUndoChange={handleUndoChange} />
     </SafeAreaView>
   );
 }
@@ -4266,9 +4289,9 @@ const styles = StyleSheet.create({
   dcNumActive: { color: '#fff' },
   dcCnt: { fontSize: rf(9.5), fontWeight: '700', color: Colors.primary },
   dcCntActive: { color: 'rgba(255,255,255,0.8)' },
-  cardArea: { flex: 1, flexDirection: 'column', paddingHorizontal: rs(10), paddingTop: rs(10), paddingBottom: rs(80) },
-  ghost1: { position: 'absolute', left: rs(10), right: rs(10), top: rs(10), bottom: rs(80), backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.97 }, { translateY: 6 }], opacity: 0.5, zIndex: 0, ...Shadow.card },
-  ghost2: { position: 'absolute', left: rs(10), right: rs(10), top: rs(10), bottom: rs(80), backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.94 }, { translateY: 12 }], opacity: 0.3, zIndex: 0, ...Shadow.card },
+  cardArea: { flex: 1, flexDirection: 'column', paddingHorizontal: rs(10), paddingTop: rs(10), paddingBottom: rs(96) },
+  ghost1: { position: 'absolute', left: rs(10), right: rs(10), top: rs(10), bottom: rs(96), backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.97 }, { translateY: 6 }], opacity: 0.5, zIndex: 0, ...Shadow.card },
+  ghost2: { position: 'absolute', left: rs(10), right: rs(10), top: rs(10), bottom: rs(96), backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.94 }, { translateY: 12 }], opacity: 0.3, zIndex: 0, ...Shadow.card },
   cardAnimated: { flex: 1, zIndex: 1, elevation: 10 },
   card: { flex: 1, backgroundColor: Colors.bg, borderRadius: Radius.xl, ...Shadow.strong, overflow: 'hidden', borderWidth: 1, borderColor: Colors.inputBorder },
   wantOverlay: { position: 'absolute', top: rs(20), left: rs(20), zIndex: 10, backgroundColor: Colors.green, borderRadius: rs(10), paddingHorizontal: rs(14), paddingVertical: rs(8), transform: [{ rotate: '-10deg' }] },
@@ -4295,12 +4318,11 @@ const styles = StyleSheet.create({
   jobTitle: { fontSize: rf(22), fontWeight: '800', color: Colors.textPrimary, lineHeight: rf(28) },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: rs(6) },
   addressChip: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: rs(8),
-    backgroundColor: '#FFF7ED', borderRadius: rs(12), paddingHorizontal: rs(10), paddingVertical: rs(7),
-    borderWidth: 1, borderColor: '#FDBA74',
+    flexDirection: 'row', alignItems: 'center', gap: rs(8),
+    backgroundColor: '#F3F4F6', borderRadius: rs(13), paddingHorizontal: rs(12), paddingVertical: rs(10),
   },
   addressChipIcon: { fontSize: rf(15), marginTop: rs(1) },
-  addressChipText: { flex: 1, fontSize: rf(14), fontWeight: '600', color: '#92400E', lineHeight: rf(20) },
+  addressChipText: { flex: 1, fontSize: rf(14), fontWeight: '600', color: Colors.textSecondary, lineHeight: rf(20) },
   cardDivider: { height: 1, backgroundColor: Colors.divider, marginHorizontal: rs(14) },
   cardMiddle: { padding: rs(10), paddingHorizontal: rs(14), gap: rs(8) },
   slotsRow: { flexDirection: 'row' },
@@ -4322,6 +4344,19 @@ const styles = StyleSheet.create({
     paddingVertical: rs(10), paddingHorizontal: rs(20),
     borderTopWidth: 1, borderTopColor: Colors.divider,
   },
+  deckFloatingActions: {
+    position: 'absolute', left: rs(24), right: rs(24), bottom: rs(10), zIndex: 20,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
+  },
+  deckFloatingAction: {
+    width: rs(58), height: rs(58), borderRadius: rs(29),
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.bg, borderWidth: 1, borderColor: Colors.divider,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 6,
+  },
+  deckFloatingSkip: { backgroundColor: '#FFFFFF' },
+  deckFloatingChat: { width: rs(52), height: rs(52), borderRadius: rs(26), backgroundColor: '#FFFFFF' },
+  deckFloatingWant: { width: rs(66), height: rs(66), borderRadius: rs(33), backgroundColor: Colors.primary, borderColor: Colors.primary },
   cardActionItem: {
     width: rs(46), height: rs(46), borderRadius: rs(14),
     alignItems: 'center', justifyContent: 'center',
