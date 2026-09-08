@@ -1,6 +1,10 @@
 // App-shell cache. Bump on every behavioral change; hashed Expo assets remain immutable.
-const SHELL_CACHE = 'jobtoo-app-shell-v4';
-const SHELL_URLS = ['/', '/index.html', '/manifest.json', '/favicon.ico', '/jt-logo.jpg'];
+// v5: атомарное обновление оболочки — HTML в кэше подменяется ТОЛЬКО после того,
+// как все его бандлы уже скачаны. Иначе после выкладки сохранённая оболочка могла
+// ссылаться на бандл, которого нет в кэше, и на капризной сети (DPI/443) это
+// давало белый экран «после обновления не грузит».
+const SHELL_CACHE = 'jobtoo-app-shell-v5';
+const SHELL_STATIC = ['/manifest.json', '/favicon.ico', '/jt-logo.jpg'];
 
 async function fetchWithTimeout(request, timeoutMs) {
   const controller = new AbortController();
@@ -12,29 +16,49 @@ async function fetchWithTimeout(request, timeoutMs) {
   }
 }
 
-async function cacheCompleteShell() {
+// Атомарно приводит кэш к новой сборке.
+//
+// Ключевой инвариант: HTML-оболочка (`/` и `/index.html`) обновляется в кэше
+// ТОЛЬКО в самом конце — после того как все бандлы, на которые она ссылается,
+// успешно скачаны и уложены в кэш. Если хоть один бандл не пришёл (сеть моргнула,
+// DPI/443), бросаем исключение и НЕ трогаем сохранённую оболочку — продолжаем
+// отдавать прежнюю рабочую пару «оболочка + бандлы». Так кэш никогда не указывает
+// на недоступный скрипт — а именно это и есть «после обновления не грузит».
+async function updateShell(cache) {
   const response = await fetchWithTimeout('/', 12000);
   if (!response.ok) throw new Error('shell HTTP ' + response.status);
 
   const html = await response.clone().text();
-  // A new worker becomes active only after every bundle referenced by its HTML
-  // is downloadable. This prevents an updated index from pointing to missing JS.
   const assetUrls = Array.from(html.matchAll(/(?:src|href)=["']([^"']+)["']/g))
     .map((match) => match[1])
     .filter((url) => url.startsWith('/_expo/static/') || url.startsWith('/assets/'));
 
-  const cache = await caches.open(SHELL_CACHE);
-  await Promise.all(Array.from(new Set([...SHELL_URLS, ...assetUrls])).map(async (url) => {
-    const item = url === '/' ? response.clone() : await fetchWithTimeout(url, 12000);
+  // 1) Сначала гарантируем доступность ВСЕХ бандлов и статики новой оболочки.
+  const staticUrls = Array.from(new Set([...SHELL_STATIC, ...assetUrls]));
+  await Promise.all(staticUrls.map(async (url) => {
+    // Неизменяемый бандл (отпечаток в имени) уже в кэше — повторно не тянем.
+    if (url.startsWith('/_expo/static/') || url.startsWith('/assets/')) {
+      const have = await cache.match(url);
+      if (have) return;
+    }
+    const item = await fetchWithTimeout(url, 12000);
     if (!item.ok) throw new Error(url + ' HTTP ' + item.status);
     await cache.put(url, item);
   }));
+
+  // 2) Все ресурсы на месте — только теперь безопасно подменить саму оболочку.
+  await cache.put('/', response.clone());
+  await cache.put('/index.html', response.clone());
 }
 
 self.addEventListener('install', (event) => {
   // If the new release is incomplete or the network drops, installation fails
   // and the previous worker/cache keeps serving the working application.
-  event.waitUntil(cacheCompleteShell().then(() => self.skipWaiting()));
+  event.waitUntil((async () => {
+    const cache = await caches.open(SHELL_CACHE);
+    await updateShell(cache);
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (event) => {
@@ -59,38 +83,24 @@ self.addEventListener('fetch', (event) => {
         || (await cache.match('/'))
         || (await cache.match('/index.html'));
 
-      // Свежую версию тянем всегда, но НЕ заставляем человека её ждать.
-      //
-      // Раньше здесь была строгая «сначала сеть»: до 6 секунд ждали ответ и
-      // только потом показывали сохранённое. На моргающей мобильной сети это и
-      // был тот самый «через раз, долго открывается» — секунды белого экрана,
-      // хотя рабочая версия уже лежала в кэше. Перезагрузка телефона сбрасывала
-      // сетевое состояние, и на время становилось быстро.
-      //
-      // Теперь наоборот: есть оболочка в кэше — показываем её сразу, как
-      // нативное приложение, а сеть догоняет в фоне и обновляет кэш к
-      // следующему открытию. Файлы сборки помечены отпечатком и лежат в кэше
-      // отдельно, поэтому мгновенно показанная оболочка ссылается на уже
-      // сохранённые скрипты. Само лечится: медленная сеть больше не тормозит
-      // запуск, а свежесть подтягивается незаметно.
-      const fromNetwork = fetchWithTimeout(request, 6000).then(async (fresh) => {
-        if (fresh && fresh.ok) {
-          await cache.put('/', fresh.clone());
-          await cache.put('/index.html', fresh.clone());
-        }
-        return fresh;
-      }).catch(() => null);
-
+      // Есть рабочая оболочка в кэше — показываем её сразу, как нативное
+      // приложение. Обновление идёт в фоне и АТОМАРНО: новая HTML-оболочка
+      // попадёт в кэш только вместе со всеми своими бандлами (см. updateShell).
+      // Поэтому мгновенно показанная оболочка всегда ссылается на уже
+      // сохранённые скрипты — белого экрана «после обновления» больше нет.
       if (cached) {
-        // Фоновое обновление не должно всплыть необработанной ошибкой.
-        fromNetwork.catch(() => {});
+        event.waitUntil(updateShell(cache).catch(() => {}));
         return cached;
       }
 
-      // Кэша ещё нет — самый первый заход. Тут без сети никак: ждём её, а если
-      // и она молчит — отдаём понятную заглушку вместо зависания.
-      const fresh = await fromNetwork;
-      return fresh || new Response(
+      // Кэша ещё нет — самый первый заход. Пытаемся атомарно установить оболочку
+      // и отдать её из кэша; если сеть молчит — понятная заглушка вместо зависания.
+      try {
+        await updateShell(cache);
+        const fresh = await cache.match('/');
+        if (fresh) return fresh;
+      } catch { /* сеть недоступна на первом заходе — отдаём заглушку ниже */ }
+      return new Response(
         '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>JobToo</title><style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f7fa;color:#172033;display:grid;place-items:center;min-height:100vh;margin:0}.c{max-width:320px;text-align:center;padding:28px}button{border:0;border-radius:14px;background:#ff6b1a;color:#fff;padding:14px 22px;font-weight:700}</style><div class="c"><h1>JobToo</h1><p>Не удалось подключиться. Рабочая версия сохранена и откроется, когда сеть восстановится.</p><button onclick="location.reload()">Повторить</button></div>',
         { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
       );
