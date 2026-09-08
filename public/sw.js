@@ -1,5 +1,6 @@
-// App-shell cache. v6 switches navigation to network-first while keeping a safe offline fallback.
-const SHELL_CACHE = 'jobtoo-app-shell-v6';
+// App-shell cache. v7 keeps navigation truly network-first: a reachable HTML
+// response is returned immediately and asset caching is best-effort only.
+const SHELL_CACHE = 'jobtoo-app-shell-v7';
 const SHELL_STATIC = ['/manifest.json', '/favicon.ico', '/jt-logo.jpg'];
 
 async function fetchWithTimeout(request, timeoutMs) {
@@ -18,32 +19,23 @@ function shellAssetUrls(html) {
     .filter((url) => url.startsWith('/_expo/static/') || url.startsWith('/assets/'));
 }
 
-// Fetch a complete fresh shell from the origin. The fresh HTML is only cached
-// after every same-origin bundle referenced by it is reachable and cached.
-async function fetchFreshShell(cache) {
-  const response = await fetchWithTimeout('/', 12000);
-  if (!response.ok) throw new Error('shell HTTP ' + response.status);
-
+async function cacheFreshShell(cache, response) {
   const html = await response.clone().text();
   const assetUrls = Array.from(new Set([...SHELL_STATIC, ...shellAssetUrls(html)]));
-  await Promise.all(assetUrls.map(async (url) => {
-    if (url.startsWith('/_expo/static/') || url.startsWith('/assets/')) {
-      const have = await cache.match(url);
-      if (have) return;
-    }
+
+  // Cache the HTML first. Optional icons or one slow bundle must never turn a
+  // successful navigation into the offline error page.
+  await cache.put('/', response.clone());
+  await cache.put('/index.html', response.clone());
+
+  await Promise.allSettled(assetUrls.map(async (url) => {
     const item = await fetchWithTimeout(url, 12000);
     if (!item.ok) throw new Error(url + ' HTTP ' + item.status);
     await cache.put(url, item.clone());
   }));
-
-  await cache.put('/', response.clone());
-  await cache.put('/index.html', response.clone());
-  return response;
 }
 
 self.addEventListener('install', (event) => {
-  // Do not pin navigation to the cache at install time. The first navigation
-  // will prefer the network and fall back to an older complete shell if needed.
   event.waitUntil(self.skipWaiting());
 });
 
@@ -66,11 +58,12 @@ self.addEventListener('fetch', (event) => {
     event.respondWith((async () => {
       const cache = await caches.open(SHELL_CACHE);
 
-      // Network-first: when the origin is reachable, return the current release.
       try {
-        return await fetchFreshShell(cache);
+        const response = await fetchWithTimeout(request, 12000);
+        if (!response.ok) throw new Error('shell HTTP ' + response.status);
+        event.waitUntil(cacheFreshShell(cache, response.clone()).catch(() => {}));
+        return response;
       } catch {
-        // Offline / broken path: use the last complete shell only as fallback.
         const cached = (await cache.match(request))
           || (await cache.match('/'))
           || (await cache.match('/index.html'));
