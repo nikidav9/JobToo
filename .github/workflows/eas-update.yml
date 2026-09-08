@@ -4,29 +4,12 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-
 jobs:
   update:
     name: OTA Update
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Apply vacancy card UI patch
-        run: |
-          python3 scripts/apply-vacancy-card-actions.py
-          git diff --check
-          if ! git diff --quiet -- 'app/(tabs)/feed.tsx'; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add 'app/(tabs)/feed.tsx'
-            git commit -m "feat: add save and share actions to job cards"
-            git push origin HEAD:main
-          fi
 
       - uses: actions/setup-node@v4
         with:
