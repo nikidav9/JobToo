@@ -2758,6 +2758,21 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
     })
   ).current;
 
+  // «Назад»: вернуть последнюю пролистанную карточку наверх колоды. Отклик,
+  // если он уже ушёл, не отзываем — как в сменах кнопка просто возвращает вид.
+  const swUndo = useCallback(() => {
+    setSwHistory(h => {
+      if (!h.length) return h;
+      const last = h[h.length - 1];
+      setSwSkipped(s => { const n = new Set(s); n.delete(last); return n; });
+      return h.slice(0, -1);
+    });
+  }, []);
+  useEffect(() => {
+    onUndoChange?.(swHistory.length ? swUndo : null);
+    return () => onUndoChange?.(null);
+  }, [swHistory.length, swUndo, onUndoChange]);
+
   if (!currentUser) return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 
   const myApps = permApplications.filter(a => a.workerId === currentUser.id);
@@ -3228,20 +3243,6 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
       if (tab === 'saved' && !('sourceId' in c) && permSavedIds.includes(c.id)) toggleSaved(c as PermVacancy);
     });
   };
-  // «Назад»: вернуть последнюю пролистанную карточку наверх колоды. Отклик,
-  // если он уже ушёл, не отзываем — как в сменах кнопка просто возвращает вид.
-  const swUndo = useCallback(() => {
-    setSwHistory(h => {
-      if (!h.length) return h;
-      const last = h[h.length - 1];
-      setSwSkipped(s => { const n = new Set(s); n.delete(last); return n; });
-      return h.slice(0, -1);
-    });
-  }, []);
-  useEffect(() => {
-    onUndoChange?.(swHistory.length ? swUndo : null);
-    return () => onUndoChange?.(null);
-  }, [swHistory.length, swUndo, onUndoChange]);
   swWantRef.current = swWant;
   swSkipRef.current = swSkip;
   swSnapBackRef.current = swSnapBack;
