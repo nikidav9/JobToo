@@ -4,42 +4,7 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-
 jobs:
-  patch-job-card-layout:
-    name: Apply job card layout patch
-    if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-
-      - name: Apply patch
-        run: python3 scripts/apply-job-card-layout-v2.py
-
-      - name: Verify patch
-        run: |
-          git diff --check
-          grep -q 'deckFloatingActions' 'app/(tabs)/feed.tsx'
-          grep -q 'primaryAction' 'components/ui/TabHeader.tsx'
-          grep -q 'Вернуть предыдущую вакансию' 'app/(tabs)/feed.tsx'
-
-      - name: Commit patch
-        run: |
-          if git diff --quiet -- 'app/(tabs)/feed.tsx' 'components/ui/TabHeader.tsx'; then
-            echo 'Patch already applied'
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add 'app/(tabs)/feed.tsx' 'components/ui/TabHeader.tsx'
-          git commit -m "feat: refine permanent job card swipe layout"
-          git push origin HEAD:main
-
   update:
     name: OTA Update
     runs-on: ubuntu-latest
@@ -68,6 +33,9 @@ jobs:
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
           EXPO_PUBLIC_APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+          # Не секрет и никогда им не был — обычный публичный адрес. В
+          # настройках он указывал на Vercel, и одна забытая строка там
+          # утянула бы приложение обратно на чужой хостинг.
           EXPO_PUBLIC_DASHBOARD_URL: https://admin.jobtoo.ru
           EXPO_PUBLIC_YANDEX_MAPS_KEY: ${{ secrets.EXPO_PUBLIC_YANDEX_MAPS_KEY }}
         run: |
