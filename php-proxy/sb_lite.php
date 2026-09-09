@@ -53,7 +53,11 @@ if (!function_exists('sb')) {
         ]);
         if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_UNESCAPED_UNICODE));
         $resp = curl_exec($ch);
+        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+        if (defined('SB_STRICT') && SB_STRICT && ($resp === false || $status < 200 || $status >= 300)) {
+            throw new RuntimeException("Database request failed: $method $table HTTP $status");
+        }
         $dec = json_decode($resp ?: '[]', true);
         return is_array($dec) ? $dec : [];
     }
@@ -85,5 +89,23 @@ if (!function_exists('sb')) {
     function now_iso(): string
     {
         return gmdate('Y-m-d\TH:i:s') . '.000Z';
+    }
+}
+
+if (!function_exists('sb_insert')) {
+    function sb_insert(string $t, array $row): void {
+        sb('POST', $t, [], $row, ['Prefer: return=minimal']);
+    }
+}
+if (!function_exists('sb_select_all')) {
+    function sb_select_all(string $t, array $f = [], string $sel = '*'): array {
+        $all = [];
+        for ($offset = 0; ; $offset += 500) {
+            $page = sb_select($t, array_merge($f, [
+                'limit' => '500', 'offset' => (string)$offset, 'order' => 'id.asc',
+            ]), $sel);
+            $all = array_merge($all, $page);
+            if (count($page) < 500) return $all;
+        }
     }
 }

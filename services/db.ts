@@ -1564,7 +1564,14 @@ export async function dbSubmitSkillTest(
  * `active` у пропавших, поэтому фильтровать по свежести здесь не нужно.
  */
 export async function dbGetExternalVacancies(): Promise<ExternalVacancy[]> {
-  const rows = await proxy<any[]>('extVacancies');
+  const rows: any[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await proxy<any[]>('extVacancies', [offset, pageSize]);
+    if (!Array.isArray(page)) throw new Error('Invalid external vacancies response');
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
   const mapped: ExternalVacancy[] = (rows ?? []).map(r => ({
     id: r.id,
     sourceId: r.source_id,

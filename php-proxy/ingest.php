@@ -18,6 +18,7 @@
 @set_time_limit(300);
 header('Content-Type: application/json; charset=utf-8');
 
+define('SB_STRICT', true);
 require_once __DIR__ . '/sb_lite.php';
 
 function ing_secret(string $name): string
@@ -350,17 +351,26 @@ function ing_run_source(array $src): array
         return ['status' => 'запрещённый или непубличный HTTPS-адрес', 'count' => 0];
     }
     $originHost = strtolower((string)(parse_url($baseUrl, PHP_URL_HOST) ?? ''));
-    $startedAt = now_iso();
-    $nextUrl = $baseUrl;
+    // One worker per source; persist only after successful page writes.
+    $stateFile = sys_get_temp_dir() . '/jt-ingest-' . hash('sha256', (string)$src['id']) . '.json';
+    $lock = fopen($stateFile . '.lock', 'c');
+    if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
+        return ['status' => 'продолжение: источник уже обрабатывается', 'count' => 0, 'pending' => true];
+    }
+    $saved = is_file($stateFile) ? json_decode((string)file_get_contents($stateFile), true) : null;
+    if (!is_array($saved) || ($saved['base'] ?? '') !== $baseUrl) $saved = [];
+    $startedAt = $saved['started'] ?? now_iso();
+    $nextUrl = $saved['next'] ?? $baseUrl;
+    $deadline = microtime(true) + 75;
     $visited = [];
-    $received = 0;
-    $skipped = 0;
-    $pages = 0;
+    $received = (int)($saved['received'] ?? 0);
+    $skipped = (int)($saved['skipped'] ?? 0);
+    $pages = (int)($saved['pages'] ?? 0);
     $complete = false;
 
     while ($nextUrl !== null) {
-        if (++$pages > 100) {
-            return ['status' => "ошибка: больше 100 страниц; загружено $received", 'count' => $received];
+        if (++$pages > 1000) {
+            return ['status' => "ошибка: больше 1000 страниц; загружено $received", 'count' => $received];
         }
         if (isset($visited[$nextUrl])) {
             return ['status' => "ошибка: цикл пагинации на странице $pages", 'count' => $received];
@@ -416,6 +426,20 @@ function ing_run_source(array $src): array
         } else {
             $nextUrl = $candidate;
         }
+        if ($nextUrl !== null) {
+            $checkpoint = json_encode([
+                'base' => $baseUrl, 'started' => $startedAt, 'next' => $nextUrl,
+                'received' => $received, 'skipped' => $skipped, 'pages' => $pages,
+            ]);
+            if (file_put_contents($stateFile . '.tmp', $checkpoint) === false
+                || !rename($stateFile . '.tmp', $stateFile)) {
+                throw new RuntimeException('Cannot save ingest checkpoint');
+            }
+            if (microtime(true) >= $deadline) {
+                return ['status' => "продолжение: страниц $pages, получено $received",
+                    'count' => $received, 'pages' => $pages, 'pending' => true];
+            }
+        }
     }
 
     // Гасим пропавшие вакансии только после полного успешного обхода. Если
@@ -433,6 +457,7 @@ function ing_run_source(array $src): array
         $gone = count($stale);
     }
 
+    if (is_file($stateFile)) unlink($stateFile);
     return [
         'status' => "ок: страниц $pages, получено $received, пропущено $skipped, погашено $gone",
         'count' => $received,
@@ -469,7 +494,7 @@ foreach ($sources as $src) {
     $deactivated = isset($res['deactivated']) ? (int)$res['deactivated'] : null;
 
     $sourceUpdate = [
-        'last_run_at' => $ranAt,
+        'last_run_at' => !empty($res['pending']) ? null : $ranAt,
         'last_status' => $res['status'],
         'last_count' => $res['count'],
         'last_duration_ms' => $durationMs,
@@ -482,7 +507,7 @@ foreach ($sources as $src) {
     if ($success) $sourceUpdate['last_success_at'] = $ranAt;
     sb_update('jm_ext_sources', ['id' => 'eq.' . $src['id']], $sourceUpdate);
 
-    sb_insert('jm_ext_ingest_runs', [
+    if (empty($res['pending'])) sb_insert('jm_ext_ingest_runs', [
         'id' => bin2hex(random_bytes(12)),
         'source_id' => (string)$src['id'],
         'success' => $success,

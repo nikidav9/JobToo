@@ -2916,8 +2916,12 @@ try {
         // источника: на карточке обязана быть надпись, откуда она, иначе это
         // не агрегатор, а перепечатка чужого под своим именем.
         case 'extVacancies': {
-            $rows = sb_select('jm_ext_vacancies', ['active' => 'is.true', 'environment' => 'eq.production', 'limit' => '1000'],
-                '*', 'last_seen_at.desc');
+            $offset = max(0, (int)($args[0] ?? 0));
+            $limit = max(1, min(1000, (int)($args[1] ?? 1000)));
+            $rows = sb_select('jm_ext_vacancies', [
+                'active' => 'is.true', 'environment' => 'eq.production',
+                'limit' => (string)$limit, 'offset' => (string)$offset,
+            ], '*', 'id.asc');
             $names = [];
             foreach (sb_select('jm_ext_sources', [], 'id,name') as $s) {
                 $names[(string)$s['id']] = $s['name'];
