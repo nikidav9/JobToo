@@ -24,7 +24,7 @@ function tv_cfg(string $name, string $default): string
 
 // Москва — код региона в API «Работа в России».
 $REGION = tv_cfg('TRUDVSEM_REGION_CODE', '7700000000000');
-$BASE = rtrim(tv_cfg('TRUDVSEM_API_BASE', 'https://opendata.trudvsem.ru/api/v1/vacancies/region'), '/');
+$BASE = rtrim(tv_cfg('TRUDVSEM_API_BASE', 'http://opendata.trudvsem.ru/api/v1/vacancies/region'), '/');
 $SELF = tv_cfg('TRUDVSEM_SELF_URL', 'https://jobtoo.ru/api/trudvsem.php');
 $LIMIT = 100;
 $offset = isset($_GET['offset']) ? max(0, (int)$_GET['offset']) : 0;
@@ -39,7 +39,8 @@ curl_setopt_array($ch, [
     CURLOPT_CONNECTTIMEOUT => 10,
     CURLOPT_TIMEOUT => 45,
     CURLOPT_FOLLOWLOCATION => false,
-    CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+    // Официальный мануал API публикует opendata.trudvsem.ru по HTTP.
+    CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
     CURLOPT_SSL_VERIFYPEER => true,
     CURLOPT_SSL_VERIFYHOST => 2,
     CURLOPT_WRITEFUNCTION => function ($ch, string $chunk) use (&$body, &$tooLarge): int {

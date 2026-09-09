@@ -953,6 +953,9 @@ function ShiftSubTabs({ value, onChange }: {
 function isRegularExternalVacancy(v: ExternalVacancy): boolean {
   if (v.kind !== 'permanent') return false;
   const source = `${v.sourceName ?? ''} ${v.sourceId}`.toLowerCase();
+  // Arbihunter остаётся только в разделе «Работа»: его постоянные вакансии
+  // не дублируем в регулярной подработке даже при гибком/сменном графике.
+  if (/arbihunter|арби.?хантер/.test(source)) return false;
   const text = `${v.title} ${v.schedule ?? ''} ${v.description ?? ''}`.toLowerCase();
   const looksRegular = /сменн|подработ|частичн|неполн|гибк|вахт|совместитель/.test(text);
   return looksRegular && source.length > 0;
@@ -1019,30 +1022,47 @@ function RegularLocked() {
         const sourceName = v.sourceName ?? (v.sourceId.toLowerCase().includes('trudvsem') ? 'Работа в России' : 'Партнёр');
         return (
           <TouchableOpacity style={rl.card} onPress={() => openSource(v)} activeOpacity={0.9}>
-            <View style={rl.cardHead}>
-              <CompanyMark company={v.company ?? sourceName} size={46} />
-              <View style={{ flex: 1 }}>
-                <Text style={rl.company} numberOfLines={1}>{v.company ?? sourceName}</Text>
-                <Text style={rl.source} numberOfLines={1}>{sourceName}</Text>
+            <View style={styles.cardTop}>
+              <View style={styles.companyRow}>
+                <CompanyMark company={v.company ?? sourceName} size={52} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.companyName} numberOfLines={1}>{v.company ?? sourceName}</Text>
+                  <View style={styles.metroHintRow}>
+                    <Ionicons name="open-outline" size={12} color={Colors.textMuted} />
+                    <Text style={styles.metroHint} numberOfLines={1}>{v.metroStation ?? sourceName}</Text>
+                  </View>
+                </View>
+                <SourceBadge partnerName={sourceName} />
               </View>
-              <Ionicons name="open-outline" size={18} color={Colors.textMuted} />
-            </View>
-            <Text style={rl.jobTitle} numberOfLines={2}>{v.title}</Text>
-            <View style={rl.chips}>
-              {salary ? <Chip label={salary} variant="salary" icon="wallet-outline" /> : null}
-              {v.schedule ? <Chip label={v.schedule} variant="time" icon="repeat-outline" /> : null}
-            </View>
-            {(v.metroStation || v.address) ? (
-              <View style={rl.address}>
-                <Ionicons name="location-outline" size={15} color={Colors.textMuted} />
-                <Text style={rl.addressTxt} numberOfLines={2}>{[v.metroStation, v.address].filter(Boolean).join(' · ')}</Text>
+
+              <Text style={styles.jobTitle} numberOfLines={2}>{v.title}</Text>
+
+              <View style={styles.chipsRow}>
+                {salary ? <Chip label={salary} variant="salary" icon="wallet-outline" /> : null}
+                <Chip label="Регулярная" variant="exp" icon="repeat-outline" />
+                {v.schedule ? <Chip label={v.schedule} variant="time" icon="calendar-outline" /> : null}
               </View>
+
+              {(v.metroStation || v.address) ? (
+                <View style={styles.addressChip}>
+                  <Ionicons name="location-outline" size={17} color={Colors.textMuted} />
+                  <Text style={styles.addressChipText} numberOfLines={2}>
+                    {[v.metroStation, v.address].filter(Boolean).join(' · ')}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+                </View>
+              ) : null}
+            </View>
+
+            {v.description ? (
+              <>
+                <View style={styles.cardDivider} />
+                <View style={styles.cardMiddle}>
+                  <Text style={pS.sectionHead}>Описание</Text>
+                  <Text style={pS.desc} numberOfLines={5}>{v.description}</Text>
+                </View>
+              </>
             ) : null}
-            {v.description ? <Text style={rl.description} numberOfLines={4}>{v.description}</Text> : null}
-            <View style={rl.footer}>
-              <Text style={rl.footerTxt}>Регулярная подработка</Text>
-              <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
-            </View>
           </TouchableOpacity>
         );
       }}
@@ -1082,7 +1102,7 @@ const rl = StyleSheet.create({
   },
   title: { fontSize: rf(18), fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
   desc: { fontSize: rf(13.5), color: Colors.textSecondary, textAlign: 'center', lineHeight: rf(20) },
-  card: { backgroundColor: Colors.bg, borderRadius: rs(18), padding: rs(16), ...Shadow.card, gap: rs(11) },
+  card: { backgroundColor: Colors.bg, borderRadius: rs(24), borderWidth: 1, borderColor: Colors.divider, overflow: 'hidden', ...Shadow.card },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: rs(11) },
   company: { fontSize: rf(14), fontWeight: '700', color: Colors.textPrimary },
   source: { fontSize: rf(11.5), color: Colors.textMuted, marginTop: rs(2) },
