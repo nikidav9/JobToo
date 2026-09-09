@@ -1,6 +1,8 @@
 name: Publish same-origin web build
 
 on:
+  push:
+    branches: [main]
   workflow_run:
     workflows: ["Сборка сайта и доставка на московский сервер"]
     types: [completed]
@@ -8,7 +10,7 @@ on:
 
 jobs:
   publish:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
