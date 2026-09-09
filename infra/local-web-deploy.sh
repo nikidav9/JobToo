@@ -5,7 +5,7 @@
 # commit этот скрипт собирает Expo прямо на московской машине в одноразовом
 # Node-контейнере и атомарно переключает /var/www/jobtoo на готовый каталог.
 # Старый сайт остаётся на месте при любой ошибке установки/сборки.
-set -u
+set -Eeuo pipefail
 
 REPO=${REPO:-/opt/jobtoo}
 SECRETS=${SECRETS:-/opt/jobtoo-secrets/env}
@@ -118,6 +118,9 @@ rm -rf "$TMP" "$RELEASE"
 mkdir -p "$TMP"
 cp -a "$SRC/dist/." "$TMP/"
 rm -rf "$TMP/api" "$TMP/.htaccess"
+DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+printf '{"sha":"%s","deployed_at":"%s","builder":"local-server"}\\n' \
+  "$HEAD" "$DEPLOYED_AT" > "$TMP/jobtoo-build.json"
 
 # Старые установленные PWA могут ещё запросить bundle предыдущей версии.
 CURRENT=$(readlink -f /var/www/jobtoo 2>/dev/null || true)
@@ -137,6 +140,20 @@ if [ -d /var/www/jobtoo ] && [ ! -L /var/www/jobtoo ]; then
 fi
 ln -s "$RELEASE" /var/www/jobtoo.next
 mv -Tf /var/www/jobtoo.next /var/www/jobtoo
+
+PUBLISHED=$(readlink -f /var/www/jobtoo 2>/dev/null || true)
+if [ "$PUBLISHED" != "$RELEASE" ] || [ ! -s /var/www/jobtoo/index.html ]; then
+  if [ -n "$CURRENT" ] && [ -d "$CURRENT" ]; then
+    ROLLBACK_LINK="/var/www/jobtoo.rollback.$"
+    if ln -s "$CURRENT" "$ROLLBACK_LINK" && mv -Tf "$ROLLBACK_LINK" /var/www/jobtoo; then
+      log "ROLLBACK $HEAD: restored $CURRENT"
+    else
+      log "ROLLBACK_FAIL $HEAD: could not restore $CURRENT"
+    fi
+  fi
+  log "FAIL $HEAD: publish verification failed"
+  exit 1
+fi
 
 echo "$HEAD" > "$STATE"
 echo ok > /var/lib/jt-web.ok
