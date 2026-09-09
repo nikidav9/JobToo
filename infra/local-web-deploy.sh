@@ -127,7 +127,7 @@ mkdir -p "$TMP"
 cp -a "$SRC/dist/." "$TMP/"
 rm -rf "$TMP/api" "$TMP/.htaccess"
 DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-printf '{"sha":"%s","deployed_at":"%s","builder":"local-server"}\\n' \
+printf '{"sha":"%s","deployed_at":"%s","builder":"local-server"}\n' \
   "$HEAD" "$DEPLOYED_AT" > "$TMP/jobtoo-build.json"
 
 # Старые установленные PWA могут ещё запросить bundle предыдущей версии.
