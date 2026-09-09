@@ -141,8 +141,13 @@ foreach ($rows as $row) {
 
 // В разных версиях API total лежит в meta.total либо results.total.
 $total = $dec['meta']['total'] ?? $dec['results']['total'] ?? $dec['total'] ?? null;
-$hasMore = is_numeric($total) ? ($offset + $LIMIT < (int)$total) : (count($rows) >= $LIMIT);
-$out = ['items' => $items, 'has_more' => $hasMore];
-if ($hasMore) $out['next_url'] = $SELF . '?offset=' . ($offset + $LIMIT);
+// offset в API — номер страницы, а не число пропущенных вакансий.
+$hasMore = count($rows) > 0 && (is_numeric($total)
+    ? (($offset + 1) * $LIMIT < (int)$total)
+    : (count($rows) >= $LIMIT));
+$out = ['items' => $items, 'has_more' => $hasMore,
+    'page' => $offset, 'page_size' => $LIMIT,
+    'total' => is_numeric($total) ? (int)$total : null];
+if ($hasMore) $out['next_url'] = $SELF . '?offset=' . ($offset + 1);
 
 echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
