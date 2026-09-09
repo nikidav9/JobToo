@@ -58,6 +58,35 @@ set -a
 # shellcheck disable=SC1090
 . "$SECRETS"
 set +a
+
+# jm_ext_sources уже используется работающим сборщиком Arbihunter. Если общий
+# журнал миграций застрял на старой, не связанной с web ошибке, новый
+# системный источник не должен из-за этого исчезать из production. Upsert
+# меняет только конфигурационную строку trudvsem и безопасен при повторах.
+if (
+  cd "$REPO/infra"
+  docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+    psql -v ON_ERROR_STOP=1 -U supabase_admin -d postgres <<'SQL'
+insert into public.jm_ext_sources
+  (id, name, url, enabled, period_min, environment)
+values
+  ('trudvsem', 'Работа в России', 'https://jobtoo.ru/api/trudvsem.php', true, 120, 'production')
+on conflict (id) do update
+set name = excluded.name,
+    url = excluded.url,
+    enabled = true,
+    period_min = excluded.period_min,
+    environment = excluded.environment,
+    last_run_at = null,
+    consecutive_failures = 0;
+notify pgrst, 'reload schema';
+SQL
+) >/tmp/jt-trudvsem-source.log 2>&1; then
+  log "SOURCE $HEAD: trudvsem ready"
+else
+  log "SOURCE_FAIL $HEAD: trudvsem registration failed"
+fi
+
 MAPS_KEY=${EXPO_PUBLIC_YANDEX_MAPS_KEY:-}
 if [ -z "$MAPS_KEY" ] && [ -d /var/www/jobtoo ]; then
   MAPS_KEY=$(python3 - <<'PY' 2>/dev/null || true
