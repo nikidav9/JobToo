@@ -39,6 +39,17 @@ command -v docker >/dev/null 2>&1 || { log "FAIL $HEAD: docker unavailable"; exi
 systemctl is-active --quiet docker || { log "FAIL $HEAD: docker inactive"; exit 1; }
 [ -r "$SECRETS" ] || { log "FAIL $HEAD: secrets unavailable"; exit 1; }
 
+# Git pull и web-сборка работают отдельным лёгким таймером. Поэтому новые
+# SQL-миграции должны догонять production и здесь, а не ждать полного
+# bootstrap. Накатыватель идемпотентен и повторный запуск безопасен.
+if [ -x "$REPO/infra/migrate.sh" ]; then
+  if bash "$REPO/infra/migrate.sh"; then
+    log "MIGRATE $HEAD: ok"
+  else
+    log "MIGRATE_FAIL $HEAD: see /var/log/jt-apply.log"
+  fi
+fi
+
 # Берём публичный ключ карт из уже работающей сборки, если он ещё не записан
 # в серверные secrets. Ключ всё равно клиентский и уже присутствует в bundle;
 # так локальная сборка не отключит карты только потому, что Actions недоступен.
