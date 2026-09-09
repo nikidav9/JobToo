@@ -80,32 +80,15 @@ jobs:
       - name: Replace favicon
         run: cp assets/images/favicon.ico dist/favicon.ico
 
-      # Статику — с Timeweb CDN, а не с одного нашего сервера.
-      #
-      # Симптом был: на капризном Wi-Fi сайт открывался в чёрный экран с
-      # висящей загрузкой. HTML доходил, а тяжёлые JS-бандлы не докачивались —
-      # крупная закачка стопорилась на пути от той сети до нашего единственного
-      # IP (кривой маршрут/MTU). CDN раздаёт статику с ближайшего узла по
-      # надёжному каналу, а origin остаётся сервером.
-      #
-      # Намеренно НЕ трогаем базовый адрес Expo (experiments.baseUrl) — это
-      # сломало бы маршрутизацию SPA. Меняем только ссылки на /_expo/static/ и
-      # /assets/ в готовых HTML. API, маршруты, вход и абсолютные адреса
-      # (EXPO_PUBLIC_*) не затрагиваются. Откат — удалить этот шаг.
-      #
-      # Побочный плюс: в HTML ссылки становятся абсолютными (CDN), поэтому
-      # service worker перестаёт пред-качивать бандлы с origin на плохом канале
-      # (см. public/sw.js, cacheCompleteShell фильтрует по /_expo/static/).
-      - name: Point static assets at Timeweb CDN
-        env:
-          CDN: https://j8a6jds2at.cdn.twcstorage.ru
+      # Статика остаётся на том же origin, что и HTML.
+      # Технический Timeweb CDN отключён: он отвечал 403 и делал свежую сборку
+      # недоступной, даже когда сам origin работал.
+      - name: Verify same-origin static assets
         run: |
-          find dist -name '*.html' -print0 | xargs -0 sed -E -i \
-            -e "s#(src|href)=\"/_expo/static/#\1=\"${CDN}/_expo/static/#g" \
-            -e "s#(src|href)=\"/assets/#\1=\"${CDN}/assets/#g"
-          echo "Ссылок переписано на CDN: $(grep -roh "${CDN}/" dist --include='*.html' | wc -l)"
-          echo "Пример из index.html:"
-          grep -oE "(src|href)=\"${CDN}[^\"]*\"" dist/index.html | head -3 || true
+          if grep -R "j8a6jds2at.cdn.twcstorage.ru" dist --include='*.html'; then
+            echo "Обнаружена ссылка на отключённый Timeweb CDN"
+            exit 1
+          fi
 
       # Здесь же собирались файлы секретов для Reg.ru: app_secrets.php,
       # sb_url.php, sb_service_key.php, admin_credentials.php. Они клались в
