@@ -19,6 +19,14 @@ flock -n 8 || exit 0
 
 log() { printf '%s %s\n' "$(date -Is)" "$*" >> "$LOG"; }
 
+on_error() {
+  rc=$?
+  trap - ERR
+  log "FAIL ${HEAD:-unknown}: unexpected error rc=$rc"
+  exit "$rc"
+}
+trap on_error ERR
+
 HEAD=$(git -C "$REPO" rev-parse HEAD 2>/dev/null || true)
 [ -n "$HEAD" ] || { log "SKIP: git HEAD unavailable"; exit 0; }
 
@@ -144,7 +152,7 @@ mv -Tf /var/www/jobtoo.next /var/www/jobtoo
 PUBLISHED=$(readlink -f /var/www/jobtoo 2>/dev/null || true)
 if [ "$PUBLISHED" != "$RELEASE" ] || [ ! -s /var/www/jobtoo/index.html ]; then
   if [ -n "$CURRENT" ] && [ -d "$CURRENT" ]; then
-    ROLLBACK_LINK="/var/www/jobtoo.rollback.$"
+    ROLLBACK_LINK=/var/www/jobtoo.rollback.next
     if ln -s "$CURRENT" "$ROLLBACK_LINK" && mv -Tf "$ROLLBACK_LINK" /var/www/jobtoo; then
       log "ROLLBACK $HEAD: restored $CURRENT"
     else
