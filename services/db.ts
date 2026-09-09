@@ -1563,15 +1563,9 @@ export async function dbSubmitSkillTest(
  * Всё живое из чужих источников. Сборщик (php-proxy/ingest.php) гасит
  * `active` у пропавших, поэтому фильтровать по свежести здесь не нужно.
  */
-export async function dbGetExternalVacancies(): Promise<ExternalVacancy[]> {
-  const rows: any[] = [];
-  const pageSize = 500;
-  for (let offset = 0; ; offset += pageSize) {
-    const page = await proxy<any[]>('extVacancies', [offset, pageSize]);
-    if (!Array.isArray(page)) throw new Error('Invalid external vacancies response');
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
+export async function dbGetExternalVacancies(offset = 0, limit = 1000): Promise<ExternalVacancy[]> {
+  const rows = await proxy<any[]>('extVacancies', [offset, limit]);
+  if (!Array.isArray(rows)) throw new Error('Invalid external vacancies response');
   const mapped: ExternalVacancy[] = (rows ?? []).map(r => ({
     id: r.id,
     sourceId: r.source_id,

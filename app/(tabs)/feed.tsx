@@ -2763,13 +2763,31 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
   // Свайп вправо неоднозначен, поэтому сначала показываем плашку с подтверждением.
   const [externalConfirm, setExternalConfirm] = useState<ExternalVacancy | null>(null);
 
+  const externalLoadId = useRef(0);
   const loadExternalVacancies = useCallback(async () => {
+    const loadId = ++externalLoadId.current;
+    const pageSize = 1000;
+    const loaded: ExternalVacancy[] = [];
+    const seen = new Set<string>();
     try {
-      const rows = await dbGetExternalVacancies();
-      setExternalVacancies(rows.filter(v => v.kind === 'permanent'));
+      for (let offset = 0; offset < 50000; offset += pageSize) {
+        const rows = await dbGetExternalVacancies(offset, pageSize);
+        if (externalLoadId.current !== loadId) return;
+        for (const vacancy of rows) {
+          if (vacancy.kind !== 'permanent') continue;
+          const key = vacancy.dedupeKey || `${vacancy.sourceId}:${vacancy.id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          loaded.push(vacancy);
+        }
+        // Показываем первую страницу сразу и дополняем список после каждой
+        // следующей, не заставляя экран ждать весь большой каталог.
+        setExternalVacancies([...loaded]);
+        if (rows.length < pageSize) break;
+      }
     } catch {
-      // Свои вакансии должны продолжить работать, даже если партнёрский фид
-      // временно недоступен.
+      // Уже загруженные страницы остаются видимыми. Свои вакансии продолжают
+      // работать, даже если очередная страница партнёрского фида недоступна.
     }
   }, []);
 
