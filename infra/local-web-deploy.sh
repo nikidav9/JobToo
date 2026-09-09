@@ -100,6 +100,42 @@ else
   log "SOURCE_FAIL $HEAD: trudvsem registration failed"
 fi
 
+
+# Постоянный worker полного импорта. Один вызов ingest.php ограничен по времени,
+# поэтому service повторяет его с сохранённого checkpoint до последней страницы.
+# Timer затем делает полный московский обход каждые два часа.
+cat >/etc/systemd/system/jt-trudvsem-import.service <<'UNIT'
+[Unit]
+Description=JobToo full trudvsem vacancy import
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/jobtoo/infra/trudvsem-import-loop.sh
+Nice=10
+UNIT
+
+cat >/etc/systemd/system/jt-trudvsem-import.timer <<'TIMER'
+[Unit]
+Description=Run full JobToo trudvsem import regularly
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2h
+Persistent=true
+RandomizedDelaySec=2min
+Unit=jt-trudvsem-import.service
+
+[Install]
+WantedBy=timers.target
+TIMER
+
+systemctl daemon-reload
+systemctl enable --now jt-trudvsem-import.timer >/dev/null
+systemctl start --no-block jt-trudvsem-import.service || true
+log "INGEST_TIMER $HEAD: trudvsem full import scheduled"
+
 MAPS_KEY=${EXPO_PUBLIC_YANDEX_MAPS_KEY:-}
 if [ -z "$MAPS_KEY" ] && [ -d /var/www/jobtoo ]; then
   MAPS_KEY=$(python3 - <<'PY' 2>/dev/null || true
