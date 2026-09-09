@@ -2,12 +2,18 @@
 # Локальное самовосстановление web-входа. Внешний мониторинг фиксирует обрывы
 # маршрута, а этот watchdog чинит то, что действительно можно исправить на
 # самой машине: остановленный nginx или неудачную конфигурацию.
+#
+# Здесь же запускаем лёгкую проверку локальной web-выкладки. Сам deploy-скрипт
+# сравнивает git HEAD с уже развернутой версией, поэтому в обычную минуту это
+# только несколько файловых операций. Тяжёлая Expo-сборка выполняется лишь
+# после нового commit и больше не зависит от GitHub Actions.
 set -u
 
 LOCK=/run/jt-site-watchdog.lock
 STATE=/run/jt-site-watchdog.failures
 LOG=/var/log/jt-watchdog.log
 DOMAIN=${DOMAIN:-jobtoo.ru}
+LOCAL_DEPLOY=/opt/jobtoo/infra/local-web-deploy.sh
 
 exec 9>"$LOCK"
 flock -n 9 || exit 0
@@ -27,6 +33,12 @@ if [[ $healthy -eq 1 ]]; then
   previous=$(cat "$STATE" 2>/dev/null || echo 0)
   rm -f "$STATE"
   [[ "$previous" -gt 0 ]] && log "RECOVERED nginx=active local_https=$code"
+
+  # Не блокируем восстановление nginx из-за неудачной сборки: локальная
+  # выкладка сама атомарна и при ошибке оставляет прежний сайт на месте.
+  if [[ -f "$LOCAL_DEPLOY" ]]; then
+    bash "$LOCAL_DEPLOY" >>"$LOG" 2>&1 || log "LOCAL_DEPLOY failed; previous site kept"
+  fi
   exit 0
 fi
 
