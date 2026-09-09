@@ -29,39 +29,113 @@ $SELF = tv_cfg('TRUDVSEM_SELF_URL', 'https://jobtoo.ru/api/trudvsem.php');
 $LIMIT = 100;
 $offset = isset($_GET['offset']) ? max(0, (int)$_GET['offset']) : 0;
 
-$url = $BASE . '/' . rawurlencode($REGION) . '?offset=' . $offset . '&limit=' . $LIMIT;
-$body = '';
-$tooLarge = false;
-$ch = curl_init($url);
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => false,
-    CURLOPT_HTTPHEADER => ['Accept: application/json'],
-    CURLOPT_CONNECTTIMEOUT => 10,
-    CURLOPT_TIMEOUT => 45,
-    CURLOPT_FOLLOWLOCATION => false,
-    // Официальный мануал API публикует opendata.trudvsem.ru по HTTP.
-    CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
-    CURLOPT_SSL_VERIFYPEER => true,
-    CURLOPT_SSL_VERIFYHOST => 2,
-    CURLOPT_WRITEFUNCTION => function ($ch, string $chunk) use (&$body, &$tooLarge): int {
-        if (strlen($body) + strlen($chunk) > 8 * 1024 * 1024) { $tooLarge = true; return 0; }
-        $body .= $chunk;
-        return strlen($chunk);
-    },
-]);
-$ok = curl_exec($ch);
-$code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$err = curl_error($ch);
-curl_close($ch);
+function tv_iso($value, string $fallback): string {
+    $value = trim((string)$value);
+    if (!preg_match('~^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$~', $value)) return $fallback;
+    return strtotime($value) === false ? $fallback : $value;
+}
 
-if ($tooLarge) { http_response_code(502); echo json_encode(['error' => 'trudvsem response too large']); exit; }
-if ($ok === false || $code < 200 || $code >= 300) {
+function tv_queue($value): array {
+    $raw = is_string($value) && strlen($value) <= 4096 ? json_decode($value, true) : null;
+    if (!is_array($raw)) return [];
+    $out = [];
+    foreach (array_slice($raw, 0, 32) as $range) {
+        if (!is_array($range) || count($range) !== 2) continue;
+        $from = tv_iso($range[0] ?? '', '');
+        $to = tv_iso($range[1] ?? '', '');
+        if ($from !== '' && $to !== '' && strtotime($from) <= strtotime($to)) $out[] = [$from, $to];
+    }
+    return $out;
+}
+
+function tv_fetch(string $base, string $region, int $offset, int $limit,
+    string $from, string $to): array {
+    $url = $base . '/' . rawurlencode($region) . '?' . http_build_query([
+        'offset' => $offset,
+        'limit' => $limit,
+        'modifiedFrom' => $from,
+        'modifiedTo' => $to,
+    ], '', '&', PHP_QUERY_RFC3986);
+    $body = '';
+    $tooLarge = false;
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => false,
+        CURLOPT_HTTPHEADER => ['Accept: application/json'],
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 45,
+        CURLOPT_FOLLOWLOCATION => false,
+        // Официальный мануал API публикует opendata.trudvsem.ru по HTTP.
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_WRITEFUNCTION => function ($ch, string $chunk) use (&$body, &$tooLarge): int {
+            if (strlen($body) + strlen($chunk) > 8 * 1024 * 1024) {
+                $tooLarge = true;
+                return 0;
+            }
+            $body .= $chunk;
+            return strlen($chunk);
+        },
+    ]);
+    $ok = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+
+    if ($tooLarge) return ['error' => 'trudvsem response too large'];
+    if ($ok === false || $code < 200 || $code >= 300) {
+        return ['error' => "trudvsem unavailable ($code $err)"];
+    }
+    $dec = json_decode($body, true);
+    return is_array($dec) ? ['data' => $dec] : ['error' => 'trudvsem invalid JSON'];
+}
+
+// API «Работы России» не отдаёт больше 10 000 записей из одной выборки:
+// offset=100 при limit=100 уже отвечает 500. Разбиваем строго московскую
+// выборку по времени изменения. Очередь диапазонов находится в next_url,
+// поэтому основной ingest сохраняет её в своём обычном checkpoint.
+// Портал запущен значительно позже; начало 2000 года покрывает весь набор и
+// не провоцирует нестабильный 500, который API иногда даёт на диапазон от 1970.
+$defaultFrom = '2000-01-01T00:00:00Z';
+$defaultTo = gmdate('Y-m-d\\TH:i:s\\Z', time() + 86400);
+$from = tv_iso($_GET['from'] ?? '', $defaultFrom);
+$to = tv_iso($_GET['to'] ?? '', $defaultTo);
+$queue = tv_queue($_GET['queue'] ?? '');
+$dec = null;
+$shardTotal = 0;
+
+for ($split = 0; $split < 32; $split++) {
+    $fetched = tv_fetch($BASE, $REGION, $offset, $LIMIT, $from, $to);
+    if (isset($fetched['error'])) {
+        http_response_code(502);
+        echo json_encode(['error' => $fetched['error']]);
+        exit;
+    }
+    $dec = $fetched['data'];
+    $shardTotal = (int)($dec['meta']['total'] ?? $dec['results']['total'] ?? $dec['total'] ?? 0);
+    if ($shardTotal <= 10000) break;
+
+    $fromTs = strtotime($from);
+    $toTs = strtotime($to);
+    if ($fromTs === false || $toTs === false || $toTs - $fromTs < 2) {
+        http_response_code(502);
+        echo json_encode(['error' => 'trudvsem range cannot be split below 10000 records']);
+        exit;
+    }
+    $mid = intdiv($fromTs + $toTs, 2);
+    // Граница намеренно входит в оба диапазона: upsert уберёт возможный
+    // дубль, а вакансия с дробными секундами между mid и mid+1 не потеряется.
+    array_unshift($queue, [gmdate('Y-m-d\\TH:i:s\\Z', $mid), $to]);
+    $to = gmdate('Y-m-d\\TH:i:s\\Z', $mid);
+    $offset = 0;
+}
+
+if (!is_array($dec) || $shardTotal > 10000) {
     http_response_code(502);
-    echo json_encode(['error' => "trudvsem unavailable ($code $err)"]);
+    echo json_encode(['error' => 'trudvsem range split limit exceeded']);
     exit;
 }
-$dec = json_decode($body, true);
-if (!is_array($dec)) { http_response_code(502); echo json_encode(['error' => 'trudvsem invalid JSON']); exit; }
 
 // API обычно отдаёт results.vacancies = [{vacancy:{...}}, ...].
 $rows = $dec['results']['vacancies'] ?? $dec['vacancies'] ?? $dec['items'] ?? [];
@@ -147,7 +221,23 @@ $hasMore = count($rows) > 0 && (is_numeric($total)
     : (count($rows) >= $LIMIT));
 $out = ['items' => $items, 'has_more' => $hasMore,
     'page' => $offset, 'page_size' => $LIMIT,
-    'total' => is_numeric($total) ? (int)$total : null];
-if ($hasMore) $out['next_url'] = $SELF . '?offset=' . ($offset + 1);
+    'total' => is_numeric($total) ? (int)$total : null,
+    'range' => ['from' => $from, 'to' => $to]];
+
+$nextOffset = $offset + 1;
+if (!$hasMore && $queue) {
+    [$from, $to] = array_shift($queue);
+    $nextOffset = 0;
+    $hasMore = true;
+    $out['has_more'] = true;
+}
+if ($hasMore) {
+    $out['next_url'] = $SELF . '?' . http_build_query([
+        'offset' => $nextOffset,
+        'from' => $from,
+        'to' => $to,
+        'queue' => $queue ? json_encode($queue, JSON_UNESCAPED_SLASHES) : null,
+    ], '', '&', PHP_QUERY_RFC3986);
+}
 
 echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
