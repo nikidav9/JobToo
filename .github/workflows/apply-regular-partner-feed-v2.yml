@@ -19,7 +19,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - run: |
+      - name: Commit patch if needed
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add 'app/(tabs)/feed.tsx' php-proxy/trudvsem.php
@@ -28,3 +29,34 @@ jobs:
           git fetch origin main
           git rebase origin/main
           git push origin HEAD:main
+      - name: Refresh checkout to latest main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+      - name: Build same-origin web
+        run: npx expo export --platform web --max-workers 2
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
+          EXPO_PUBLIC_APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+          EXPO_PUBLIC_DASHBOARD_URL: https://admin.jobtoo.ru
+          EXPO_PUBLIC_YANDEX_MAPS_KEY: ${{ secrets.EXPO_PUBLIC_YANDEX_MAPS_KEY }}
+      - run: cp assets/images/favicon.ico dist/favicon.ico
+      - name: Verify same-origin assets
+        run: |
+          if grep -R "j8a6jds2at.cdn.twcstorage.ru" dist --include='*.html'; then
+            echo "Обнаружена ссылка на отключённый Timeweb CDN"
+            exit 1
+          fi
+      - name: Publish web release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          rm -rf pack && mkdir pack
+          cp -a dist/. pack/
+          rm -rf pack/api pack/.htaccess
+          tar -czf dist.tar.gz -C pack .
+          gh release view web >/dev/null 2>&1 || gh release create web --latest=false -t "Веб-сборка"
+          gh release upload web dist.tar.gz --clobber
