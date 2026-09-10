@@ -125,6 +125,11 @@ jobs:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           YANDEX_GEOCODER_KEY: ${{ secrets.YANDEX_GEOCODER_KEY }}
           YANDEX_SUGGEST_KEY: ${{ secrets.YANDEX_SUGGEST_KEY }}
+          SUPERJOB_SECRET_KEY: ${{ secrets.SUPERJOB_SECRET_KEY }}
+          SUPERJOB_CLIENT_ID: ${{ secrets.SUPERJOB_CLIENT_ID }}
+          SUPERJOB_CLIENT_SECRET: ${{ secrets.SUPERJOB_CLIENT_SECRET }}
+          HH_CLIENT_ID: ${{ secrets.HH_CLIENT_ID }}
+          HH_CLIENT_SECRET: ${{ secrets.HH_CLIENT_SECRET }}
           DASHBOARD_LOGIN: ${{ secrets.DASHBOARD_LOGIN }}
           DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
           STUDIO_LOGIN: ${{ secrets.STUDIO_LOGIN }}
@@ -149,6 +154,11 @@ jobs:
                   "TG_BOT_TOKEN":        e("TG_BOT_TOKEN", ""),
                   "YANDEX_GEOCODER_KEY": e("YANDEX_GEOCODER_KEY", ""),
                   "YANDEX_SUGGEST_KEY":  e("YANDEX_SUGGEST_KEY", ""),
+                  "SUPERJOB_SECRET_KEY": e("SUPERJOB_SECRET_KEY", ""),
+                  "SUPERJOB_CLIENT_ID": e("SUPERJOB_CLIENT_ID", ""),
+                  "SUPERJOB_CLIENT_SECRET": e("SUPERJOB_CLIENT_SECRET", ""),
+                  "HH_CLIENT_ID": e("HH_CLIENT_ID", ""),
+                  "HH_CLIENT_SECRET": e("HH_CLIENT_SECRET", ""),
               },
               "admin": {
                   "login":    e("DASHBOARD_LOGIN", ""),

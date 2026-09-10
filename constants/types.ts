@@ -202,17 +202,18 @@ export interface PermVacancy {
  * Вакансия из чужого сервиса.
  *
  * Отдельный тип, а не `Vacancy` с флажком, ровно по той же причине, по какой
- * они лежат в отдельной таблице (см. миграцию 031): на неё нельзя
- * откликнуться, у неё нет работодателя в нашей базе, нет переписки и нет
- * счётчика набранных. Если бы она приходила под видом обычной вакансии,
- * любой забытый фильтр давал бы человеку кнопку «Откликнуться», за которой
- * ничего нет.
+ * они лежат в отдельной таблице (см. миграцию 031): способ отклика зависит
+ * от интеграции источника. Redirect-вакансии открываются у партнёра, а
+ * embedded-вакансии принимают отклик через защищённый шлюз JobToo.
  */
 export interface ExternalVacancy {
   id: string;
   sourceId: string;
   /** Как называется источник — это видно на карточке. */
   sourceName?: string;
+  /** redirect — переход к источнику; embedded — отклик внутри JobToo. */
+  integrationMode?: 'redirect' | 'embedded_test' | 'embedded';
+  connectorKind?: string;
   title: string;
   company?: string;
   /** Станция из нашего справочника. Пусто — источник прислал что-то,
@@ -244,6 +245,28 @@ export interface ExternalVacancy {
   /** Отпечаток «та же самая работа»: по нему прячем дубли из разных
    *  источников. Считает сборщик, см. php-proxy/ingest.php. */
   dedupeKey?: string;
+}
+
+export type PartnerApplicationStatus =
+  | 'local_created' | 'submitting' | 'submitted' | 'accepted' | 'rejected'
+  | 'booked' | 'check_in_pending' | 'checked_in' | 'completed'
+  | 'worker_cancelled' | 'employer_cancelled' | 'no_show' | 'disputed' | 'failed';
+
+/** Отклик пользователя на вакансию подключённого внешнего партнёра. */
+export interface PartnerApplication {
+  id: string;
+  sourceId: string;
+  externalVacancyId: string;
+  workerId: string;
+  status: PartnerApplicationStatus;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  company?: string;
+  sourceName?: string;
+  address?: string;
+  salary?: number;
+  payPeriod?: string;
 }
 
 // hired — работодатель нажал «Завершить»: кандидат закрыт, карточка ушла из

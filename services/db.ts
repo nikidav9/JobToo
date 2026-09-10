@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
-import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus, ReportableOutcome, ExternalVacancy, WorkType } from '@/constants/types';
+import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus, PartnerApplication, ReportableOutcome, ExternalVacancy, WorkType } from '@/constants/types';
 import { uid, nowISO } from '@/services/storage';
 
 const DB_TIMEOUT = 12_000;
@@ -453,6 +453,39 @@ export async function dbRecordPartnerDataConsent(value: PartnerDataConsent): Pro
     consent_version: value.consentVersion,
     user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
   }]);
+}
+
+export async function dbCreatePartnerApplication(value: {
+  sourceId: string;
+  workerId: string;
+  externalVacancyId: string;
+  consentVersion: string;
+}): Promise<{ id: string; status: string; created: boolean }> {
+  return proxy('partnerApplicationCreate', [{
+    source_id: value.sourceId,
+    worker_id: value.workerId,
+    ext_vacancy_id: value.externalVacancyId,
+    consent_version: value.consentVersion,
+  }]);
+}
+
+export async function dbGetPartnerApplications(workerId: string): Promise<PartnerApplication[]> {
+  const rows = await proxy<any[]>('partnerApplicationsGet', [workerId]);
+  return (rows ?? []).map(r => ({
+    id: r.id,
+    sourceId: r.source_id,
+    externalVacancyId: r.ext_vacancy_id,
+    workerId: r.worker_id,
+    status: r.status,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    title: r.title ?? 'Вакансия партнёра',
+    company: r.company ?? undefined,
+    sourceName: r.source_name ?? undefined,
+    address: r.address ?? undefined,
+    salary: r.salary != null ? Number(r.salary) : undefined,
+    payPeriod: r.pay_period ?? undefined,
+  }));
 }
 
 /** Последнее принятое: что показать в профиле и спрашивать ли заново. */
@@ -1576,6 +1609,8 @@ export async function dbGetExternalVacancyPage(offset = 0, limit = 1000): Promis
     id: r.id,
     sourceId: r.source_id,
     sourceName: r.source_name ?? undefined,
+    integrationMode: r.integration_mode ?? 'redirect',
+    connectorKind: r.connector_kind ?? 'redirect',
     title: r.title,
     company: r.company ?? undefined,
     metroStation: r.metro_station_norm ?? undefined,

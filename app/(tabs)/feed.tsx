@@ -44,6 +44,8 @@ import {
   dbGetExternalVacancyPage,
   dbRecordExternalImpression,
   dbRecordExternalClick,
+  dbRecordPartnerDataConsent,
+  dbCreatePartnerApplication,
   dbRecordGuestEvent,
   dbStartGuestRegistration,
 } from '@/services/db';
@@ -68,6 +70,7 @@ import { ApplySheet } from '@/components/feature/ApplySheet';
 import { getChatSuggestions } from '@/constants/chatSuggestions';
 import { payShort } from '@/services/pay';
 import { vacancyInfoLines, permVacancyInfoLines } from '@/services/vacancyCard';
+import { PartnerConsentSheet, PARTNER_CONSENT_VERSION } from '@/components/feature/PartnerConsentSheet';
 
 function partnerAttributionUrl(raw: string, clickId: string, sourceId: string): string {
   try {
@@ -2760,9 +2763,10 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
   const [chatLoading, setChatLoading] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [externalVacancies, setExternalVacancies] = useState<ExternalVacancy[]>([]);
-  // Партнёрскую вакансию нельзя «откликнуть» у нас — на неё уходят к источнику.
-  // Свайп вправо неоднозначен, поэтому сначала показываем плашку с подтверждением.
+  // Redirect-источник открываем с подтверждением. Для embedded-источника
+  // отдельно получаем согласие на передачу данных и создаём отклик у нас.
   const [externalConfirm, setExternalConfirm] = useState<ExternalVacancy | null>(null);
+  const [partnerConsentFor, setPartnerConsentFor] = useState<ExternalVacancy | null>(null);
 
   const externalLoadId = useRef(0);
   const loadExternalVacancies = useCallback(async () => {
@@ -3043,12 +3047,6 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
     rejected: { label: 'Отказ',           icon: 'close-circle',      color: Colors.red,   bg: '#FEE2E2' },
   };
 
-  const TAB_CONFIG: { key: PermTab; label: string; count: number }[] = [
-    { key: 'open',    label: 'Открытые',     count: openVacancies.length + externalOpenVacancies.length },
-    // «Откликнулись» убрали: отклики и их статусы видны в разделе «Мэтчи».
-    { key: 'saved',   label: 'Избранное',    count: savedVacancies.length },
-  ];
-
   const toggleSaved = (v: PermVacancy) => {
     if (!currentUser) return;
     if (currentUser.isGuest) {
@@ -3111,6 +3109,33 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
     } catch {
       showToast('Не удалось открыть вакансию', 'error');
     }
+  };
+
+  const submitPartnerApplication = async (v: ExternalVacancy) => {
+    if (currentUser.isGuest) {
+      setPartnerConsentFor(null);
+      promptRegister({ vacancyKind: 'permanent' });
+      return;
+    }
+    await dbRecordPartnerDataConsent({
+      sourceId: v.sourceId,
+      workerId: currentUser.id,
+      externalVacancyId: v.id,
+      recipientName: v.sourceName ?? v.company ?? 'Партнёр',
+      dataCategories: ['profile', 'application', 'messages', 'statuses'],
+      purpose: 'Рассмотрение отклика и обмен статусами по выбранной вакансии',
+      consentVersion: PARTNER_CONSENT_VERSION,
+    });
+    const result = await dbCreatePartnerApplication({
+      sourceId: v.sourceId,
+      workerId: currentUser.id,
+      externalVacancyId: v.id,
+      consentVersion: PARTNER_CONSENT_VERSION,
+    });
+    setPartnerConsentFor(null);
+    setSwSkipped(s => new Set(s).add(v.id));
+    setSwHistory(h => h.includes(v.id) ? h : [...h, v.id]);
+    showToast(result.created ? 'Отклик отправляется работодателю' : 'Вы уже откликнулись', 'success');
   };
 
   const renderPerm = ({ item: v }: { item: PermVacancy | ExternalVacancy }) => {
@@ -3348,14 +3373,18 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
     });
   };
   // Вправо — принять: отклик (уходит в «Отклики» → матчи, ждёт ответа). В
-  // «Избранном» вдобавок убираем из избранного. Партнёрские (внешние) — не наш
-  // отклик, их просто листаем дальше.
+  // «Избранном» вдобавок убираем из избранного. У партнёрских вакансий способ
+  // отклика определяется режимом интеграции источника.
   const swWant = (vx = 0.5) => {
     const c = swTop;
     if (!c) return;
-    // Партнёрскую вакансию не «откликаем» у нас — на неё уходят к источнику.
-    // Карточку не убираем: показываем плашку-подтверждение, решение за человеком.
-    if ('sourceId' in c) { swSnapBack(); setExternalConfirm(c as ExternalVacancy); return; }
+    if ('sourceId' in c) {
+      swSnapBack();
+      const external = c as ExternalVacancy;
+      if (external.integrationMode === 'embedded') setPartnerConsentFor(external);
+      else setExternalConfirm(external);
+      return;
+    }
     swFly('right', vx, () => {
       setSwSkipped(s => new Set(s).add(c.id));
       setSwHistory(h => [...h, c.id]);
@@ -3588,31 +3617,19 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
           contentContainerStyle={pS.tabChipsRow}
           style={pS.tabChipsScroll}
         >
-          {TAB_CONFIG.map(t => {
-            const isActive = tab === t.key;
-            return (
-              <TouchableOpacity
-                key={t.key}
-                style={[pS.tabChip, isActive && pS.tabChipActive]}
-                onPress={() => setTab(t.key)}
-                activeOpacity={0.8}
-              >
-                {t.key === 'saved' ? (
-                  <Ionicons
-                    name="heart"
-                    size={15}
-                    color={Colors.red}
-                  />
-                ) : null}
-                <Text style={[pS.tabChipTxt, isActive && pS.tabChipTxtActive]}>
-                  {t.label}
-                </Text>
-                <Text style={[pS.tabChipCount, isActive && pS.tabChipCountActive]}>
-                  {t.count}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          <TouchableOpacity
+            style={[pS.tabChip, tab === 'saved' && pS.tabChipActive]}
+            onPress={() => setTab(current => current === 'saved' ? 'open' : 'saved')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: tab === 'saved' }}
+            accessibilityLabel={tab === 'saved' ? 'Показать все вакансии' : 'Показать избранные вакансии'}
+          >
+            <Ionicons name="heart" size={15} color={Colors.red} />
+            <Text style={[pS.tabChipTxt, tab === 'saved' && pS.tabChipTxtActive]}>
+              Избранное
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
         <TouchableOpacity
           style={[pS.filtersBtn, { marginLeft: rs(10) }, permFiltersActive ? pS.filtersBtnActive : null]}
@@ -3706,6 +3723,16 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
         title="Отклик на вакансию"
         info={permApplyFor ? permVacancyInfoLines(permApplyFor) : []}
         chips={getChatSuggestions('worker', null)}
+      />
+
+      <PartnerConsentSheet
+        visible={!!partnerConsentFor}
+        partnerName={partnerConsentFor?.sourceName ?? 'Партнёр'}
+        companyName={partnerConsentFor?.company}
+        onClose={() => setPartnerConsentFor(null)}
+        onAccept={() => partnerConsentFor
+          ? submitPartnerApplication(partnerConsentFor)
+          : Promise.resolve()}
       />
 
       {/* Плашка подтверждения перехода к партнёрской вакансии (свайп вправо). */}
@@ -4291,21 +4318,19 @@ const pS = StyleSheet.create({
     flex: 1, flexShrink: 1, alignSelf: 'stretch', minWidth: 0,
   },
   tabChipsRow: {
-    flexGrow: 1, flexDirection: 'row', gap: rs(6),
+    flexDirection: 'row', gap: rs(6),
     paddingLeft: rs(12), paddingVertical: rs(10),
   },
   tabChip: {
-    flex: 1, minWidth: 0,
+    alignSelf: 'center', flexShrink: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(4),
-    borderRadius: rs(100), paddingHorizontal: rs(8), paddingVertical: rs(8),
+    borderRadius: rs(100), paddingHorizontal: rs(12), paddingVertical: rs(8),
     borderWidth: 1.5, borderColor: Colors.inputBorder,
     backgroundColor: Colors.bg,
   },
   tabChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   tabChipTxt: { fontSize: rf(12.5), fontWeight: '500', color: Colors.textSecondary, flexShrink: 1 },
   tabChipTxtActive: { color: Colors.primary, fontWeight: '700' },
-  tabChipCount: { fontSize: rf(12.5), fontWeight: '600', color: Colors.textMuted, flexShrink: 0 },
-  tabChipCountActive: { color: Colors.primary },
   deckUtilityActions: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: rs(8),
     marginTop: rs(-2),

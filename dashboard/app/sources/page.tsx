@@ -36,6 +36,9 @@ type Source = {
   auth_configured: boolean
   environment: 'production' | 'sandbox'
   notifications_enabled: boolean
+  connector_kind: string
+  integration_mode: 'redirect' | 'embedded_test' | 'embedded'
+  integration_configured: boolean
 }
 
 type PartnerReport = {
@@ -412,8 +415,8 @@ export default function SourcesPage() {
             <a href={SAMPLE} target="_blank" rel="noreferrer">образец фида</a>.
           </div>
           <div style={{ fontSize: 13.5, color: 'var(--ink-3)', marginTop: 8, maxWidth: '68ch' }}>
-            Ссылка обязательна: человек откликается у источника, а не у нас. Без неё это была бы
-            перепечатка чужого объявления.
+            По умолчанию человек откликается на сайте источника. После настройки подписанного API
+            источник можно перевести во встроенный режим — тогда повторная регистрация не нужна.
           </div>
         </div>
 
@@ -507,6 +510,11 @@ export default function SourcesPage() {
                             : 'стабилен'}
                         </Chip>
                         {s.auth_configured && <Chip tone="neutral">доступ настроен</Chip>}
+                        {s.integration_mode === 'embedded' && s.integration_configured
+                          ? <Chip tone="positive">отклик внутри JobToo</Chip>
+                          : s.integration_mode === 'embedded_test'
+                          ? <Chip tone="neutral">тест встроенного отклика</Chip>
+                          : <Chip tone="neutral">переход по ссылке</Chip>}
                       </div>
                       <div className="num" style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
                         успешно: {when(s.last_success_at)}
