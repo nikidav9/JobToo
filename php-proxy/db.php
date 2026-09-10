@@ -3413,6 +3413,49 @@ try {
             $data = ['id' => $applicationId, 'status' => 'local_created', 'created' => true]; break;
         }
 
+        case 'partnerApplicationsGet': {
+            $workerId = trim((string)($args[0] ?? ''));
+            if ($authUid === null || $workerId === '' || $workerId !== $authUid) {
+                $data = ['error' => 'Нельзя читать чужие отклики']; break;
+            }
+            $rows = sb_select('jm_partner_applications', [
+                'worker_id' => 'eq.' . $workerId,
+            ], 'id,source_id,ext_vacancy_id,worker_id,status,created_at,updated_at', 'updated_at.desc');
+            $vacancyIds = [];
+            $sourceIds = [];
+            foreach ($rows as $row) {
+                $vacancyIds[(string)$row['ext_vacancy_id']] = true;
+                $sourceIds[(string)$row['source_id']] = true;
+            }
+            $vacancies = [];
+            if ($vacancyIds) {
+                foreach (sb_select('jm_ext_vacancies', [
+                    'id' => 'in.(' . implode(',', array_keys($vacancyIds)) . ')',
+                ], 'id,title,company,address,salary,pay_period') as $vacancy) {
+                    $vacancies[(string)$vacancy['id']] = $vacancy;
+                }
+            }
+            $sources = [];
+            if ($sourceIds) {
+                foreach (sb_select('jm_ext_sources', [
+                    'id' => 'in.(' . implode(',', array_keys($sourceIds)) . ')',
+                ], 'id,name') as $source) {
+                    $sources[(string)$source['id']] = $source['name'];
+                }
+            }
+            foreach ($rows as &$row) {
+                $vacancy = $vacancies[(string)$row['ext_vacancy_id']] ?? [];
+                $row['title'] = $vacancy['title'] ?? null;
+                $row['company'] = $vacancy['company'] ?? null;
+                $row['address'] = $vacancy['address'] ?? null;
+                $row['salary'] = $vacancy['salary'] ?? null;
+                $row['pay_period'] = $vacancy['pay_period'] ?? null;
+                $row['source_name'] = $sources[(string)$row['source_id']] ?? null;
+            }
+            unset($row);
+            $data = $rows; break;
+        }
+
         case 'partnerBillingReport': {
             $sourceId = trim((string)($args[0] ?? ''));
             $from = trim((string)($args[1] ?? ''));

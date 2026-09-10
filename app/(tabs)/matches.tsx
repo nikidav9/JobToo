@@ -10,11 +10,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { Like, User, Vacancy, PermApplication, PermVacancy, Chat, ReportableOutcome } from '@/constants/types';
+import { Like, User, Vacancy, PermApplication, PermVacancy, PartnerApplication, Chat, ReportableOutcome } from '@/constants/types';
 import { formatDate, getInitials, nameColorFromString } from '@/services/storage';
 import {
   dbUpsertLike, dbCheckAndCreateMatch, dbSetShiftOutcome,
-  dbSetPermApplicationStatus, dbCreateChat,
+  dbSetPermApplicationStatus, dbCreateChat, dbGetPartnerApplications,
 } from '@/services/db';
 import { TabHeader } from '@/components/ui/TabHeader';
 import GuestGate from '@/components/GuestGate';
@@ -292,21 +292,59 @@ function ConfirmBanner({ onOutcome, loading }: {
 // ─────────────────────────────────────────────────
 // WORKER VIEW
 // ─────────────────────────────────────────────────
+function partnerStatus(status: PartnerApplication['status']): {
+  label: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  color: string;
+  bg: string;
+  finished?: boolean;
+} {
+  if (status === 'accepted' || status === 'booked')
+    return { label: 'Работодатель подтвердил', icon: 'checkmark-circle', color: Colors.green, bg: '#D1FAE5' };
+  if (status === 'checked_in' || status === 'check_in_pending')
+    return { label: 'Выход подтверждается', icon: 'location', color: Colors.blue, bg: Colors.blueLight };
+  if (status === 'completed')
+    return { label: 'Работа завершена', icon: 'checkmark-done-circle', color: Colors.blue, bg: Colors.blueLight, finished: true };
+  if (status === 'rejected')
+    return { label: 'Работодатель отказал', icon: 'close-circle', color: Colors.red, bg: '#FEE2E2', finished: true };
+  if (status === 'worker_cancelled')
+    return { label: 'Вы отменили отклик', icon: 'close-circle-outline', color: Colors.red, bg: '#FEE2E2', finished: true };
+  if (status === 'employer_cancelled')
+    return { label: 'Работодатель отменил', icon: 'close-circle-outline', color: Colors.red, bg: '#FEE2E2', finished: true };
+  if (status === 'no_show')
+    return { label: 'Неявка', icon: 'alert-circle', color: Colors.red, bg: '#FEE2E2', finished: true };
+  if (status === 'failed')
+    return { label: 'Ошибка отправки — повторим', icon: 'refresh-circle', color: '#92400E', bg: '#FEF3C7' };
+  if (status === 'disputed')
+    return { label: 'Идёт разбирательство', icon: 'help-circle', color: '#92400E', bg: '#FEF3C7' };
+  if (status === 'submitted')
+    return { label: 'На рассмотрении', icon: 'hourglass-outline', color: '#92400E', bg: '#FFF7ED' };
+  return { label: 'Отправляем работодателю', icon: 'paper-plane-outline', color: Colors.primary, bg: Colors.primaryLight };
+}
+
 function WorkerMatches() {
   const router = useRouter();
   const { currentUser, likes, vacancies, users, chats, refreshAll, showToast } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const [detailVacancy, setDetailVacancy] = useState<Vacancy | null>(null);
+  const [partnerApplications, setPartnerApplications] = useState<PartnerApplication[]>([]);
   const [tab, setTab] = useState<'active' | 'rejected' | 'completed'>('active');
   const tabBarHeight = useBottomTabBarHeight();
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refreshAll();
+    await Promise.all([
+      refreshAll(),
+      currentUser ? dbGetPartnerApplications(currentUser.id).then(setPartnerApplications) : Promise.resolve(),
+    ]);
     setRefreshing(false);
   };
 
   const currentUserId = currentUser?.id ?? '';
+  useEffect(() => {
+    if (!currentUserId) return;
+    dbGetPartnerApplications(currentUserId).then(setPartnerApplications).catch(() => {});
+  }, [currentUserId]);
   const myLikes = workerLikes(likes, currentUserId);
 
   const getVacancy = (id: string) => vacancies.find(v => v.id === id);
@@ -324,12 +362,49 @@ function WorkerMatches() {
   const rejectedItems = workerRejected(myLikes);
   const completedItems = workerCompleted(myLikes);
 
-  const shownItems =
-    tab === 'active' ? activeItems :
-    tab === 'rejected' ? rejectedItems :
-    completedItems;
+  const partnerRejected = partnerApplications.filter(a =>
+    ['rejected', 'worker_cancelled', 'employer_cancelled'].includes(a.status));
+  const partnerCompleted = partnerApplications.filter(a =>
+    ['completed', 'no_show'].includes(a.status));
+  const partnerActive = partnerApplications.filter(a =>
+    !partnerRejected.includes(a) && !partnerCompleted.includes(a));
 
-  const renderItem = ({ item: like }: { item: Like }) => {
+  const shownItems =
+    tab === 'active'
+      ? [...activeItems.map(like => ({ kind: 'like' as const, like })), ...partnerActive.map(app => ({ kind: 'partner' as const, app }))]
+      : tab === 'rejected'
+      ? [...rejectedItems.map(like => ({ kind: 'like' as const, like })), ...partnerRejected.map(app => ({ kind: 'partner' as const, app }))]
+      : [...completedItems.map(like => ({ kind: 'like' as const, like })), ...partnerCompleted.map(app => ({ kind: 'partner' as const, app }))];
+
+  const renderItem = ({ item }: { item: { kind: 'like'; like: Like } | { kind: 'partner'; app: PartnerApplication } }) => {
+    if (item.kind === 'partner') {
+      const app = item.app;
+      const status = partnerStatus(app.status);
+      return (
+        <View style={[s.card, status.finished && s.completedCard]}>
+          <View style={[s.statusBadge, { backgroundColor: status.bg }]}>
+            <Ionicons name={status.icon} size={14} color={status.color} />
+            <Text style={[s.statusTxt, { color: status.color }]}>{status.label}</Text>
+          </View>
+          <Text style={s.jobTitle}>{app.title}</Text>
+          <Text style={s.subText}>{app.company ?? 'Компания'} · {app.sourceName ?? 'Партнёр JobToo'}</Text>
+          {app.salary != null ? (
+            <View style={s.partnerMetaRow}>
+              <Ionicons name="wallet-outline" size={15} color={Colors.primary} />
+              <Text style={s.partnerMetaTxt}>{app.salary.toLocaleString('ru-RU')} ₽{app.payPeriod === 'month' ? '/мес' : ''}</Text>
+            </View>
+          ) : null}
+          {app.address ? (
+            <View style={s.addressRow}>
+              <Ionicons name="location-outline" size={14} color="#92400E" />
+              <Text style={s.addressTxt}>{app.address}</Text>
+            </View>
+          ) : null}
+          <Text style={s.partnerCaption}>Отклик отправлен внутри JobToo — повторная регистрация не нужна</Text>
+        </View>
+      );
+    }
+    const like = item.like;
     const vac = getVacancy(like.vacancyId);
     if (!vac) return null;
     const employer = getEmployer(like.employerId);
@@ -455,9 +530,9 @@ function WorkerMatches() {
   };
 
   const TABS = [
-    { key: 'active',    label: 'Активные',  count: activeItems.length },
-    { key: 'rejected',  label: 'Отказ',     count: rejectedItems.length },
-    { key: 'completed', label: 'Завершено', count: completedItems.length },
+    { key: 'active',    label: 'Активные',  count: activeItems.length + partnerActive.length },
+    { key: 'rejected',  label: 'Отказ',     count: rejectedItems.length + partnerRejected.length },
+    { key: 'completed', label: 'Завершено', count: completedItems.length + partnerCompleted.length },
   ] as const;
 
   const emptyIcon: Record<typeof tab, React.ComponentProps<typeof Ionicons>['name']> = {
@@ -503,7 +578,7 @@ function WorkerMatches() {
       ) : (
         <FlatList
           data={shownItems}
-          keyExtractor={l => l.id}
+          keyExtractor={item => `${item.kind}:${item.kind === 'like' ? item.like.id : item.app.id}`}
           contentContainerStyle={[s.list, { paddingBottom: tabBarHeight + 16 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -1335,6 +1410,9 @@ const s = StyleSheet.create({
     backgroundColor: '#FFFBEB', borderRadius: rs(10), paddingHorizontal: rs(10), paddingVertical: rs(8),
   },
   addressTxt: { flex: 1, fontSize: rf(12.5), color: '#92400E', lineHeight: rf(17) },
+  partnerMetaRow: { flexDirection: 'row', alignItems: 'center', gap: rs(6) },
+  partnerMetaTxt: { fontSize: rf(13), fontWeight: '700', color: Colors.textPrimary },
+  partnerCaption: { fontSize: rf(12), lineHeight: rf(17), color: Colors.textMuted },
   profileRow: {
     flexDirection: 'row', alignItems: 'center', gap: rs(10),
     backgroundColor: Colors.surface, borderRadius: rs(12), padding: rs(10),

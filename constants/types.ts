@@ -247,6 +247,28 @@ export interface ExternalVacancy {
   dedupeKey?: string;
 }
 
+export type PartnerApplicationStatus =
+  | 'local_created' | 'submitting' | 'submitted' | 'accepted' | 'rejected'
+  | 'booked' | 'check_in_pending' | 'checked_in' | 'completed'
+  | 'worker_cancelled' | 'employer_cancelled' | 'no_show' | 'disputed' | 'failed';
+
+/** Отклик пользователя на вакансию подключённого внешнего партнёра. */
+export interface PartnerApplication {
+  id: string;
+  sourceId: string;
+  externalVacancyId: string;
+  workerId: string;
+  status: PartnerApplicationStatus;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  company?: string;
+  sourceName?: string;
+  address?: string;
+  salary?: number;
+  payPeriod?: string;
+}
+
 // hired — работодатель нажал «Завершить»: кандидат закрыт, карточка ушла из
 // «Мэтчей» в «Завершённые». Сама вакансия при этом остаётся в поиске, закрыть
 // её можно во вкладке «Активные».
