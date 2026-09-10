@@ -154,6 +154,10 @@ After=network-online.target nginx.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/jt-site-watchdog
+# При новом commit watchdog запускает атомарную Expo-сборку. На этой машине
+# systemd иначе обрывает oneshot через 90 секунд, и deploy не успевает
+# установить/запустить фоновые службы нового commit.
+TimeoutStartSec=1800
 EOF
   cat > /etc/systemd/system/jt-site-watchdog.timer <<'EOF'
 [Unit]

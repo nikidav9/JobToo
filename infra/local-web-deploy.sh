@@ -83,19 +83,6 @@ notify pgrst, 'reload schema';
 SQL
 ) >/tmp/jt-trudvsem-source.log 2>&1; then
   log "SOURCE $HEAD: trudvsem ready"
-  # Не ждём очередного десятиминутного bootstrap-цикла: после появления
-  # системного источника сразу заполняем его вакансии. Токен остаётся только
-  # в HTTP-заголовке и ни в вывод, ни в журнал не попадает.
-  if [ -n "${ADMIN_API_TOKEN:-}" ]; then
-    if curl -fsS --max-time 300 \
-      -H "X-Admin-Token: $ADMIN_API_TOKEN" \
-      'https://jobtoo.ru/api/ingest.php?source=trudvsem&force=1' \
-      -o /var/lib/jt-ingest-trudvsem.out; then
-      log "INGEST $HEAD: trudvsem triggered"
-    else
-      log "INGEST_FAIL $HEAD: trudvsem request failed"
-    fi
-  fi
 else
   log "SOURCE_FAIL $HEAD: trudvsem registration failed"
 fi
@@ -141,7 +128,7 @@ systemctl daemon-reload
 systemctl enable --now jt-trudvsem-import.timer >/dev/null
 systemctl reset-failed jt-trudvsem-import.service >/dev/null 2>&1 || true
 systemctl start --no-block jt-trudvsem-import.service || true
-log "INGEST_TIMER $HEAD: trudvsem full import scheduled"
+log "INGEST_TIMER $HEAD: trudvsem full import started"
 
 MAPS_KEY=${EXPO_PUBLIC_YANDEX_MAPS_KEY:-}
 if [ -z "$MAPS_KEY" ] && [ -d /var/www/jobtoo ]; then

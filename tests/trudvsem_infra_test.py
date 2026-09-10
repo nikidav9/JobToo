@@ -6,6 +6,7 @@ deploy = (root / "infra/local-web-deploy.sh").read_text(encoding="utf-8")
 worker = (root / "infra/trudvsem-import-loop.sh").read_text(encoding="utf-8")
 adapter = (root / "php-proxy/trudvsem.php").read_text(encoding="utf-8")
 workflow = (root / ".github/workflows/deploy-regru.yml").read_text(encoding="utf-8")
+bootstrap = (root / "infra/bootstrap.sh").read_text(encoding="utf-8")
 
 # Regression checks for the production-only pieces that cannot be exercised by
 # the Expo unit tests. A missing timeout previously allowed a long Moscow feed
@@ -14,6 +15,9 @@ assert "TimeoutStartSec=8h" in deploy
 assert "Restart=on-failure" in deploy
 assert "RestartSec=1min" in deploy
 assert "systemctl reset-failed jt-trudvsem-import.service" in deploy
+assert "ingest.php?source=trudvsem&force=1" not in deploy
+assert "ExecStart=/usr/local/bin/jt-site-watchdog\n" in bootstrap
+assert "TimeoutStartSec=1800" in bootstrap
 
 # The worker must validate the response envelope and the sole source status;
 # substring grep could accept malformed JSON or an unrelated field.
