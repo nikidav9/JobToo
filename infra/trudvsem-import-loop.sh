@@ -40,16 +40,44 @@ for batch in $(seq 1 300); do
   fi
   mv "$tmp" "$OUT"
 
-  if grep -q 'продолжение:' "$OUT"; then
+  # Разбираем JSON, а не ищем фрагмент текста через grep: так повреждённый
+  # ответ, пустой run или случайное совпадение в другом поле не смогут
+  # преждевременно завершить полный импорт.
+  state=$(python3 - "$OUT" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as response:
+        payload = json.load(response)
+    runs = payload.get("run")
+    if payload.get("ok") is not True or not isinstance(runs, list) or len(runs) != 1:
+        raise ValueError("unexpected ingest envelope")
+    status = runs[0].get("status", "")
+    if not isinstance(status, str):
+        raise ValueError("missing ingest status")
+    if status.startswith("продолжение:"):
+        print("pending")
+    elif status.startswith("ок:"):
+        print("complete")
+    else:
+        print("error")
+except (OSError, ValueError, json.JSONDecodeError, TypeError):
+    print("invalid")
+PY
+)
+
+  if [ "$state" = pending ]; then
     sleep 2
     continue
   fi
-  if grep -q '"status":"ок' "$OUT"; then
+  if [ "$state" = complete ]; then
     printf '%s complete batch=%s\n' "$(date -Is)" "$batch" >>"$LOG"
     exit 0
   fi
 
-  printf '%s unexpected response batch=%s\n' "$(date -Is)" "$batch" >>"$LOG"
+  printf '%s unexpected response batch=%s state=%s\n' \
+    "$(date -Is)" "$batch" "$state" >>"$LOG"
   exit 1
 done
 

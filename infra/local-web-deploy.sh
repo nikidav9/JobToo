@@ -114,6 +114,12 @@ Wants=network-online.target
 Type=oneshot
 ExecStart=/bin/bash /opt/jobtoo/infra/trudvsem-import-loop.sh
 Nice=10
+# Полный обход официального API состоит из сотен страниц и при медленном
+# upstream занимает заметно больше стандартных 90 секунд некоторых systemd-
+# конфигураций. Не даём manager оборвать worker посреди сохранённого обхода.
+TimeoutStartSec=8h
+Restart=on-failure
+RestartSec=1min
 UNIT
 
 cat >/etc/systemd/system/jt-trudvsem-import.timer <<'TIMER'
@@ -133,6 +139,7 @@ TIMER
 
 systemctl daemon-reload
 systemctl enable --now jt-trudvsem-import.timer >/dev/null
+systemctl reset-failed jt-trudvsem-import.service >/dev/null 2>&1 || true
 systemctl start --no-block jt-trudvsem-import.service || true
 log "INGEST_TIMER $HEAD: trudvsem full import scheduled"
 
