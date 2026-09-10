@@ -3043,12 +3043,6 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
     rejected: { label: 'Отказ',           icon: 'close-circle',      color: Colors.red,   bg: '#FEE2E2' },
   };
 
-  const TAB_CONFIG: { key: PermTab; label: string; count: number }[] = [
-    { key: 'open',    label: 'Открытые',     count: openVacancies.length + externalOpenVacancies.length },
-    // «Откликнулись» убрали: отклики и их статусы видны в разделе «Мэтчи».
-    { key: 'saved',   label: 'Избранное',    count: savedVacancies.length },
-  ];
-
   const toggleSaved = (v: PermVacancy) => {
     if (!currentUser) return;
     if (currentUser.isGuest) {
@@ -3588,31 +3582,19 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
           contentContainerStyle={pS.tabChipsRow}
           style={pS.tabChipsScroll}
         >
-          {TAB_CONFIG.map(t => {
-            const isActive = tab === t.key;
-            return (
-              <TouchableOpacity
-                key={t.key}
-                style={[pS.tabChip, isActive && pS.tabChipActive]}
-                onPress={() => setTab(t.key)}
-                activeOpacity={0.8}
-              >
-                {t.key === 'saved' ? (
-                  <Ionicons
-                    name="heart"
-                    size={15}
-                    color={Colors.red}
-                  />
-                ) : null}
-                <Text style={[pS.tabChipTxt, isActive && pS.tabChipTxtActive]}>
-                  {t.label}
-                </Text>
-                <Text style={[pS.tabChipCount, isActive && pS.tabChipCountActive]}>
-                  {t.count}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          <TouchableOpacity
+            style={[pS.tabChip, tab === 'saved' && pS.tabChipActive]}
+            onPress={() => setTab(current => current === 'saved' ? 'open' : 'saved')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: tab === 'saved' }}
+            accessibilityLabelLabel={tab === 'saved' ? 'Показать все вакансии' : 'Показать избранные вакансии'}
+          >
+            <Ionicons name="heart" size={15} color={Colors.red} />
+            <Text style={[pS.tabChipTxt, tab === 'saved' && pS.tabChipTxtActive]}>
+              Избранное
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
         <TouchableOpacity
           style={[pS.filtersBtn, { marginLeft: rs(10) }, permFiltersActive ? pS.filtersBtnActive : null]}
@@ -4291,21 +4273,19 @@ const pS = StyleSheet.create({
     flex: 1, flexShrink: 1, alignSelf: 'stretch', minWidth: 0,
   },
   tabChipsRow: {
-    flexGrow: 1, flexDirection: 'row', gap: rs(6),
+    flexDirection: 'row', gap: rs(6),
     paddingLeft: rs(12), paddingVertical: rs(10),
   },
   tabChip: {
-    flex: 1, minWidth: 0,
+    alignSelf: 'center', flexShrink: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(4),
-    borderRadius: rs(100), paddingHorizontal: rs(8), paddingVertical: rs(8),
+    borderRadius: rs(100), paddingHorizontal: rs(12), paddingVertical: rs(8),
     borderWidth: 1.5, borderColor: Colors.inputBorder,
     backgroundColor: Colors.bg,
   },
   tabChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   tabChipTxt: { fontSize: rf(12.5), fontWeight: '500', color: Colors.textSecondary, flexShrink: 1 },
   tabChipTxtActive: { color: Colors.primary, fontWeight: '700' },
-  tabChipCount: { fontSize: rf(12.5), fontWeight: '600', color: Colors.textMuted, flexShrink: 0 },
-  tabChipCountActive: { color: Colors.primary },
   deckUtilityActions: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: rs(8),
     marginTop: rs(-2),
