@@ -488,6 +488,38 @@ export async function dbGetPartnerApplications(workerId: string): Promise<Partne
   }));
 }
 
+export type SuperJobOAuthStatus = {
+  connected: boolean;
+  has_resume?: boolean;
+  connected_at?: string | null;
+  last_error?: string | null;
+};
+
+/** URL одноразовой авторизации SuperJob. Токены остаются только на сервере. */
+export async function dbStartSuperJobOAuth(returnUrl: string): Promise<{ url: string }> {
+  return proxy('superjobOauthStart', [returnUrl]);
+}
+
+export async function dbGetSuperJobOAuthStatus(): Promise<SuperJobOAuthStatus> {
+  return proxy('superjobOauthStatus');
+}
+
+export async function dbDisconnectSuperJob(): Promise<void> {
+  await proxy('superjobOauthDisconnect');
+}
+
+export async function dbApplyViaSuperJob(value: {
+  externalVacancyId: string;
+  consentVersion: string;
+  comment?: string;
+}): Promise<{ id: string; status: string; created: boolean }> {
+  return proxy('superjobApply', [{
+    ext_vacancy_id: value.externalVacancyId,
+    consent_version: value.consentVersion,
+    comment: value.comment ?? '',
+  }]);
+}
+
 /** Последнее принятое: что показать в профиле и спрашивать ли заново. */
 export async function dbGetConsent(userId: string): Promise<{
   stamp: string; docs: Record<string, string>; source: string; accepted_at: string;

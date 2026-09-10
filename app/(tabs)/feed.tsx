@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 58809)
+Total output lines: 4722
+
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
@@ -46,6 +49,9 @@ import {
   dbRecordExternalClick,
   dbRecordPartnerDataConsent,
   dbCreatePartnerApplication,
+  dbStartSuperJobOAuth,
+  dbGetSuperJobOAuthStatus,
+  dbApplyViaSuperJob,
   dbRecordGuestEvent,
   dbStartGuestRegistration,
 } from '@/services/db';
@@ -53,6 +59,7 @@ import { notifyEmployerGotMatch, notifyWorkerGotMatch,
   notifyEmployerNewMessage } from '@/services/notifications';
 import { Image } from 'expo-image';
 import * as Crypto from 'expo-crypto';
+import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
@@ -2103,728 +2110,7 @@ function WorkerFeed() {
 
   // Сохранить смену в «Избранное» (кнопка ★). Партнёрские (внешние) карточки в
   // наше избранное не кладём — у них нет стабильного id в нашей базе; для них
-  // ★ работает как переход к источнику (см. кнопку). Гостю — предложение
-  // зарегистрироваться, как и на остальных действиях.
-  const isCurrentSaved = !!currentCard && !('external' in currentCard) && savedIds.includes(currentCard.id);
-  const toggleSavedShift = useCallback(() => {
-    if (!currentCard || 'external' in currentCard) return;
-    const user = currentUser;
-    if (!user) return;
-    if (user.isGuest) { promptRegister({ vacancyKind: 'shift' }); return; }
-    const id = currentCard.id;
-    if (savedIds.includes(id)) {
-      optimisticRemoveSaved(id);
-      dbRemoveSaved(user.id, id).catch(() => {});
-    } else {
-      optimisticAddSaved(id);
-      dbAddSaved(user.id, id).catch(() => {});
-      showToast('Добавлено в избранное', 'success');
-    }
-  }, [currentCard, currentUser, savedIds, optimisticAddSaved, optimisticRemoveSaved, promptRegister, showToast]);
-
-  // Отклик на смену. Если переписка с этим работодателем уже есть — просто
-  // открываем её. Если нет, сначала спрашиваем у человека пару слов о себе:
-  // раньше вместо них уходил шаблон от имени системы, и отвечать было нечему.
-  const doMessage = useCallback(() => {
-    if (!currentCard || !currentUser || messagingRef.current) return;
-    if (currentUser.isGuest) {
-      const isExternal = 'external' in currentCard;
-      const ext = isExternal ? (currentCard as PartnerShiftCard).external : null;
-      promptRegister({
-        vacancyId: ext?.id ?? currentCard.id,
-        vacancyKind: isExternal ? 'external' : 'shift',
-        sourceId: ext?.sourceId ?? null,
-        campaignId: currentCard.id === deepLinkVacancyId ? campaignId || null : null,
-      });
-      return;
-    }
-    if ('external' in currentCard) {
-      const ext = (currentCard as PartnerShiftCard).external;
-      dbRecordExternalClick(ext.id, ext.sourceId, currentUser.id).catch(() => {});
-      Linking.openURL(ext.url).catch(() => showToast('Не удалось открыть источник', 'error'));
-      return;
-    }
-    const existingChat = chats.find(
-      c => c.employerId === currentCard.employerId && c.workerId === currentUser.id
-    );
-    if (existingChat) {
-      router.push({ pathname: '/chat-room', params: { chatId: existingChat.id } });
-      return;
-    }
-    setApplyFor(currentCard);
-  }, [currentCard, currentUser, chats, router, promptRegister]);
-
-  const sendApply = useCallback(async (message: string) => {
-    const card = applyFor;
-    if (!card || !currentUser || messagingRef.current) return;
-    if (campaignId && card.id === deepLinkVacancyId) {
-      void dbRecordGuestEvent('campaign_apply', {
-        vacancyId: card.id,
-        vacancyKind: 'shift',
-        campaignId,
-      });
-    }
-    if (currentUser.isGuest) {
-      promptRegister({
-        vacancyId: card.id,
-        vacancyKind: 'shift',
-        campaignId: card.id === deepLinkVacancyId ? campaignId || null : null,
-      });
-      return;
-    }
-    messagingRef.current = true;
-    try {
-      await dbUpsertLike(card.id, currentUser.id, card.employerId, {
-        workerLiked: true,
-        workerSkipped: false,
-      });
-      const chatId = await dbCreateChat(
-        currentUser.id,
-        card.employerId,
-        card.id,
-        card.title,
-        card.company,
-        message,
-        0,
-        1,
-        true,   // сообщение от работника, а не от системы
-      );
-      refreshChats().catch(() => {});
-      // В уведомлении — сами слова человека: работодатель решает, отвечать
-      // ли, по ним, а не по казённому «Новый отклик».
-      notifyEmployerNewMessage(
-        card.employerId,
-        `${currentUser.firstName} ${currentUser.lastName}`,
-        message,
-        chatId,
-      ).catch(() => {});
-      setApplyFor(null);
-      router.push({ pathname: '/chat-room', params: { chatId } });
-    } catch (e) {
-      showToast('Не удалось отправить отклик', 'error');
-    } finally {
-      messagingRef.current = false;
-    }
-  }, [applyFor, currentUser, refreshChats, router, showToast, promptRegister]);
-
-  const swipeCbRef = useRef<((dir: 'want' | 'skip', vx: number) => void) | null>(null);
-  const snapBackRef = useRef<(() => void) | null>(null);
-  const doMessageRef = useRef<(() => void) | null>(null);
-
-  useEffect(() => {
-    swipeCbRef.current = (dir, vx) => { if (dir === 'want') doWant(vx); else doSkip(vx); };
-    snapBackRef.current = snapBack;
-    doMessageRef.current = doMessage;
-  });
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dx) > Math.abs(g.dy) * 1.2 && Math.abs(g.dx) > 8,
-      onPanResponderGrant: () => {
-        pan.setOffset({ x: (pan.x as any)._value, y: (pan.y as any)._value });
-        pan.setValue({ x: 0, y: 0 });
-      },
-      // Карточка свободно следует за пальцем в любую сторону (без рывков), а
-      // решение — по горизонтали: вправо — отклик, влево — отказ.
-      // Карточка ходит только по горизонтали (влево/вправо). Вертикаль не
-      // трогаем — она уходит во внутренний скролл содержимого карточки.
-      onPanResponderMove: Animated.event([null, { dx: pan.x }], { useNativeDriver: false }),
-      onPanResponderRelease: (_, { dx, vx }) => {
-        pan.flattenOffset();
-        if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) {
-          swipeCbRef.current?.('want', Math.abs(vx));
-        } else if (dx < -SWIPE_THRESHOLD || vx < -VELOCITY_THRESHOLD) {
-          swipeCbRef.current?.('skip', Math.abs(vx));
-        } else {
-          snapBackRef.current?.();
-        }
-      },
-      onPanResponderTerminate: () => { swipingRef.current = false; setSwiping(false); snapBackRef.current?.(); },
-    })
-  ).current;
-
-  const countShifts = (d: string, f: ShiftFilters) => {
-    if (!currentUser) return 0;
-    return [...vacancies, ...partnerShifts].filter(v => {
-      if (v.status !== 'open') return false;
-      if (v.date !== d) return false;
-      if (!sourceFilterMatches(f.sources, 'external' in v ? (v as PartnerShiftCard).external.sourceId : undefined)) return false;
-      if (!('external' in v && !(v as PartnerShiftCard).external.workType)
-        && !currentUser.workTypes?.includes(v.workType)) return false;
-      const alreadySwiped = likes.find(l => l.vacancyId === v.id && l.workerId === currentUser.id);
-      if (alreadySwiped) return false;
-      if (f.stations.length && !f.stations.includes(v.metroStation ?? '')) return false;
-      if (!shiftMatchesTime((v as { timeStart?: string }).timeStart, (v as { timeEnd?: string }).timeEnd, f)) return false;
-      return true;
-    }).length;
-  };
-  const getDateCount = (d: string) => countShifts(d, { stations: filterStations, start: timeFilters.start, end: timeFilters.end, sources: filterSources });
-
-  const visibleDates = dates;
-
-  const getRuDay = (iso: string) => {
-    const d = new Date(iso + 'T00:00:00');
-    return ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'][d.getDay()];
-  };
-
-  return (
-    <View style={{ flex: 1 }}>
-      {isGuest && (
-        <TouchableOpacity style={gB.banner} activeOpacity={0.85} onPress={() => promptRegister()}>
-          <Ionicons name="lock-closed" size={rs(15)} color="#fff" />
-          <Text style={gB.bannerTxt}>Вы смотрите как гость. Зарегистрируйтесь, чтобы откликаться</Text>
-          <Text style={gB.bannerCta}>Войти</Text>
-        </TouchableOpacity>
-      )}
-      {/* Разовая / Регулярная */}
-      <ShiftSubTabs value={subMode} onChange={setSubMode} />
-      {subMode === 'regular' ? (
-        <RegularLocked />
-      ) : (
-      <>
-      {/* Date strip + inline filter button */}
-      <View style={styles.dateStrip}>
-        <View style={styles.dateStripInner}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.dateRow}
-            style={{ flex: 1 }}
-          >
-            {visibleDates.map(d => {
-              const active = d === selectedDate;
-              const cnt = getDateCount(d);
-              return (
-                <TouchableOpacity key={d} style={[styles.dateChip, active && styles.dateChipActive]} onPress={() => setSelectedDate(d)} activeOpacity={0.8}>
-                  <Text style={[styles.dcDay, active && styles.dcDayActive]}>{getRuDay(d)}</Text>
-                  <Text style={[styles.dcNum, active && styles.dcNumActive]}>{new Date(d + 'T00:00:00').getDate()}</Text>
-                  <Text style={[styles.dcCnt, active && styles.dcCntActive]}>{cnt}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-          <TouchableOpacity
-            style={[pS.inlineFilter, filtersActive ? pS.inlineFilterActive : null]}
-            onPress={() => setFilterOpen(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="options-outline" size={20} color={filtersActive ? Colors.primary : Colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {filterStations.length > 0 ? (
-        <TouchableOpacity style={styles.activeStationChip} onPress={() => setFilterStations([])} activeOpacity={0.8}>
-          <Ionicons name="location" size={13} color={Colors.primary} />
-          <Text style={styles.activeStationTxt}>
-            {filterStations.length === 1 ? `м. ${filterStations[0]}` : `Станций: ${filterStations.length}`}
-          </Text>
-          <Ionicons name="close" size={14} color={Colors.textMuted} />
-        </TouchableOpacity>
-      ) : null}
-
-      {filterOpen && (
-        <ShiftFilterSheet
-          initial={{ stations: filterStations, start: timeFilters.start, end: timeFilters.end, sources: filterSources }}
-          sourceOptions={shiftSourceOptions}
-          count={(f) => countShifts(selectedDate, f)}
-          onApply={(f) => { setFilterStations(f.stations); setTimeFilters({ start: f.start, end: f.end }); setFilterSources(f.sources); }}
-          onClose={() => setFilterOpen(false)}
-        />
-      )}
-
-      <MetroMap
-        visible={mapOpen}
-        title="Смены на карте"
-        items={mapItems}
-        onSelect={(st) => { setFilterStations(st ? [st] : []); setMapOpen(false); }}
-        onClose={() => setMapOpen(false)}
-      />
-
-      {/* Card area */}
-      <View
-        ref={cardAreaRef}
-        style={styles.cardArea}
-        onLayout={() => {
-          cardAreaRef.current?.measureInWindow((x, y, w, h) => {
-            if (w > 0) setOnboardingTarget('card', { x, y, w, h: Math.min(h, 360) });
-          });
-        }}
-      >
-        {!currentCard ? (
-          <ScrollView
-            contentContainerStyle={[styles.emptyState, { flexGrow: 1 }]}
-            showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
-          >
-            <View style={styles.emptyCharContainer} pointerEvents="none">
-              <Image
-                source={require('../../assets/images/char-seeker-empty.png')}
-                style={styles.emptyCharImg}
-                contentFit="cover"
-                contentPosition={{ top: '22%' }}
-              />
-            </View>
-            {(() => {
-              // Пустой экран не должен быть тупиком: если стоит фильтр — даём его
-              // снять; иначе подсказываем ближайший день, где смены реально есть.
-              const nextDay = visibleDates.find(d => d !== selectedDate && getDateCount(d) > 0);
-              if (filterStations.length) {
-                return (
-                  <>
-                    <Text style={styles.emptyTitle}>На выбранных станциях смен нет</Text>
-                    <Text style={styles.emptySubtitle}>Уберите фильтр по метро — покажем все смены поблизости</Text>
-                    <TouchableOpacity style={eS.btn} activeOpacity={0.85} onPress={() => setFilterStations([])}>
-                      <Ionicons name="close-circle-outline" size={rf(17)} color="#fff" />
-                      <Text style={eS.btnTxt}>Показать все смены</Text>
-                    </TouchableOpacity>
-                  </>
-                );
-              }
-              if (nextDay) {
-                const cnt = getDateCount(nextDay);
-                const mod10 = cnt % 10, mod100 = cnt % 100;
-                const word = mod10 === 1 && mod100 !== 11 ? 'смена'
-                  : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? 'смены'
-                  : 'смен';
-                return (
-                  <>
-                    <Text style={styles.emptyTitle}>На этот день смен нет</Text>
-                    <Text style={styles.emptySubtitle}>Зато есть на другой день — посмотрите их</Text>
-                    <TouchableOpacity style={eS.btn} activeOpacity={0.85} onPress={() => setSelectedDate(nextDay)}>
-                      <Ionicons name="calendar-outline" size={rf(16)} color="#fff" />
-                      <Text style={eS.btnTxt}>{getRuDay(nextDay)}, {new Date(nextDay + 'T00:00:00').getDate()} — {cnt} {word}</Text>
-                    </TouchableOpacity>
-                  </>
-                );
-              }
-              return (
-                <>
-                  <Text style={styles.emptyTitle}>Новых вакансий пока нет</Text>
-                  <Text style={styles.emptySubtitle}>Потяните вниз, чтобы обновить, или дождитесь новых объявлений</Text>
-                </>
-              );
-            })()}
-          </ScrollView>
-        ) : (
-          <>
-            {cards[2] ? <View style={styles.ghost2} /> : null}
-            {cards[1] ? <View style={styles.ghost1} /> : null}
-
-            <Animated.View
-              style={[styles.cardAnimated, { transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }] }]}
-              {...panResponder.panHandlers}
-            >
-              <View style={styles.card}>
-                <Animated.View style={[styles.wantOverlay, { opacity: wantOpacity }]}>
-                  <Text style={styles.wantText}>ХОЧУ ♥</Text>
-                </Animated.View>
-                <Animated.View style={[styles.skipOverlay, { opacity: skipOpacity }]}>
-                  <Text style={styles.skipText}>НЕТ ✕</Text>
-                </Animated.View>
-
-                <ScrollView
-                  style={{ flex: 1 }}
-                  contentContainerStyle={{ paddingBottom: rs(28) }}
-                  showsVerticalScrollIndicator={false}
-                  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
-                >
-                  <View style={styles.cardTop}>
-                    <View style={styles.companyRow}>
-                      <CompanyMark company={currentCard.company} size={52} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.companyName} numberOfLines={1}>
-                          {normalizeCompany(currentCard.company)}
-                        </Text>
-                        <View style={styles.metroHintRow}>
-                          <Ionicons
-                            name={'external' in currentCard ? 'open-outline' : 'subway-outline'}
-                            size={12}
-                            color={Colors.textMuted}
-                          />
-                          <Text style={styles.metroHint}>
-                            {'external' in currentCard ? (currentCard.metroStation ?? '') : currentCard.metroStation}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.cardBadges}>
-                        {currentCard.isUrgent ? (
-                          <View style={styles.urgentTag}>
-                            <Ionicons name="flash" size={11} color="#92400E" />
-                            <Text style={styles.urgentTagTxt}>Срочно</Text>
-                          </View>
-                        ) : null}
-                        <SourceBadge partnerName={'external' in currentCard ? ((currentCard as PartnerShiftCard).external.sourceName ?? 'Партнёр') : undefined} />
-                      </View>
-                    </View>
-
-                    <Text style={styles.jobTitle} numberOfLines={2}>{currentCard.title}</Text>
-
-                    <View style={styles.chipsRow}>
-                      <Chip label={`${currentCard.timeStart}–${currentCard.timeEnd}`} variant="time" icon="time-outline" />
-                      <Chip label={formatDate(currentCard.date)} variant="date" icon="calendar-outline" />
-                      {currentCard.noExperienceNeeded ? <Chip label="Без опыта" variant="exp" icon="school-outline" /> : null}
-                    </View>
-
-                    {currentCard.address ? (
-                      <View style={styles.addressChip}>
-                        <Ionicons name="location-outline" size={15} color="#92400E" style={{ marginTop: 1 }} />
-                        <Text style={styles.addressChipText} numberOfLines={3}>{currentCard.address}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-
-                  <View style={styles.cardDivider} />
-
-                  <View style={styles.cardMiddle}>
-                    {!('external' in currentCard) ? (
-                      <View style={{ gap: rs(12) }}>
-                        {currentCard.conditions ? (
-                          <View style={{ gap: rs(6) }}>
-                            <Text style={pS.sectionHead}>Условия</Text>
-                            <View style={{ position: 'relative' }}>
-                              <Text style={pS.desc} numberOfLines={expanded.has(currentCard.id) ? undefined : 6}>
-                                {currentCard.conditions}
-                              </Text>
-                              {!expanded.has(currentCard.id) ? (
-                                <Text
-                                  accessible={false}
-                                  style={[pS.desc, { position: 'absolute', opacity: 0, left: 0, right: 0, top: 0 }]}
-                                  onTextLayout={(e) => rememberShiftDescriptionLines(currentCard.id, e.nativeEvent.lines.length)}
-                                >
-                                  {currentCard.conditions}
-                                </Text>
-                              ) : null}
-                            </View>
-                            {(expanded.has(currentCard.id) || truncatedShiftDescriptions.has(currentCard.id)) ? (
-                              <TouchableOpacity style={pS.readMore} onPress={() => toggleExpanded(currentCard.id)} activeOpacity={0.7}>
-                                <Text style={pS.readMoreTxt}>{expanded.has(currentCard.id) ? 'Свернуть' : 'Читать ещё'}</Text>
-                                <Ionicons name={expanded.has(currentCard.id) ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.primary} />
-                              </TouchableOpacity>
-                            ) : null}
-                          </View>
-                        ) : null}
-                        {currentCard.normsAndPay ? (
-                          <View style={{ gap: rs(6) }}>
-                            <Text style={pS.sectionHead}>Нормативы и оплата</Text>
-                            <Text style={pS.desc}>{currentCard.normsAndPay}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                    ) : null}
-                  </View>
-                </ScrollView>
-              </View>
-            </Animated.View>
-
-            {/* Плавающие кнопки как в «Работе» и на образце: ✕ / ★ / ♥ и
-                подсказка «Свайпай». Раньше это была плоская панель внутри
-                карточки (отмена/✕/чат/♥) — теперь одинаково с постоянной работой.
-                У партнёрских карточек средняя кнопка ведёт к источнику (в наше
-                избранное их не кладём — нет стабильного id). */}
-            <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents="box-none">
-              <View style={styles.shiftDeckRow}>
-                <TouchableOpacity
-                  accessibilityLabel="Отклонить смену"
-                  style={[styles.deckFloatingAction, styles.deckFloatingSkip]}
-                  onPress={() => doSkip(0.5)}
-                  disabled={swiping}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons name="close" size={34} color={Colors.red} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  accessibilityLabel={'external' in currentCard ? 'Открыть у источника' : 'Написать работодателю'}
-                  style={[styles.deckFloatingAction, styles.deckFloatingChat]}
-                  onPress={() => doMessageRef.current?.()}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons
-                    name="chatbubble-outline"
-                    size={23}
-                    color={Colors.blue}
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  accessibilityLabel="Откликнуться на смену"
-                  style={[styles.deckFloatingAction, styles.deckFloatingWant]}
-                  onPress={() => doWant(0.5)}
-                  disabled={swiping}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons name="heart" size={31} color="#fff" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.swipeHintRow}>
-                <Ionicons name="arrow-undo-outline" size={20} color="#9AA3B2" />
-                <Text style={styles.swipeHint}>Свайпай</Text>
-                <Ionicons name="arrow-redo-outline" size={20} color="#9AA3B2" />
-              </View>
-            </View>
-          </>
-        )}
-      </View>
-
-
-      <MetroPicker
-        visible={filterPicker}
-        selected={filterStations}
-        onChange={setFilterStations}
-        onClose={() => setFilterPicker(false)}
-      />
-
-      {/* Detail modal */}
-      <VacancyDetailModal
-        vacancy={detailVacancy}
-        visible={!!detailVacancy}
-        employer={detailEmployer}
-        onClose={() => { setDetailVacancy(null); setDetailEmployer(null); }}
-        actions={
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            {detailVacancy && !('external' in detailVacancy) ? (
-              <TouchableOpacity
-                accessibilityLabel="Поделиться вакансией"
-                style={{ width: 46, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.divider, alignItems: 'center', justifyContent: 'center' }}
-                onPress={() => { void shareShiftVacancy(detailVacancy); }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="share-outline" size={19} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            ) : null}
-            <TouchableOpacity
-              style={styles.detailSkipBtn}
-              onPress={() => { setDetailVacancy(null); doSkip(0.5); }}
-              activeOpacity={0.8}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="close" size={16} color={Colors.red} />
-                <Text style={styles.detailSkipTxt}>Не подходит</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.detailWantBtn}
-              onPress={() => { setDetailVacancy(null); doWant(0.5); }}
-              activeOpacity={0.8}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="heart" size={16} color="#fff" />
-                <Text style={styles.detailWantTxt}>Хочу!</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        }
-      />
-
-      <ApplySheet
-        visible={!!applyFor}
-        onClose={() => setApplyFor(null)}
-        onSend={sendApply}
-        title="Отклик на смену"
-        info={applyFor ? vacancyInfoLines(applyFor) : []}
-        chips={getChatSuggestions('worker', applyFor)}
-      />
-      </>
-      )}
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────
-// Worker Permanent mode
-// ─────────────────────────────────────────────────
-type PermTab = 'open' | 'applied' | 'saved';
-
-const SALARY_CHIPS = [
-  { label: 'Любая', value: 0 },
-  { label: '30 000+', value: 30000 },
-  { label: '50 000+', value: 50000 },
-  { label: '80 000+', value: 80000 },
-  { label: '100 000+', value: 100000 },
-];
-
-// Значок в углу карточки. У наших вакансий — фирменный вордмарк JobToo (как в
-// шапке, components/ui/TabHeader.tsx), у партнёрских (залитых по API) — название
-// источника. Логотип-картинку партнёра добавим позже отдельным полем.
-function SourceBadge({ partnerName }: { partnerName?: string }) {
-  if (partnerName) {
-    return (
-      <View style={styles.sourceBadge}>
-        <Text style={styles.sourceBadgeTxt} numberOfLines={1}>{partnerName}</Text>
-      </View>
-    );
-  }
-  return (
-    <View style={styles.jtBadge}>
-      <Text style={styles.jtBadgeTxt}>
-        <Text style={styles.jtBadgeB}>Job</Text>
-        <Text style={styles.jtBadgeO}>Too</Text>
-      </Text>
-    </View>
-  );
-}
-
-// Засчитывает просмотр верхней карточки колоды «Работа».
-//
-// Раньше просмотр писался только в списочном режиме (onViewableItemsChanged у
-// FlatList), а «Открытые»/«Избранное» давно стали свайп-колодой — и листание
-// карточек не засчитывалось вовсе, число «Просмотрели» не росло. Здесь
-// повторяем логику колоды смен: гость — событие аналитики, партнёр — внешний
-// импрешн, наша вакансия — запись в jm_perm_vacancy_views (сервер сам
-// схлопывает дубли по паре vacancy_id+worker_id).
-//
-// Отдельным компонентом, а не useEffect в теле WorkerPermMode: там ниже есть
-// ранний return (гость без currentUser), и хук после него нарушил бы порядок
-// хуков.
-function PermDeckViewRecorder({ vacancy, userId, isGuest }: {
-  vacancy: PermVacancy | ExternalVacancy | undefined;
-  userId: string;
-  isGuest: boolean;
-}) {
-  const vid = vacancy?.id;
-  const isExternal = !!vacancy && 'sourceId' in vacancy;
-  const sourceId = isExternal ? (vacancy as ExternalVacancy).sourceId : null;
-  useEffect(() => {
-    if (!vid) return;
-    const t = setTimeout(() => {
-      if (isGuest) {
-        void dbRecordGuestEvent('vacancy_impression', {
-          vacancyId: vid,
-          vacancyKind: isExternal ? 'external' : 'permanent',
-          sourceId,
-        });
-        return;
-      }
-      if (isExternal && sourceId) dbRecordExternalImpression(vid, sourceId).catch(() => {});
-      else if (!isExternal && userId) dbRecordPermVacancyView(vid, userId).catch(() => {});
-    }, 300);
-    return () => clearTimeout(t);
-  }, [vid, userId, isGuest, isExternal, sourceId]);
-  return null;
-}
-
-function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void) | null) => void } = {}) {
-  const router = useRouter();
-  const {
-    currentUser, users, permVacancies, permApplications,
-    refreshPermVacancies, refreshPermApplications,
-    chats, refreshChats,
-    showToast, permVacancyViewsMap, refreshPermVacancyViews,
-    permSavedIds, optimisticAddPermSaved, optimisticRemovePermSaved, exitGuest,
-    backendOffline,
-  } = useApp();
-  const tabBarHeight = useBottomTabBarHeight();
-
-  // Гость смотрит постоянные вакансии, но действовать не может — ведём на
-  // регистрацию (см. соискательскую ленту смен).
-  const isGuest = !!currentUser?.isGuest;
-  const promptRegister = (context: {
-    vacancyId?: string | null;
-    vacancyKind?: 'shift' | 'permanent' | 'external' | null;
-    sourceId?: string | null;
-  } = {}) => {
-    void dbStartGuestRegistration(context);
-    exitGuest();
-    router.replace('/');
-  };
-
-  const [tab, setTab] = useState<PermTab>('open');
-  const [refreshing, setRefreshing] = useState(false);
-  const [searchText, setSearchText] = useState('');
-  const [filterStations, setFilterStations] = useState<string[]>([]);
-  // Доп. фильтры постоянной работы (см. PermFilterSheet).
-  const [searchIn, setSearchIn] = useState<('title' | 'desc')[]>([]);
-  const [posted, setPosted] = useState<'all' | 'week' | '3days'>('all');
-  const [schedules, setSchedules] = useState<string[]>([]);
-  const [filterSources, setFilterSources] = useState<string[]>([]);
-  const [permFilterOpen, setPermFilterOpen] = useState(false);
-  // Какие карточки развёрнуты (описание «Читать ещё»). По id вакансии.
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [truncatedDescriptions, setTruncatedDescriptions] = useState<Set<string>>(new Set());
-  const toggleExpanded = (id: string) =>
-    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const rememberDescriptionLines = (id: string, lines: number) => {
-    setTruncatedDescriptions(prev => {
-      const shouldShow = lines > 5;
-      if (prev.has(id) === shouldShow) return prev;
-      const next = new Set(prev);
-      shouldShow ? next.add(id) : next.delete(id);
-      return next;
-    });
-  };
-  const [filterPicker, setFilterPicker] = useState(false);
-  const [minSalary, setMinSalary] = useState(0);
-  const [applying, setApplying] = useState<string | null>(null);
-  // Вакансия, по которой человек сейчас пишет отклик (null — окно закрыто)
-  const [permApplyFor, setPermApplyFor] = useState<PermVacancy | null>(null);
-  const [chatLoading, setChatLoading] = useState<string | null>(null);
-  const [mapOpen, setMapOpen] = useState(false);
-  const [externalVacancies, setExternalVacancies] = useState<ExternalVacancy[]>([]);
-  // Redirect-источник открываем с подтверждением. Для embedded-источника
-  // отдельно получаем согласие на передачу данных и создаём отклик у нас.
-  const [externalConfirm, setExternalConfirm] = useState<ExternalVacancy | null>(null);
-  const [partnerConsentFor, setPartnerConsentFor] = useState<ExternalVacancy | null>(null);
-
-  const externalLoadId = useRef(0);
-  const loadExternalVacancies = useCallback(async () => {
-    const loadId = ++externalLoadId.current;
-    const pageSize = 1000;
-    const loaded: ExternalVacancy[] = [];
-    const seen = new Set<string>();
-    try {
-      for (let offset = 0; offset < 50000; offset += pageSize) {
-        const page = await dbGetExternalVacancyPage(offset, pageSize);
-        const rows = page.vacancies;
-        if (externalLoadId.current !== loadId) return;
-        for (const vacancy of rows) {
-          if (vacancy.kind !== 'permanent') continue;
-          const key = vacancy.dedupeKey || `${vacancy.sourceId}:${vacancy.id}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          loaded.push(vacancy);
-        }
-        // Показываем первую страницу сразу и дополняем список после каждой
-        // следующей, не заставляя экран ждать весь большой каталог.
-        setExternalVacancies([...loaded]);
-        // rows уже очищены от дублей и почти всегда короче сырой страницы.
-        // Конец выдачи можно определять только по числу строк от сервера.
-        if (page.rawCount < pageSize) break;
-      }
-    } catch {
-      // Уже загруженные страницы остаются видимыми. Свои вакансии продолжают
-      // работать, даже если очередная страница партнёрского фида недоступна.
-    }
-  }, []);
-
-  useEffect(() => { loadExternalVacancies(); }, [loadExternalVacancies]);
-
-  const permSourceOptions = buildSourceOptions(externalVacancies);
-
-  // Вакансии для карты: метка — это адрес, станция остаётся для фильтра
-  const permMapItems: MapListItem[] = useMemo(
-    () => [
-      ...(permVacancies as PermVacancy[])
-      .filter((v: PermVacancy) => v.status === 'open' && sourceFilterMatches(filterSources) && (!!v.metroStation || !!v.address))
-      .map((v: PermVacancy) => ({
-        id: v.id,
-        station: (v.metroStation ?? '') as string,
-        title: v.title,
-        company: v.company,
-        pay: payShort(v.salary, v.workType),
-        meta: v.schedule,
-        address: v.address,
-        lat: v.lat,
-        lng: v.lng,
-      })),
-      ...externalVacancies
-        .filter(v => sourceFilterMatches(filterSources, v.sourceId) && (!!v.metroStation || !!v.address))
-        .map(v => ({
-          id: `external:${v.id}`,
-          station: v.metroStation ?? '',
-          title: v.title,
+  // ★ работает как переход к источни…8809 tokens truncated…title: v.title,
           company: v.company ?? v.sourceName ?? 'Компания',
           pay: v.salary ? `${v.salary.toLocaleString('ru-RU')} ₽/мес` : undefined,
           meta: v.schedule,
@@ -3126,16 +2412,59 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
       purpose: 'Рассмотрение отклика и обмен статусами по выбранной вакансии',
       consentVersion: PARTNER_CONSENT_VERSION,
     });
-    const result = await dbCreatePartnerApplication({
-      sourceId: v.sourceId,
-      workerId: currentUser.id,
-      externalVacancyId: v.id,
-      consentVersion: PARTNER_CONSENT_VERSION,
-    });
+    const result = v.connectorKind === 'superjob'
+      ? await dbApplyViaSuperJob({
+          externalVacancyId: v.id,
+          consentVersion: PARTNER_CONSENT_VERSION,
+        })
+      : await dbCreatePartnerApplication({
+          sourceId: v.sourceId,
+          workerId: currentUser.id,
+          externalVacancyId: v.id,
+          consentVersion: PARTNER_CONSENT_VERSION,
+        });
     setPartnerConsentFor(null);
     setSwSkipped(s => new Set(s).add(v.id));
     setSwHistory(h => h.includes(v.id) ? h : [...h, v.id]);
-    showToast(result.created ? 'Отклик отправляется работодателю' : 'Вы уже откликнулись', 'success');
+    showToast(
+      result.created
+        ? (v.connectorKind === 'superjob' ? 'Отклик отправлен в SuperJob' : 'Отклик отправляется работодателю')
+        : 'Вы уже откликнулись',
+      'success',
+    );
+  };
+
+  const prepareSuperJobApplication = async (v: ExternalVacancy) => {
+    if (currentUser.isGuest) {
+      promptRegister({ vacancyKind: 'permanent' });
+      return;
+    }
+    try {
+      const status = await dbGetSuperJobOAuthStatus();
+      if (status.connected && status.has_resume) {
+        setPartnerConsentFor(v);
+        return;
+      }
+      if (status.connected && !status.has_resume) {
+        showToast('Сначала создайте или выберите основное резюме в SuperJob', 'error');
+        return;
+      }
+      const returnUrl = Platform.OS === 'web' ? 'https://jobtoo.ru/' : 'onspaceapp:///';
+      const { url } = await dbStartSuperJobOAuth(returnUrl);
+      if (Platform.OS === 'web') {
+        await Linking.openURL(url);
+      } else {
+        await WebBrowser.openAuthSessionAsync(url, returnUrl);
+        const connected = await dbGetSuperJobOAuthStatus();
+        if (connected.connected && connected.has_resume) {
+          setPartnerConsentFor(v);
+          return;
+        }
+      }
+      showToast('После подключения повторите свайп', 'success');
+    } catch (e: any) {
+      showToast(e?.message ?? 'Не удалось подключить SuperJob', 'error');
+    }
   };
 
   const renderPerm = ({ item: v }: { item: PermVacancy | ExternalVacancy }) => {
@@ -3381,7 +2710,8 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
     if ('sourceId' in c) {
       swSnapBack();
       const external = c as ExternalVacancy;
-      if (external.integrationMode === 'embedded') setPartnerConsentFor(external);
+      if (external.connectorKind === 'superjob') void prepareSuperJobApplication(external);
+      else if (external.integrationMode === 'embedded') setPartnerConsentFor(external);
       else setExternalConfirm(external);
       return;
     }
