@@ -196,6 +196,8 @@ jobs:
           rm -rf pack && mkdir pack
           cp -a dist/. pack/
           rm -rf pack/api pack/.htaccess
+          printf '{"sha":"%s","deployed_at":"%s","builder":"github-actions"}\n' \
+            "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > pack/jobtoo-build.json
           tar -czf dist.tar.gz -C pack .
           ls -l dist.tar.gz
           gh release view web >/dev/null 2>&1 \

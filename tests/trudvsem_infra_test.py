@@ -5,6 +5,7 @@ root = Path(__file__).resolve().parents[1]
 deploy = (root / "infra/local-web-deploy.sh").read_text(encoding="utf-8")
 worker = (root / "infra/trudvsem-import-loop.sh").read_text(encoding="utf-8")
 adapter = (root / "php-proxy/trudvsem.php").read_text(encoding="utf-8")
+workflow = (root / ".github/workflows/deploy-regru.yml").read_text(encoding="utf-8")
 
 # Regression checks for the production-only pieces that cannot be exercised by
 # the Expo unit tests. A missing timeout previously allowed a long Moscow feed
@@ -28,5 +29,10 @@ assert "'modifiedFrom' => $from" in adapter
 assert "'modifiedTo' => $to" in adapter
 assert "$shardTotal <= 10000" in adapter
 assert "array_unshift($queue" in adapter
+
+# The release deployment used to replace the locally generated build marker,
+# making it impossible to tell which commit production was serving.
+assert '"$GITHUB_SHA"' in workflow
+assert "pack/jobtoo-build.json" in workflow
 
 print("trudvsem production import invariants: ok")
