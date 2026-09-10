@@ -26,6 +26,8 @@ assert "json.load(response)" in worker
 assert 'status.startswith("продолжение:")' in worker
 assert 'status.startswith("ок:")' in worker
 assert "grep -q" not in worker
+assert 'curl -fsS --max-time 300 --config -' in worker
+assert '-H "X-Admin-Token: $ADMIN_API_TOKEN"' not in worker
 
 # Keep the adapter strictly Moscow-only and keep the time-window pagination
 # needed to get past the official API's 10,000-result ceiling.

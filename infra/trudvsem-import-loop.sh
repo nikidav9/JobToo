@@ -23,10 +23,14 @@ for batch in $(seq 1 300); do
   tmp="$OUT.tmp"
   request_ok=0
   for request_attempt in 1 2 3; do
-    if curl -fsS --max-time 300 \
-      -H "X-Admin-Token: $ADMIN_API_TOKEN" \
+    # Заголовок передаём через stdin-конфигурацию. Если положить токен после
+    # -H, systemctl status и ps покажут его любому, кто видит процессы.
+    if curl -fsS --max-time 300 --config - \
       'https://jobtoo.ru/api/ingest.php?source=trudvsem&force=1' \
-      -o "$tmp"; then
+      -o "$tmp" <<CURL_CONFIG
+header = "X-Admin-Token: $ADMIN_API_TOKEN"
+CURL_CONFIG
+    then
       request_ok=1
       break
     fi
