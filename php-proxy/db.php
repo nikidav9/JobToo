@@ -2860,10 +2860,14 @@ try {
             $rows = sb_select('jm_ext_sources', ['order' => 'created_at.desc'],
                 'id,name,url,enabled,period_min,last_run_at,last_status,last_count,'
                 . 'last_success_at,consecutive_failures,last_duration_ms,last_pages,'
-                . 'last_skipped,last_deactivated,created_at,auth_header,environment,notifications_enabled');
+                . 'last_skipped,last_deactivated,created_at,auth_header,environment,notifications_enabled,'
+                . 'connector_kind,integration_mode,connector_config,webhook_secret');
             foreach ($rows as &$source) {
                 $source['auth_configured'] = !empty($source['auth_header']);
-                unset($source['auth_header']);
+                $config = is_array($source['connector_config'] ?? null) ? $source['connector_config'] : [];
+                $source['integration_configured'] = !empty($config['application_submit_url'])
+                    && !empty($source['webhook_secret']);
+                unset($source['auth_header'], $source['connector_config'], $source['webhook_secret']);
             }
             unset($source);
             $data = $rows; break;
@@ -2899,6 +2903,31 @@ try {
             }
             if ($isNew || array_key_exists('auth_value', $v)) {
                 $row['auth_value'] = $v['auth_value'] ?? null;
+            }
+            if ($isNew || array_key_exists('connector_kind', $v)) {
+                $row['connector_kind'] = trim((string)($v['connector_kind'] ?? 'redirect')) ?: 'redirect';
+            }
+            if ($isNew || array_key_exists('integration_mode', $v)) {
+                $mode = (string)($v['integration_mode'] ?? 'redirect');
+                if (!in_array($mode, ['redirect', 'embedded_test', 'embedded'], true)) {
+                    $data = ['error' => 'неизвестный режим интеграции']; break;
+                }
+                $row['integration_mode'] = $mode;
+            }
+            if (array_key_exists('application_submit_url', $v)) {
+                $submitUrl = trim((string)($v['application_submit_url'] ?? ''));
+                if ($submitUrl !== '' && !preg_match('~^https://~i', $submitUrl)) {
+                    $data = ['error' => 'endpoint отклика должен использовать HTTPS']; break;
+                }
+                $previous = !$isNew
+                    ? sb_single('jm_ext_sources', ['id' => 'eq.' . $row['id']], 'connector_config') : null;
+                $config = is_array($previous['connector_config'] ?? null)
+                    ? $previous['connector_config'] : [];
+                $config['application_submit_url'] = $submitUrl;
+                $row['connector_config'] = $config;
+            }
+            if (array_key_exists('webhook_secret', $v)) {
+                $row['webhook_secret'] = trim((string)($v['webhook_secret'] ?? '')) ?: null;
             }
             sb_upsert('jm_ext_sources', $row, 'id');
             $data = ['ok' => true, 'id' => $row['id']]; break;
