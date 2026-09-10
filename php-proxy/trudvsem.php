@@ -29,6 +29,12 @@ $SELF = tv_cfg('TRUDVSEM_SELF_URL', 'https://jobtoo.ru/api/trudvsem.php');
 $LIMIT = 100;
 $offset = isset($_GET['offset']) ? max(0, (int)$_GET['offset']) : 0;
 
+// Checkpoint старой схемы мог сохранить offset=100. Для API это уже 101-я
+// страница и гарантированный 500; новая схема до такого offset не доходит,
+// потому что заранее делит любой диапазон больше 10 000 результатов.
+// Без диапазона это однозначно legacy URL — безопасно начинаем новый обход.
+if ($offset >= 100 && !isset($_GET['from'], $_GET['to'])) $offset = 0;
+
 function tv_iso($value, string $fallback): string {
     $value = trim((string)$value);
     if (!preg_match('~^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$~', $value)) return $fallback;

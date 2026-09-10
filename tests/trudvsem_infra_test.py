@@ -16,6 +16,7 @@ assert "Restart=on-failure" in deploy
 assert "RestartSec=1min" in deploy
 assert "systemctl reset-failed jt-trudvsem-import.service" in deploy
 assert "ingest.php?source=trudvsem&force=1" not in deploy
+assert "trudvsem.php?v=2" in deploy
 assert "ExecStart=/usr/local/bin/jt-site-watchdog\n" in bootstrap
 assert "TimeoutStartSec=1800" in bootstrap
 
@@ -33,6 +34,7 @@ assert "'modifiedFrom' => $from" in adapter
 assert "'modifiedTo' => $to" in adapter
 assert "$shardTotal <= 10000" in adapter
 assert "array_unshift($queue" in adapter
+assert "$offset >= 100" in adapter
 
 # The release deployment used to replace the locally generated build marker,
 # making it impossible to tell which commit production was serving.

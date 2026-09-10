@@ -70,7 +70,7 @@ if (
 insert into public.jm_ext_sources
   (id, name, url, enabled, period_min, environment)
 values
-  ('trudvsem', 'Работа в России', 'https://jobtoo.ru/api/trudvsem.php', true, 120, 'production')
+  ('trudvsem', 'Работа в России', 'https://jobtoo.ru/api/trudvsem.php?v=2', true, 120, 'production')
 on conflict (id) do update
 set name = excluded.name,
     url = excluded.url,

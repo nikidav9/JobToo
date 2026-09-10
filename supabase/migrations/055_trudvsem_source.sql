@@ -8,7 +8,7 @@ insert into public.jm_ext_sources (id, name, url, enabled, period_min, environme
 values (
     'trudvsem',
     'Работа в России',
-    'https://jobtoo.ru/api/trudvsem.php',
+    'https://jobtoo.ru/api/trudvsem.php?v=2',
     true,
     120,
     'production'
