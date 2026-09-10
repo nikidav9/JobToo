@@ -83,12 +83,18 @@ if (is_array($app)) {
         $v = @include __DIR__ . '/app_secrets.php';
         if (is_array($v)) $cur = $v;
     }
-    foreach (['APP_SECRET', 'APP_SECRET_PREV', 'TG_BOT_TOKEN', 'YANDEX_GEOCODER_KEY', 'YANDEX_SUGGEST_KEY'] as $k) {
+    $appKeys = [
+        'APP_SECRET', 'APP_SECRET_PREV', 'TG_BOT_TOKEN',
+        'YANDEX_GEOCODER_KEY', 'YANDEX_SUGGEST_KEY',
+        'SUPERJOB_SECRET_KEY', 'SUPERJOB_CLIENT_ID', 'SUPERJOB_CLIENT_SECRET',
+        'HH_CLIENT_ID', 'HH_CLIENT_SECRET',
+    ];
+    foreach ($appKeys as $k) {
         $x = $app[$k] ?? '';
         if (is_string($x) && $x !== '') $cur[$k] = $x;
     }
     $parts = [];
-    foreach (['APP_SECRET', 'APP_SECRET_PREV', 'TG_BOT_TOKEN', 'YANDEX_GEOCODER_KEY', 'YANDEX_SUGGEST_KEY'] as $k) {
+    foreach ($appKeys as $k) {
         $parts[] = "'$k' => " . literal((string) ($cur[$k] ?? ''));
     }
     if (put(__DIR__ . '/app_secrets.php', "<?php return [" . implode(', ', $parts) . "];\n")) {
