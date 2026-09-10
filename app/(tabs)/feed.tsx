@@ -44,6 +44,8 @@ import {
   dbGetExternalVacancyPage,
   dbRecordExternalImpression,
   dbRecordExternalClick,
+  dbRecordPartnerDataConsent,
+  dbCreatePartnerApplication,
   dbRecordGuestEvent,
   dbStartGuestRegistration,
 } from '@/services/db';
@@ -68,6 +70,7 @@ import { ApplySheet } from '@/components/feature/ApplySheet';
 import { getChatSuggestions } from '@/constants/chatSuggestions';
 import { payShort } from '@/services/pay';
 import { vacancyInfoLines, permVacancyInfoLines } from '@/services/vacancyCard';
+import { PartnerConsentSheet, PARTNER_CONSENT_VERSION } from '@/components/feature/PartnerConsentSheet';
 
 function partnerAttributionUrl(raw: string, clickId: string, sourceId: string): string {
   try {
@@ -2760,9 +2763,10 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
   const [chatLoading, setChatLoading] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [externalVacancies, setExternalVacancies] = useState<ExternalVacancy[]>([]);
-  // Партнёрскую вакансию нельзя «откликнуть» у нас — на неё уходят к источнику.
-  // Свайп вправо неоднозначен, поэтому сначала показываем плашку с подтверждением.
+  // Redirect-источник открываем с подтверждением. Для embedded-источника
+  // отдельно получаем согласие на передачу данных и создаём отклик у нас.
   const [externalConfirm, setExternalConfirm] = useState<ExternalVacancy | null>(null);
+  const [partnerConsentFor, setPartnerConsentFor] = useState<ExternalVacancy | null>(null);
 
   const externalLoadId = useRef(0);
   const loadExternalVacancies = useCallback(async () => {
@@ -3107,6 +3111,33 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
     }
   };
 
+  const submitPartnerApplication = async (v: ExternalVacancy) => {
+    if (currentUser.isGuest) {
+      setPartnerConsentFor(null);
+      promptRegister({ vacancyKind: 'permanent' });
+      return;
+    }
+    await dbRecordPartnerDataConsent({
+      sourceId: v.sourceId,
+      workerId: currentUser.id,
+      externalVacancyId: v.id,
+      recipientName: v.sourceName ?? v.company ?? 'Партнёр',
+      dataCategories: ['profile', 'application', 'messages', 'statuses'],
+      purpose: 'Рассмотрение отклика и обмен статусами по выбранной вакансии',
+      consentVersion: PARTNER_CONSENT_VERSION,
+    });
+    const result = await dbCreatePartnerApplication({
+      sourceId: v.sourceId,
+      workerId: currentUser.id,
+      externalVacancyId: v.id,
+      consentVersion: PARTNER_CONSENT_VERSION,
+    });
+    setPartnerConsentFor(null);
+    setSwSkipped(s => new Set(s).add(v.id));
+    setSwHistory(h => h.includes(v.id) ? h : [...h, v.id]);
+    showToast(result.created ? 'Отклик отправляется работодателю' : 'Вы уже откликнулись', 'success');
+  };
+
   const renderPerm = ({ item: v }: { item: PermVacancy | ExternalVacancy }) => {
     const isExternal = 'sourceId' in v;
     if (isExternal) {
@@ -3342,14 +3373,18 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
     });
   };
   // Вправо — принять: отклик (уходит в «Отклики» → матчи, ждёт ответа). В
-  // «Избранном» вдобавок убираем из избранного. Партнёрские (внешние) — не наш
-  // отклик, их просто листаем дальше.
+  // «Избранном» вдобавок убираем из избранного. У партнёрских вакансий способ
+  // отклика определяется режимом интеграции источника.
   const swWant = (vx = 0.5) => {
     const c = swTop;
     if (!c) return;
-    // Партнёрскую вакансию не «откликаем» у нас — на неё уходят к источнику.
-    // Карточку не убираем: показываем плашку-подтверждение, решение за человеком.
-    if ('sourceId' in c) { swSnapBack(); setExternalConfirm(c as ExternalVacancy); return; }
+    if ('sourceId' in c) {
+      swSnapBack();
+      const external = c as ExternalVacancy;
+      if (external.integrationMode === 'embedded') setPartnerConsentFor(external);
+      else setExternalConfirm(external);
+      return;
+    }
     swFly('right', vx, () => {
       setSwSkipped(s => new Set(s).add(c.id));
       setSwHistory(h => [...h, c.id]);
@@ -3688,6 +3723,16 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
         title="Отклик на вакансию"
         info={permApplyFor ? permVacancyInfoLines(permApplyFor) : []}
         chips={getChatSuggestions('worker', null)}
+      />
+
+      <PartnerConsentSheet
+        visible={!!partnerConsentFor}
+        partnerName={partnerConsentFor?.sourceName ?? 'Партнёр'}
+        companyName={partnerConsentFor?.company}
+        onClose={() => setPartnerConsentFor(null)}
+        onAccept={() => partnerConsentFor
+          ? submitPartnerApplication(partnerConsentFor)
+          : Promise.resolve()}
       />
 
       {/* Плашка подтверждения перехода к партнёрской вакансии (свайп вправо). */}

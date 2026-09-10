@@ -455,6 +455,20 @@ export async function dbRecordPartnerDataConsent(value: PartnerDataConsent): Pro
   }]);
 }
 
+export async function dbCreatePartnerApplication(value: {
+  sourceId: string;
+  workerId: string;
+  externalVacancyId: string;
+  consentVersion: string;
+}): Promise<{ id: string; status: string; created: boolean }> {
+  return proxy('partnerApplicationCreate', [{
+    source_id: value.sourceId,
+    worker_id: value.workerId,
+    ext_vacancy_id: value.externalVacancyId,
+    consent_version: value.consentVersion,
+  }]);
+}
+
 /** Последнее принятое: что показать в профиле и спрашивать ли заново. */
 export async function dbGetConsent(userId: string): Promise<{
   stamp: string; docs: Record<string, string>; source: string; accepted_at: string;
@@ -1576,6 +1590,8 @@ export async function dbGetExternalVacancyPage(offset = 0, limit = 1000): Promis
     id: r.id,
     sourceId: r.source_id,
     sourceName: r.source_name ?? undefined,
+    integrationMode: r.integration_mode ?? 'redirect',
+    connectorKind: r.connector_kind ?? 'redirect',
     title: r.title,
     company: r.company ?? undefined,
     metroStation: r.metro_station_norm ?? undefined,

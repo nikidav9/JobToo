@@ -2922,12 +2922,15 @@ try {
                 'active' => 'is.true', 'environment' => 'eq.production',
                 'limit' => (string)$limit, 'offset' => (string)$offset,
             ], '*', 'id.asc');
-            $names = [];
-            foreach (sb_select('jm_ext_sources', [], 'id,name') as $s) {
-                $names[(string)$s['id']] = $s['name'];
+            $sources = [];
+            foreach (sb_select('jm_ext_sources', [], 'id,name,connector_kind,integration_mode') as $s) {
+                $sources[(string)$s['id']] = $s;
             }
             foreach ($rows as &$r) {
-                $r['source_name'] = $names[(string)$r['source_id']] ?? null;
+                $source = $sources[(string)$r['source_id']] ?? [];
+                $r['source_name'] = $source['name'] ?? null;
+                $r['connector_kind'] = $source['connector_kind'] ?? 'redirect';
+                $r['integration_mode'] = $source['integration_mode'] ?? 'redirect';
                 // Идентификатор у источника наружу не нужен: по нему ничего
                 // не показывают, а знать чужие внутренние номера незачем.
                 // dedupe_key, наоборот, нужен — по нему приложение прячет
@@ -3308,12 +3311,106 @@ try {
                     'user_agent' => substr((string)($v['user_agent'] ?? ''), 0, 300),
                 ],
             ];
-            try { sb_insert('jm_partner_data_consents', $row); }
-            catch (Throwable $e) {
-                if (stripos($e->getMessage(), 'duplicate') === false
-                    && stripos($e->getMessage(), 'unique') === false) throw $e;
+            $previous = sb_single('jm_partner_data_consents', [
+                'source_id' => 'eq.' . $row['source_id'], 'worker_id' => 'eq.' . $row['worker_id'],
+                'ext_vacancy_id' => 'eq.' . $row['ext_vacancy_id'],
+                'consent_version' => 'eq.' . $row['consent_version'],
+            ], 'id');
+            if ($previous) {
+                $row['id'] = $previous['id'];
+                $row['revoked_at'] = null;
+                sb_upsert('jm_partner_data_consents', $row, 'id');
+            } else {
+                sb_insert('jm_partner_data_consents', $row);
             }
             $data = ['recorded' => true, 'consent_version' => $row['consent_version']]; break;
+        }
+
+        // Отклик внутри JobToo доступен только для боевой embedded-интеграции.
+        // В очередь кладём непрозрачные ID; профиль партнёру собирает уже
+        // серверный адаптер, поэтому клиент не может подменить персональные данные.
+        case 'partnerApplicationCreate': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $workerId = trim((string)($v['worker_id'] ?? ''));
+            $sourceId = trim((string)($v['source_id'] ?? ''));
+            $vacancyId = trim((string)($v['ext_vacancy_id'] ?? ''));
+            $consentVersion = trim((string)($v['consent_version'] ?? ''));
+            if ($authUid === null || $workerId === '' || $workerId !== $authUid) {
+                $data = ['error' => 'Нельзя отправить отклик за другого пользователя']; break;
+            }
+            if ($sourceId === '' || $vacancyId === '' || $consentVersion === '') {
+                $data = ['error' => 'Не хватает данных для отклика']; break;
+            }
+            $source = sb_single('jm_ext_sources', [
+                'id' => 'eq.' . $sourceId, 'enabled' => 'is.true',
+                'environment' => 'eq.production', 'integration_mode' => 'eq.embedded',
+            ], 'id');
+            $vacancy = sb_single('jm_ext_vacancies', [
+                'id' => 'eq.' . $vacancyId, 'source_id' => 'eq.' . $sourceId,
+                'active' => 'is.true', 'environment' => 'eq.production',
+            ], 'id');
+            if (!$source || !$vacancy) {
+                $data = ['error' => 'Встроенный отклик для этой вакансии недоступен']; break;
+            }
+            $existing = sb_single('jm_partner_applications', [
+                'source_id' => 'eq.' . $sourceId, 'ext_vacancy_id' => 'eq.' . $vacancyId,
+                'worker_id' => 'eq.' . $workerId,
+            ], 'id,status');
+            if ($existing) {
+                try {
+                    sb_insert('jm_partner_outbox', [
+                        'id' => uid(), 'source_id' => $sourceId,
+                        'aggregate_type' => 'application', 'aggregate_id' => $existing['id'],
+                        'event_kind' => 'application.submit',
+                        'idempotency_key' => 'application.submit:' . $existing['id'],
+                        'payload' => ['application_id' => $existing['id'], 'ext_vacancy_id' => $vacancyId],
+                        'delivery_status' => 'pending', 'attempts' => 0,
+                        'next_attempt_at' => now_iso(), 'created_at' => now_iso(),
+                    ]);
+                } catch (Throwable $e) {
+                    if (stripos($e->getMessage(), 'duplicate') === false
+                        && stripos($e->getMessage(), 'unique') === false) throw $e;
+                }
+                $data = ['id' => $existing['id'], 'status' => $existing['status'], 'created' => false]; break;
+            }
+            $consent = sb_single('jm_partner_data_consents', [
+                'source_id' => 'eq.' . $sourceId, 'worker_id' => 'eq.' . $workerId,
+                'ext_vacancy_id' => 'eq.' . $vacancyId, 'consent_version' => 'eq.' . $consentVersion,
+                'revoked_at' => 'is.null',
+            ], 'id');
+            if (!$consent) { $data = ['error' => 'Сначала подтвердите передачу данных партнёру']; break; }
+
+            $applicationId = uid();
+            $createdAt = now_iso();
+            try {
+                sb_insert('jm_partner_applications', [
+                    'id' => $applicationId, 'source_id' => $sourceId,
+                    'ext_vacancy_id' => $vacancyId, 'worker_id' => $workerId,
+                    'status' => 'local_created', 'status_version' => 1,
+                    'consent_version' => $consentVersion,
+                    'created_at' => $createdAt, 'updated_at' => $createdAt,
+                ]);
+                sb_insert('jm_partner_outbox', [
+                    'id' => uid(), 'source_id' => $sourceId,
+                    'aggregate_type' => 'application', 'aggregate_id' => $applicationId,
+                    'event_kind' => 'application.submit',
+                    'idempotency_key' => 'application.submit:' . $applicationId,
+                    'payload' => ['application_id' => $applicationId, 'ext_vacancy_id' => $vacancyId],
+                    'delivery_status' => 'pending', 'attempts' => 0,
+                    'next_attempt_at' => $createdAt, 'created_at' => $createdAt,
+                ]);
+                sb_update('jm_partner_data_consents', ['id' => 'eq.' . $consent['id']], [
+                    'application_id' => $applicationId,
+                ]);
+            } catch (Throwable $e) {
+                $existing = sb_single('jm_partner_applications', [
+                    'source_id' => 'eq.' . $sourceId, 'ext_vacancy_id' => 'eq.' . $vacancyId,
+                    'worker_id' => 'eq.' . $workerId,
+                ], 'id,status');
+                if (!$existing) throw $e;
+                $data = ['id' => $existing['id'], 'status' => $existing['status'], 'created' => false]; break;
+            }
+            $data = ['id' => $applicationId, 'status' => 'local_created', 'created' => true]; break;
         }
 
         case 'partnerBillingReport': {
