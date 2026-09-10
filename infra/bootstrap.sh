@@ -296,6 +296,20 @@ if [ -f /opt/jobtoo-proxy/ingest.php ]; then
   fi
 fi
 
+# Очередь встроенных партнёрских откликов. Частый короткий запуск даёт
+# пользователю быстрый отклик, а сама очередь отвечает за повторы и backoff.
+if [ -f /opt/jobtoo-proxy/partner_outbox.php ]; then
+  if [ ! -f /var/lib/jt-partner-outbox ] \
+     || [ $(( $(date +%s) - $(stat -c %Y /var/lib/jt-partner-outbox 2>/dev/null || echo 0) )) -gt 30 ]; then
+    touch /var/lib/jt-partner-outbox
+    AT=$(grep -m1 '^ADMIN_API_TOKEN=' "$SECRETS" 2>/dev/null | cut -d= -f2-)
+    if [ -n "${AT:-}" ]; then
+      curl -s -m 120 -o /var/lib/jt-partner-outbox.out -X POST \
+        -H "X-Admin-Token: $AT" https://jobtoo.ru/api/partner_outbox.php >/dev/null 2>&1 || true
+    fi
+  fi
+fi
+
 # Проверка анонимного пути — того, чем приложение грузит файлы и держит
 # живые подписки. Раз в десять минут: она лазает в базу и в три службы,
 # а ответ меняется только когда мы сами что-то поменяли.
