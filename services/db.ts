@@ -1563,7 +1563,13 @@ export async function dbSubmitSkillTest(
  * Всё живое из чужих источников. Сборщик (php-proxy/ingest.php) гасит
  * `active` у пропавших, поэтому фильтровать по свежести здесь не нужно.
  */
-export async function dbGetExternalVacancies(offset = 0, limit = 1000): Promise<ExternalVacancy[]> {
+export type ExternalVacancyPage = {
+  vacancies: ExternalVacancy[];
+  /** Число строк до удаления дублей — только оно определяет конец страницы. */
+  rawCount: number;
+};
+
+export async function dbGetExternalVacancyPage(offset = 0, limit = 1000): Promise<ExternalVacancyPage> {
   const rows = await proxy<any[]>('extVacancies', [offset, limit]);
   if (!Array.isArray(rows)) throw new Error('Invalid external vacancies response');
   const mapped: ExternalVacancy[] = (rows ?? []).map(r => ({
@@ -1595,12 +1601,17 @@ export async function dbGetExternalVacancies(offset = 0, limit = 1000): Promise<
   // Один и тот же заказ может прийти от нескольких интеграций. Оставляем
   // одну карточку по серверному отпечатку, чтобы лента не выглядела спамом.
   const seen = new Set<string>();
-  return mapped.filter(v => {
+  const vacancies = mapped.filter(v => {
     const key = v.dedupeKey || `${v.sourceId}:${v.id}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+  return { vacancies, rawCount: rows.length };
+}
+
+export async function dbGetExternalVacancies(offset = 0, limit = 1000): Promise<ExternalVacancy[]> {
+  return (await dbGetExternalVacancyPage(offset, limit)).vacancies;
 }
 
 /**

@@ -41,6 +41,7 @@ import {
   dbAddSaved,
   dbRemoveSaved,
   dbGetExternalVacancies,
+  dbGetExternalVacancyPage,
   dbRecordExternalImpression,
   dbRecordExternalClick,
   dbRecordGuestEvent,
@@ -2771,7 +2772,8 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
     const seen = new Set<string>();
     try {
       for (let offset = 0; offset < 50000; offset += pageSize) {
-        const rows = await dbGetExternalVacancies(offset, pageSize);
+        const page = await dbGetExternalVacancyPage(offset, pageSize);
+        const rows = page.vacancies;
         if (externalLoadId.current !== loadId) return;
         for (const vacancy of rows) {
           if (vacancy.kind !== 'permanent') continue;
@@ -2783,7 +2785,9 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
         // Показываем первую страницу сразу и дополняем список после каждой
         // следующей, не заставляя экран ждать весь большой каталог.
         setExternalVacancies([...loaded]);
-        if (rows.length < pageSize) break;
+        // rows уже очищены от дублей и почти всегда короче сырой страницы.
+        // Конец выдачи можно определять только по числу строк от сервера.
+        if (page.rawCount < pageSize) break;
       }
     } catch {
       // Уже загруженные страницы остаются видимыми. Свои вакансии продолжают
