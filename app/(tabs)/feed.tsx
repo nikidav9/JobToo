@@ -3588,7 +3588,7 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityState={{ selected: tab === 'saved' }}
-            accessibilityLabelLabel={tab === 'saved' ? 'Показать все вакансии' : 'Показать избранные вакансии'}
+            accessibilityLabel={tab === 'saved' ? 'Показать все вакансии' : 'Показать избранные вакансии'}
           >
             <Ionicons name="heart" size={15} color={Colors.red} />
             <Text style={[pS.tabChipTxt, tab === 'saved' && pS.tabChipTxtActive]}>
