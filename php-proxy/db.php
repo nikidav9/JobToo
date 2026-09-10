@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 73549)
-Total output lines: 4935
-
 <?php
 // Ответ прокси должен быть только JSON.
 //
@@ -1792,7 +1789,1515 @@ const EMP_MIN_SHIFTS = 3;
 function jt_recalc_employer_score(string $uid): array {
     $out = [
         'emp_score' => null, 'emp_score_shifts' => 0,
-        'emp_sco…23549 tokens truncated…      $event = $eventId !== '' ? sb_single('jm_partner_billable_events',
+        'emp_score_desc' => null, 'emp_score_attitude' => null,
+        'emp_score_pay' => null, 'emp_score_kept' => null,
+        'emp_score_updated_at' => now_iso(),
+    ];
+    try {
+        $likes = sb_select_all('jm_likes', ['employer_id' => 'eq.' . $uid], 'outcome');
+        $всего = 0; $отменил = 0;
+        foreach ($likes as $l) {
+            $o = $l['outcome'] ?? null;
+            // Считаем только смены с записанным исходом. cancelled_legacy не
+            // берём: причины у них нет, и приписать её работодателю значило
+            // бы наказать за то, чего мы не знаем.
+            if (!in_array($o, ['worked', 'no_show', 'worker_cancelled', 'employer_cancelled'], true)) continue;
+            $всего++;
+            if ($o === 'employer_cancelled') $отменил++;
+        }
+        $out['emp_score_shifts'] = $всего;
+        $out['emp_score_kept'] = $всего > 0 ? round(1 - $отменил / $всего, 4) : null;
+
+        // role='worker' — это оценка, которую поставил работник, то есть
+        // оценка работодателя.
+        $rs = sb_select_all('jm_ratings',
+            ['to_user_id' => 'eq.' . $uid, 'role' => 'eq.worker'],
+            'emp_matched_desc,emp_attitude,emp_paid_on_time');
+        $ср = function (string $поле) use ($rs) {
+            $s = 0; $n = 0;
+            foreach ($rs as $r) {
+                if ($r[$поле] !== null) { $s += (float)$r[$поле]; $n++; }
+            }
+            return $n > 0 ? round(($s / $n) / 5, 4) : null;
+        };
+        $out['emp_score_desc']     = $ср('emp_matched_desc');
+        $out['emp_score_attitude'] = $ср('emp_attitude');
+        $out['emp_score_pay']      = $ср('emp_paid_on_time');
+
+        if ($всего >= EMP_MIN_SHIFTS) {
+            $оси = [
+                'kept'     => $out['emp_score_kept'],
+                'pay'      => $out['emp_score_pay'],
+                'desc'     => $out['emp_score_desc'],
+                'attitude' => $out['emp_score_attitude'],
+            ];
+            $вес = 0; $сумма = 0;
+            foreach (EMP_WEIGHTS as $ключ => $w) {
+                if ($оси[$ключ] === null) continue;
+                $вес += $w;
+                $сумма += $w * max(0.0, min(1.0, (float)$оси[$ключ]));
+            }
+            if ($вес > 0) $out['emp_score'] = (int)round(100 * $сумма / $вес);
+        }
+
+        sb_update('jm_users', ['id' => 'eq.' . $uid], $out);
+    } catch (Throwable $e) {
+    }
+    return $out;
+}
+
+// ─── Dispatch ─────────────────────────────────────────────────────────────────
+try {
+    $data = null;
+
+    switch ($fn) {
+
+        // ── Users ──────────────────────────────────────────────────────────────
+        case 'dbGetUserById':
+            $data = sb_single('jm_users', ['id' => 'eq.' . $args[0]], USER_PUBLIC_COLS); break;
+
+        case 'dbGetUsers':
+            $data = sb_select('jm_users', [], USER_PUBLIC_COLS, 'created_at.asc'); break;
+
+        // Только число для приветственного экрана. Раньше он считал сам,
+        // напрямую из базы публичным ключом, — и после закрытия базы получал
+        // отказ, показывая число из кэша телефона, замороженное навсегда.
+        case 'dbCountUsers':
+            $data = sb_count('jm_users'); break;
+
+        // Какого рода ключ лежит на хостинге — не сам ключ, а только его вид.
+        //
+        // Понадобилось после того, как отключение старых JWT-ключей в Supabase
+        // положило приложение: в sb_service_key.php оказался старый ключ, а
+        // снаружи это было не отличить — старый работал, пока его не погасили,
+        // и выглядело всё исправным. Теперь вид ключа можно спросить заранее.
+        //
+        // Значение не раскрывается: наружу уходит одно слово и длина.
+        case 'dbKeyKind': {
+            $k = SB_KEY;
+            $kind = $k === '' ? 'нет ключа'
+                  : (strpos($k, 'sb_secret_') === 0 ? 'новый секретный (sb_secret_)'
+                  : (strpos($k, 'sb_publishable_') === 0 ? 'публикуемый — на сервере он бесполезен'
+                  : (strpos($k, 'eyJ') === 0 ? 'СТАРЫЙ JWT — погаснет при отключении legacy-ключей'
+                  : 'неизвестный вид')));
+            $data = ['kind' => $kind, 'length' => strlen($k)];
+            break;
+        }
+
+        // Заявка на привязку Telegram: живёт 15 минут, бот заберёт её по «/start»
+        case 'tgPrepareLink': {
+            $all = tg_pending_read();
+            $all[(string)$args[0]] = time();
+            tg_pending_write($all);
+            $data = true; break;
+        }
+
+        // Отметка «был в сети». Колонки может ещё не быть — тогда просто молчим:
+        // ради фоновой отметки нельзя возвращать клиенту ошибку.
+        case 'dbTouchLastSeen':
+            try {
+                sb_update('jm_users', ['id' => 'eq.' . $args[0]], ['last_seen_at' => now_iso()]);
+            } catch (\Throwable $e) { /* колонки нет — не беда */ }
+            break;
+
+        // Пароль хешируется здесь, на сервере. Раньше приложение клало его в
+        // базу как есть, и с конца июня так набралось 176 паролей открытым
+        // текстом. Уже готовый хеш второй раз не трогаем: этой же операцией
+        // сохраняется профиль целиком, и пароль в нём приезжает обратно.
+        case 'dbUpsertUser': {
+            $u = is_array($args[0] ?? null) ? $args[0] : [];
+            $uid = trim((string)($u['id'] ?? ''));
+            if ($uid === '') throw new RuntimeException('Нужен id пользователя');
+            $existing = sb_single('jm_users', ['id' => 'eq.' . $uid], 'id');
+            if ($existing && $authUid !== $uid) {
+                jt_respond(['error' => 'Authentication required'], 401); exit;
+            }
+            if (!$existing && (empty($u['phone']) || empty($u['password']))) {
+                throw new RuntimeException('Для регистрации нужны телефон и пароль');
+            }
+            // Пустой пароль — это не «сотри пароль», а «в профиле его нет».
+            if (empty($u['password'])) {
+                unset($u['password']);
+            } elseif (!is_bcrypt($u['password'])) {
+                $u['password'] = password_hash((string)$u['password'], PASSWORD_BCRYPT);
+            }
+            sb_upsert('jm_users', $u, 'id');
+            $data = ['session_token' => $existing ? null : jt_session_issue($uid)];
+            break;
+        }
+
+        // Вход. Сверка переехала сюда с клиента: раньше приложение спрашивало
+        // профиль по номеру телефона и сравнивало пароль у себя — а значит
+        // пароль (или его хеш) уходил наружу всякому, кто знает номер.
+        //
+        // Принимаем обе формы. Пока у части людей пароль лежит открытым
+        // текстом, отказывать им нельзя; зато при удачном входе такой пароль
+        // тут же превращается в хеш — база вычищается сама, по мере того как
+        // люди заходят.
+        case 'dbLogin': {
+            $phone = preg_replace('/\D+/', '', (string)($args[0] ?? ''));
+            $pass  = (string)($args[1] ?? '');
+            $row = $phone === '' ? null : sb_single('jm_users', ['phone' => 'eq.' . $phone]);
+            if (!$row || $pass === '' || empty($row['password'])) { $data = null; break; }
+
+            $stored = (string)$row['password'];
+            $ok = is_bcrypt($stored) ? password_verify($pass, $stored) : hash_equals($stored, $pass);
+            if (!$ok) { $data = null; break; }
+
+            if (!is_bcrypt($stored)) {
+                try {
+                    sb_update('jm_users', ['id' => 'eq.' . $row['id']],
+                        ['password' => password_hash($pass, PASSWORD_BCRYPT)]);
+                } catch (\Throwable $e) { /* вход важнее, чем перевод в хеш */ }
+            }
+
+            unset($row['password']);
+            $data = ['user' => $row, 'session_token' => jt_session_issue((string)$row['id'])]; break;
+        }
+
+        case 'dbSession': {
+            $row = sb_single('jm_users', ['id' => 'eq.' . $authUid], USER_PUBLIC_COLS);
+            $data = $row ? ['user' => $row] : null;
+            break;
+        }
+
+        // Смена пароля в профиле. Тоже на сервере — на клиенте старый пароль
+        // сравнивался строкой, то есть для всех, у кого уже хеш, смена пароля
+        // попросту не работала.
+        case 'dbChangePassword': {
+            $row = sb_single('jm_users', ['id' => 'eq.' . ($args[0] ?? '')], 'id,password');
+            $old = (string)($args[1] ?? '');
+            $new = (string)($args[2] ?? '');
+            if (!$row || $new === '') { $data = ['ok' => false, 'reason' => 'not_found']; break; }
+
+            $stored = (string)($row['password'] ?? '');
+            $ok = is_bcrypt($stored) ? password_verify($old, $stored) : hash_equals($stored, $old);
+            if (!$ok) { $data = ['ok' => false, 'reason' => 'wrong_password']; break; }
+
+            sb_update('jm_users', ['id' => 'eq.' . $row['id']],
+                ['password' => password_hash($new, PASSWORD_BCRYPT)]);
+            $data = ['ok' => true]; break;
+        }
+
+        // Сброс чужого пароля — для дашборда.
+        //
+        // Раньше дашборд ходил за этим прямо в Supabase собственным ключом.
+        // Ключ отозвали, и кнопка стала отвечать «Unregistered API key» —
+        // причём тем, кто её нажимал, а не тем, кто мог бы починить. Рабочий
+        // ключ лежит на хостинге, и правильнее ходить сюда, как ходят
+        // остальные страницы дашборда: меньше мест, где живут ключи.
+        case 'adminResetPassword': {
+            $uid = (string)($args[0] ?? '');
+            if ($uid === '') { $data = ['ok' => false, 'reason' => 'no_user']; break; }
+
+            // Шесть знаков без похожих друг на друга: пароль диктуют голосом,
+            // и «0 или O» на том конце провода стоит отдельного звонка.
+            $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            $pass = '';
+            for ($i = 0; $i < 6; $i++) $pass .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+
+            // return=representation: без него запрос по несуществующему id
+            // проходил молча, и дашборд показывал пароль, которого ни у кого нет.
+            $rows = sb('PATCH', 'jm_users', ['id' => 'eq.' . $uid],
+                ['password' => password_hash($pass, PASSWORD_BCRYPT)],
+                ['Prefer: return=representation']);
+            if (empty($rows)) { $data = ['ok' => false, 'reason' => 'not_found']; break; }
+
+            $data = ['ok' => true, 'password' => $pass];
+            break;
+        }
+
+        case 'dbWarmup':
+            // Раньше просто возвращалось true — прогревался только PHP, а сама
+            // база оставалась холодной. Теперь делаем самое дешёвое чтение:
+            // этим же вызовом её будит и расписание раз в пять минут.
+            try { sb_select('jm_users', ['limit' => '1'], 'id'); } catch (\Throwable $e) {}
+            $data = true; break;
+
+        // Удаление аккаунта: своё стирает, чужое обезличивает.
+        //
+        // Раньше здесь было `delete from jm_users`, и приложение вызывало
+        // это напрямую анонимным ключом. С миграции 013 у anon отобраны все
+        // права на таблицу, так что запрос отклонялся — а код ответ не
+        // проверял и показывал «Аккаунт удалён». То есть кнопка не удаляла
+        // ничего вообще, при этом уверяя в обратном.
+        //
+        // Теперь работу делает jm_delete_account (миграция 032) под
+        // служебной ролью, а здесь проверяется главное: что человек удаляет
+        // себя. Без этой проверки по чужому идентификатору стёрся бы чужой
+        // аккаунт — функции всё равно, чей номер ей передали.
+        case 'dbDeleteAccount': {
+            $uid = (string)($args[0] ?? '');
+            $pass = (string)($args[1] ?? '');
+            if ($uid === '' || $pass === '') {
+                $data = ['error' => 'Нужны идентификатор и пароль']; break;
+            }
+            $u = sb_single('jm_users', ['id' => 'eq.' . $uid], 'id,password');
+            if (!$u) { $data = ['error' => 'Пользователь не найден']; break; }
+            $stored = (string)($u['password'] ?? '');
+            $ok = is_bcrypt($stored) ? password_verify($pass, $stored) : hash_equals($stored, $pass);
+            if (!$ok) { $data = ['error' => 'Неверный пароль']; break; }
+            $data = sb_rpc('jm_delete_account', ['uid' => $uid]);
+            break;
+        }
+
+        // ── Медиа переписки ─────────────────────────────────────────────
+        //
+        // Фото и голосовые из чатов уходят в закрытый бакет chat-media
+        // (миграция 034), а не в публичный avatars, где они лежали раньше:
+        // оттуда ссылка открывалась кем угодно, без авторизации и навсегда.
+        //
+        // Возвращаем путь, а не ссылку. Ссылку приложение просит отдельно,
+        // перед показом, и живёт она недолго — см. dbSignMedia ниже.
+        case 'dbUploadChatMedia': {
+            $name = (string)($args[0] ?? '');
+            $b64  = (string)($args[1] ?? '');
+            $type = (string)($args[2] ?? 'application/octet-stream');
+            if (!preg_match('#^chat/[A-Za-z0-9._-]{1,180}$#', $name) || str_contains($name, '..')) {
+                $data = ['error' => 'плохое имя файла']; break;
+            }
+            $bytes = base64_decode($b64, true);
+            if ($bytes === false || $bytes === '') { $data = ['error' => 'пустой файл']; break; }
+            if (strlen($bytes) > 25 * 1024 * 1024) { $data = ['error' => 'файл больше 25 МБ']; break; }
+
+            $ch = curl_init(SB_URL . '/storage/v1/object/chat-media/' . $name);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CUSTOMREQUEST => 'POST',
+                CURLOPT_POSTFIELDS => $bytes,
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_HTTPHEADER => [
+                    'apikey: ' . SB_KEY,
+                    'Authorization: Bearer ' . SB_KEY,
+                    'Content-Type: ' . $type,
+                    'x-upsert: true',
+                ],
+            ]);
+            $resp = curl_exec($ch);
+            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err  = curl_error($ch);
+            curl_close($ch);
+            if ($code < 200 || $code >= 300) {
+                $data = ['error' => $err ?: ('хранилище ответило ' . $code . ': ' . substr((string)$resp, 0, 200))];
+                break;
+            }
+            $data = ['path' => $name];
+            break;
+        }
+
+        // Подписанная ссылка на файл переписки: живёт час и после этого
+        // перестаёт работать. Утёкшая ссылка протухает сама — в этом вся
+        // разница с публичным бакетом, где она не протухала никогда.
+        //
+        // Принимаем и путь, и старую публичную ссылку целиком: в сообщениях,
+        // отправленных до этой правки, лежит именно она, и переписывать их
+        // задним числом не нужно.
+        case 'dbSignMedia': {
+            $raw = (string)($args[0] ?? '');
+            if ($raw === '') { $data = ['error' => 'нужен путь']; break; }
+
+            // Из старой ссылки достаём путь после имени бакета.
+            $path = $raw;
+            if (str_starts_with($raw, 'http')) {
+                if (preg_match('#/avatars/(chat/[^?\s]+)#', $raw, $m)) {
+                    $path = $m[1];
+                } else {
+                    // Не наш адрес и не наш бакет — отдаём как есть, пусть
+                    // показывает. Ломать старые сообщения хуже, чем оставить
+                    // ссылку прежней.
+                    $data = ['url' => $raw]; break;
+                }
+            }
+            if (!preg_match('#^chat/[A-Za-z0-9._-]{1,180}$#', $path) || str_contains($path, '..')) {
+                $data = ['error' => 'плохой путь']; break;
+            }
+
+            $ch = curl_init(SB_URL . '/storage/v1/object/sign/chat-media/' . $path);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode(['expiresIn' => 3600]),
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_HTTPHEADER => [
+                    'apikey: ' . SB_KEY,
+                    'Authorization: Bearer ' . SB_KEY,
+                    'Content-Type: application/json',
+                ],
+            ]);
+            $resp = curl_exec($ch);
+            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            $dec = json_decode($resp ?: 'null', true);
+
+            if ($code >= 200 && $code < 300 && !empty($dec['signedURL'])) {
+                $data = ['url' => SB_URL . '/storage/v1' . $dec['signedURL']];
+                break;
+            }
+            // Файла в закрытом бакете нет — значит он ещё лежит в публичном,
+            // с тех времён. Возвращаем прежнюю ссылку: старые сообщения
+            // должны показываться, пока файлы не переехали.
+            $data = ['url' => SB_URL . '/storage/v1/object/public/avatars/' . $path];
+            break;
+        }
+
+        // Перевозка уже загруженных файлов переписки из публичного бакета
+        // в закрытый. Пачками, потому что запрос не должен упираться в
+        // время ожидания: сколько там файлов, заранее никто не знает.
+        //
+        // Порядок важен: сначала копия, только потом удаление оригинала.
+        // Если оборвётся посередине — часть файлов окажется в обоих
+        // бакетах, и это безобидно: dbSignMedia отдаст подписанную ссылку
+        // на закрытый, а не найдёт — вернёт прежнюю публичную. Ни одно
+        // сообщение не сломается ни в какой момент перевозки.
+        case 'dbMigrateChatMedia': {
+            $moved = 0; $failed = 0;
+            $ch = curl_init(SB_URL . '/storage/v1/object/list/avatars');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_HTTPHEADER => ['apikey: ' . SB_KEY, 'Authorization: Bearer ' . SB_KEY,
+                                       'Content-Type: application/json'],
+                CURLOPT_POSTFIELDS => json_encode(['prefix' => 'chat', 'limit' => 100]),
+            ]);
+            $list = json_decode((string)curl_exec($ch), true);
+            curl_close($ch);
+            if (!is_array($list)) { $data = ['error' => 'не удалось прочитать список']; break; }
+
+            foreach ($list as $obj) {
+                $name = (string)($obj['name'] ?? '');
+                if ($name === '' || !preg_match('#^[A-Za-z0-9._-]{1,180}$#', $name)) continue;
+                $src = 'chat/' . $name;
+
+                $c = curl_init(SB_URL . '/storage/v1/object/copy');
+                curl_setopt_array($c, [
+                    CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_TIMEOUT => 30,
+                    CURLOPT_HTTPHEADER => ['apikey: ' . SB_KEY, 'Authorization: Bearer ' . SB_KEY,
+                                           'Content-Type: application/json'],
+                    CURLOPT_POSTFIELDS => json_encode([
+                        'bucketId' => 'avatars', 'sourceKey' => $src,
+                        'destinationBucket' => 'chat-media', 'destinationKey' => $src,
+                    ]),
+                ]);
+                curl_exec($c);
+                $code = (int) curl_getinfo($c, CURLINFO_HTTP_CODE);
+                curl_close($c);
+                if ($code < 200 || $code >= 300) { $failed++; continue; }
+
+                $d = curl_init(SB_URL . '/storage/v1/object/avatars/' . $src);
+                curl_setopt_array($d, [
+                    CURLOPT_RETURNTRANSFER => true, CURLOPT_CUSTOMREQUEST => 'DELETE',
+                    CURLOPT_TIMEOUT => 20,
+                    CURLOPT_HTTPHEADER => ['apikey: ' . SB_KEY, 'Authorization: Bearer ' . SB_KEY],
+                ]);
+                curl_exec($d); curl_close($d);
+                $moved++;
+            }
+            $data = ['перевезено' => $moved, 'не вышло' => $failed, 'ещё_есть' => count($list) >= 100];
+            break;
+        }
+
+        // ── Согласие с документами ──────────────────────────────────────
+        //
+        // Пишем отпечаток принятого набора редакций. Раньше галочка при
+        // регистрации жила переменной в памяти экрана и дальше кнопки
+        // «Продолжить» о ней не знал никто: ни отметки, ни даты, ни версии.
+        //
+        // Записывать «принял» задним числом или за другого нельзя, поэтому
+        // отпечаток сюда приходит от приложения, а не выдумывается здесь:
+        // человек принимал то, что видел на экране своей версии, а не то,
+        // что сейчас лежит на сервере.
+        case 'dbRecordConsent': {
+            $uid    = (string)($args[0] ?? '');
+            $stamp  = (string)($args[1] ?? '');
+            $docs   = is_array($args[2] ?? null) ? $args[2] : [];
+            $source = (string)($args[3] ?? 'registration');
+            if ($uid === '' || $stamp === '') {
+                $data = ['error' => 'Нужны пользователь и отпечаток']; break;
+            }
+            if (!sb_single('jm_users', ['id' => 'eq.' . $uid], 'id')) {
+                $data = ['error' => 'Пользователь не найден']; break;
+            }
+            // Именно upsert, а не insert. Идентификатор строки — человек плюс
+            // отпечаток набора, то есть при повторном нажатии он тот же самый,
+            // и обычная вставка упиралась бы в первичный ключ. Комментарий
+            // ниже это и обещал — «перезаписывает свою», — но вставка так не
+            // умеет, и обещание держалось только до второго нажатия.
+            sb_upsert('jm_consents', [
+                // Один человек — одна запись на редакцию: повторное нажатие
+                // не плодит строки, а перезаписывает свою.
+                'id'          => $uid . ':' . substr(hash('sha256', $stamp), 0, 16),
+                'user_id'     => $uid,
+                'stamp'       => $stamp,
+                'docs'        => $docs,
+                'source'      => in_array($source, ['registration', 'reconsent'], true)
+                                 ? $source : 'registration',
+                'accepted_at' => now_iso(),
+            ], 'id');
+            $data = ['записано' => true];
+            break;
+        }
+
+        // Что человек принял в последний раз — для показа в профиле и для
+        // ответа на вопрос «спрашивать ли заново».
+        case 'dbGetConsent': {
+            $rows = sb_select('jm_consents', ['user_id' => 'eq.' . (string)($args[0] ?? '')],
+                              'stamp,docs,source,accepted_at', 'accepted_at.desc');
+            $data = $rows[0] ?? null;
+            break;
+        }
+
+        // Осталось для дашборда: там удаляет администратор, и пароля
+        // человека у него нет. Проверка прав — на входе в дашборд.
+        case 'dbDeleteUser':
+            $data = sb_rpc('jm_delete_account', ['uid' => (string)$args[0]]); break;
+
+        case 'dbCheckPhoneExists':
+            $data = sb_single('jm_users', ['phone' => 'eq.' . $args[0]], 'id') !== null; break;
+
+        // Как быстро человек отвечает — для чужого профиля.
+        //
+        // Считаем по переписке: в каждом чате берём первое сообщение и первый
+        // ответ этого человека. Отвечает он далеко не всегда — из 143 чатов
+        // ответ был в 65, — и именно это директору с работником полезнее всего
+        // знать заранее, до того как потратить отклик.
+        //
+        // Пока чатов меньше двух, ничего не показываем: одна переписка о
+        // человеке не говорит ничего, а выглядит как приговор.
+        // Отзывчивость сразу по всем — для карточек в ленте.
+        //
+        // Поштучно нельзя: на экране десяток вакансий, и запрос на каждую
+        // превратил бы ленту в слайд-шоу. Данных мало (сотни чатов и
+        // сообщений), так что считаем всё за два запроса и отдаём картой.
+        case 'dbResponsivenessMap': {
+            $chats = sb_select('jm_chats', [], 'id,worker_id,employer_id,created_at');
+            $msgs = sb_select('jm_messages', [], 'chat_id,sender_id,created_at', 'created_at.asc');
+            $byChat = [];
+            foreach ($msgs as $m) {
+                if ($m['sender_id'] === 'system' || $m['sender_id'] === 'system_safety') continue;
+                $byChat[$m['chat_id']][] = $m;
+            }
+            // Пустой чат считаем молчанием, только когда срок ответа уже вышел:
+            // те же двое суток, что и у авто-закрытия отклика.
+            $staleBefore = time() - 2 * 86400;
+            $acc = [];
+            foreach ($chats as $c) {
+                foreach ([$c['worker_id'], $c['employer_id']] as $uid) {
+                    if (!$uid) continue;
+                    if (!isset($acc[$uid])) $acc[$uid] = ['chats' => 0, 'answered' => 0, 'lags' => []];
+                    $ms = $byChat[$c['id']] ?? [];
+                    if (!$ms) {
+                        if (strtotime($c['created_at']) < $staleBefore) $acc[$uid]['chats']++;
+                        continue;
+                    }
+                    // Разговор, который человек завёл сам, о нём не говорит.
+                    if ($ms[0]['sender_id'] === $uid) continue;
+                    $acc[$uid]['chats']++;
+                    foreach ($ms as $m) {
+                        if ($m['sender_id'] === $uid) {
+                            $acc[$uid]['answered']++;
+                            $acc[$uid]['lags'][] = max(0, strtotime($m['created_at']) - strtotime($ms[0]['created_at']));
+                            break;
+                        }
+                    }
+                }
+            }
+            $out = [];
+            foreach ($acc as $uid => $a) {
+                if ($a['chats'] < 2) continue;
+                sort($a['lags']);
+                $out[$uid] = [
+                    'chats' => $a['chats'],
+                    'answered' => $a['answered'],
+                    // Медиана по одному ответу — это просто тот единственный случай.
+                    'medianSeconds' => count($a['lags']) >= 2 ? $a['lags'][intdiv(count($a['lags']), 2)] : null,
+                ];
+            }
+            $data = $out; break;
+        }
+
+        case 'dbUserStats': {
+            $uid = (string)($args[0] ?? '');
+            if ($uid === '') { $data = null; break; }
+            $chats = sb_select('jm_chats', ['or' => "(worker_id.eq.{$uid},employer_id.eq.{$uid})"], 'id,created_at');
+            $ids = array_map(fn($c) => $c['id'], $chats);
+            if (!$ids) { $data = ['enough' => false]; break; }
+            // Одним запросом на все чаты разом: по запросу на чат открытие
+            // профиля у человека с полутора десятками переписок ждало бы секунды.
+            $all = sb_select('jm_messages',
+                ['chat_id' => 'in.(' . implode(',', $ids) . ')'],
+                'chat_id,sender_id,created_at', 'created_at.asc');
+            $byChat = [];
+            foreach ($all as $m) {
+                // Системные сообщения не в счёт: их пишет не человек.
+                if ($m['sender_id'] === 'system' || $m['sender_id'] === 'system_safety') continue;
+                $byChat[$m['chat_id']][] = $m;
+            }
+            // Пустой чат — тот, где не написал никто. Считаем его молчанием,
+            // но только когда разговор уже точно не состоится: срок ответа на
+            // отклик двое суток, после него ждать нечего. Свежие пустые чаты
+            // не в счёт — иначе директор получал бы клеймо за переписку,
+            // которая началась час назад.
+            //
+            // Без этого метрика молчала почти у всех: у директора с 16 чатами
+            // двенадцать были пустыми, и в расчёт попадал ровно один.
+            $staleBefore = time() - 2 * 86400;
+            $total = 0; $answered = 0; $lags = [];
+            foreach ($chats as $c) {
+                $ms = $byChat[$c['id']] ?? [];
+                if (!$ms) {
+                    if (strtotime($c['created_at']) < $staleBefore) $total++;
+                    continue;
+                }
+                // Чат, который завёл он сам, об отзывчивости не говорит.
+                if ($ms[0]['sender_id'] === $uid) continue;
+                $total++;
+                foreach ($ms as $m) {
+                    if ($m['sender_id'] === $uid) {
+                        $answered++;
+                        $lags[] = max(0, strtotime($m['created_at']) - strtotime($ms[0]['created_at']));
+                        break;
+                    }
+                }
+            }
+            if ($total < 2) { $data = ['enough' => false]; break; }
+            sort($lags);
+            // Скорость показываем только при двух ответах и больше: медиана по
+            // одному — это просто тот единственный случай, а в профиле она
+            // выглядит как «обычно отвечает за 12 дней».
+            $median = count($lags) >= 2 ? $lags[intdiv(count($lags), 2)] : null;
+            $data = [
+                'enough' => true,
+                'chats' => $total,
+                'answered' => $answered,
+                'medianSeconds' => $median,
+            ];
+            break;
+        }
+
+        // Старый клиентский вход по номеру возвращал всю строку, включая
+        // пароль. Современный вход — только dbLogin; этот путь закрыт.
+        case 'dbGetUserByPhone':
+            jt_respond(['error' => 'Deprecated endpoint'], 410); exit;
+
+        // ── Telegram Mini App ──────────────────────────────────────────────────
+        // args: [initDataString] → { ok, user|null, tg: {id, first_name, ...} }
+        case 'tgAuth': {
+            $v = tg_validate_init_data($args[0] ?? '');
+            if (!$v || empty($v['user']['id'])) { $data = ['ok' => false]; break; }
+            $tgId = (int)$v['user']['id'];
+            $u = sb_single('jm_users', ['telegram_id' => 'eq.' . $tgId]);
+            if (is_array($u)) unset($u['password'], $u['push_token']);
+            $data = [
+                'ok' => true,
+                'user' => $u,
+                'session_token' => $u ? jt_session_issue((string)$u['id']) : null,
+                'tg' => [
+                    'id' => $tgId,
+                    'first_name' => $v['user']['first_name'] ?? '',
+                    'last_name' => $v['user']['last_name'] ?? '',
+                    'username' => $v['user']['username'] ?? '',
+                ],
+            ];
+            break;
+        }
+
+        // args: [userId, initDataString] — link a Telegram account to a user
+        case 'tgBindTelegram': {
+            $v = tg_validate_init_data($args[1] ?? '');
+            if (!$v || empty($v['user']['id'])) { $data = false; break; }
+            sb_update('jm_users', ['id' => 'eq.' . $args[0]], ['telegram_id' => (int)$v['user']['id']]);
+            $data = true;
+            break;
+        }
+
+        // args: [employerId, workerId, vacancyId, vacancyTitle]
+        // Директору в Telegram: карточка кандидата + кнопки Одобрить/Отклонить
+        // args: [employerId, workerId, vacancyId, vacancyTitle]
+        case 'tgNotifyNewApplication':
+            $data = tg_new_application_card((string)$args[0], (string)$args[1], (string)$args[2], (string)($args[3] ?? ''));
+            break;
+
+        // Ежедневные авто-касания (вызывается кроном раз в день):
+        // 1) напоминания директорам о необработанных заявках (каждый день)
+        // 2) «разместите смену/вакансию» директорам (раз в 3 дня)
+        // 3) «посмотрите новые смены» работникам (раз в 3 дня, со сдвигом)
+        case 'cronEveningDigest': {
+            // Вечерний дайджест смен на завтра в группу «ПОДРАБОТКИ».
+            // Спящее условие: постим только когда на завтра 3+ открытых смены от 2+ лавок.
+            $tomorrowMsk = gmdate('Y-m-d', time() + 3 * 3600 + 86400);
+            $rows = sb_select('jm_vacancies', ['status' => 'eq.open', 'date' => 'eq.' . $tomorrowMsk],
+                'id,employer_id,title,metro_station,time_start,time_end,salary');
+            $emps = [];
+            foreach ($rows as $r) if (!empty($r['employer_id'])) $emps[$r['employer_id']] = true;
+            $data = ['posted' => false, 'shifts' => count($rows), 'lavkas' => count($emps)];
+            if (count($rows) >= 3 && count($emps) >= 2) {
+                $lines = [];
+                foreach (array_slice($rows, 0, 10) as $r) {
+                    $sal = ((float)($r['salary'] ?? 0)) > 0
+                        ? number_format((float)$r['salary'], 0, ',', ' ') . ' ₽'
+                        : 'сдельные нормативы';
+                    $lines[] = "• {$r['title']} · м. {$r['metro_station']} · {$r['time_start']}–{$r['time_end']} · {$sal}";
+                }
+                $more = count($rows) > 10 ? "\n…и ещё " . (count($rows) - 10) : '';
+                $txt = "⚡ <b>Смены на завтра</b> — " . count($rows) . " в " . count($emps) . " лавках:\n\n"
+                    . implode("\n", $lines) . $more
+                    . "\n\nОткликнись первым — прямо в Телеграме 👇";
+                tg_send_message((int)TG_GROUP_CHAT_ID, $txt, true);
+                $data['posted'] = true;
+            }
+            break;
+        }
+
+        case 'cronDailyNudges': {
+            @set_time_limit(300);
+            @ignore_user_abort(true);
+            $result = ['pendingReminders' => 0, 'employerNudges' => 0, 'workerNudges' => 0];
+            $dayIdx = (int)date('z');
+
+            // ── 1. Необработанные заявки старше 24 часов ──
+            $cut24 = gmdate('Y-m-d\TH:i:s\Z', time() - 86400);
+            $pending = sb_select('jm_perm_applications', [
+                'status' => 'eq.pending',
+                'created_at' => 'lt.' . $cut24,
+            ], 'employer_id');
+            $byEmp = [];
+            foreach ($pending as $p) {
+                if (!empty($p['employer_id'])) $byEmp[$p['employer_id']] = ($byEmp[$p['employer_id']] ?? 0) + 1;
+            }
+            foreach ($byEmp as $eid => $cnt) {
+                $emp = sb_single('jm_users', ['id' => 'eq.' . $eid], 'telegram_id,push_token');
+                // Приходит через сутки после отклика — ровно посередине срока,
+                // поэтому называем и остаток: «ещё день» точнее, чем «ответьте».
+                $title = '⏳ Кандидаты ждут ответа';
+                $body = "У вас {$cnt} " . ($cnt === 1 ? 'необработанная заявка' : 'необработанных заявок')
+                    . ' на вакансии. Остался день: через 2 дня после отклика заявка закрывается'
+                    . ' автоматически, и кандидат уходит к другим.';
+                sb_insert('jm_notifications', ['user_id' => $eid, 'title' => $title, 'body' => $body]);
+                if ($emp && !empty($emp['telegram_id'])) {
+                    tg_send_message((int)$emp['telegram_id'], $title . "\n\n" . $body, true);
+                } elseif ($emp && !empty($emp['push_token'])) {
+                    expo_push([[ 'to' => $emp['push_token'], 'title' => $title, 'body' => $body,
+                        'sound' => 'default', 'priority' => 'high', 'channelId' => 'matches', 'data' => ['type' => 'pending_apps'] ]]);
+                }
+                $result['pendingReminders']++;
+            }
+
+            // ── 0. Понедельник: сезонная сводка владельцу в Telegram ──
+            if ((int)date('N') === 1) {
+                $cutW = gmdate('Y-m-d\TH:i:s\Z', time() - 7 * 86400);
+                $shiftMatches = count(sb_select('jm_likes', ['is_match' => 'eq.true', 'created_at' => 'gte.' . $cutW], 'id'));
+                $permApproved = count(sb_select('jm_perm_applications', ['status' => 'eq.approved', 'created_at' => 'gte.' . $cutW], 'id'));
+                $wtv = sb_select('jm_vacancies', ['created_at' => 'gte.' . $cutW], 'employer_id');
+                $wpv = sb_select('jm_perm_vacancies', ['created_at' => 'gte.' . $cutW], 'employer_id');
+                $wPubs = [];
+                foreach (array_merge($wtv, $wpv) as $r) if (!empty($r['employer_id'])) $wPubs[$r['employer_id']] = true;
+                $tgTotal = count(sb_select_all('jm_users', ['telegram_id' => 'not.is.null'], 'id'));
+                $newWorkers = count(sb_select('jm_users', ['role' => 'eq.worker', 'created_at' => 'gte.' . $cutW], 'id'));
+                $newApps = count(sb_select('jm_perm_applications', ['created_at' => 'gte.' . $cutW], 'id'));
+                $matches = $shiftMatches + $permApproved;
+                $sum = "📊 <b>JobToo — сводка за неделю</b>\n\n"
+                    . "🤝 Мэтчей: <b>{$matches}</b> (цель 15) — смены {$shiftMatches}, вакансии {$permApproved}\n"
+                    . "📦 Публиковали: <b>" . count($wPubs) . "</b> директоров (цель 15)\n"
+                    . "📨 Новых откликов: {$newApps}\n"
+                    . "✈️ Telegram привязан: {$tgTotal} чел (всего)\n"
+                    . "🆕 Новых работников за неделю: {$newWorkers}";
+                tg_send_message(1172082720, $sum, false);
+                $result['weeklySummary'] = true;
+
+                // Понедельничный пост в группу: актуальные постоянные вакансии со ссылками
+                $result['weeklyPermDigest'] = post_weekly_perm_digest();
+            }
+
+            // ── 1б. Авто-отклонение заявок, висящих без ответа 2+ суток ──
+            //
+            // Было семь дней. По чатам видно, что столько ждать незачем: из 65
+            // случаев, когда директор ответил, 49 ответов пришли в первый час,
+            // 56 — за сутки и лишь 9 позже. Неделя не добавляла шансов, зато всё
+            // это время человек сидел без ответа и уходил насовсем.
+            $cutStale = gmdate('Y-m-d\TH:i:s\Z', time() - 2 * 86400);
+            $stale = sb_select('jm_perm_applications', [
+                'status' => 'eq.pending',
+                'created_at' => 'lt.' . $cutStale,
+            ], 'id,worker_id,vacancy_id');
+            $result['autoRejected'] = 0;
+            foreach ($stale as $srow) {
+                sb_update('jm_perm_applications', ['id' => 'eq.' . $srow['id']], ['status' => 'rejected']);
+                $vac = sb_single('jm_perm_vacancies', ['id' => 'eq.' . $srow['vacancy_id']], 'title');
+                $vt = $vac ? $vac['title'] : 'вакансию';
+                $wTitle = 'Отклик закрыт без ответа';
+                $wBody = "Директор не ответил на ваш отклик на «{$vt}» за 2 дня. "
+                    . 'Не ждите — посмотрите другие вакансии и смены рядом, отклик в два тапа.';
+                sb_insert('jm_notifications', ['user_id' => $srow['worker_id'], 'title' => $wTitle, 'body' => $wBody]);
+                $wu = sb_single('jm_users', ['id' => 'eq.' . $srow['worker_id']], 'telegram_id,push_token');
+                if ($wu && !empty($wu['telegram_id'])) {
+                    tg_send_message((int)$wu['telegram_id'], $wTitle . "\n\n" . $wBody, true);
+                } elseif ($wu && !empty($wu['push_token'])) {
+                    expo_push([[ 'to' => $wu['push_token'], 'title' => $wTitle, 'body' => $wBody,
+                        'sound' => 'default', 'priority' => 'default', 'channelId' => 'matches', 'data' => ['type' => 'app_auto_rejected'] ]]);
+                }
+                $result['autoRejected']++;
+            }
+
+            // ── 1в. То же для откликов на смены: 2+ суток без решения директора ──
+            $staleLikes = sb_select('jm_likes', [
+                'worker_liked' => 'eq.true',
+                'is_match' => 'eq.false',
+                'employer_liked' => 'is.null',
+                'created_at' => 'lt.' . $cutStale,
+            ], 'id,worker_id,vacancy_id');
+            $result['autoRejectedShifts'] = 0;
+            foreach ($staleLikes as $lrow) {
+                sb_update('jm_likes', ['id' => 'eq.' . $lrow['id']], ['employer_liked' => false]);
+                $svac = sb_single('jm_vacancies', ['id' => 'eq.' . $lrow['vacancy_id']], 'title');
+                $st = $svac ? $svac['title'] : 'смену';
+                $wTitle = 'Отклик закрыт без ответа';
+                $wBody = "Директор не ответил на ваш отклик на смену «{$st}» за 2 дня. "
+                    . 'Посмотрите свежие смены рядом — отклик в два тапа.';
+                sb_insert('jm_notifications', ['user_id' => $lrow['worker_id'], 'title' => $wTitle, 'body' => $wBody]);
+                $result['autoRejectedShifts']++;
+            }
+
+            // ── 2. Директорам: пора размещать (раз в 3 дня) ──
+            if ($dayIdx % 3 === 0) {
+                $cut3d = gmdate('Y-m-d\TH:i:s\Z', time() - 3 * 86400);
+                $employers = sb_select('jm_users', ['role' => 'eq.employer'], 'id,telegram_id,push_token');
+                $recentTv = sb_select('jm_vacancies', ['created_at' => 'gte.' . $cut3d], 'employer_id');
+                $recentPv = sb_select('jm_perm_vacancies', ['created_at' => 'gte.' . $cut3d], 'employer_id');
+                $recentPosters = [];
+                foreach (array_merge($recentTv, $recentPv) as $r) $recentPosters[$r['employer_id']] = true;
+                $workersCnt = count(sb_select('jm_users', ['role' => 'eq.worker'], 'id'));
+
+                $title = '👷 Работники ждут смен';
+                $body = "В JobToo {$workersCnt}+ работников готовы выйти. Разместите смену или вакансию — отклики придут в тот же день.";
+                foreach ($employers as $e) {
+                    if (isset($recentPosters[$e['id']])) continue; // недавно публиковал — не трогаем
+                    sb_insert('jm_notifications', ['user_id' => $e['id'], 'title' => $title, 'body' => $body]);
+                    if (!empty($e['telegram_id'])) {
+                        tg_send_message((int)$e['telegram_id'], $title . "\n\n" . $body, true);
+                    } elseif (!empty($e['push_token'])) {
+                        expo_push([[ 'to' => $e['push_token'], 'title' => $title, 'body' => $body,
+                            'sound' => 'default', 'priority' => 'default', 'channelId' => 'default', 'data' => ['type' => 'post_nudge'] ]]);
+                    }
+                    $result['employerNudges']++;
+                }
+            }
+
+            // ── 3. Работникам: смены рядом (раз в 2 дня и только тем, у кого рядом есть) ──
+            //
+            // Раньше здесь раз в три дня уходило всем «появились новые варианты
+            // рядом с вашим метро» — без цифр и без проверки, есть ли там
+            // что-то рядом. За этим последовало 27% блокировок бота среди тех,
+            // кто телеграм подключал сам. Теперь адресно, см. shift_nudge_run().
+            $nudge = shift_nudge_run();
+            $result['workerNudges'] = $nudge['sent'];
+            $result['workerSilent'] = $nudge['silent'];
+
+            $data = $result;
+            break;
+        }
+
+        // Отдельный вызов той же рассылки — чтобы прогнать вручную, не дожидаясь крона.
+        case 'cronShiftNudge':
+            @set_time_limit(300);
+            $data = shift_nudge_run(); break;
+
+        // args: [title, body, roleFilter 'all'|'worker'|'employer']
+        // Рассылка по всем с привязанным Telegram (кнопка приложения в каждом сообщении)
+        case 'tgBroadcast': {
+            @set_time_limit(300);
+            @ignore_user_abort(true);
+            [$bTitle, $bBody, $roleF] = [(string)$args[0], (string)$args[1], (string)($args[2] ?? 'all')];
+            $filters = ['telegram_id' => 'not.is.null'];
+            if ($roleF === 'worker' || $roleF === 'employer') $filters['role'] = 'eq.' . $roleF;
+            $recipients = sb_select('jm_users', $filters, 'telegram_id');
+            $text = '<b>' . $bTitle . '</b>' . ($bBody !== '' ? "\n\n" . $bBody : '');
+            $sent = 0;
+            foreach ($recipients as $r) {
+                if (tg_send_message((int)$r['telegram_id'], $text, true)) $sent++;
+            }
+            $data = ['sent' => $sent, 'total' => count($recipients)];
+            break;
+        }
+
+        // args: [[userId, …], template] — личное сообщение боту каждому из списка.
+        //
+        // Не рассылка: спрашиваем у конкретных людей о конкретном, и текст
+        // обращается по имени — {name} подставляется. Кнопки «Открыть JobToo»
+        // тут нет намеренно: мы задаём вопрос, а не зовём в приложение, и
+        // кнопка превратила бы вопрос в рекламу.
+        case 'tgSendToUsers': {
+            @set_time_limit(300);
+            $ids = is_array($args[0] ?? null) ? $args[0] : [];
+            $tpl = (string)($args[1] ?? '');
+            if (empty($ids) || $tpl === '') { $data = ['error' => 'нужны список и текст']; break; }
+            $sent = []; $skipped = [];
+            foreach ($ids as $uid) {
+                $u = sb_single('jm_users', ['id' => 'eq.' . $uid], 'id,first_name,telegram_id');
+                if (!$u || empty($u['telegram_id'])) { $skipped[] = $uid; continue; }
+                $name = htmlspecialchars((string)($u['first_name'] ?? ''), ENT_QUOTES, 'UTF-8');
+                $text = str_replace('{name}', $name, $tpl);
+                if (tg_send_message((int)$u['telegram_id'], $text)) {
+                    $sent[] = $uid;
+                    // В журнал: без этого ответ человека прилетит без вопроса,
+                    // на который он отвечает, и понять его будет нельзя.
+                    try {
+                        sb_insert('jm_bot_messages', [
+                            'id' => uid(), 'user_id' => $u['id'], 'telegram_id' => (int)$u['telegram_id'],
+                            'direction' => 'out', 'name' => 'Никита', 'topic' => 'outreach',
+                            'text' => $text, 'created_at' => now_iso(),
+                        ]);
+                    } catch (Throwable $e) {}
+                } else $skipped[] = $uid;
+            }
+            $data = ['sent' => count($sent), 'skipped' => $skipped];
+            break;
+        }
+
+        // Опрос спящих соискателей «почему не пользуетесь» — в один тап.
+        // Шлём только тем, у кого есть телеграм и кто спит: last_seen пусто
+        // или старше 30 дней. Кнопки-ответы уходят в jm_survey_responses через
+        // обработчик бота (php-proxy/tg.php).
+        case 'surveyDormantSend': {
+            @set_time_limit(300);
+            @ignore_user_abort(true);
+            $surveyKey = 'dormant_worker_v1';
+            $batch = 20;                 // за один тап — не больше, чтобы уложиться в таймаут роута
+            $cutoff = time() - 14 * 86400;   // спящий = не заходил 14+ дней (или ни разу)
+            // Кому уже слали — тем не шлём повторно (идемпотентность по логу).
+            $sentRows = sb_select('jm_survey_sends', ['survey_key' => 'eq.' . $surveyKey], 'user_id');
+            $already = [];
+            foreach ($sentRows as $s) { $already[(string)$s['user_id']] = true; }
+
+            $rows = sb_select('jm_users',
+                ['role' => 'eq.worker', 'telegram_id' => 'not.is.null'],
+                'id,telegram_id,last_seen_at');
+            $text = "Привет! Вы заводили <b>JobToo</b>, но давно не заходили 👀\n\n"
+                  . "Помогите одним касанием — <b>почему пока не пользуетесь?</b>";
+            $kb = [
+                [['text' => 'Не нашёл смен рядом',        'callback_data' => 'survey_' . $surveyKey . '_no_shifts']],
+                [['text' => 'Не было времени / забыл',     'callback_data' => 'survey_' . $surveyKey . '_no_time']],
+                [['text' => 'Непонятно, как пользоваться', 'callback_data' => 'survey_' . $surveyKey . '_confusing']],
+                [['text' => 'Уже нашёл работу',            'callback_data' => 'survey_' . $surveyKey . '_found_job']],
+                [['text' => 'Другое',                      'callback_data' => 'survey_' . $surveyKey . '_other']],
+            ];
+            $sent = 0; $eligible = 0; $remaining = 0;
+            foreach ($rows as $r) {
+                $ls = $r['last_seen_at'] ?? null;
+                $dormant = ($ls === null) || (strtotime((string)$ls) < $cutoff);
+                if (!$dormant) continue;
+                $eligible++;
+                if (isset($already[(string)$r['id']])) continue;   // уже получил
+                if ($sent >= $batch) { $remaining++; continue; }   // на следующий тап
+                if (tg_send_message((int)$r['telegram_id'], $text, false, '', $kb)) {
+                    $sent++;
+                    sb('POST', 'jm_survey_sends', ['on_conflict' => 'survey_key,user_id'],
+                        ['survey_key' => $surveyKey, 'user_id' => $r['id'], 'sent_at' => now_iso()],
+                        ['Prefer: resolution=ignore-duplicates,return=minimal']);
+                }
+            }
+            $sentTotal = count($already) + $sent;
+            $data = ['sent' => $sent, 'sent_total' => $sentTotal, 'remaining' => $remaining,
+                     'eligible' => $eligible, 'survey_key' => $surveyKey];
+            break;
+        }
+
+        // Итоги опроса: охват (кому ушло) и ответы. args: [survey_key?]
+        case 'surveyResults': {
+            $key = (string)($args[0] ?? 'dormant_worker_v1');
+            $rows = sb_select('jm_survey_responses', ['survey_key' => 'eq.' . $key], 'answer');
+            $tally = [];
+            foreach ($rows as $r) {
+                $a = (string)($r['answer'] ?? '');
+                if ($a === '') continue;
+                $tally[$a] = ($tally[$a] ?? 0) + 1;
+            }
+            $sentTotal = count(sb_select('jm_survey_sends', ['survey_key' => 'eq.' . $key], 'user_id'));
+            $data = ['survey_key' => $key, 'total' => count($rows), 'tally' => $tally,
+                     'sent_total' => $sentTotal];
+            break;
+        }
+
+        // Пересчитать рейтинги всем работникам разом. Нужно ровно дважды:
+        // сразу после выкладки, чтобы уже накопленные смены и оценки
+        // превратились в числа, и если формулу поменяют.
+        case 'scoreRecalcAll': {
+            $n = 0;
+            foreach (sb_select_all('jm_users', ['role' => 'eq.worker'], 'id') as $w) {
+                jt_recalc_score((string)$w['id']); $n++;
+            }
+            foreach (sb_select_all('jm_users', ['role' => 'eq.employer'], 'id') as $e) {
+                jt_recalc_employer_score((string)$e['id']); $n++;
+            }
+            $data = ['пересчитано' => $n]; break;
+        }
+
+        // ── К счёту: сколько подборов состоялось у кого ────────────────────
+        //
+        // Первая опора монетизации из презентации — комиссия за успешный
+        // подбор. Тарифа ещё нет, эквайринга тоже, но событие, за которое
+        // берут деньги, происходит уже сейчас: работник вышел и отработал.
+        // Считаем его с этого дня, а не с того, когда договорятся о цене:
+        // выставить счёт за прошлый месяц можно только по тому, что за
+        // прошлый месяц записано.
+        //
+        // Отдельно показываем невыходы и отмены — за них платить не за что,
+        // и первый же разговор с работодателем начнётся именно с них.
+        case 'billingReport': {
+            $с = (string)($args[0] ?? '');   // YYYY-MM-DD, включительно
+            $по = (string)($args[1] ?? '');  // YYYY-MM-DD, включительно
+            $f = ['outcome' => 'not.is.null'];
+            if ($с !== '')  $f['outcome_at'] = 'gte.' . $с . 'T00:00:00Z';
+            // Второй фильтр по той же колонке в массив не влезает — верхнюю
+            // границу отсекаем уже здесь, в разборе.
+            $rows = sb_select_all('jm_likes', $f, 'employer_id,worker_id,outcome,outcome_at');
+
+            $поКомпаниям = [];
+            foreach ($rows as $r) {
+                if ($по !== '' && substr((string)$r['outcome_at'], 0, 10) > $по) continue;
+                $e = (string)$r['employer_id'];
+                if ($e === '') continue;
+                if (!isset($поКомпаниям[$e])) {
+                    $поКомпаниям[$e] = [
+                        'employer_id' => $e, 'выходов' => 0, 'невыходов' => 0,
+                        'отменил' => 0, 'отказов' => 0, '_люди' => [],
+                    ];
+                }
+                switch ($r['outcome']) {
+                    case 'worked':
+                        $поКомпаниям[$e]['выходов']++;
+                        $поКомпаниям[$e]['_люди'][(string)$r['worker_id']] = true;
+                        break;
+                    case 'no_show':            $поКомпаниям[$e]['невыходов']++; break;
+                    case 'employer_cancelled': $поКомпаниям[$e]['отменил']++;   break;
+                    case 'worker_cancelled':   $поКомпаниям[$e]['отказов']++;   break;
+                }
+            }
+
+            // Имя компании — здесь же: иначе панели пришлось бы тянуть всех
+            // пользователей ради одной колонки.
+            $имена = [];
+            foreach (sb_select_all('jm_users', ['role' => 'eq.employer'],
+                     'id,company,first_name,last_name') as $u) {
+                $имена[(string)$u['id']] = trim((string)($u['company'] ?? ''))
+                    ?: trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? ''));
+            }
+
+            $out = [];
+            foreach ($поКомпаниям as $e => $v) {
+                $v['компания'] = $имена[$e] ?? $e;
+                $v['человек'] = count($v['_люди']);
+                unset($v['_люди']);
+                $out[] = $v;
+            }
+            usort($out, fn($a, $b) => $b['выходов'] <=> $a['выходов']);
+            $data = ['с' => $с, 'по' => $по, 'компании' => $out]; break;
+        }
+
+        // ── Микро-тесты по профессиям ──────────────────────────────────────
+        //
+        // Сами вопросы живут в приложении (constants/skillTests.ts) — их
+        // некому редактировать, редактора в панели нет. Сюда приходит только
+        // результат. Значит, проверять его сервер не может, и единственное,
+        // что он делает всерьёз, — считает попытки: без ограничения тест
+        // перебирается наугад, и подтверждение перестаёт что-либо значить.
+        case 'dbGetSkillResults':
+            $data = sb_select('jm_skill_results', ['user_id' => 'eq.' . $args[0]]); break;
+
+        // args: [userId, workType, correct, total, passed]
+        case 'dbSubmitSkillTest': {
+            [$uid, $wt, $correct, $total, $passed] = [
+                (string)$args[0], (string)$args[1],
+                (int)$args[2], (int)$args[3], (bool)$args[4],
+            ];
+            $известные = ['stocker', 'cook', 'shift_supervisor', 'picker'];
+            if (!in_array($wt, $известные, true)) throw new Exception('неизвестная профессия');
+
+            $было = sb_single('jm_skill_results',
+                ['user_id' => 'eq.' . $uid, 'work_type' => 'eq.' . $wt]);
+            $сегодня = gmdate('Y-m-d');
+            $попыток = ($было && ($было['attempts_day'] ?? null) === $сегодня)
+                ? (int)$было['attempts_today'] : 0;
+
+            if ($попыток >= 3) {
+                $data = ['error_попытки' => true, 'осталось' => 0];
+                break;
+            }
+
+            $row = [
+                'user_id'         => $uid,
+                'work_type'       => $wt,
+                'correct'         => $correct,
+                'total'           => $total,
+                // Подтверждение, однажды полученное, неудачной пересдачей не
+                // отнимается: человек пробовал улучшить результат, а не
+                // разучился за неделю.
+                'passed'          => $passed || !empty($было['passed']),
+                'passed_at'       => $passed
+                    ? ($было['passed_at'] ?? now_iso())
+                    : ($было['passed_at'] ?? null),
+                'attempts_today'  => $попыток + 1,
+                'attempts_day'    => $сегодня,
+                'last_attempt_at' => now_iso(),
+            ];
+            sb_upsert('jm_skill_results', $row, 'user_id,work_type');
+
+            // Короткий список подтверждённого переписываем в строку
+            // пользователя: подбор кандидатов должен отвечать «у кого из
+            // этих сорока подтверждён склад» без сорока запросов.
+            $все = sb_select('jm_skill_results',
+                ['user_id' => 'eq.' . $uid, 'passed' => 'is.true'], 'work_type');
+            $навыки = array_values(array_unique(array_column($все, 'work_type')));
+            sort($навыки);
+            sb_update('jm_users', ['id' => 'eq.' . $uid], ['confirmed_skills' => $навыки]);
+
+            $data = ['passed' => $row['passed'], 'осталось' => max(0, 3 - ($попыток + 1))];
+            break;
+        }
+
+        // ── Источники чужих вакансий ───────────────────────────────────────
+        case 'extSourcesList':
+            // Никогда не отдаём auth_header/auth_value в браузер дашборда.
+            // Даже администратору достаточно знать, что секрет настроен.
+            $rows = sb_select('jm_ext_sources', ['order' => 'created_at.desc'],
+                'id,name,url,enabled,period_min,last_run_at,last_status,last_count,'
+                . 'last_success_at,consecutive_failures,last_duration_ms,last_pages,'
+                . 'last_skipped,last_deactivated,created_at,auth_header,environment,notifications_enabled,'
+                . 'connector_kind,integration_mode,connector_config,webhook_secret');
+            foreach ($rows as &$source) {
+                $source['auth_configured'] = !empty($source['auth_header']);
+                $config = is_array($source['connector_config'] ?? null) ? $source['connector_config'] : [];
+                $source['integration_configured'] = !empty($config['application_submit_url'])
+                    && !empty($source['webhook_secret']);
+                unset($source['auth_header'], $source['connector_config'], $source['webhook_secret']);
+            }
+            unset($source);
+            $data = $rows; break;
+
+        // args: [{id?, name, url, auth_header?, auth_value?, period_min?, enabled?}]
+        case 'extSourceSave': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $name = trim((string)($v['name'] ?? ''));
+            $url  = trim((string)($v['url'] ?? ''));
+            if ($name === '' || !preg_match('~^https://~i', $url)) {
+                $data = ['error' => 'нужны имя и публичный HTTPS-адрес фида']; break;
+            }
+            $isNew = (string)($v['id'] ?? '') === '';
+            $row = [
+                'id' => $isNew ? uid() : (string)$v['id'],
+                'name' => $name,
+                'url' => $url,
+                'period_min' => max(5, (int)($v['period_min'] ?? 30)),
+                'enabled' => array_key_exists('enabled', $v) ? (bool)$v['enabled'] : true,
+            ];
+            // Новые источники всегда начинаются в sandbox. Продвижение в production
+            // должно быть явным; в sandbox уведомления невозможно включить даже ошибочно.
+            if ($isNew || array_key_exists('environment', $v)) {
+                $environment = (($v['environment'] ?? 'sandbox') === 'production') ? 'production' : 'sandbox';
+                $row['environment'] = $environment;
+                $row['notifications_enabled'] = $environment === 'production'
+                    && !empty($v['notifications_enabled']);
+            }
+            // При переключении enabled браузер не знает секрет и не должен
+            // стирать его. Меняем доступ только когда поля присланы явно.
+            if ($isNew || array_key_exists('auth_header', $v)) {
+                $row['auth_header'] = $v['auth_header'] ?? null;
+            }
+            if ($isNew || array_key_exists('auth_value', $v)) {
+                $row['auth_value'] = $v['auth_value'] ?? null;
+            }
+            if ($isNew || array_key_exists('connector_kind', $v)) {
+                $row['connector_kind'] = trim((string)($v['connector_kind'] ?? 'redirect')) ?: 'redirect';
+            }
+            if ($isNew || array_key_exists('integration_mode', $v)) {
+                $mode = (string)($v['integration_mode'] ?? 'redirect');
+                if (!in_array($mode, ['redirect', 'embedded_test', 'embedded'], true)) {
+                    $data = ['error' => 'неизвестный режим интеграции']; break;
+                }
+                $row['integration_mode'] = $mode;
+            }
+            if (array_key_exists('application_submit_url', $v)) {
+                $submitUrl = trim((string)($v['application_submit_url'] ?? ''));
+                if ($submitUrl !== '' && !preg_match('~^https://~i', $submitUrl)) {
+                    $data = ['error' => 'endpoint отклика должен использовать HTTPS']; break;
+                }
+                $previous = !$isNew
+                    ? sb_single('jm_ext_sources', ['id' => 'eq.' . $row['id']], 'connector_config') : null;
+                $config = is_array($previous['connector_config'] ?? null)
+                    ? $previous['connector_config'] : [];
+                $config['application_submit_url'] = $submitUrl;
+                $row['connector_config'] = $config;
+            }
+            if (array_key_exists('webhook_secret', $v)) {
+                $row['webhook_secret'] = trim((string)($v['webhook_secret'] ?? '')) ?: null;
+            }
+            sb_upsert('jm_ext_sources', $row, 'id');
+            $data = ['ok' => true, 'id' => $row['id']]; break;
+        }
+
+        case 'extSourceDelete': {
+            $id = (string)($args[0] ?? '');
+            if ($id === '') { $data = ['error' => 'нужен id']; break; }
+            sb_delete('jm_ext_vacancies', ['source_id' => 'eq.' . $id]);
+            sb_delete('jm_ext_sources', ['id' => 'eq.' . $id]);
+            $data = ['ok' => true]; break;
+        }
+
+        // Чужие вакансии — приложению. Возвращаем вместе с названием
+        // источника: на карточке обязана быть надпись, откуда она, иначе это
+        // не агрегатор, а перепечатка чужого под своим именем.
+        case 'extVacancies': {
+            $offset = max(0, (int)($args[0] ?? 0));
+            $limit = max(1, min(1000, (int)($args[1] ?? 1000)));
+            $rows = sb_select('jm_ext_vacancies', [
+                'active' => 'is.true', 'environment' => 'eq.production',
+                'limit' => (string)$limit, 'offset' => (string)$offset,
+            ], '*', 'id.asc');
+            $sources = [];
+            foreach (sb_select('jm_ext_sources', [], 'id,name,connector_kind,integration_mode') as $s) {
+                $sources[(string)$s['id']] = $s;
+            }
+            foreach ($rows as &$r) {
+                $source = $sources[(string)$r['source_id']] ?? [];
+                $r['source_name'] = $source['name'] ?? null;
+                $r['connector_kind'] = $source['connector_kind'] ?? 'redirect';
+                $r['integration_mode'] = $source['integration_mode'] ?? 'redirect';
+                // Идентификатор у источника наружу не нужен: по нему ничего
+                // не показывают, а знать чужие внутренние номера незачем.
+                // dedupe_key, наоборот, нужен — по нему приложение прячет
+                // одну и ту же смену, приехавшую из двух источников.
+                unset($r['external_id']);
+            }
+            unset($r);
+            $data = $rows; break;
+        }
+
+        // События партнёрской воронки. Показы принимаются только от
+        // авторизованного пользователя; переход может быть анонимным.
+        case 'extImpression': {
+            $extId = (string)($args[0] ?? '');
+            $sourceId = (string)($args[1] ?? '');
+            $vac = ($extId !== '' && $sourceId !== '')
+                ? sb_single('jm_ext_vacancies', [
+                    'id' => 'eq.' . $extId,
+                    'source_id' => 'eq.' . $sourceId,
+                    'active' => 'is.true',
+                ], 'id')
+                : null;
+            if (!$vac) { $data = false; break; }
+            sb_insert('jm_ext_events', [
+                'id' => uid(), 'ext_id' => $extId, 'source_id' => $sourceId,
+                'event_type' => 'impression', 'user_id' => $authUid,
+                'occurred_at' => now_iso(),
+            ]);
+            $data = true; break;
+        }
+
+        // Переход на чужую вакансию. Отдельную старую таблицу сохраняем для
+        // совместимости, а универсальный журнал строит полную воронку.
+        case 'extClick': {
+            $extId = (string)($args[0] ?? '');
+            $sourceId = (string)($args[1] ?? '');
+            $vac = ($extId !== '' && $sourceId !== '')
+                ? sb_single('jm_ext_vacancies', [
+                    'id' => 'eq.' . $extId,
+                    'source_id' => 'eq.' . $sourceId,
+                    'active' => 'is.true',
+                ], 'id')
+                : null;
+            if (!$vac) { $data = false; break; }
+            // Непрозрачный click_id создаётся клиентом до открытия URL, чтобы
+            // браузер не блокировал переход ожиданием API. В нём нет user_id.
+            $clickId = trim((string)($args[3] ?? ''));
+            if (!preg_match('~^[A-Za-z0-9_-]{16,80}$~', $clickId)) $clickId = uid();
+            try {
+                sb_insert('jm_ext_clicks', [
+                    'id' => $clickId, 'ext_id' => $extId, 'source_id' => $sourceId,
+                    'user_id' => $authUid, 'clicked_at' => now_iso(),
+                ]);
+                sb_insert('jm_ext_events', [
+                    'id' => uid(), 'ext_id' => $extId, 'source_id' => $sourceId,
+                    'event_type' => 'click', 'user_id' => $authUid,
+                    'attribution_id' => $clickId, 'occurred_at' => now_iso(),
+                ]);
+            } catch (Throwable $e) {
+                // Повтор того же click_id идемпотентен: двойной tap не должен
+                // превращаться в два оплачиваемых перехода.
+                if (stripos($e->getMessage(), 'duplicate') === false
+                    && stripos($e->getMessage(), 'unique') === false) throw $e;
+            }
+            $data = ['recorded' => true, 'click_id' => $clickId]; break;
+        }
+
+        // Сводка по партнёрским вакансиям: объём, качество фида и воронка.
+        case 'extStats': {
+            $sources = sb_select_all('jm_ext_sources', [], 'id,name,environment');
+            $production = [];
+            foreach ($sources as $source) {
+                if (($source['environment'] ?? 'production') === 'production') {
+                    $production[(string)$source['id']] = (string)$source['name'];
+                }
+            }
+
+            $allVacancies = sb_select_all('jm_ext_vacancies', ['active' => 'is.true'],
+                'source_id,kind,metro_station,metro_station_norm,work_type');
+            $rows = array_values(array_filter($allVacancies,
+                fn($r) => isset($production[(string)($r['source_id'] ?? '')])));
+            $by = []; $withoutStation = 0; $withoutProfession = 0;
+            foreach ($rows as $r) {
+                $k = (string)$r['source_id'];
+                $by[$k] = ($by[$k] ?? 0) + 1;
+                if (!empty($r['metro_station']) && empty($r['metro_station_norm'])) $withoutStation++;
+                if (empty($r['work_type'])) $withoutProfession++;
+            }
+
+            $c7 = gmdate('Y-m-d\\TH:i:s', time() - 7 * 86400) . 'Z';
+            $c30 = gmdate('Y-m-d\\TH:i:s', time() - 30 * 86400) . 'Z';
+            $date30 = gmdate('Y-m-d', time() - 30 * 86400);
+            $onlyProduction = fn($r) => isset($production[(string)($r['source_id'] ?? '')]);
+            $events7 = array_values(array_filter(sb_select_all('jm_ext_events',
+                ['occurred_at' => 'gte.' . $c7], 'id,source_id,event_type,user_id,new_candidate'), $onlyProduction));
+            $events30 = array_values(array_filter(sb_select_all('jm_ext_events',
+                ['occurred_at' => 'gte.' . $c30], 'id,source_id,event_type,user_id,new_candidate'), $onlyProduction));
+            $runs7 = array_values(array_filter(sb_select_all('jm_ext_ingest_runs',
+                ['ran_at' => 'gte.' . $c7], 'source_id,success,received,status,ran_at'), $onlyProduction));
+
+            $summarize = function(array $events): array {
+                $totals = ['impression' => 0, 'click' => 0, 'conversion' => 0];
+                $perSource = [];
+                foreach ($events as $e) {
+                    $type = (string)($e['event_type'] ?? '');
+                    $source = (string)($e['source_id'] ?? '');
+                    if (!isset($totals[$type])) continue;
+                    $totals[$type]++;
+                    if (!isset($perSource[$source])) {
+                        $perSource[$source] = ['impressions' => 0, 'clicks' => 0, 'conversions' => 0];
+                    }
+                    $field = $type === 'impression' ? 'impressions' : ($type === 'click' ? 'clicks' : 'conversions');
+                    $perSource[$source][$field]++;
+                }
+                return ['totals' => $totals, 'sources' => $perSource];
+            };
+            $s7 = $summarize($events7);
+            $s30 = $summarize($events30);
+            $impressions = $s7['totals']['impression'];
+            $clicks = $s7['totals']['click'];
+            $conversions = $s7['totals']['conversion'];
+            $errors7 = count(array_filter($runs7, fn($r) => empty($r['success'])));
+
+            // Аудитория JobToo: только реальные незаблокированные работники.
+            $workers = sb_select_all('jm_users', ['role' => 'eq.worker', 'is_blocked' => 'not.is.true'],
+                'id,metro_station,created_at,last_seen_at');
+            $workerById = []; $regions = []; $activeRegions = [];
+            $active30 = 0; $registered30 = 0;
+            foreach ($workers as $worker) {
+                $uid = (string)($worker['id'] ?? '');
+                if ($uid !== '') $workerById[$uid] = $worker;
+                $region = trim((string)($worker['metro_station'] ?? ''));
+                if ($region !== '') $regions[$region] = ($regions[$region] ?? 0) + 1;
+                if (!empty($worker['last_seen_at']) && (string)$worker['last_seen_at'] >= $c30) {
+                    $active30++;
+                    if ($region !== '') $activeRegions[$region] = ($activeRegions[$region] ?? 0) + 1;
+                }
+                if (!empty($worker['created_at']) && (string)$worker['created_at'] >= $c30) $registered30++;
+            }
+            arsort($regions); arsort($activeRegions);
+
+            $unique = ['impression' => [], 'click' => [], 'conversion' => []];
+            $activityRegions = []; $newYes = 0; $newNo = 0; $newUnknown = 0;
+            $perSourceBusiness = [];
+            foreach ($events30 as $event) {
+                $type = (string)($event['event_type'] ?? '');
+                $sid = (string)($event['source_id'] ?? '');
+                $uid = trim((string)($event['user_id'] ?? ''));
+                if (!isset($perSourceBusiness[$sid])) {
+                    $perSourceBusiness[$sid] = [
+                        'source_name' => $production[$sid] ?? $sid,
+                        'unique_reached' => [], 'unique_interested' => [], 'unique_converted' => [],
+                        'new_yes' => 0, 'new_no' => 0, 'new_unknown' => 0, 'spend_rub' => 0.0,
+                    ];
+                }
+                if ($uid !== '' && isset($unique[$type])) {
+                    $unique[$type][$uid] = true;
+                    $field = $type === 'impression' ? 'unique_reached'
+                        : ($type === 'click' ? 'unique_interested' : 'unique_converted');
+                    $perSourceBusiness[$sid][$field][$uid] = true;
+                    $region = trim((string)($workerById[$uid]['metro_station'] ?? ''));
+                    if ($region !== '') $activityRegions[$region] = ($activityRegions[$region] ?? 0) + 1;
+                }
+                if ($type === 'conversion') {
+                    if (($event['new_candidate'] ?? null) === true) {
+                        $newYes++; $perSourceBusiness[$sid]['new_yes']++;
+                    } elseif (($event['new_candidate'] ?? null) === false) {
+                        $newNo++; $perSourceBusiness[$sid]['new_no']++;
+                    } else {
+                        $newUnknown++; $perSourceBusiness[$sid]['new_unknown']++;
+                    }
+                }
+            }
+            arsort($activityRegions);
+
+            $costs = array_values(array_filter(sb_select_all('jm_partner_costs',
+                ['incurred_at' => 'gte.' . $date30], 'source_id,amount_rub,incurred_at'), $onlyProduction));
+            $spend30 = 0.0;
+            foreach ($costs as $cost) {
+                $sid = (string)($cost['source_id'] ?? '');
+                $amount = (float)($cost['amount_rub'] ?? 0);
+                $spend30 += $amount;
+                if (!isset($perSourceBusiness[$sid])) {
+                    $perSourceBusiness[$sid] = [
+                        'source_name' => $production[$sid] ?? $sid,
+                        'unique_reached' => [], 'unique_interested' => [], 'unique_converted' => [],
+                        'new_yes' => 0, 'new_no' => 0, 'new_unknown' => 0, 'spend_rub' => 0.0,
+                    ];
+                }
+                $perSourceBusiness[$sid]['spend_rub'] += $amount;
+            }
+
+            foreach ($perSourceBusiness as $sid => &$metric) {
+                $metric['unique_reached'] = count($metric['unique_reached']);
+                $metric['unique_interested'] = count($metric['unique_interested']);
+                $metric['unique_converted'] = count($metric['unique_converted']);
+                $known = $metric['new_yes'] + $metric['new_no'];
+                $metric['new_candidate_share_pct'] = $known > 0
+                    ? round($metric['new_yes'] * 100 / $known, 2) : null;
+                $metric['cost_per_conversion_rub'] = $metric['unique_converted'] > 0
+                    && $metric['spend_rub'] > 0
+                    ? round($metric['spend_rub'] / $metric['unique_converted'], 2) : null;
+            }
+            unset($metric);
+
+            $uniqueReached = count($unique['impression']);
+            $uniqueInterested = count($unique['click']);
+            $uniqueConverted = count($unique['conversion']);
+            $knownNew = $newYes + $newNo;
+
+            $data = [
+                'всего' => count($rows),
+                'по_источникам' => $by,
+                'без_станции' => $withoutStation,
+                'без_профессии' => $withoutProfession,
+                'показы_7дней' => $impressions,
+                'переходов_7дней' => $clicks,
+                'конверсии_7дней' => $conversions,
+                'ctr_7дней' => $impressions > 0 ? round($clicks * 100 / $impressions, 2) : 0,
+                'конверсия_из_переходов_7дней' => $clicks > 0 ? round($conversions * 100 / $clicks, 2) : 0,
+                'ошибок_фида_7дней' => $errors7,
+                'воронка_по_источникам_7дней' => $s7['sources'],
+                'воронка_30дней' => $s30['totals'],
+                'партнёрский_отчёт_30дней' => [
+                    'аудитория_работников' => count($workers),
+                    'активных_работников' => $active30,
+                    'новых_регистраций' => $registered30,
+                    'уникальный_охват' => $uniqueReached,
+                    'уникальный_интерес' => $uniqueInterested,
+                    'уникальные_конверсии' => $uniqueConverted,
+                    'конверсия_охват_интерес_pct' => $uniqueReached > 0
+                        ? round($uniqueInterested * 100 / $uniqueReached, 2) : null,
+                    'конверсия_интерес_отклик_pct' => $uniqueInterested > 0
+                        ? round($uniqueConverted * 100 / $uniqueInterested, 2) : null,
+                    'расходы_rub' => round($spend30, 2),
+                    'стоимость_отклика_rub' => $uniqueConverted > 0 && $spend30 > 0
+                        ? round($spend30 / $uniqueConverted, 2) : null,
+                    'новых_для_партнёра' => $newYes,
+                    'известных_партнёру' => $newNo,
+                    'статус_новизны_не_передан' => $newUnknown,
+                    'доля_новых_pct' => $knownNew > 0 ? round($newYes * 100 / $knownNew, 2) : null,
+                    'регионы_аудитории' => array_slice($regions, 0, 15, true),
+                    'регионы_активной_аудитории' => array_slice($activeRegions, 0, 15, true),
+                    'регионы_партнёрской_активности' => array_slice($activityRegions, 0, 15, true),
+                    'по_источникам' => $perSourceBusiness,
+                ],
+            ];
+            break;
+        }
+
+        // Расходы пилота вводятся фактами. Нулевое или отсутствующее значение
+        // не считается бесплатным откликом и не искажает коммерческий отчёт.
+        case 'extPartnerCostSave': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $sourceId = trim((string)($v['source_id'] ?? ''));
+            $amount = (float)($v['amount_rub'] ?? 0);
+            $date = trim((string)($v['incurred_at'] ?? ''));
+            if ($sourceId === '' || $amount <= 0 || !preg_match('~^\\d{4}-\\d{2}-\\d{2}$~', $date)) {
+                $data = ['error' => 'нужны источник, положительная сумма и дата']; break;
+            }
+            $source = sb_single('jm_ext_sources', ['id' => 'eq.' . $sourceId], 'id');
+            if (!$source) { $data = ['error' => 'источник не найден']; break; }
+            sb_insert('jm_partner_costs', [
+                'id' => uid(), 'source_id' => $sourceId,
+                'amount_rub' => round($amount, 2), 'incurred_at' => $date,
+                'note' => trim((string)($v['note'] ?? '')) ?: null,
+                'created_at' => now_iso(),
+            ]);
+            $data = ['ok' => true]; break;
+        }
+
+        // ── Биллинг и сверка партнёрского пилота ─────────────────────────
+        case 'partnerTariffsList': {
+            $sourceId = trim((string)($args[0] ?? ''));
+            $filters = $sourceId !== '' ? ['source_id' => 'eq.' . $sourceId] : [];
+            $data = sb_select_all('jm_partner_tariffs', $filters,
+                'id,source_id,name,billing_model,amount_rub,fixed_monthly_rub,effective_from,effective_to,active,terms_version,created_at');
+            break;
+        }
+
+        case 'partnerTariffSave': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $sourceId = trim((string)($v['source_id'] ?? ''));
+            $model = trim((string)($v['billing_model'] ?? ''));
+            $allowed = ['first_completed_shift','completed_shift','qualified_application','fixed_monthly','hybrid'];
+            $from = trim((string)($v['effective_from'] ?? ''));
+            if ($sourceId === '' || !in_array($model, $allowed, true)
+                || !preg_match('~^\\d{4}-\\d{2}-\\d{2}$~', $from)) {
+                $data = ['error' => 'Нужны источник, модель и дата начала тарифа']; break;
+            }
+            $row = [
+                'id' => trim((string)($v['id'] ?? '')) ?: uid(),
+                'source_id' => $sourceId,
+                'name' => trim((string)($v['name'] ?? '')) ?: $model,
+                'billing_model' => $model,
+                'amount_rub' => max(0, round((float)($v['amount_rub'] ?? 0), 2)),
+                'fixed_monthly_rub' => max(0, round((float)($v['fixed_monthly_rub'] ?? 0), 2)),
+                'effective_from' => $from,
+                'effective_to' => !empty($v['effective_to']) ? (string)$v['effective_to'] : null,
+                'active' => ($v['active'] ?? true) !== false,
+                'terms_version' => trim((string)($v['terms_version'] ?? '')) ?: $from,
+                'created_at' => now_iso(),
+            ];
+            sb_upsert('jm_partner_tariffs', $row, 'id');
+            $data = $row; break;
+        }
+
+        case 'partnerBillableEventRecord': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $sourceId = trim((string)($v['source_id'] ?? ''));
+            $occurredAt = trim((string)($v['occurred_at'] ?? '')) ?: now_iso();
+            $tariffs = sb_select_all('jm_partner_tariffs',
+                ['source_id' => 'eq.' . $sourceId, 'active' => 'is.true'],
+                'id,source_id,billing_model,amount_rub,effective_from,effective_to,active');
+            $v['occurred_at'] = $occurredAt;
+            try {
+                $dedupe = pb_dedupe_key($v);
+                $existing = sb_single('jm_partner_billable_events',
+                    ['source_id' => 'eq.' . $sourceId, 'dedupe_key' => 'eq.' . $dedupe], 'id,dedupe_key,status');
+                if ($existing) { $data = ['created' => false, 'reason' => 'duplicate', 'event' => $existing]; break; }
+                $built = pb_build_billable_event($v, $tariffs);
+                if (!$built['created']) { $data = $built; break; }
+                sb_insert('jm_partner_billable_events', $built['billable_event']);
+                $data = $built;
+            } catch (Throwable $e) {
+                if (stripos($e->getMessage(), 'duplicate') !== false
+                    || stripos($e->getMessage(), 'unique') !== false) {
+                    $data = ['created' => false, 'reason' => 'duplicate'];
+                } else throw $e;
+            }
+            break;
+        }
+
+        case 'partnerReconciliationRecord': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $eventId = trim((string)($v['billable_event_id'] ?? ''));
+            $event = $eventId !== '' ? sb_single('jm_partner_billable_events',
                 ['id' => 'eq.' . $eventId], 'id,source_id,application_id,status') : null;
             if (!$event) { $data = ['error' => 'Оплачиваемое событие не найдено']; break; }
             $issue = pb_reconciliation_issue($event, [
