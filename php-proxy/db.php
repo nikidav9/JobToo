@@ -33,29 +33,17 @@ function jt_respond(array $payload, int $code = 200): void {
 //
 // Значение не задано — работает облако. Выкладка сама по себе ничего не
 // переключает, и это намеренно.
-function sb_resolve_url(): string {
-    $env = getenv('SB_URL');
-    if (is_string($env) && trim($env) !== '') return rtrim(trim($env), '/');
-
-    $file = __DIR__ . '/sb_url.php';
-    if (is_readable($file)) {
-        $v = @include $file;
-        if (is_string($v) && trim($v) !== '') return rtrim(trim($v), '/');
-    }
-    // Умолчание — свой сервер в Москве.
-    //
-    // Раньше здесь стоял адрес облака, но 15.08 оно оказалось заблокировано
-    // за превышение квоты на трафик, и приложение перестало работать.
-    // Данные к тому моменту были уже перенесены и проверены, поэтому
-    // умолчание переведено сюда: сервис важнее осторожности, когда простой
-    // уже идёт.
-    //
-    // Секрет SB_URL по-прежнему перекрывает это значение — им же делается
-    // и откат, если понадобится вернуться в облако.
-    return 'https://jobtoo.ru';
-}
-
-define('SB_URL', sb_resolve_url());
+// Адрес бэкенда — свой сервер в Москве, и только он.
+//
+// Раньше здесь была пара «переменная окружения SB_URL или файл sb_url.php, а
+// иначе умолчание». Заводилось это как быстрый откат в облако, если переезд
+// пойдёт не так. Переезд состоялся 15.08, данные давно в России, а рычаг
+// остался — и это ровно тот рычаг, которым первичная запись ПДн граждан РФ
+// одной настройкой уводится за границу, мимо ч. 5 ст. 18 152-ФЗ.
+//
+// Поэтому адрес теперь в коде. Сменить его — правка и коммит, и это осознанно:
+// так переезд виден в истории, а не случается от значения в чужом окружении.
+define('SB_URL', 'https://jobtoo.ru');
 
 // Ключ доступа к базе.
 //
@@ -158,6 +146,11 @@ $adminFns = [
     'extSourcesList', 'extSourceSave', 'extSourceDelete', 'extStats',
     'partnerTariffsList', 'partnerTariffSave', 'partnerBillableEventRecord',
     'partnerReconciliationRecord', 'partnerBillingReport', 'partnerReportSnapshotSave',
+    // dbGetUsers отдаёт всех пользователей разом. Приложение её не зовёт
+    // (в services/db.ts обёртка есть, вызовов нет), а любому вошедшему она
+    // выгружала бы список всех людей сервиса одним запросом. Дашборд ходит в
+    // базу своим путём, поэтому место операции — здесь.
+    'dbGetUsers',
     'apiKeysList', 'apiKeyCreate', 'apiKeyRevoke',
     'botAdminGet', 'botAdminSet', 'supportClose', 'supportReopen',
     'supportReply', 'supportThreads', 'botReply', 'botInbox',

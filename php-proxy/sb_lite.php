@@ -12,15 +12,12 @@
 
 if (!function_exists('sb')) {
 
+    // Адрес тот же и с той же оговоркой, что в db.php: только свой сервер в
+    // Москве, без переключателя в окружении. Настройка, которой первичная
+    // запись ПДн граждан РФ уводится за границу, не должна существовать —
+    // ч. 5 ст. 18 152-ФЗ. Сменить адрес можно правкой кода.
     function sb_lite_url(): string
     {
-        $env = getenv('SB_URL');
-        if (is_string($env) && trim($env) !== '') return rtrim(trim($env), '/');
-        $f = __DIR__ . '/sb_url.php';
-        if (is_readable($f)) {
-            $v = @include $f;
-            if (is_string($v) && trim($v) !== '') return rtrim(trim($v), '/');
-        }
         return 'https://jobtoo.ru';
     }
 
