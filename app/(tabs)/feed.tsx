@@ -78,6 +78,10 @@ import { payShort } from '@/services/pay';
 import { vacancyInfoLines, permVacancyInfoLines } from '@/services/vacancyCard';
 import { PartnerConsentSheet, PARTNER_CONSENT_VERSION } from '@/components/feature/PartnerConsentSheet';
 
+// Закрывает OAuth popup на web после возврата с SuperJob. На native вызов
+// безопасен и ничего не делает.
+WebBrowser.maybeCompleteAuthSession();
+
 function partnerAttributionUrl(raw: string, clickId: string, sourceId: string): string {
   try {
     const url = new URL(raw);
@@ -2807,6 +2811,9 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
   // отдельно получаем согласие на передачу данных и создаём отклик у нас.
   const [externalConfirm, setExternalConfirm] = useState<ExternalVacancy | null>(null);
   const [partnerConsentFor, setPartnerConsentFor] = useState<ExternalVacancy | null>(null);
+  const [superJobConnectFor, setSuperJobConnectFor] = useState<ExternalVacancy | null>(null);
+  const [superJobConnecting, setSuperJobConnecting] = useState(false);
+  const [superJobConnectError, setSuperJobConnectError] = useState<string | null>(null);
 
   const externalLoadId = useRef(0);
   const loadExternalVacancies = useCallback(async (sourceIds?: string[]) => {
@@ -3221,21 +3228,50 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
         showToast('Сначала создайте или выберите основное резюме в SuperJob', 'error');
         return;
       }
-      const returnUrl = Platform.OS === 'web' ? 'https://jobtoo.ru/' : 'onspaceapp:///';
-      const { url } = await dbStartSuperJobOAuth(returnUrl);
-      if (Platform.OS === 'web') {
-        await Linking.openURL(url);
-      } else {
-        await WebBrowser.openAuthSessionAsync(url, returnUrl);
-        const connected = await dbGetSuperJobOAuthStatus();
-        if (connected.connected && connected.has_resume) {
-          setPartnerConsentFor(v);
-          return;
-        }
-      }
-      showToast('После подключения повторите свайп', 'success');
+      setSuperJobConnectError(null);
+      setSuperJobConnectFor(v);
     } catch (e: any) {
       showToast(e?.message ?? 'Не удалось подключить SuperJob', 'error');
+    }
+  };
+
+  const connectSuperJobAndContinue = async () => {
+    const vacancy = superJobConnectFor;
+    if (!vacancy || superJobConnecting) return;
+    setSuperJobConnecting(true);
+    setSuperJobConnectError(null);
+    try {
+      const returnUrl = Platform.OS === 'web' ? 'https://jobtoo.ru/' : 'onspaceapp:///';
+      const { url } = await dbStartSuperJobOAuth(returnUrl);
+      const auth = await WebBrowser.openAuthSessionAsync(url, returnUrl);
+      if (auth.type !== 'success') {
+        setSuperJobConnectError('Подключение отменено. Можно попробовать ещё раз.');
+        return;
+      }
+
+      // Callback сначала сохраняет токены на сервере и только потом возвращает
+      // человека в приложение. Даём реплике БД несколько секунд догнать запись,
+      // вместо прежней одиночной проверки и требования повторить свайп.
+      let status = await dbGetSuperJobOAuthStatus();
+      for (let attempt = 0; !status.connected && attempt < 11; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        status = await dbGetSuperJobOAuthStatus();
+      }
+      if (!status.connected) {
+        setSuperJobConnectError('Не удалось подтвердить подключение. Нажмите «Попробовать снова».');
+        return;
+      }
+      if (!status.has_resume) {
+        setSuperJobConnectError('В SuperJob нужно создать или выбрать основное резюме. После этого попробуйте снова.');
+        return;
+      }
+
+      setSuperJobConnectFor(null);
+      setPartnerConsentFor(vacancy);
+    } catch (e: any) {
+      setSuperJobConnectError(e?.message ?? 'Не удалось подключить SuperJob. Попробуйте снова.');
+    } finally {
+      setSuperJobConnecting(false);
     }
   };
 
@@ -3838,6 +3874,50 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
           : Promise.resolve()}
       />
 
+      {/* Подключение показываем отдельным понятным шагом. После OAuth эта же
+          вакансия автоматически продолжит отклик — повторный свайп не нужен. */}
+      {superJobConnectFor ? (
+        <View style={pS.confirmOverlay}>
+          <View style={pS.confirmCard} accessibilityViewIsModal>
+            <View style={pS.connectIcon}>
+              <Ionicons name="link-outline" size={25} color={Colors.primary} />
+            </View>
+            <Text style={pS.confirmTitle}>Подключить SuperJob</Text>
+            <Text style={pS.confirmVacancy} numberOfLines={2}>{superJobConnectFor.title}</Text>
+            <Text style={pS.confirmHint}>
+              Войдите в SuperJob один раз. После возврата JobToo автоматически продолжит этот отклик — повторно свайпать не придётся.
+            </Text>
+            <View style={pS.connectPrivacy}>
+              <Ionicons name="shield-checkmark-outline" size={17} color={Colors.green} />
+              <Text style={pS.connectPrivacyTxt}>Пароль остаётся в SuperJob и не передаётся JobToo</Text>
+            </View>
+            {superJobConnectError ? <Text style={pS.connectError}>{superJobConnectError}</Text> : null}
+            <TouchableOpacity
+              style={[pS.connectPrimary, superJobConnecting && pS.connectPrimaryDisabled]}
+              onPress={() => void connectSuperJobAndContinue()}
+              disabled={superJobConnecting}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Подключить SuperJob и продолжить отклик"
+            >
+              {superJobConnecting ? <ActivityIndicator size="small" color="#fff" /> : null}
+              <Text style={pS.connectPrimaryTxt}>
+                {superJobConnecting ? 'Подключаем…' : (superJobConnectError ? 'Попробовать снова' : 'Подключить и откликнуться')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={pS.connectLater}
+              onPress={() => { if (!superJobConnecting) setSuperJobConnectFor(null); }}
+              disabled={superJobConnecting}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+            >
+              <Text style={pS.connectLaterTxt}>Не сейчас</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
       {/* Плашка подтверждения перехода к партнёрской вакансии (свайп вправо). */}
       {externalConfirm ? (
         <View style={pS.confirmOverlay}>
@@ -4367,6 +4447,24 @@ const pS = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary,
   },
   confirmOpenTxt: { fontSize: rf(15), fontWeight: '700', color: '#fff' },
+  connectIcon: {
+    width: rs(48), height: rs(48), borderRadius: rs(24), alignItems: 'center',
+    justifyContent: 'center', backgroundColor: Colors.primaryLight, marginBottom: rs(4),
+  },
+  connectPrivacy: {
+    flexDirection: 'row', alignItems: 'center', gap: rs(7), marginTop: rs(5),
+    padding: rs(10), borderRadius: rs(10), backgroundColor: '#F0FDF4',
+  },
+  connectPrivacyTxt: { flex: 1, fontSize: rf(12), lineHeight: rf(16), color: Colors.textSecondary },
+  connectError: { fontSize: rf(12), lineHeight: rf(17), color: Colors.red, marginTop: rs(4) },
+  connectPrimary: {
+    height: rs(50), borderRadius: rs(12), flexDirection: 'row', gap: rs(8),
+    alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary, marginTop: rs(10),
+  },
+  connectPrimaryDisabled: { opacity: 0.7 },
+  connectPrimaryTxt: { color: '#fff', fontSize: rf(15), fontWeight: '700' },
+  connectLater: { height: rs(40), alignItems: 'center', justifyContent: 'center' },
+  connectLaterTxt: { fontSize: rf(14), fontWeight: '600', color: Colors.textSecondary },
   // — разделы карточки —
   section: {
     marginTop: rs(12), padding: rs(12),
