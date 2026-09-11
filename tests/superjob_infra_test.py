@@ -12,6 +12,7 @@ db = (ROOT / 'php-proxy/db.php').read_text()
 oauth_migration = (ROOT / 'supabase/migrations/060_superjob_oauth.sql').read_text()
 import_loop = (ROOT / 'infra/superjob-import-loop.sh').read_text()
 local_deploy = (ROOT / 'infra/local-web-deploy.sh').read_text()
+import_workflow = (ROOT / '.github/workflows/superjob-import.yml').read_text()
 
 assert "X-Api-App-Id: ' . $secret" in adapter
 assert "CURLOPT_PROTOCOLS => CURLPROTO_HTTPS" in adapter
@@ -41,5 +42,7 @@ assert 'enable row level security' in oauth_migration
 assert 'revoke all' in oauth_migration
 assert 'source=superjob&force=1' in import_loop
 assert 'jt-superjob-import.timer' in local_deploy
+assert 'source=superjob&force=1' in import_workflow
+assert 'DASHBOARD_PASSWORD' in import_workflow
 
 print('superjob adapter invariants: ok')

@@ -1,0 +1,73 @@
+name: Полный импорт SuperJob
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17,47 * * * *'
+  push:
+    paths:
+      - '.github/workflows/superjob-import.yml'
+      - 'php-proxy/superjob.php'
+      - 'php-proxy/ingest.php'
+      - 'infra/superjob-import-loop.sh'
+
+concurrency:
+  group: superjob-full-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    name: Пройти каталог до последней страницы
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Import all SuperJob pages
+        env:
+          ADMIN_TOKEN: ${{ secrets.DASHBOARD_PASSWORD }}
+        run: |
+          if [ -z "$ADMIN_TOKEN" ]; then
+            echo "DASHBOARD_PASSWORD не задан"
+            exit 1
+          fi
+
+          for batch in $(seq 1 100); do
+            response=$(mktemp)
+            code=$(curl -sS --max-time 180 -o "$response" -w '%{http_code}' \
+              --config - 'https://jobtoo.ru/api/ingest.php?source=superjob&force=1' <<CURL_CONFIG
+          header = "X-Admin-Token: $ADMIN_TOKEN"
+          CURL_CONFIG
+            )
+            if [ "$code" != 200 ]; then
+              echo "Импорт вернул HTTP $code"
+              sed -E 's/[[:cntrl:]]//g' "$response" | cut -c1-500
+              exit 1
+            fi
+
+            state=$(python3 - "$response" "$batch" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding='utf-8') as fh:
+              payload = json.load(fh)
+          runs = payload.get('run')
+          if payload.get('ok') is not True or not isinstance(runs, list) or len(runs) != 1:
+              raise SystemExit('invalid ingest response')
+          status = runs[0].get('status', '')
+          print(f"batch={sys.argv[2]} status={status}", file=sys.stderr)
+          if status.startswith('ок:'):
+              print('complete')
+          elif status.startswith('продолжение:'):
+              print('pending')
+          else:
+              print('error')
+          PY
+            )
+            rm -f "$response"
+
+            [ "$state" = complete ] && exit 0
+            [ "$state" = pending ] || exit 1
+            sleep 2
+          done
+
+          echo "Каталог не завершился за 100 порций"
+          exit 1
