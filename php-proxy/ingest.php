@@ -62,6 +62,9 @@ function ing_dedupe_key(array $v): string
     return substr(hash('sha256', implode('|', [
         $norm($v['company'] ?? ''), $norm($v['title'] ?? ''),
         $norm($v['metro_station_norm'] ?? $v['metro_station'] ?? ''),
+        // У постоянных вакансий дата и время обычно пустые. Без адреса все
+        // одинаковые должности сети магазинов/ресторанов схлопывались в одну.
+        $norm(($v['kind'] ?? '') === 'permanent' ? ($v['address'] ?? '') : ''),
         (string)($v['date'] ?? ''),
         (string)($v['time_start'] ?? ''),
     ])), 0, 32);
@@ -404,9 +407,13 @@ function ing_run_source(array $src): array
             sb_upsert_rows('jm_ext_vacancies', $chunk, 'source_id,external_id');
         }
         $received += count($rows);
-        if ($received + $skipped > 50000) {
+        // SuperJob обходится по рубрикам из-за лимита API в 500 результатов
+        // на запрос. Одна вакансия может входить в несколько рубрик, поэтому
+        // входных строк больше, чем уникальных вакансий в таблице.
+        $recordLimit = (string)$src['id'] === 'superjob' ? 250000 : 50000;
+        if ($received + $skipped > $recordLimit) {
             return [
-                'status' => "ошибка: больше 50000 записей; загружено $received, прежние вакансии сохранены",
+                'status' => "ошибка: больше $recordLimit записей; загружено $received, прежние вакансии сохранены",
                 'count' => $received,
             ];
         }

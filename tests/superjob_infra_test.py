@@ -9,9 +9,11 @@ server_deploy = (ROOT / 'php-proxy/deploy.php').read_text()
 oauth_lib = (ROOT / 'php-proxy/superjob_oauth_lib.php').read_text()
 oauth_callback = (ROOT / 'php-proxy/superjob_oauth.php').read_text()
 db = (ROOT / 'php-proxy/db.php').read_text()
+ingest = (ROOT / 'php-proxy/ingest.php').read_text()
 oauth_migration = (ROOT / 'supabase/migrations/060_superjob_oauth.sql').read_text()
 import_loop = (ROOT / 'infra/superjob-import-loop.sh').read_text()
 local_deploy = (ROOT / 'infra/local-web-deploy.sh').read_text()
+import_workflow = (ROOT / '.github/workflows/superjob-import.yml').read_text()
 
 assert "X-Api-App-Id: ' . $secret" in adapter
 assert "CURLOPT_PROTOCOLS => CURLPROTO_HTTPS" in adapter
@@ -21,6 +23,11 @@ assert "'count' => $limit" in adapter
 assert "'page' => $page" in adapter
 assert "!empty($decoded['more'])" in adapter
 assert "superjob\\.ru" in adapter
+assert "'/catalogues/'" in adapter
+assert "'catalogue_index'" in adapter
+assert 'API SuperJob отдаёт максимум 500' in adapter
+assert "if ($metro !== '') $item['metro']" in adapter
+assert "'superjob' ? 250000" in ingest
 assert "integration_mode" in migration and "'redirect'" in migration
 assert "false" in migration, 'source must stay disabled until the API key is configured'
 assert "set enabled = true" in enable_migration
@@ -41,5 +48,7 @@ assert 'enable row level security' in oauth_migration
 assert 'revoke all' in oauth_migration
 assert 'source=superjob&force=1' in import_loop
 assert 'jt-superjob-import.timer' in local_deploy
+assert 'source=superjob&force=1' in import_workflow
+assert 'DASHBOARD_PASSWORD' in import_workflow
 
 print('superjob adapter invariants: ok')
