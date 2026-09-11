@@ -124,7 +124,7 @@ export default function MatchingPage() {
               <XAxis type="number" domain={[0, 100]} tick={AXIS} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
               <YAxis type="category" dataKey="name" tick={AXIS_CAT} tickLine={false} axisLine={false} width={80} />
               <Tooltip contentStyle={TT} formatter={(v: any) => [`${v}%`, 'Конверсия']} />
-              <Bar dataKey="rate" name="Конверсия %" radius={[0, 4, 4, 0]} label={{ position: 'right', fontSize: 11, fill: '#5E6875', formatter: (v: any) => `${v}%` }}>
+              <Bar dataKey="rate" name="Конверсия %" radius={[0, 4, 4, 0]} label={{ position: 'right', fontSize: 11, fill: 'var(--ink-3)', formatter: (v: any) => `${v}%` }}>
                 {d.matchByWorkType.map((e, i) => (
                   <Cell key={i} fill={e.rate > 50 ? PALETTE.green : e.rate > 25 ? PALETTE.amber : PALETTE.red} />
                 ))}

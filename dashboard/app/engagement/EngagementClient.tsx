@@ -73,7 +73,7 @@ export default function EngagementPage() {
               <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip contentStyle={TT} />
               <Bar dataKey="value" name="Чатов" radius={[4, 4, 0, 0]} fill={PALETTE.blue}
-                   label={{ position: 'top', fontSize: 11, fill: '#5E6875' }} />
+                   label={{ position: 'top', fontSize: 11, fill: 'var(--ink-3)' }} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>

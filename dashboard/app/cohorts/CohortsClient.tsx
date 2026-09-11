@@ -35,13 +35,20 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
  * при этом читались накопительно («≥60%»), а ступени были непересекающимися
  * диапазонами — то же расхождение, что уже ловили на «Последнем входе».
  */
+// Ступени заливки — прозрачностью одного зелёного, а не шестью разными.
+//
+// Раньше три средние ступени были заданы светлыми оттенками числом. На светлой
+// теме это работало, а на тёмной такая клетка осталась бы светлым пятном, и
+// подпись «до 20%» цветом var(--positive) — светло-зелёная на светло-зелёном —
+// перестала бы читаться. Прозрачность решает обе темы сразу: под ней своя
+// поверхность, и контраст с текстом сохраняется.
 const STEPS: { upTo: number; bg: string; fg: string; label: string }[] = [
-  { upTo: 0,   bg: 'var(--bg-sunken)', fg: 'var(--ink-3)', label: 'никто' },
-  { upTo: 20,  bg: '#D3E7DC',          fg: 'var(--positive)', label: 'до 20%' },
-  { upTo: 40,  bg: '#A3CDB7',          fg: 'var(--positive)', label: '20–40%' },
-  { upTo: 60,  bg: '#6BAE8B',          fg: '#fff',            label: '40–60%' },
-  { upTo: 80,  bg: '#3D8E62',          fg: '#fff',            label: '60–80%' },
-  { upTo: 101, bg: 'var(--positive)',  fg: '#fff',            label: '80% и выше' },
+  { upTo: 0,   bg: 'var(--bg-sunken)',        fg: 'var(--ink-3)',    label: 'никто' },
+  { upTo: 20,  bg: 'color-mix(in srgb, var(--positive) 12%, transparent)', fg: 'var(--positive)', label: 'до 20%' },
+  { upTo: 40,  bg: 'color-mix(in srgb, var(--positive) 28%, transparent)', fg: 'var(--positive)', label: '20–40%' },
+  { upTo: 60,  bg: 'color-mix(in srgb, var(--positive) 55%, transparent)', fg: '#fff',            label: '40–60%' },
+  { upTo: 80,  bg: 'color-mix(in srgb, var(--positive) 78%, transparent)', fg: '#fff',            label: '60–80%' },
+  { upTo: 101, bg: 'var(--positive)',         fg: '#fff',            label: '80% и выше' },
 ]
 
 function stepOf(pct: number) {

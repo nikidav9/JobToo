@@ -37,7 +37,9 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
-  themeColor: '#F6F7F9',
+  // Тот же серый, что у фона панели (--bg → gray-50 из палитры TailAdmin):
+  // этим цветом браузер красит свою полосу вокруг страницы.
+  themeColor: '#f9fafb',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

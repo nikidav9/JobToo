@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { isAuthed } from '@/lib/auth'
 import { SidebarProvider, useSidebar } from '@/context/SidebarContext'
 import { ThemeProvider } from '@/context/ThemeContext'
@@ -60,9 +61,18 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null)
+  // Адрес берётся хуком, а не из window: window на сервере нет, там любая
+  // проверка по нему ложна. Если решать по ней, сервер нарисует заглушку, а
+  // браузер — саму страницу, и React ругается на несовпадение разметки.
+  // Так уже было: кабинет партнёра ронял гидратацию именно из-за этого.
+  // Проверки по window остаются рядом — они нужны для варианта, когда панель
+  // открыта в подкаталоге /JobToo, где путь из хука не совпадает с адресом.
+  const rawPath = usePathname()
+  const path = rawPath.replace(/\/$/, '') || '/'
+  const outsidePanel = path === '/login' || path === '/partner'
 
   useEffect(() => {
-    if (isOnLoginPage() || isPartnerPortal()) {
+    if (outsidePanel || isOnLoginPage() || isPartnerPortal()) {
       setAuthed(true)
       return
     }
@@ -71,9 +81,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     } else {
       window.location.replace(getBase() + '/login/')
     }
-  }, [])
+  }, [outsidePanel])
 
-  if (isOnLoginPage() || isPartnerPortal()) {
+  if (outsidePanel || isOnLoginPage() || isPartnerPortal()) {
     return <>{children}</>
   }
 

@@ -33,10 +33,15 @@ export default function KpiCard({
   label, value, sub, delta, deltaTone = 'neutral',
   color = 'var(--accent)', spark, sparkColor,
 }: Props) {
+  // Подложка и граница берутся из пары к самому цвету, а не пишутся числом.
+  // Раньше здесь стояли rgba от прежней, более светлой зелени: текст сменил
+  // оттенок, подложка осталась старой — и перестала совпадать со своим же
+  // текстом. Карточка показывается на 23 страницах, так что расхождение
+  // разъезжалось по всей панели разом.
   const chip = deltaTone === 'pos'
-    ? { color: 'var(--positive)', bg: 'rgba(30,122,76,.08)', border: 'rgba(30,122,76,.20)' }
+    ? { color: 'var(--positive)', bg: 'var(--positive-soft)', border: 'var(--positive-line)' }
     : deltaTone === 'neg'
-    ? { color: 'var(--negative)', bg: 'rgba(184,52,42,.08)', border: 'rgba(184,52,42,.20)' }
+    ? { color: 'var(--negative)', bg: 'var(--negative-soft)', border: 'var(--negative-line)' }
     : { color: 'var(--ink-3)', bg: 'var(--bg-sunken)', border: 'var(--line)' }
 
   const parsed = parseKpi(value)

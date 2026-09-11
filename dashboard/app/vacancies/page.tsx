@@ -310,7 +310,7 @@ function TempCard({ c, onRefresh }: { c: TempCardData; onRefresh: () => void }) 
           background: isOpen ? 'var(--accent-soft)' : 'var(--bg-sunken)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <IconBriefcase color={isOpen ? PALETTE.orange : '#8B94A1'} />
+          <IconBriefcase color={isOpen ? PALETTE.orange : 'var(--ink-4)'} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.3, wordBreak: 'break-word' }}>
@@ -420,7 +420,7 @@ function TempCard({ c, onRefresh }: { c: TempCardData; onRefresh: () => void }) 
         onClick={() => hasApps && setOpen(o => !o)}
         style={{ all: 'unset', display: 'flex', alignItems: 'center', gap: 8, width: '100%', cursor: hasApps ? 'pointer' : 'default' }}
       >
-        <IconPeople color={hasApps ? PALETTE.orange : '#C8C5BF'} />
+        <IconPeople color={hasApps ? PALETTE.orange : 'var(--ink-4)'} />
         <span style={{ fontSize: 18, fontWeight: 700, color: hasApps ? 'var(--ink)' : 'var(--ink-3)', lineHeight: 1 }}>
           {c.apps.total}
         </span>
@@ -440,7 +440,7 @@ function TempCard({ c, onRefresh }: { c: TempCardData; onRefresh: () => void }) 
       </button>
 
       {hasApps && (
-        <div style={{ marginTop: 8, height: 3, borderRadius: 2, background: '#F0EEE9', overflow: 'hidden' }}>
+        <div style={{ marginTop: 8, height: 3, borderRadius: 2, background: 'var(--bg-sunken)', overflow: 'hidden' }}>
           <div style={{ height: '100%', borderRadius: 2, background: PALETTE.green, width: `${matchedPct}%` }} />
         </div>
       )}
@@ -593,7 +593,7 @@ function PermCard({ c, onRefresh }: { c: PermCard; onRefresh: () => void }) {
           background: isOpen ? 'var(--positive-soft)' : 'var(--bg-sunken)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <IconBriefcase color={isOpen ? PALETTE.green : '#8B94A1'} />
+          <IconBriefcase color={isOpen ? PALETTE.green : 'var(--ink-4)'} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.3, wordBreak: 'break-word' }}>
@@ -679,7 +679,7 @@ function PermCard({ c, onRefresh }: { c: PermCard; onRefresh: () => void }) {
           cursor: hasApps ? 'pointer' : 'default',
         }}
       >
-        <IconPeople color={hasApps ? PALETTE.blue : '#C8C5BF'} />
+        <IconPeople color={hasApps ? PALETTE.blue : 'var(--ink-4)'} />
         <span style={{ fontSize: 18, fontWeight: 700, color: hasApps ? 'var(--ink)' : 'var(--ink-3)', lineHeight: 1 }}>
           {c.apps.total}
         </span>
@@ -700,7 +700,7 @@ function PermCard({ c, onRefresh }: { c: PermCard; onRefresh: () => void }) {
 
       {/* progress bar */}
       {hasApps && (
-        <div style={{ marginTop: 8, height: 3, borderRadius: 2, background: '#F0EEE9', overflow: 'hidden' }}>
+        <div style={{ marginTop: 8, height: 3, borderRadius: 2, background: 'var(--bg-sunken)', overflow: 'hidden' }}>
           <div style={{ height: '100%', borderRadius: 2, background: PALETTE.green, width: `${approvedPct}%` }} />
         </div>
       )}
@@ -773,7 +773,7 @@ function Pill({ color, label, value }: { color: string; label: string; value: nu
 
 function IconCalendar() {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5E6875" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
       <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
     </svg>
   )
@@ -781,7 +781,7 @@ function IconCalendar() {
 
 function IconPin() {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5E6875" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
     </svg>
   )
@@ -797,7 +797,7 @@ function IconBriefcase({ color }: { color: string }) {
 
 function IconMetro() {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8B94A1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--ink-4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10" /><path d="M12 6 8 18M12 6l4 12M8 14h8" />
     </svg>
   )
