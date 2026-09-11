@@ -1,3 +1,5 @@
-import loadDynamic from 'next/dynamic'
 export const dynamic = 'force-static'
-export default loadDynamic(() => import('./GeoClient'), { ssr: false })
+
+// Сам компонент — в ./loader: он клиентский, потому что отключение серверной
+// отрисовки (ssr: false) с Next 15 доступно только в клиентском модуле.
+export { default } from './loader'
