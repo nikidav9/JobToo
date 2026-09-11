@@ -15,6 +15,7 @@
 @ini_set('html_errors', '0');
 ob_start();
 require_once __DIR__ . '/partner_billing.php';
+require_once __DIR__ . '/superjob_oauth_lib.php';
 
 /** Отдать ответ, отбросив всё, что случайно напечаталось до него. */
 function jt_respond(array $payload, int $code = 200): void {
@@ -3353,6 +3354,130 @@ try {
                 sb_insert('jm_partner_data_consents', $row);
             }
             $data = ['recorded' => true, 'consent_version' => $row['consent_version']]; break;
+        }
+
+        // SuperJob OAuth начинается только для вошедшего пользователя. В state
+        // нет user_id — наружу уходит случайная строка, а в базе лежит её хеш.
+        case 'superjobOauthStart': {
+            if ($authUid === null) throw new RuntimeException('Нужна авторизация JobToo');
+            $clientId = sjo_cfg('SUPERJOB_CLIENT_ID');
+            if ($clientId === '' || sjo_client_secret() === '') {
+                throw new RuntimeException('SuperJob OAuth ещё не настроен');
+            }
+            $state = jt_b64url_encode(random_bytes(32));
+            $returnUrl = trim((string)($args[0] ?? ''));
+            if (!preg_match('~^(?:https://jobtoo\.ru/|onspaceapp://)~i', $returnUrl)) {
+                $returnUrl = 'https://jobtoo.ru/';
+            }
+            sb_insert('jm_superjob_oauth_states', [
+                'state_hash' => hash('sha256', $state),
+                'worker_id' => $authUid,
+                'return_url' => $returnUrl,
+                'expires_at' => gmdate('Y-m-d\TH:i:s', time() + 600) . '.000Z',
+            ]);
+            $redirectUri = 'https://jobtoo.ru/api/superjob_oauth.php';
+            $data = ['url' => 'https://www.superjob.ru/authorize/?' . http_build_query([
+                'client_id' => $clientId,
+                'redirect_uri' => $redirectUri,
+                'state' => $state,
+            ], '', '&', PHP_QUERY_RFC3986)];
+            break;
+        }
+
+        case 'superjobOauthStatus': {
+            if ($authUid === null) { $data = ['connected' => false]; break; }
+            $connection = sb_single('jm_superjob_connections', ['worker_id' => 'eq.' . $authUid],
+                'resume_id,expires_at,connected_at,last_error');
+            $data = $connection ? [
+                'connected' => true,
+                'has_resume' => !empty($connection['resume_id']),
+                'connected_at' => $connection['connected_at'] ?? null,
+                'last_error' => $connection['last_error'] ?? null,
+            ] : ['connected' => false];
+            break;
+        }
+
+        case 'superjobOauthDisconnect': {
+            if ($authUid === null) throw new RuntimeException('Нужна авторизация JobToo');
+            sb_delete('jm_superjob_connections', ['worker_id' => 'eq.' . $authUid]);
+            $data = ['disconnected' => true];
+            break;
+        }
+
+        // Отправляем только ID резюме, выбранный самим SuperJob как основной,
+        // и ID вакансии из нашей серверной копии. Клиент не может подставить их.
+        case 'superjobApply': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $vacancyId = trim((string)($v['ext_vacancy_id'] ?? ''));
+            $consentVersion = trim((string)($v['consent_version'] ?? ''));
+            $comment = mb_substr(trim((string)($v['comment'] ?? '')), 0, 1000);
+            if ($authUid === null || $vacancyId === '' || $consentVersion === '') {
+                throw new RuntimeException('Не хватает данных для отклика');
+            }
+            $vacancy = sb_single('jm_ext_vacancies', [
+                'id' => 'eq.' . $vacancyId, 'source_id' => 'eq.superjob',
+                'active' => 'is.true', 'environment' => 'eq.production',
+            ], 'id,external_id');
+            $consent = sb_single('jm_partner_data_consents', [
+                'source_id' => 'eq.superjob', 'worker_id' => 'eq.' . $authUid,
+                'ext_vacancy_id' => 'eq.' . $vacancyId,
+                'consent_version' => 'eq.' . $consentVersion, 'revoked_at' => 'is.null',
+            ], 'id');
+            if (!$vacancy || !$consent) throw new RuntimeException('Вакансия или согласие не найдены');
+
+            $existing = sb_single('jm_partner_applications', [
+                'source_id' => 'eq.superjob', 'worker_id' => 'eq.' . $authUid,
+                'ext_vacancy_id' => 'eq.' . $vacancyId,
+            ], 'id,status');
+            if ($existing && ($existing['status'] ?? '') !== 'failed') {
+                $data = ['id' => $existing['id'], 'status' => $existing['status'], 'created' => false]; break;
+            }
+            $connection = sb_single('jm_superjob_connections', ['worker_id' => 'eq.' . $authUid]);
+            if (!$connection) throw new RuntimeException('Подключите аккаунт SuperJob');
+            if (empty($connection['resume_id'])) throw new RuntimeException('В SuperJob нет основного резюме');
+
+            try {
+                $access = sjo_decrypt((string)$connection['access_token_enc'], SB_KEY);
+                if (strtotime((string)$connection['expires_at']) <= time() + 60) {
+                    $refresh = sjo_decrypt((string)$connection['refresh_token_enc'], SB_KEY);
+                    $token = sjo_request('GET', 'https://api.superjob.ru/2.0/oauth2/refresh_token/?' . http_build_query([
+                        'refresh_token' => $refresh,
+                        'client_id' => sjo_cfg('SUPERJOB_CLIENT_ID'),
+                        'client_secret' => sjo_client_secret(),
+                    ], '', '&', PHP_QUERY_RFC3986));
+                    $access = (string)($token['access_token'] ?? '');
+                    $newRefresh = (string)($token['refresh_token'] ?? $refresh);
+                    if ($access === '') throw new RuntimeException('SuperJob did not refresh the token');
+                    $ttl = (int)($token['ttl'] ?? 0);
+                    $expires = $ttl > time() ? $ttl : time() + max(300, (int)($token['expires_in'] ?? 3600));
+                    sb_update('jm_superjob_connections', ['worker_id' => 'eq.' . $authUid], [
+                        'access_token_enc' => sjo_encrypt($access, SB_KEY),
+                        'refresh_token_enc' => sjo_encrypt($newRefresh, SB_KEY),
+                        'expires_at' => gmdate('Y-m-d\TH:i:s', $expires) . '.000Z',
+                        'updated_at' => now_iso(), 'last_error' => null,
+                    ]);
+                }
+                sjo_request('POST', 'https://api.superjob.ru/2.0/send_cv_on_vacancy/', [
+                    'id_cv' => (string)$connection['resume_id'],
+                    'id_vacancy' => (string)$vacancy['external_id'],
+                    'comment' => $comment,
+                ], $access);
+                $applicationId = $existing['id'] ?? uid();
+                sb_upsert('jm_partner_applications', [
+                    'id' => $applicationId, 'source_id' => 'superjob',
+                    'ext_vacancy_id' => $vacancyId, 'worker_id' => $authUid,
+                    'status' => 'submitted', 'consent_version' => $consentVersion,
+                    'failure_code' => null, 'failure_message' => null,
+                    'updated_at' => now_iso(), 'partner_updated_at' => now_iso(),
+                ], 'id');
+                $data = ['id' => $applicationId, 'status' => 'submitted', 'created' => !$existing];
+            } catch (Throwable $e) {
+                sb_update('jm_superjob_connections', ['worker_id' => 'eq.' . $authUid], [
+                    'last_error' => mb_substr($e->getMessage(), 0, 300), 'updated_at' => now_iso(),
+                ]);
+                throw new RuntimeException('SuperJob не принял отклик. Попробуйте ещё раз.');
+            }
+            break;
         }
 
         // Отклик внутри JobToo доступен только для боевой embedded-интеграции.

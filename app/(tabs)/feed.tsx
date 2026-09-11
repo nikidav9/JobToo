@@ -46,6 +46,9 @@ import {
   dbRecordExternalClick,
   dbRecordPartnerDataConsent,
   dbCreatePartnerApplication,
+  dbStartSuperJobOAuth,
+  dbGetSuperJobOAuthStatus,
+  dbApplyViaSuperJob,
   dbRecordGuestEvent,
   dbStartGuestRegistration,
 } from '@/services/db';
@@ -53,6 +56,7 @@ import { notifyEmployerGotMatch, notifyWorkerGotMatch,
   notifyEmployerNewMessage } from '@/services/notifications';
 import { Image } from 'expo-image';
 import * as Crypto from 'expo-crypto';
+import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
@@ -3126,16 +3130,59 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
       purpose: 'Рассмотрение отклика и обмен статусами по выбранной вакансии',
       consentVersion: PARTNER_CONSENT_VERSION,
     });
-    const result = await dbCreatePartnerApplication({
-      sourceId: v.sourceId,
-      workerId: currentUser.id,
-      externalVacancyId: v.id,
-      consentVersion: PARTNER_CONSENT_VERSION,
-    });
+    const result = v.connectorKind === 'superjob'
+      ? await dbApplyViaSuperJob({
+          externalVacancyId: v.id,
+          consentVersion: PARTNER_CONSENT_VERSION,
+        })
+      : await dbCreatePartnerApplication({
+          sourceId: v.sourceId,
+          workerId: currentUser.id,
+          externalVacancyId: v.id,
+          consentVersion: PARTNER_CONSENT_VERSION,
+        });
     setPartnerConsentFor(null);
     setSwSkipped(s => new Set(s).add(v.id));
     setSwHistory(h => h.includes(v.id) ? h : [...h, v.id]);
-    showToast(result.created ? 'Отклик отправляется работодателю' : 'Вы уже откликнулись', 'success');
+    showToast(
+      result.created
+        ? (v.connectorKind === 'superjob' ? 'Отклик отправлен в SuperJob' : 'Отклик отправляется работодателю')
+        : 'Вы уже откликнулись',
+      'success',
+    );
+  };
+
+  const prepareSuperJobApplication = async (v: ExternalVacancy) => {
+    if (currentUser.isGuest) {
+      promptRegister({ vacancyKind: 'permanent' });
+      return;
+    }
+    try {
+      const status = await dbGetSuperJobOAuthStatus();
+      if (status.connected && status.has_resume) {
+        setPartnerConsentFor(v);
+        return;
+      }
+      if (status.connected && !status.has_resume) {
+        showToast('Сначала создайте или выберите основное резюме в SuperJob', 'error');
+        return;
+      }
+      const returnUrl = Platform.OS === 'web' ? 'https://jobtoo.ru/' : 'onspaceapp:///';
+      const { url } = await dbStartSuperJobOAuth(returnUrl);
+      if (Platform.OS === 'web') {
+        await Linking.openURL(url);
+      } else {
+        await WebBrowser.openAuthSessionAsync(url, returnUrl);
+        const connected = await dbGetSuperJobOAuthStatus();
+        if (connected.connected && connected.has_resume) {
+          setPartnerConsentFor(v);
+          return;
+        }
+      }
+      showToast('После подключения повторите свайп', 'success');
+    } catch (e: any) {
+      showToast(e?.message ?? 'Не удалось подключить SuperJob', 'error');
+    }
   };
 
   const renderPerm = ({ item: v }: { item: PermVacancy | ExternalVacancy }) => {
@@ -3381,7 +3428,8 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
     if ('sourceId' in c) {
       swSnapBack();
       const external = c as ExternalVacancy;
-      if (external.integrationMode === 'embedded') setPartnerConsentFor(external);
+      if (external.connectorKind === 'superjob') void prepareSuperJobApplication(external);
+      else if (external.integrationMode === 'embedded') setPartnerConsentFor(external);
       else setExternalConfirm(external);
       return;
     }
