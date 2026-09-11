@@ -2260,11 +2260,25 @@ function WorkerFeed() {
     doMessageRef.current = doMessage;
   });
 
+  // Листает ли человек прямо сейчас содержимое карточки.
+  //
+  // Без этого флага карточка улетала от обычной прокрутки. Палец почти никогда
+  // не идёт строго вниз: первые же миллиметры движения дают пару пикселей вбок,
+  // и прежнего условия (8 пикселей вбок при перевесе в 1.2 раза) хватало, чтобы
+  // свайп забрал жест себе — раньше, чем список успевал начать прокрутку.
+  // А забрав, уже не отдавал: дальше палец ехал вниз, но карточка следовала за
+  // его горизонтальной составляющей и показывала «ХОЧУ»/«НЕТ».
+  const cardScrollingRef = useRef(false);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
+      // Прокрутка идёт — свайп не начинаем вовсе. В остальном порог выше и
+      // перевес строже: вбок должно уехать заметно и явно больше, чем вниз.
       onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dx) > Math.abs(g.dy) * 1.2 && Math.abs(g.dx) > 8,
+        !cardScrollingRef.current
+        && Math.abs(g.dx) > Math.abs(g.dy) * 2
+        && Math.abs(g.dx) > 14,
       onPanResponderGrant: () => {
         pan.setOffset({ x: (pan.x as any)._value, y: (pan.y as any)._value });
         pan.setValue({ x: 0, y: 0 });
@@ -2472,6 +2486,12 @@ function WorkerFeed() {
                   style={{ flex: 1 }}
                   contentContainerStyle={{ paddingBottom: rs(28) }}
                   showsVerticalScrollIndicator={false}
+                  // Пока карточка уезжает, листать её нельзя: жест либо
+                  // прокручивает, либо двигает карточку, но не оба разом.
+                  scrollEnabled={!swiping}
+                  onScrollBeginDrag={() => { cardScrollingRef.current = true; }}
+                  onScrollEndDrag={() => { cardScrollingRef.current = false; }}
+                  onMomentumScrollEnd={() => { cardScrollingRef.current = false; }}
                   refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
                 >
                   <View style={styles.cardTop}>
@@ -2947,10 +2967,16 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
   const swWantRef = useRef<(vx?: number) => void>(() => {});
   const swSkipRef = useRef<(vx?: number) => void>(() => {});
   const swSnapBackRef = useRef<() => void>(() => {});
+  // Тот же флаг прокрутки, что и у колоды смен, и по той же причине —
+  // см. cardScrollingRef выше.
+  const swScrollingRef = useRef(false);
   const swPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > Math.abs(g.dy) * 1.2 && Math.abs(g.dx) > 8,
+      onMoveShouldSetPanResponder: (_, g) =>
+        !swScrollingRef.current
+        && Math.abs(g.dx) > Math.abs(g.dy) * 2
+        && Math.abs(g.dx) > 14,
       onPanResponderGrant: () => {
         swPan.setOffset({ x: (swPan.x as any)._value, y: (swPan.y as any)._value });
         swPan.setValue({ x: 0, y: 0 });
@@ -3586,6 +3612,9 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
             <ScrollView
               style={{ flex: 1 }}
               showsVerticalScrollIndicator={false}
+              onScrollBeginDrag={() => { swScrollingRef.current = true; }}
+              onScrollEndDrag={() => { swScrollingRef.current = false; }}
+              onMomentumScrollEnd={() => { swScrollingRef.current = false; }}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
             >
               <View style={styles.cardTop}>
