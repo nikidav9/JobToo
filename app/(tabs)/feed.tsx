@@ -701,6 +701,16 @@ export type PermFilters = {
 };
 export const EMPTY_PERM_FILTERS: PermFilters = { query: '', searchIn: [], posted: 'all', stations: [], salaryFrom: '', schedules: [], sources: [] };
 
+const countExternalPerm = (f: PermFilters) => dbCountExternalVacancies({
+  query: f.query,
+  searchIn: f.searchIn,
+  posted: f.posted,
+  stations: f.stations,
+  salaryFrom: f.salaryFrom,
+  schedules: f.schedules,
+  sourceIds: selectedPartnerSourceIds(f.sources),
+});
+
 const postedWithin = (iso: string | undefined, p: PermFilters['posted']) => {
   if (p === 'all' || !iso) return true;
   const days = p === 'week' ? 7 : 3;
@@ -3011,16 +3021,6 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
       && sourceFilterMatches(f.sources)
       && permMatchesQuery(v.title, v.company, v.description ?? '', f)
       && permMatchesMeta(v.metroStation, v.salary, v.createdAt, v.schedule, f)).length;
-
-  const countExternalPerm = useCallback((f: PermFilters) => dbCountExternalVacancies({
-    query: f.query,
-    searchIn: f.searchIn,
-    posted: f.posted,
-    stations: f.stations,
-    salaryFrom: f.salaryFrom,
-    schedules: f.schedules,
-    sourceIds: selectedPartnerSourceIds(f.sources),
-  }), []);
 
   const shownVacancies: (PermVacancy | ExternalVacancy)[] =
     tab === 'open'     ? [...openVacancies, ...externalOpenVacancies] :
