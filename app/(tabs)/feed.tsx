@@ -748,8 +748,9 @@ function PermFilterSheet({
   }, [countKey, countExternal, draft]);
 
   const counting = remoteCount?.key !== countKey;
-  const countAvailable = !counting && remoteCount.total !== null;
-  const n = countLocal(draft) + (countAvailable ? remoteCount.total : 0);
+  const externalCount = remoteCount?.key === countKey ? remoteCount.total : null;
+  const countAvailable = externalCount !== null;
+  const n = countLocal(draft) + (externalCount ?? 0);
 
   return (
     <View style={styles.filterOverlay}>
