@@ -130,6 +130,44 @@ systemctl reset-failed jt-trudvsem-import.service >/dev/null 2>&1 || true
 systemctl start --no-block jt-trudvsem-import.service || true
 log "INGEST_TIMER $HEAD: trudvsem full import started"
 
+# SuperJob также отдаёт каталог страницами. Отдельный worker не даёт ему
+# ждать, пока долгий обход другого источника освободит общий ingest.php.
+cat >/etc/systemd/system/jt-superjob-import.service <<'UNIT'
+[Unit]
+Description=JobToo full SuperJob vacancy import
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/jobtoo/infra/superjob-import-loop.sh
+Nice=10
+TimeoutStartSec=2h
+Restart=on-failure
+RestartSec=1min
+UNIT
+
+cat >/etc/systemd/system/jt-superjob-import.timer <<'TIMER'
+[Unit]
+Description=Run full JobToo SuperJob import regularly
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=30min
+Persistent=true
+RandomizedDelaySec=1min
+Unit=jt-superjob-import.service
+
+[Install]
+WantedBy=timers.target
+TIMER
+
+systemctl daemon-reload
+systemctl enable --now jt-superjob-import.timer >/dev/null
+systemctl reset-failed jt-superjob-import.service >/dev/null 2>&1 || true
+systemctl start --no-block jt-superjob-import.service || true
+log "INGEST_TIMER $HEAD: superjob full import started"
+
 MAPS_KEY=${EXPO_PUBLIC_YANDEX_MAPS_KEY:-}
 if [ -z "$MAPS_KEY" ] && [ -d /var/www/jobtoo ]; then
   MAPS_KEY=$(python3 - <<'PY' 2>/dev/null || true
