@@ -62,7 +62,8 @@
 | Admin Dashboard | Next.js 14 + Tailwind CSS |
 | Сборка | EAS Build (Android APK / AAB, iOS IPA) |
 | OTA-обновления | expo-updates (EAS Update) |
-| Веб-деплой | FTP на Reg.ru (GitHub Actions) |
+| Веб-деплой | GitHub Actions → релиз с `dist.tar.gz` → забирает self-hosted сервер (Москва) |
+| Бэкенд | self-hosted Supabase-стек (Postgres/PostgREST/Realtime/Storage) на сервере в Москве, `infra/` |
 | CI/CD | GitHub Actions |
 
 ---
@@ -171,7 +172,8 @@ npm run dev   # http://localhost:3000
 ```bash
 EXPO_TOKEN=<токен> npx eas-cli build --platform android --profile production
 ```
-Runtime version: `1.3.0` (задаётся в `app.json`)
+Runtime version: политика `appVersion` в `app.json` — берётся автоматически из
+поля `version` (сейчас `1.4.0`), отдельно не задаётся
 
 **Перед первой сборкой** заведите на expo.dev (Project → Environment variables)
 переменные `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_APP_SECRET` и
@@ -188,13 +190,23 @@ EXPO_TOKEN=<токен> npx eas-cli update --branch production --message "опи
 Работает только если runtime version не изменился.
 
 ### Веб на jobtoo.ru
-Автоматически при пуше в `main` — GitHub Actions (`deploy-regru.yml`):
+Домен переехал с хостинга Reg.ru на собственный сервер в Москве (17 августа
+2026); FTP-деплоя на Reg.ru больше нет. Автоматически при пуше в `main` —
+GitHub Actions (`deploy-regru.yml`):
 1. `npx expo export --platform web` → папка `dist/`
-2. Копирование `php-proxy/db.php` → `dist/api/db.php`
-3. FTP-деплой на `www/jobtoo.ru/` (Reg.ru)
+2. Сборка упаковывается в `dist.tar.gz` и публикуется GitHub-релизом (`web`)
+3. Московский сервер раз в минуту забирает изменения из репозитория и релиз
+   со сборкой (`infra/bootstrap.sh` → `docker compose up -d` → `nginx reload`)
 
-### Admin Dashboard на Vercel
-Автоматически при пуше в `main` (Vercel CI).
+PHP-прокси (`php-proxy/*.php`) на сервер тоже не заливается по FTP — сервер
+берёт файлы прямо из репозитория при каждом `git pull` (см. `infra/README.md`).
+
+### Admin Dashboard
+Дашборд переехал с Vercel на тот же московский сервер (`admin.jobtoo.ru`).
+Автоматически при пуше в `main`, если менялась папка `dashboard/` —
+GitHub Actions (`build-dashboard.yml`) собирает standalone-сборку Next.js,
+публикует её GitHub-релизом (`dashboard`), сервер забирает релиз и
+разворачивает через blue-green (`docker compose --profile dashboard`).
 
 ---
 
@@ -283,7 +295,8 @@ JobMatch/
 ├── public/                   # PWA-манифест, favicon, deep-link файлы
 │
 ├── .github/workflows/
-│   ├── deploy-regru.yml      # Авто-деплой веба на Reg.ru при пуше в main
+│   ├── deploy-regru.yml      # Сборка веба и доставка на self-hosted сервер (Москва) при пуше в main
+│   ├── build-dashboard.yml   # Сборка Admin Dashboard и доставка на тот же сервер (при изменениях в dashboard/)
 │   ├── eas-update.yml        # Авто OTA-обновление при пуше в main
 │   └── keep-alive.yml        # Ping для поддержания активности сервиса
 │
