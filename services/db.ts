@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { supabase } from '@/lib/supabase';
 import { User, Vacancy, Like, Chat, Message, PermVacancy, PermApplication, PermApplicationStatus, PartnerApplication, ReportableOutcome, ExternalVacancy, WorkType } from '@/constants/types';
 import { uid, nowISO } from '@/services/storage';
@@ -30,16 +31,52 @@ const APP_SECRET = (process.env.EXPO_PUBLIC_APP_SECRET ?? '').trim();
 const SESSION_TOKEN_KEY = 'jm_session_token';
 let sessionTokenCache: string | null | undefined;
 
+/**
+ * Где лежит токен сессии.
+ *
+ * На телефоне — в защищённом хранилище системы (Keychain на iOS, EncryptedShared
+ * Preferences на Android), а не в AsyncStorage: тот хранит значения открытым
+ * файлом в песочнице приложения, и на разлоченном устройстве или из резервной
+ * копии токен читается как обычный текст. Живёт он тридцать дней, так что
+ * находка стоит месяца доступа к чужой переписке.
+ *
+ * На вебе expo-secure-store не работает вовсе (нет системного хранилища), там
+ * остаётся AsyncStorage поверх localStorage — и защищает его уже origin, а не
+ * файловые права.
+ */
+const useSecureStore = Platform.OS !== 'web';
+
+async function readToken(): Promise<string | null> {
+  if (!useSecureStore) return AsyncStorage.getItem(SESSION_TOKEN_KEY).catch(() => null);
+  const fromSecure = await SecureStore.getItemAsync(SESSION_TOKEN_KEY).catch(() => null);
+  if (fromSecure) return fromSecure;
+  // Разовый перенос: у тех, кто уже вошёл, токен лежит на старом месте.
+  // Иначе эта правка разлогинила бы всех сразу после обновления.
+  const legacy = await AsyncStorage.getItem(SESSION_TOKEN_KEY).catch(() => null);
+  if (legacy) {
+    await SecureStore.setItemAsync(SESSION_TOKEN_KEY, legacy).catch(() => {});
+    await AsyncStorage.removeItem(SESSION_TOKEN_KEY).catch(() => {});
+  }
+  return legacy;
+}
+
 export async function getSessionToken(): Promise<string | null> {
   if (sessionTokenCache !== undefined) return sessionTokenCache;
-  sessionTokenCache = await AsyncStorage.getItem(SESSION_TOKEN_KEY).catch(() => null);
+  sessionTokenCache = await readToken();
   return sessionTokenCache;
 }
 
 async function saveSessionToken(token: string | null): Promise<void> {
   sessionTokenCache = token;
-  if (token) await AsyncStorage.setItem(SESSION_TOKEN_KEY, token);
-  else await AsyncStorage.removeItem(SESSION_TOKEN_KEY);
+  if (!useSecureStore) {
+    if (token) await AsyncStorage.setItem(SESSION_TOKEN_KEY, token);
+    else await AsyncStorage.removeItem(SESSION_TOKEN_KEY);
+    return;
+  }
+  if (token) await SecureStore.setItemAsync(SESSION_TOKEN_KEY, token).catch(() => {});
+  else await SecureStore.deleteItemAsync(SESSION_TOKEN_KEY).catch(() => {});
+  // Старое место чистим в любом случае: там мог остаться прежний токен.
+  await AsyncStorage.removeItem(SESSION_TOKEN_KEY).catch(() => {});
 }
 
 export async function dbClearSession(): Promise<void> {
@@ -331,7 +368,14 @@ export async function dbChangePassword(
   oldPassword: string,
   newPassword: string
 ): Promise<{ ok: boolean; reason?: string }> {
-  return proxy<{ ok: boolean; reason?: string }>('dbChangePassword', [userId, oldPassword, newPassword]);
+  const res = await proxy<{ ok: boolean; reason?: string; session_token?: string | null }>(
+    'dbChangePassword', [userId, oldPassword, newPassword]
+  );
+  // Смена пароля гасит все выданные токены, в том числе наш собственный:
+  // сервер тут же выдаёт новый, и без этой строки человек, сменивший пароль,
+  // оказывался бы выброшен из приложения.
+  if (res?.session_token) await saveSessionToken(res.session_token);
+  return res;
 }
 
 export async function dbUpsertUser(u: User): Promise<void> {

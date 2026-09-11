@@ -181,7 +181,42 @@ if (in_array($fn, $adminFns, true)) {
 }
 
 $authHeader = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? '');
-$authUid = jt_session_uid($authHeader);
+$authClaims = jt_session_claims($authHeader);
+$authUid = $authClaims['uid'] ?? null;
+
+// Токен подписан верно — но этого мало.
+//
+// Он живёт тридцать дней и до сих пор ничем не гасился: ни сменой пароля, ни
+// блокировкой. То есть увели токен — и он работает месяц, сколько пароль ни
+// меняй; а заблокированный пользователь просто продолжал ходить в API, потому
+// что is_blocked спрашивали только рассылки, решая, слать ли уведомление.
+//
+// Поэтому один запрос к своей же строке: он заодно ловит и удалённый аккаунт.
+// Колонки sessions_valid_from может ещё не быть (миграция 046) — тогда
+// проверяем хотя бы блокировку, а не роняем всё приложение.
+if ($authUid !== null) {
+    $acct = null;
+    try {
+        $acct = sb_single('jm_users', ['id' => 'eq.' . $authUid], 'id,is_blocked,sessions_valid_from');
+    } catch (\Throwable $e) {
+        try { $acct = sb_single('jm_users', ['id' => 'eq.' . $authUid], 'id,is_blocked'); }
+        catch (\Throwable $e2) { $acct = null; }
+    }
+    if (!is_array($acct)) {
+        jt_respond(['error' => 'Session is no longer valid'], 401); exit;
+    }
+    if (!empty($acct['is_blocked'])) {
+        jt_respond(['error' => 'Аккаунт заблокирован'], 403); exit;
+    }
+    $validFrom = isset($acct['sessions_valid_from']) && $acct['sessions_valid_from'] !== null
+        ? (int)strtotime((string)$acct['sessions_valid_from']) : 0;
+    // Пять секунд допуска: отметка времени в базе и iat в токене ставятся
+    // разными часами и с разным округлением, а без запаса свежевыданный при
+    // смене пароля токен мог бы оказаться «старше» самой отметки.
+    if ($validFrom > 0 && (int)($authClaims['iat'] ?? 0) + 5 < $validFrom) {
+        jt_respond(['error' => 'Session is no longer valid'], 401); exit;
+    }
+}
 $publicFns = [
     'dbCountUsers', 'dbWarmup', 'dbCheckPhoneExists', 'dbLogin',
     'dbUpsertUser', 'tgAuth', 'dbGetVacancies', 'dbGetPermVacancies',
@@ -491,28 +526,111 @@ function jt_b64url_decode(string $raw): string|false {
     if ($pad) $raw .= str_repeat('=', 4 - $pad);
     return base64_decode(strtr($raw, '-_', '+/'), true);
 }
+// ─── Перебор ──────────────────────────────────────────────────────────────────
+//
+// Вход — это номер телефона и пароль, и оба подбираются: `dbCheckPhoneExists`
+// отвечает, есть ли такой номер, а `dbLogin` — верен ли к нему пароль. Обе
+// операции публичные (иначе нельзя ни зарегистрироваться, ни войти), и до сих
+// пор ни одна из них не считала попытки. В админке такой счёт есть с самого
+// начала — здесь его не было, хотя перебирать выгоднее как раз здесь.
+//
+// Счёт файловый, как в admin.php: база для этого слишком дорога, а запрос
+// ронять из-за счётчика нельзя. REMOTE_ADDR — настоящий адрес клиента: nginx
+// отдаёт PHP по FastCGI и стоит на краю, без второго прокси перед собой.
+const JT_TRY_WINDOW = 900;          // 15 минут
+const JT_TRY_MAX = ['login' => 10, 'phone' => 30];
+
+function jt_try_file(string $kind): string {
+    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+    return sys_get_temp_dir() . '/jm_try_' . $kind . '_' . hash('sha256', $ip) . '.json';
+}
+
+function jt_try_blocked(string $kind): bool {
+    $st = json_decode((string)@file_get_contents(jt_try_file($kind)), true);
+    if (!is_array($st)) return false;
+    if ((int)($st['since'] ?? 0) + JT_TRY_WINDOW < time()) return false;
+    return (int)($st['fails'] ?? 0) >= (JT_TRY_MAX[$kind] ?? 10);
+}
+
+function jt_try_note(string $kind): void {
+    $f = jt_try_file($kind);
+    $st = json_decode((string)@file_get_contents($f), true);
+    if (!is_array($st) || (int)($st['since'] ?? 0) + JT_TRY_WINDOW < time()) {
+        $st = ['since' => time(), 'fails' => 0];
+    }
+    $st['fails'] = (int)($st['fails'] ?? 0) + 1;
+    @file_put_contents($f, json_encode($st), LOCK_EX);
+}
+
+function jt_try_reset(string $kind): void { @unlink(jt_try_file($kind)); }
+
+// Ключ подписи сессий — свой, а не ключ базы.
+//
+// Раньше при пустом SESSION_SECRET подпись считалась ключом Supabase. Две беды
+// сразу: ротация ключа базы разлогинивала всех разом, а если ключ до сервера
+// не доехал и оказался пустым, подпись считалась пустым ключом — и токен на
+// любой чужой uid подделывался в две строки.
+//
+// Теперь ключ берётся свой (bootstrap.sh заводит его при первом запуске), а
+// ключ базы остаётся запасным, пока свой не доехал: иначе эта правка в момент
+// выкатки положила бы вход всем. Пустым ключ не бывает ни при каком раскладе —
+// на этом и держалась подделка.
 function jt_session_key(): string {
     $key = jt_secret('SESSION_SECRET');
-    return $key !== '' ? $key : SB_KEY;
+    if ($key === '') $key = SB_KEY;
+    if ($key === '') {
+        // Подписывать нечем. Молчать нельзя: пустой ключ — это подделываемые
+        // токены, то есть вход под любым чужим id.
+        jt_respond(['error' => 'Server is not configured to issue sessions'], 500);
+        exit;
+    }
+    return $key;
+}
+/**
+ * Ключ, которым подписаны токены, выданные до появления SESSION_SECRET.
+ *
+ * Принимается только на проверке — тот же приём, что с APP_SECRET_PREV: дать
+ * уже выданным токенам дожить, а не разлогинивать четыреста человек разом.
+ */
+function jt_session_key_prev(): string {
+    return jt_secret('SESSION_SECRET') !== '' ? SB_KEY : '';
 }
 function jt_session_issue(string $uid): string {
     $payload = jt_b64url_encode(json_encode([
-        'uid' => $uid, 'exp' => time() + 30 * 86400,
+        'uid' => $uid, 'iat' => time(), 'exp' => time() + 30 * 86400,
     ], JSON_UNESCAPED_SLASHES));
     $sig = jt_b64url_encode(hash_hmac('sha256', $payload, jt_session_key(), true));
     return $payload . '.' . $sig;
 }
-function jt_session_uid(string $header): ?string {
+/**
+ * Кто предъявил токен — или null.
+ *
+ * Возвращает пару [uid, iat]: время выдачи нужно, чтобы смена пароля и
+ * блокировка гасили уже выданные токены. У токенов, выданных до этой правки,
+ * iat нет — считаем их выданными в нулевой момент, то есть первая же смена
+ * пароля их погасит.
+ */
+function jt_session_claims(string $header): ?array {
     if (!preg_match('/^Bearer\s+(.+)$/i', trim($header), $m)) return null;
     $parts = explode('.', trim($m[1]), 2);
     if (count($parts) !== 2) return null;
     [$payload, $provided] = $parts;
-    $expected = jt_b64url_encode(hash_hmac('sha256', $payload, jt_session_key(), true));
-    if (!hash_equals($expected, $provided)) return null;
+    $ok = false;
+    foreach ([jt_session_key(), jt_session_key_prev()] as $key) {
+        if ($key === '') continue;
+        if (hash_equals(jt_b64url_encode(hash_hmac('sha256', $payload, $key, true)), $provided)) {
+            $ok = true; break;
+        }
+    }
+    if (!$ok) return null;
     $raw = jt_b64url_decode($payload);
     $data = is_string($raw) ? json_decode($raw, true) : null;
     if (!is_array($data) || empty($data['uid']) || (int)($data['exp'] ?? 0) < time()) return null;
-    return (string)$data['uid'];
+    return ['uid' => (string)$data['uid'], 'iat' => (int)($data['iat'] ?? 0)];
+}
+function jt_session_uid(string $header): ?string {
+    $c = jt_session_claims($header);
+    return $c === null ? null : $c['uid'];
 }
 
 // ─── Мгновенные сообщения ─────────────────────────────────────────────────────
@@ -1915,6 +2033,37 @@ try {
             if (!$existing && (empty($u['phone']) || empty($u['password']))) {
                 throw new RuntimeException('Для регистрации нужны телефон и пароль');
             }
+
+            // Сюда приходит профиль целиком, и раньше он целиком же уходил в
+            // базу. Но в той же строке лежат поля, которые человек про себя
+            // назначать не должен: `is_blocked` — это его блокировка,
+            // `avg_rating`/`rating_count` — оценки, которые ему поставили
+            // другие, `telegram_id` и `push_token` — адреса доставки, у них
+            // свои операции с проверкой владения.
+            //
+            // Клиент их и не шлёт (`services/db.ts` вырезает оценки сам), но
+            // запрос к `db.php` пишется руками за пять минут: пропуск лежит в
+            // бандле сайта. Поэтому решает сервер, а не добрая воля клиента.
+            // Список именно тот, что шлёт `userToRow` в services/db.ts, минус
+            // запретное. `nudge_off` и `vacancy_delivery_mode` сюда не входят
+            // намеренно: их меняет бот через /settings, и лишний путь записи
+            // здесь ни к чему.
+            $editable = [
+                'first_name', 'last_name', 'age', 'metro_line_id', 'metro_station',
+                'work_types', 'company', 'bio', 'avatar_url',
+            ];
+            // При регистрации строки ещё нет: тогда же задаются и те поля,
+            // которые потом менять нельзя. Роль и телефон — опознание
+            // человека, и смена их задним числом ломает вход.
+            $atCreate = ['id', 'role', 'phone', 'password', 'created_at'];
+            $allowed = $existing ? $editable : array_merge($editable, $atCreate);
+            // Пароль меняется через dbChangePassword со сверкой старого.
+            if ($existing) $u = array_diff_key($u, ['password' => 1]);
+            $u = array_intersect_key($u, array_flip($allowed));
+            $u['id'] = $uid;
+            // Клиент присылает is_blocked: false при каждом сохранении профиля.
+            // Своё значение тут задаёт сервер, а не присланное.
+            if (!$existing) $u['is_blocked'] = false;
             // Пустой пароль — это не «сотри пароль», а «в профиле его нет».
             if (empty($u['password'])) {
                 unset($u['password']);
@@ -1935,14 +2084,18 @@ try {
         // тут же превращается в хеш — база вычищается сама, по мере того как
         // люди заходят.
         case 'dbLogin': {
+            if (jt_try_blocked('login')) {
+                jt_respond(['error' => 'Слишком много попыток входа. Попробуйте через 15 минут.'], 429); exit;
+            }
             $phone = preg_replace('/\D+/', '', (string)($args[0] ?? ''));
             $pass  = (string)($args[1] ?? '');
             $row = $phone === '' ? null : sb_single('jm_users', ['phone' => 'eq.' . $phone]);
-            if (!$row || $pass === '' || empty($row['password'])) { $data = null; break; }
+            if (!$row || $pass === '' || empty($row['password'])) { jt_try_note('login'); $data = null; break; }
 
             $stored = (string)$row['password'];
             $ok = is_bcrypt($stored) ? password_verify($pass, $stored) : hash_equals($stored, $pass);
-            if (!$ok) { $data = null; break; }
+            if (!$ok) { jt_try_note('login'); $data = null; break; }
+            jt_try_reset('login');
 
             if (!is_bcrypt($stored)) {
                 try {
@@ -1974,9 +2127,17 @@ try {
             $ok = is_bcrypt($stored) ? password_verify($old, $stored) : hash_equals($stored, $old);
             if (!$ok) { $data = ['ok' => false, 'reason' => 'wrong_password']; break; }
 
-            sb_update('jm_users', ['id' => 'eq.' . $row['id']],
-                ['password' => password_hash($new, PASSWORD_BCRYPT)]);
-            $data = ['ok' => true]; break;
+            // Вместе с паролем гасим выданные токены: смена пароля затем и
+            // делается, что доступ у кого-то лишнего. Свой же токен станет
+            // недействителен, поэтому тут же выдаём новый.
+            $upd = ['password' => password_hash($new, PASSWORD_BCRYPT)];
+            try {
+                sb_update('jm_users', ['id' => 'eq.' . $row['id']],
+                    $upd + ['sessions_valid_from' => now_iso()]);
+            } catch (\Throwable $e) {
+                sb_update('jm_users', ['id' => 'eq.' . $row['id']], $upd);
+            }
+            $data = ['ok' => true, 'session_token' => jt_session_issue((string)$row['id'])]; break;
         }
 
         // Сброс чужого пароля — для дашборда.
@@ -1998,9 +2159,18 @@ try {
 
             // return=representation: без него запрос по несуществующему id
             // проходил молча, и дашборд показывал пароль, которого ни у кого нет.
-            $rows = sb('PATCH', 'jm_users', ['id' => 'eq.' . $uid],
-                ['password' => password_hash($pass, PASSWORD_BCRYPT)],
-                ['Prefer: return=representation']);
+            // Сброс пароля из дашборда — это обычно ответ на «у меня увели
+            // доступ». Значит и выданные токены надо погасить: иначе тот, кто
+            // увёл, ходит дальше с тем же токеном ещё месяц.
+            $patch = ['password' => password_hash($pass, PASSWORD_BCRYPT)];
+            try {
+                $rows = sb('PATCH', 'jm_users', ['id' => 'eq.' . $uid],
+                    $patch + ['sessions_valid_from' => now_iso()],
+                    ['Prefer: return=representation']);
+            } catch (\Throwable $e) {
+                $rows = sb('PATCH', 'jm_users', ['id' => 'eq.' . $uid], $patch,
+                    ['Prefer: return=representation']);
+            }
             if (empty($rows)) { $data = ['ok' => false, 'reason' => 'not_found']; break; }
 
             $data = ['ok' => true, 'password' => $pass];
@@ -2055,6 +2225,18 @@ try {
             $type = (string)($args[2] ?? 'application/octet-stream');
             if (!preg_match('#^chat/[A-Za-z0-9._-]{1,180}$#', $name) || str_contains($name, '..')) {
                 $data = ['error' => 'плохое имя файла']; break;
+            }
+            // Бакет закрытый, но ссылку на него подписывают и отдают с того же
+            // имени, что и сайт, — значит разметка, залитая сюда, тоже
+            // выполнится как своя. Приложение шлёт только фотографии и
+            // голосовые (image/jpeg и audio/mp4); всё остальное, и прежде
+            // всего svg+xml и html, здесь не нужно.
+            $allowedMedia = [
+                'image/jpeg', 'image/png', 'image/webp',
+                'audio/mp4', 'audio/mpeg', 'audio/aac',
+            ];
+            if (!in_array($type, $allowedMedia, true)) {
+                $data = ['error' => 'такой тип файла в переписке не принимается']; break;
             }
             $bytes = base64_decode($b64, true);
             if ($bytes === false || $bytes === '') { $data = ['error' => 'пустой файл']; break; }
@@ -2251,7 +2433,14 @@ try {
         case 'dbDeleteUser':
             $data = sb_rpc('jm_delete_account', ['uid' => (string)$args[0]]); break;
 
+        // Проверка «этот номер уже занят» нужна форме регистрации, но ею же
+        // перебирают базу номеров. Поэтому считаем и её: тридцати проверок за
+        // четверть часа человеку при регистрации хватит с запасом.
         case 'dbCheckPhoneExists':
+            if (jt_try_blocked('phone')) {
+                jt_respond(['error' => 'Слишком много проверок. Попробуйте через 15 минут.'], 429); exit;
+            }
+            jt_try_note('phone');
             $data = sb_single('jm_users', ['phone' => 'eq.' . $args[0]], 'id') !== null; break;
 
         // Как быстро человек отвечает — для чужого профиля.
@@ -4182,14 +4371,43 @@ try {
             $b64  = (string)($args[1] ?? '');
             $type = (string)($args[2] ?? 'application/octet-stream');
 
-            // Имя приходит от приложения, а уходит в путь. Пускаем только то,
-            // из чего нельзя составить выход за пределы каталога.
+            // Бакет avatars — публичный, и лежит он на том же имени, что и сам
+            // сайт: ссылка вида jobtoo.ru/storage/v1/object/public/avatars/…
+            // открывается в том же origin, где работает веб-приложение.
+            //
+            // Значит тип файла нельзя брать с клиента. Иначе достаточно
+            // зарегистрироваться, залить «аватар» с типом text/html и кинуть
+            // ссылку в переписку: страница выполнится как своя, с доступом к
+            // сохранённому токену сессии. Пускаем только картинки, и проверяем
+            // не заявленный тип, а сами байты.
+            $byType = [
+                'image/jpeg' => IMAGETYPE_JPEG,
+                'image/png'  => IMAGETYPE_PNG,
+                'image/webp' => IMAGETYPE_WEBP,
+            ];
+            if (!isset($byType[$type])) {
+                $data = ['error' => 'аватаром может быть только JPEG, PNG или WebP']; break;
+            }
+
+            // Имя тоже не с клиента: под ним лежит чужой аватар, а запись идёт
+            // с x-upsert, то есть поверх. Единственное допустимое имя — своё.
+            if ($authUid === null || $name !== 'avatar_' . $authUid . '.jpg') {
+                $data = ['error' => 'плохое имя файла']; break;
+            }
             if (!preg_match('#^[A-Za-z0-9._/-]{1,180}$#', $name) || str_contains($name, '..')) {
                 $data = ['error' => 'плохое имя файла']; break;
             }
             $bytes = base64_decode($b64, true);
             if ($bytes === false || $bytes === '') { $data = ['error' => 'пустой файл']; break; }
             if (strlen($bytes) > 25 * 1024 * 1024) { $data = ['error' => 'файл больше 25 МБ']; break; }
+
+            // Заявленный тип сверяем с содержимым: бывают файлы, которые и
+            // картинка, и разметка сразу, — такой проходит по типу, а
+            // открывается как страница.
+            $probe = @getimagesizefromstring($bytes);
+            if (!is_array($probe) || ($probe[2] ?? null) !== $byType[$type]) {
+                $data = ['error' => 'содержимое не похоже на ' . $type]; break;
+            }
 
             $ch = curl_init(SB_URL . '/storage/v1/object/avatars/' . $name);
             curl_setopt_array($ch, [
