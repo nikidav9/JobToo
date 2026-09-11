@@ -238,6 +238,8 @@ export interface ExternalVacancy {
   payPeriod?: string;
   schedule?: string;
   description?: string;
+  /** Когда вакансия впервые появилась у нас — используется фильтром свежести. */
+  createdAt?: string;
   /** Куда уводим. Без него карточка бессмысленна. */
   url: string;
   /** Когда источник в последний раз показывал её живой. */

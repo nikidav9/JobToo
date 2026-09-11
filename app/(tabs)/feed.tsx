@@ -42,6 +42,8 @@ import {
   dbRemoveSaved,
   dbGetExternalVacancies,
   dbGetExternalVacancyPage,
+  dbGetExternalSourceOptions,
+  dbCountExternalVacancies,
   dbRecordExternalImpression,
   dbRecordExternalClick,
   dbRecordPartnerDataConsent,
@@ -514,6 +516,11 @@ const partnerSourceFilterId = (sourceId: string) => `partner:${sourceId}`;
 const sourceFilterMatches = (selected: string[], sourceId?: string) =>
   selected.length === 0 || selected.includes(sourceId ? partnerSourceFilterId(sourceId) : JOBTOO_SOURCE_FILTER_ID);
 
+const selectedPartnerSourceIds = (selected: string[]): string[] | undefined =>
+  selected.length === 0
+    ? undefined
+    : selected.filter(id => id.startsWith('partner:')).map(id => id.slice('partner:'.length));
+
 const buildSourceOptions = (externalVacancies: ExternalVacancy[]): VacancySourceOption[] => {
   const partners = new Map<string, string>();
   externalVacancies.forEach(v => {
@@ -701,23 +708,38 @@ const postedWithin = (iso: string | undefined, p: PermFilters['posted']) => {
 };
 
 function PermFilterSheet({
-  initial, sourceOptions, count, onApply, onClose,
+  initial, sourceOptions, countLocal, countExternal, onApply, onClose,
 }: {
   initial: PermFilters;
   sourceOptions: VacancySourceOption[];
-  count: (f: PermFilters) => number;
+  countLocal: (f: PermFilters) => number;
+  countExternal: (f: PermFilters) => Promise<number>;
   onApply: (f: PermFilters) => void;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState<PermFilters>(initial);
   const [metroOpen, setMetroOpen] = useState(false);
+  const [remoteCount, setRemoteCount] = useState<{ key: string; total: number | null } | null>(null);
   const insets = useSafeAreaInsets();
 
   const toggleSearchIn = (id: 'title' | 'desc') => setDraft(d => ({
     ...d, searchIn: d.searchIn.includes(id) ? d.searchIn.filter(x => x !== id) : [...d.searchIn, id],
   }));
 
-  const n = count(draft);
+  const countKey = JSON.stringify(draft);
+  useEffect(() => {
+    let alive = true;
+    const timer = setTimeout(() => {
+      countExternal(draft)
+        .then(total => { if (alive) setRemoteCount({ key: countKey, total }); })
+        .catch(() => { if (alive) setRemoteCount({ key: countKey, total: null }); });
+    }, 350);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [countKey, countExternal, draft]);
+
+  const counting = remoteCount?.key !== countKey;
+  const countAvailable = !counting && remoteCount.total !== null;
+  const n = countLocal(draft) + (countAvailable ? remoteCount.total : 0);
 
   return (
     <View style={styles.filterOverlay}>
@@ -825,7 +847,9 @@ function PermFilterSheet({
         </ScrollView>
 
         <TouchableOpacity style={[fst.cta, { marginBottom: insets.bottom + rs(80) }]} activeOpacity={0.85} onPress={() => { onApply(draft); onClose(); }}>
-          <Text style={fst.ctaTxt}>{n > 0 ? `Показать ${n}` : 'Показать вакансии'}</Text>
+          <Text style={fst.ctaTxt}>
+            {counting ? 'Считаем вакансии…' : (countAvailable && n > 0 ? `Показать ${n}` : 'Показать вакансии')}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -2767,20 +2791,25 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
   const [chatLoading, setChatLoading] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [externalVacancies, setExternalVacancies] = useState<ExternalVacancy[]>([]);
+  const [externalSourceOptions, setExternalSourceOptions] = useState<VacancySourceOption[]>([]);
   // Redirect-источник открываем с подтверждением. Для embedded-источника
   // отдельно получаем согласие на передачу данных и создаём отклик у нас.
   const [externalConfirm, setExternalConfirm] = useState<ExternalVacancy | null>(null);
   const [partnerConsentFor, setPartnerConsentFor] = useState<ExternalVacancy | null>(null);
 
   const externalLoadId = useRef(0);
-  const loadExternalVacancies = useCallback(async () => {
+  const loadExternalVacancies = useCallback(async (sourceIds?: string[]) => {
     const loadId = ++externalLoadId.current;
+    if (sourceIds && sourceIds.length === 0) {
+      setExternalVacancies([]);
+      return;
+    }
     const pageSize = 1000;
     const loaded: ExternalVacancy[] = [];
     const seen = new Set<string>();
     try {
       for (let offset = 0; offset < 50000; offset += pageSize) {
-        const page = await dbGetExternalVacancyPage(offset, pageSize);
+        const page = await dbGetExternalVacancyPage(offset, pageSize, sourceIds);
         const rows = page.vacancies;
         if (externalLoadId.current !== loadId) return;
         for (const vacancy of rows) {
@@ -2803,9 +2832,27 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
     }
   }, []);
 
-  useEffect(() => { loadExternalVacancies(); }, [loadExternalVacancies]);
+  useEffect(() => {
+    dbGetExternalSourceOptions()
+      .then(rows => setExternalSourceOptions(rows.map(row => ({
+        id: partnerSourceFilterId(row.id), label: row.name,
+      }))))
+      .catch(() => {});
+  }, []);
 
-  const permSourceOptions = buildSourceOptions(externalVacancies);
+  const externalSelection = useMemo(() => selectedPartnerSourceIds(filterSources), [filterSources]);
+  useEffect(() => { loadExternalVacancies(externalSelection); }, [loadExternalVacancies, externalSelection]);
+
+  const permSourceOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    for (const item of [...externalSourceOptions, ...buildSourceOptions(externalVacancies)]) {
+      options.set(item.id, item.label);
+    }
+    options.set(JOBTOO_SOURCE_FILTER_ID, 'JobToo');
+    return Array.from(options, ([id, label]) => ({ id, label }))
+      .sort((a, b) => a.id === JOBTOO_SOURCE_FILTER_ID ? -1
+        : b.id === JOBTOO_SOURCE_FILTER_ID ? 1 : a.label.localeCompare(b.label, 'ru'));
+  }, [externalSourceOptions, externalVacancies]);
 
   // Вакансии для карты: метка — это адрес, станция остаётся для фильтра
   const permMapItems: MapListItem[] = useMemo(
@@ -2959,15 +3006,21 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
 
   // «Показать N» в шторке фильтров: открытые (не откликнутые) + внешние
   // под выбранный черновик фильтров.
-  const countPerm = (f: PermFilters) =>
+  const countPermLocal = (f: PermFilters) =>
     permVacancies.filter(v => v.status === 'open' && !myAppVacIds.has(v.id)
       && sourceFilterMatches(f.sources)
       && permMatchesQuery(v.title, v.company, v.description ?? '', f)
-      && permMatchesMeta(v.metroStation, v.salary, v.createdAt, v.schedule, f)).length
-    + externalVacancies.filter(v =>
-      sourceFilterMatches(f.sources, v.sourceId)
-      && permMatchesQuery(v.title, v.company ?? v.sourceName ?? '', (v as { description?: string }).description ?? '', f)
-      && permMatchesMeta(v.metroStation, v.salary ?? 0, (v as { createdAt?: string }).createdAt, (v as { schedule?: string }).schedule, f)).length;
+      && permMatchesMeta(v.metroStation, v.salary, v.createdAt, v.schedule, f)).length;
+
+  const countExternalPerm = useCallback((f: PermFilters) => dbCountExternalVacancies({
+    query: f.query,
+    searchIn: f.searchIn,
+    posted: f.posted,
+    stations: f.stations,
+    salaryFrom: f.salaryFrom,
+    schedules: f.schedules,
+    sourceIds: selectedPartnerSourceIds(f.sources),
+  }), []);
 
   const shownVacancies: (PermVacancy | ExternalVacancy)[] =
     tab === 'open'     ? [...openVacancies, ...externalOpenVacancies] :
@@ -3699,7 +3752,8 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
         <PermFilterSheet
           initial={permF}
           sourceOptions={permSourceOptions}
-          count={countPerm}
+          countLocal={countPermLocal}
+          countExternal={countExternalPerm}
           onApply={(f) => {
             setSearchText(f.query);
             setSearchIn(f.searchIn);

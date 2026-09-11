@@ -1634,8 +1634,8 @@ export type ExternalVacancyPage = {
   rawCount: number;
 };
 
-export async function dbGetExternalVacancyPage(offset = 0, limit = 1000): Promise<ExternalVacancyPage> {
-  const rows = await proxy<any[]>('extVacancies', [offset, limit]);
+export async function dbGetExternalVacancyPage(offset = 0, limit = 1000, sourceIds?: string[]): Promise<ExternalVacancyPage> {
+  const rows = await proxy<any[]>('extVacancies', [offset, limit, sourceIds]);
   if (!Array.isArray(rows)) throw new Error('Invalid external vacancies response');
   const mapped: ExternalVacancy[] = (rows ?? []).map(r => ({
     id: r.id,
@@ -1660,6 +1660,7 @@ export async function dbGetExternalVacancyPage(offset = 0, limit = 1000): Promis
     payPeriod: r.pay_period ?? undefined,
     schedule: r.schedule ?? undefined,
     description: r.description ?? undefined,
+    createdAt: r.first_seen_at ?? undefined,
     url: r.url,
     lastSeenAt: r.last_seen_at ?? undefined,
     dedupeKey: r.dedupe_key ?? undefined,
@@ -1679,6 +1680,31 @@ export async function dbGetExternalVacancyPage(offset = 0, limit = 1000): Promis
 
 export async function dbGetExternalVacancies(offset = 0, limit = 1000): Promise<ExternalVacancy[]> {
   return (await dbGetExternalVacancyPage(offset, limit)).vacancies;
+}
+
+export async function dbGetExternalSourceOptions(): Promise<Array<{ id: string; name: string }>> {
+  return proxy('extSourceOptions');
+}
+
+export async function dbCountExternalVacancies(filters: {
+  query: string;
+  searchIn: Array<'title' | 'desc'>;
+  posted: 'all' | 'week' | '3days';
+  stations: string[];
+  salaryFrom: string;
+  schedules: string[];
+  /** undefined = все партнёры; [] = ни одного партнёра. */
+  sourceIds?: string[];
+}): Promise<number> {
+  return proxy('extVacancyCount', [{
+    query: filters.query,
+    search_in: filters.searchIn,
+    posted: filters.posted,
+    stations: filters.stations,
+    salary_from: filters.salaryFrom,
+    schedules: filters.schedules,
+    ...(filters.sourceIds === undefined ? {} : { sources: filters.sourceIds }),
+  }]);
 }
 
 /**

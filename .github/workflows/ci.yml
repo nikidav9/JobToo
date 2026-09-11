@@ -55,6 +55,7 @@ jobs:
           python3 tests/trudvsem_infra_test.py
           python3 tests/superjob_infra_test.py
           python3 tests/headhunter_infra_test.py
+          python3 tests/external_filter_count_test.py
 
       - name: Web build
         env:

@@ -185,7 +185,7 @@ $authUid = jt_session_uid($authHeader);
 $publicFns = [
     'dbCountUsers', 'dbWarmup', 'dbCheckPhoneExists', 'dbLogin',
     'dbUpsertUser', 'tgAuth', 'dbGetVacancies', 'dbGetPermVacancies',
-    'extVacancies', 'extClick', 'addressSuggest', 'dbLogOpen', 'guestEvent',
+    'extVacancies', 'extVacancyCount', 'extSourceOptions', 'extClick', 'addressSuggest', 'dbLogOpen', 'guestEvent',
     'dbResponsivenessMap',
 ];
 if (!in_array($fn, $publicFns, true) && !in_array($fn, $adminFns, true) && $authUid === null) {
@@ -2948,14 +2948,27 @@ try {
         case 'extVacancies': {
             $offset = max(0, (int)($args[0] ?? 0));
             $limit = max(1, min(1000, (int)($args[1] ?? 1000)));
-            $rows = sb_select('jm_ext_vacancies', [
+            $sourceRows = sb_select('jm_ext_sources', [
+                'enabled' => 'is.true', 'environment' => 'eq.production',
+            ], 'id,name,connector_kind,integration_mode');
+            $sources = [];
+            foreach ($sourceRows as $s) { $sources[(string)$s['id']] = $s; }
+            $sourceIds = array_keys($sources);
+            $filters = [
                 'active' => 'is.true', 'environment' => 'eq.production',
                 'limit' => (string)$limit, 'offset' => (string)$offset,
-            ], '*', 'id.asc');
-            $sources = [];
-            foreach (sb_select('jm_ext_sources', [], 'id,name,connector_kind,integration_mode') as $s) {
-                $sources[(string)$s['id']] = $s;
+            ];
+            if (is_array($args[2] ?? null)) {
+                $requestedSourceIds = array_values(array_filter(array_map(
+                    fn($id) => preg_match('/^[a-z0-9_-]{1,64}$/i', (string)$id) ? (string)$id : '',
+                    $args[2]
+                )));
+                $sourceIds = array_values(array_intersect($sourceIds, $requestedSourceIds));
+                // Пустой массив означает «ни одного внешнего источника».
             }
+            if (!$sourceIds) { $data = []; break; }
+            $filters['source_id'] = 'in.(' . implode(',', $sourceIds) . ')';
+            $rows = sb_select('jm_ext_vacancies', $filters, '*', 'id.asc');
             foreach ($rows as &$r) {
                 $source = $sources[(string)$r['source_id']] ?? [];
                 $r['source_name'] = $source['name'] ?? null;
@@ -2969,6 +2982,46 @@ try {
             }
             unset($r);
             $data = $rows; break;
+        }
+
+        case 'extSourceOptions': {
+            $rows = sb_select('jm_ext_sources', [
+                'enabled' => 'is.true', 'environment' => 'eq.production',
+            ], 'id,name', 'name.asc');
+            $data = array_values(array_map(fn($r) => [
+                'id' => (string)$r['id'], 'name' => (string)$r['name'],
+            ], $rows));
+            break;
+        }
+
+        case 'extVacancyCount': {
+            $v = is_array($args[0] ?? null) ? $args[0] : [];
+            $clean = [
+                'query' => mb_substr(trim((string)($v['query'] ?? '')), 0, 120),
+                'search_in' => array_values(array_intersect(
+                    is_array($v['search_in'] ?? null) ? $v['search_in'] : [], ['title', 'desc'])),
+                'posted' => in_array(($v['posted'] ?? 'all'), ['all', 'week', '3days'], true)
+                    ? $v['posted'] : 'all',
+                'stations' => array_slice(array_values(array_filter(array_map(
+                    fn($x) => mb_substr(trim((string)$x), 0, 100),
+                    is_array($v['stations'] ?? null) ? $v['stations'] : []
+                ))), 0, 50),
+                'salary_from' => (string)max(0, (int)($v['salary_from'] ?? 0)),
+                'schedules' => array_slice(array_values(array_filter(array_map(
+                    fn($x) => mb_substr(trim((string)$x), 0, 100),
+                    is_array($v['schedules'] ?? null) ? $v['schedules'] : []
+                ))), 0, 20),
+            ];
+            // Отсутствие sources = все партнёры; [] = только JobToo.
+            if (array_key_exists('sources', $v) && is_array($v['sources'])) {
+                $clean['sources'] = array_values(array_filter(array_map(
+                    fn($id) => preg_match('/^[a-z0-9_-]{1,64}$/i', (string)$id) ? (string)$id : '',
+                    $v['sources']
+                )));
+            }
+            $rows = sb_rpc('jm_ext_vacancy_filter_count', ['p_filters' => $clean]);
+            $data = (int)($rows[0]['total'] ?? 0);
+            break;
         }
 
         // События партнёрской воронки. Показы принимаются только от
