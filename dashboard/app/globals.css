@@ -774,58 +774,59 @@ span.flatpickr-weekday,
  * ───────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* Токены — из MASTER.md. Значения в разметке запрещены: через двадцать три
-     раздела расхождение неизбежно, и лечится оно потом сплошной вычиткой.
+  /* Токены панели — теперь поверх палитры TailAdmin.
+   *
+   * Имена оставлены прежними намеренно: на них завязаны 772 места в разметке
+   * страниц. Пока страницы не переписаны на классы TailAdmin, переопределение
+   * здесь — единственный способ привести их к одному виду разом, не трогая
+   * 29 файлов и ничего по дороге не забыв.
+   *
+   * Значения не свои, а ссылки на палитру из @theme: поменяется серый там —
+   * поменяется и здесь, второй расходящейся палитры не заводим. Это то же
+   * правило, что было раньше («значения в разметке запрещены»), только теперь
+   * единственный источник — палитра TailAdmin.
+   */
+  --bg: var(--color-gray-50);
+  --bg-elev: #ffffff;
+  --bg-sunken: var(--color-gray-100);
+  --line: var(--color-gray-200);
+  --line-strong: var(--color-gray-300);
 
-     Тема светлая. Тёмную попробовали и отказались: панель открывают днём с
-     одного рабочего места, и тёмный фон там выигрывал только на скриншоте.
-     Нейтральные — холодные, а не кремовые: кремовый с терракотой выглядит
-     «как у всех» и не имеет отношения к фирменному цвету. */
-  --bg: #F6F7F9;
-  --bg-elev: #FFFFFF;
-  --bg-sunken: #EDEFF3;
-  --line: #E1E5EB;
-  --line-strong: #C9D0D9;
+  --ink: var(--color-gray-900);
+  --ink-2: var(--color-gray-700);
+  --ink-3: var(--color-gray-500);
+  --ink-4: var(--color-gray-400);
+  --muted: var(--color-gray-500);
 
-  --ink: #131720;    /* 16.7:1 */
-  --ink-2: #414A57;  /*  8.4:1 */
-  --ink-3: #5E6875;  /*  5.3:1 */
-  --ink-4: #8B94A1;  /*  2.9:1 — линии и выключенное, текстом не писать */
+  /* Фирменный оранжевый. 500 — читаемый оттенок: им пишут текст. */
+  --accent: var(--color-brand-500);
+  --accent-soft: var(--color-brand-50);
+  --accent-line: var(--color-brand-200);
 
-  /* Оранжевый притемнён против фирменного: исходный на светлом фоне даёт
-     4.2:1 и не проходит порог. Это тот же цвет, только читаемый. */
-  --accent: #BE4C16;                      /* 4.6:1 */
-  --accent-soft: rgba(190, 76, 22, .09);
-  --accent-line: rgba(190, 76, 22, .28);
-
-  --positive: #1E7A4C;
-  --negative: #B8342A;
-  --info: #2C6FB5;
-  --violet: #5F4BB6;
-
-  /* Мягкие подложки и границы к смысловым цветам. Раньше их писали прямо в
-     разметке — `rgba(46,125,84,.08)` встречалось в панели около полусотни раз,
-     причём от прошлой, более светлой зелени: подложки перестали совпадать со
-     своим же текстом. Теперь пара «цвет — подложка» задаётся один раз. */
-  --positive-soft: rgba(30, 122, 76, .08);
-  --positive-line: rgba(30, 122, 76, .20);
-  --negative-soft: rgba(184, 52, 42, .08);
-  --negative-line: rgba(184, 52, 42, .20);
-  --info-soft: rgba(44, 111, 181, .08);
-  --info-line: rgba(44, 111, 181, .20);
-  --violet-soft: rgba(95, 75, 182, .08);
-  --violet-line: rgba(95, 75, 182, .20);
+  /* Смысловые цвета. Для текста берутся тёмные ступени (700): 500-е на светлой
+     подложке порог контраста не проходят. */
+  --positive: var(--color-success-700);
+  --positive-soft: var(--color-success-50);
+  --positive-line: var(--color-success-200);
+  --negative: var(--color-error-700);
+  --negative-soft: var(--color-error-50);
+  --negative-line: var(--color-error-200);
+  --info: var(--color-blue-light-700);
+  --info-soft: var(--color-blue-light-50);
+  --info-line: #b9e6fe;
+  --violet: var(--color-theme-purple-500);
+  --violet-soft: #f4f3ff;
+  --violet-line: #e0deff;
   --neutral-soft: var(--bg-sunken);
   --neutral-line: var(--line);
 
-  /* На светлом фоне тень читается и работает — в отличие от тёмного, где мы
-     от неё отказывались. Но еле-еле: глубина по-прежнему даётся тоном. */
-  --shadow-sm: 0 1px 2px rgba(19, 23, 32, .05);
-  --shadow-md: 0 1px 2px rgba(19, 23, 32, .05), 0 8px 24px -14px rgba(19, 23, 32, .12);
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, .05);
+  --shadow-md: 0 1px 2px rgba(16, 24, 40, .05), 0 8px 24px -14px rgba(16, 24, 40, .12);
 
-  --radius: 10px;
-  --radius-sm: 6px;
-  --sidebar-w: 232px;
+  /* Скругления — как у TailAdmin: карточки 12, мелкие элементы 8. */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --sidebar-w: 290px;
 
   /* Движение. Одна кривая на всю панель: резкий старт, мягкая остановка,
      ноль перелёта. */
@@ -836,6 +837,50 @@ span.flatpickr-weekday,
   --stagger: 30ms;
   --flash: 1000ms;
   --ease: cubic-bezier(.2, .8, .2, 1);
+}
+
+/* Тёмная тема для ещё не перенесённых страниц.
+ *
+ * Те же имена, другие значения — и вся разметка, написанная через токены,
+ * темнеет сама. Без этого блока страницы оставались бы светлыми пятнами
+ * внутри тёмной оболочки.
+ *
+ * Текст и смысловые цвета берут светлые ступени (400): тёмные на тёмном не
+ * читаются — та же проверка контраста, только с другой стороны.
+ */
+.dark {
+  --bg: var(--color-gray-950);
+  --bg-elev: var(--color-gray-900);
+  --bg-sunken: var(--color-gray-800);
+  --line: var(--color-gray-800);
+  --line-strong: var(--color-gray-700);
+
+  --ink: var(--color-gray-25);
+  --ink-2: var(--color-gray-300);
+  --ink-3: var(--color-gray-400);
+  --ink-4: var(--color-gray-500);
+  --muted: var(--color-gray-400);
+
+  --accent: var(--color-brand-400);
+  --accent-soft: rgba(232, 117, 62, .14);
+  --accent-line: rgba(232, 117, 62, .30);
+
+  --positive: var(--color-success-400);
+  --positive-soft: rgba(50, 213, 131, .12);
+  --positive-line: rgba(50, 213, 131, .28);
+  --negative: var(--color-error-400);
+  --negative-soft: rgba(249, 112, 102, .12);
+  --negative-line: rgba(249, 112, 102, .28);
+  --info: #7cd4fd;
+  --info-soft: rgba(124, 212, 253, .12);
+  --info-line: rgba(124, 212, 253, .28);
+  --violet: #b9b4ff;
+  --violet-soft: rgba(185, 180, 255, .12);
+  --violet-line: rgba(185, 180, 255, .28);
+
+  /* На тёмном тень не читается — глубина даётся тоном поверхности. */
+  --shadow-sm: none;
+  --shadow-md: none;
 }
 
 
@@ -1267,3 +1312,77 @@ html, body {
 .jt-table tbody td { padding: 10px 12px; border-top: 1px solid var(--line); }
 .jt-table tbody tr { transition: background var(--fast) var(--ease); }
 .jt-table tbody tr:hover { background: var(--bg-sunken); }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Общие классы разметки: карточка, поле ввода, кнопка.
+ *
+ * Они использовались в 73 местах панели и при этом не были определены нигде —
+ * ни здесь, ни в отдельном файле. То есть треть страниц ссылалась на пустоту:
+ * `jt-card` не рисовал карточку, `jt-input` не рисовал поле. Заметить это по
+ * коду нельзя — класс на месте, — а на экране выглядело как «так задумано».
+ *
+ * Теперь они есть и собраны по TailAdmin: те же скругления, границы и высоты,
+ * что у его собственных компонентов. Один источник вида — значит страницы
+ * выглядят одинаково независимо от того, кто и когда их писал.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.jt-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.jt-input {
+  width: 100%;
+  height: 44px;                 /* минимальная область нажатия из MASTER.md */
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+}
+.jt-input::placeholder { color: var(--ink-4); }
+.jt-input:hover:not(:disabled) { border-color: var(--line-strong); }
+.jt-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.jt-input:disabled { opacity: .5; cursor: not-allowed; }
+/* Числовое поле: узкое и с табличными цифрами — столбцы чисел читаются сверху вниз. */
+.jt-input.num { width: auto; min-width: 72px; font-variant-numeric: tabular-nums; }
+
+textarea.jt-input { height: auto; min-height: 96px; padding: 10px 14px; line-height: 1.5; }
+select.jt-input { padding-right: 32px; }
+
+.jt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.jt-btn:hover:not(:disabled) { background: var(--color-brand-600); }
+.jt-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.jt-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.jt-btn-secondary {
+  color: var(--ink-2);
+  background: var(--bg-elev);
+  border-color: var(--line);
+}
+.jt-btn-secondary:hover:not(:disabled) { background: var(--bg-sunken); border-color: var(--line-strong); }
