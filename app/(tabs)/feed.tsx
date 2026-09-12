@@ -2317,21 +2317,6 @@ function WorkerFeed() {
               );
             })}
           </ScrollView>
-          {/* Обновить вручную. Раньше ленту обновляли потягиванием карточки
-              вниз, но карточка больше не прокручивается — тянуть нечего. Сама
-              лента обновляется по realtime, кнопка нужна, когда связь подвисла
-              и человек хочет проверить прямо сейчас. */}
-          <TouchableOpacity
-            accessibilityLabel="Обновить ленту"
-            style={pS.inlineFilter}
-            onPress={() => { void onRefresh(); }}
-            disabled={refreshing}
-            activeOpacity={0.8}
-          >
-            {refreshing
-              ? <ActivityIndicator size="small" color={Colors.primary} />
-              : <Ionicons name="refresh-outline" size={20} color={Colors.textSecondary} />}
-          </TouchableOpacity>
           <TouchableOpacity
             style={[pS.inlineFilter, filtersActive ? pS.inlineFilterActive : null]}
             onPress={() => setFilterOpen(true)}
@@ -2502,13 +2487,13 @@ function WorkerFeed() {
                     <View style={styles.cardDivider} />
 
                     <View style={styles.cardMiddle}>
-                      {/* Текст в гибком блоке, ссылка — за ним. Если чипов
-                          много и места осталось мало, ужмётся описание, а
-                          «Читать полностью» останется на виду: без прокрутки
-                          уехавшую за край ссылку уже ничем не достать. */}
+                      {/* Ссылка идёт сразу за текстом, как на образце. Если
+                          места мало, ужимается текст, а не ссылка: без
+                          прокрутки уехавшую за край ссылку уже ничем не
+                          достать. */}
                       <View style={styles.cardSummary}>
                         {shiftSummary ? (
-                          <Text style={pS.desc} numberOfLines={6}>{shiftSummary}</Text>
+                          <Text style={pS.desc} numberOfLines={4}>{shiftSummary}</Text>
                         ) : null}
                       </View>
                       <TouchableOpacity
@@ -3573,7 +3558,7 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
 
                 <View style={styles.cardMiddle}>
                   <View style={styles.cardSummary}>
-                    {description ? <Text style={pS.desc} numberOfLines={6}>{description}</Text> : null}
+                    {description ? <Text style={pS.desc} numberOfLines={4}>{description}</Text> : null}
                   </View>
                   <TouchableOpacity
                     style={styles.readFullRow}
@@ -3689,19 +3674,6 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
           activeOpacity={0.8}
         >
           <Ionicons name="map-outline" size={16} color={Colors.textSecondary} />
-        </TouchableOpacity>
-        {/* Как и в сменах: карточка колоды не прокручивается, потянуть её вниз
-            для обновления нельзя — нужна кнопка. */}
-        <TouchableOpacity
-          accessibilityLabel="Обновить список"
-          style={pS.filtersBtn}
-          onPress={() => { void onRefresh(); }}
-          disabled={refreshing}
-          activeOpacity={0.8}
-        >
-          {refreshing
-            ? <ActivityIndicator size="small" color={Colors.primary} />
-            : <Ionicons name="refresh-outline" size={16} color={Colors.textSecondary} />}
         </TouchableOpacity>
       </View>
 
@@ -4678,7 +4650,12 @@ const styles = StyleSheet.create({
   addressChipText: { flex: 1, fontSize: rf(14), fontWeight: '600', color: Colors.textSecondary, lineHeight: rf(20) },
   cardDivider: { height: 1, backgroundColor: Colors.divider, marginHorizontal: rs(14) },
   cardMiddle: { flex: 1, padding: rs(10), paddingHorizontal: rs(14), gap: rs(4) },
-  cardSummary: { flex: 1, overflow: 'hidden' },
+  // flexShrink, а не flex. С flex блок текста занимал всё свободное место и
+  // прижимал «Читать полностью» к нижнему краю карточки — ровно туда, где над
+  // карточкой висят кнопки ✕ / чат / ♥, и ссылка оказывалась под ними.
+  // Теперь текст занимает свою высоту, ссылка идёт сразу за ним, а ужимается
+  // текст только если места совсем мало.
+  cardSummary: { flexShrink: 1, overflow: 'hidden' },
   slotsRow: { flexDirection: 'row' },
   slotInfo: { flex: 1, alignItems: 'center', paddingVertical: rs(2) },
   slotInfoBordered: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: Colors.divider },
