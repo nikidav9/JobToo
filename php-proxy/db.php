@@ -86,7 +86,7 @@ define('SB_KEY', sb_resolve_key());
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-App-Secret, X-Admin-Token, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, X-App-Secret, X-Admin-Token, X-Yandex-Metrika-Token, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -401,6 +401,86 @@ function sb_count(string $t, array $f = []): int {
     if (!is_string($resp)) return 0;
     // Content-Range: 0-0/357
     return preg_match('#Content-Range:\s*[^/]+/(\d+)#i', $resp, $m) ? (int)$m[1] : 0;
+}
+
+const YANDEX_METRIKA_COUNTER_ID = 109805381;
+
+/** Один запрос к Reporting API. Неполный отчёт не отправляем. */
+function ym_stat(string $token, array $params): array {
+    $params = array_merge([
+        'ids' => YANDEX_METRIKA_COUNTER_ID,
+        'accuracy' => 'full',
+    ], $params);
+    $url = 'https://api-metrika.yandex.net/stat/v1/data?'
+        . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Authorization: OAuth ' . $token],
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $raw = curl_exec($ch);
+    $error = curl_error($ch);
+    $errno = curl_errno($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($raw === false) {
+        throw new RuntimeException("Яндекс.Метрика недоступна: curl {$errno}: {$error}");
+    }
+    $result = json_decode($raw, true);
+    if ($code >= 400 || !is_array($result)) {
+        $description = is_array($result)
+            ? (string)($result['message'] ?? $result['errors'][0]['message'] ?? '')
+            : json_last_error_msg();
+        throw new RuntimeException("Яндекс.Метрика ответила HTTP {$code}: {$description}");
+    }
+    return $result;
+}
+
+function ym_daily_report(string $token): array {
+    $tz = new DateTimeZone('Europe/Moscow');
+    $today = (new DateTimeImmutable('now', $tz))->setTime(0, 0);
+    $day = $today->modify('-1 day');
+    $previousDay = $today->modify('-2 days');
+    $metrics = 'ym:s:visits,ym:s:users,ym:s:bounceRate';
+    $bySource = ym_stat($token, [
+        'date1' => $day->format('Y-m-d'),
+        'date2' => $day->format('Y-m-d'),
+        'metrics' => $metrics,
+        'dimensions' => 'ym:s:lastSignTrafficSource',
+        'limit' => 100,
+    ]);
+    $previous = ym_stat($token, [
+        'date1' => $previousDay->format('Y-m-d'),
+        'date2' => $previousDay->format('Y-m-d'),
+        'metrics' => 'ym:s:visits',
+    ]);
+    $search30 = ym_stat($token, [
+        'date1' => $day->modify('-29 days')->format('Y-m-d'),
+        'date2' => $day->format('Y-m-d'),
+        'metrics' => 'ym:s:visits',
+        'filters' => "ym:s:lastSignTrafficSource=='organic'",
+    ]);
+
+    $totals = $bySource['totals'] ?? [];
+    $sources = ['organic' => 0, 'direct' => 0, 'referral' => 0, 'social' => 0];
+    foreach (($bySource['data'] ?? []) as $row) {
+        $source = (string)($row['dimensions'][0]['id'] ?? '');
+        if (array_key_exists($source, $sources)) {
+            $sources[$source] = (int)round((float)($row['metrics'][0] ?? 0));
+        }
+    }
+    return [
+        'date' => $day->format('d.m.Y'),
+        'visits' => (int)round((float)($totals[0] ?? 0)),
+        'users' => (int)round((float)($totals[1] ?? 0)),
+        'bounce_rate' => (float)($totals[2] ?? 0),
+        'previous_visits' => (int)round((float)($previous['totals'][0] ?? 0)),
+        'search_30d' => (int)round((float)($search30['totals'][0] ?? 0)),
+        'sources' => $sources,
+    ];
 }
 
 // Поля пользователя, которые можно отдавать клиенту.
@@ -2641,6 +2721,11 @@ try {
             $now = time();
             $cut24 = gmdate('Y-m-d\\TH:i:s\\Z', $now - 86400);
             $cut48 = gmdate('Y-m-d\\TH:i:s\\Z', $now - 2 * 86400);
+            $metrikaToken = trim((string)($_SERVER['HTTP_X_YANDEX_METRIKA_TOKEN'] ?? ''));
+            if ($metrikaToken === '') {
+                throw new RuntimeException('YANDEX_METRIKA_TOKEN не передан');
+            }
+            $metrika = ym_daily_report($metrikaToken);
 
             $newWorkers = sb_count('jm_users', [
                 'role' => 'eq.worker', 'created_at' => 'gte.' . $cut24,
@@ -2692,6 +2777,9 @@ try {
             if ($newWorkers === 0 && $previousWorkers > 0) {
                 $alerts[] = 'новых работников — 0, хотя накануне были';
             }
+            if ($metrika['visits'] === 0 && $metrika['previous_visits'] > 0) {
+                $alerts[] = 'визитов за сутки — 0, хотя накануне были';
+            }
 
             $lines = [];
             if ($alerts) $lines[] = '🚨 <b>Тревога:</b> ' . implode('; ', $alerts);
@@ -2703,6 +2791,12 @@ try {
             $lines[] = "🤝 Новых партнёрских вакансий: <b>{$partnerVacancies}</b>";
             $lines[] = "🔄 Последний успешный импорт: {$lastImport}";
             $lines[] = "📅 Открытых смен на завтра: <b>{$tomorrowShifts}</b>";
+            $bounceRate = number_format($metrika['bounce_rate'], 1, ',', ' ');
+            $sources = $metrika['sources'];
+            $lines[] = '';
+            $lines[] = "📈 Метрика за {$metrika['date']}: визиты <b>{$metrika['visits']}</b>, посетители <b>{$metrika['users']}</b>, отказы <b>{$bounceRate}%</b>";
+            $lines[] = "🧭 Источники: поиск <b>{$sources['organic']}</b>, прямые <b>{$sources['direct']}</b>, переходы <b>{$sources['referral']}</b>, соцсети <b>{$sources['social']}</b>";
+            $lines[] = "🔎 Поиск за 30 дней: <b>{$metrika['search_30d']}</b> визитов";
             $text = implode("\n", $lines);
 
             $sent = tg_send_message(
@@ -2719,6 +2813,7 @@ try {
                     'partner_vacancies' => $partnerVacancies,
                     'last_import_at' => $lastImportTs !== null ? gmdate('c', $lastImportTs) : null,
                     'tomorrow_shifts' => $tomorrowShifts,
+                    'metrika' => $metrika,
                 ],
             ];
             if (!$sent && isset($GLOBALS['jt_last_tg_error'])) {
