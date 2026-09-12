@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Animated, PanResponder, Dimensions, RefreshControl, Modal, FlatList,
+  Animated, Dimensions, RefreshControl, Modal, FlatList,
   TextInput, ActivityIndicator, Share, Platform, Linking,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -2260,36 +2261,37 @@ function WorkerFeed() {
     doMessageRef.current = doMessage;
   });
 
-  // Листает ли человек прямо сейчас содержимое карточки.
-  //
-  // Без этого флага карточка улетала от обычной прокрутки. Палец почти никогда
-  // не идёт строго вниз: первые же миллиметры движения дают пару пикселей вбок,
-  // и прежнего условия (8 пикселей вбок при перевесе в 1.2 раза) хватало, чтобы
-  // свайп забрал жест себе — раньше, чем список успевал начать прокрутку.
-  // А забрав, уже не отдавал: дальше палец ехал вниз, но карточка следовала за
-  // его горизонтальной составляющей и показывала «ХОЧУ»/«НЕТ».
-  const cardScrollingRef = useRef(false);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      // Прокрутка идёт — свайп не начинаем вовсе. В остальном порог выше и
-      // перевес строже: вбок должно уехать заметно и явно больше, чем вниз.
-      onMoveShouldSetPanResponder: (_, g) =>
-        !cardScrollingRef.current
-        && Math.abs(g.dx) > Math.abs(g.dy) * 2
-        && Math.abs(g.dx) > 14,
-      onPanResponderGrant: () => {
-        pan.setOffset({ x: (pan.x as any)._value, y: (pan.y as any)._value });
-        pan.setValue({ x: 0, y: 0 });
-      },
-      // Карточка свободно следует за пальцем в любую сторону (без рывков), а
-      // решение — по горизонтали: вправо — отклик, влево — отказ.
-      // Карточка ходит только по горизонтали (влево/вправо). Вертикаль не
-      // трогаем — она уходит во внутренний скролл содержимого карточки.
-      onPanResponderMove: Animated.event([null, { dx: pan.x }], { useNativeDriver: false }),
-      onPanResponderRelease: (_, { dx, vx }) => {
-        pan.flattenOffset();
+  /**
+   * Свайп карточки — на react-native-gesture-handler, а не на PanResponder.
+   *
+   * Замена не из любви к новому. Карточка улетала от обычной прокрутки, и
+   * побороть это порогами не выходит в принципе. Палец, начиная листать, идёт
+   * дугой: за первые миллисекунды набегает десяток пикселей вбок при паре
+   * вниз. Любой порог в этот момент говорит «жест горизонтальный», свайп
+   * забирает его себе — и уже не отдаёт. PanResponder умеет только «беру
+   * сейчас»; сказать «я ошибся, это прокрутка, забирайте» он не умеет.
+   *
+   * Здесь для этого есть failOffsetY: жест насовсем проигрывает, если палец
+   * ушёл вниз больше чем на 12 пикселей до того, как набрал 20 вбок. То есть
+   * прокрутка забирает жест сама, а не отвоёвывает его у карточки.
+   *
+   * runOnJS — потому что двигаем обычный Animated.ValueXY, а не Reanimated:
+   * без него обработчики уходят на UI-поток, где этого значения нет.
+   */
+  const swipeGesture = useMemo(
+    () => Gesture.Pan()
+      .runOnJS(true)
+      .activeOffsetX([-20, 20])
+      .failOffsetY([-12, 12])
+      // translationX считается от начала жеста, поэтому смещение не копим —
+      // карточка и так приходит сюда на нуле после снапбэка или улёта.
+      .onUpdate(e => { pan.x.setValue(e.translationX); })
+      .onEnd(e => {
+        // Здесь скорость в пикселях в секунду, а пороги исторически в
+        // пикселях на миллисекунду — переводим, иначе любой свайп считался бы
+        // «быстрым» и карточка улетала бы от касания.
+        const vx = e.velocityX / 1000;
+        const dx = e.translationX;
         if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) {
           swipeCbRef.current?.('want', Math.abs(vx));
         } else if (dx < -SWIPE_THRESHOLD || vx < -VELOCITY_THRESHOLD) {
@@ -2297,10 +2299,9 @@ function WorkerFeed() {
         } else {
           snapBackRef.current?.();
         }
-      },
-      onPanResponderTerminate: () => { swipingRef.current = false; setSwiping(false); snapBackRef.current?.(); },
-    })
-  ).current;
+      }),
+    [pan],
+  );
 
   const countShifts = (d: string, f: ShiftFilters) => {
     if (!currentUser) return 0;
@@ -2470,9 +2471,9 @@ function WorkerFeed() {
             {cards[2] ? <View style={styles.ghost2} /> : null}
             {cards[1] ? <View style={styles.ghost1} /> : null}
 
+            <GestureDetector gesture={swipeGesture}>
             <Animated.View
               style={[styles.cardAnimated, { transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }] }]}
-              {...panResponder.panHandlers}
             >
               <View style={styles.card}>
                 <Animated.View style={[styles.wantOverlay, { opacity: wantOpacity }]}>
@@ -2489,9 +2490,6 @@ function WorkerFeed() {
                   // Пока карточка уезжает, листать её нельзя: жест либо
                   // прокручивает, либо двигает карточку, но не оба разом.
                   scrollEnabled={!swiping}
-                  onScrollBeginDrag={() => { cardScrollingRef.current = true; }}
-                  onScrollEndDrag={() => { cardScrollingRef.current = false; }}
-                  onMomentumScrollEnd={() => { cardScrollingRef.current = false; }}
                   refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
                 >
                   <View style={styles.cardTop}>
@@ -2581,6 +2579,7 @@ function WorkerFeed() {
                 </ScrollView>
               </View>
             </Animated.View>
+            </GestureDetector>
 
             {/* Плавающие кнопки как в «Работе» и на образце: ✕ / ★ / ♥ и
                 подсказка «Свайпай». Раньше это была плоская панель внутри
@@ -2967,30 +2966,23 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
   const swWantRef = useRef<(vx?: number) => void>(() => {});
   const swSkipRef = useRef<(vx?: number) => void>(() => {});
   const swSnapBackRef = useRef<() => void>(() => {});
-  // Тот же флаг прокрутки, что и у колоды смен, и по той же причине —
-  // см. cardScrollingRef выше.
-  const swScrollingRef = useRef(false);
-  const swPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) =>
-        !swScrollingRef.current
-        && Math.abs(g.dx) > Math.abs(g.dy) * 2
-        && Math.abs(g.dx) > 14,
-      onPanResponderGrant: () => {
-        swPan.setOffset({ x: (swPan.x as any)._value, y: (swPan.y as any)._value });
-        swPan.setValue({ x: 0, y: 0 });
-      },
-      onPanResponderMove: Animated.event([null, { dx: swPan.x }], { useNativeDriver: false }),
-      onPanResponderRelease: (_, { dx, vx }) => {
-        swPan.flattenOffset();
+  // Тот же жест, что у колоды смен, и по той же причине — см. swipeGesture
+  // выше: карточка не должна уезжать, когда человек листает её содержимое.
+  const swSwipeGesture = useMemo(
+    () => Gesture.Pan()
+      .runOnJS(true)
+      .activeOffsetX([-20, 20])
+      .failOffsetY([-12, 12])
+      .onUpdate(e => { swPan.x.setValue(e.translationX); })
+      .onEnd(e => {
+        const vx = e.velocityX / 1000;
+        const dx = e.translationX;
         if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) swWantRef.current(Math.abs(vx));
         else if (dx < -SWIPE_THRESHOLD || vx < -VELOCITY_THRESHOLD) swSkipRef.current(Math.abs(vx));
         else swSnapBackRef.current();
-      },
-      onPanResponderTerminate: () => swSnapBackRef.current(),
-    })
-  ).current;
+      }),
+    [swPan],
+  );
 
   // «Назад»: вернуть последнюю пролистанную карточку наверх колоды. Отклик,
   // если он уже ушёл, не отзываем — как в сменах кнопка просто возвращает вид.
@@ -3597,9 +3589,9 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
       <View style={styles.cardArea}>
         {deckCards[2] ? <View style={styles.ghost2} /> : null}
         {deckCards[1] ? <View style={styles.ghost1} /> : null}
+        <GestureDetector gesture={swSwipeGesture}>
         <Animated.View
           style={[styles.cardAnimated, { transform: [{ translateX: swPan.x }, { translateY: swPan.y }, { rotate: swRotate }] }]}
-          {...swPanResponder.panHandlers}
         >
           <View style={styles.card}>
             <Animated.View style={[styles.wantOverlay, { opacity: swWantOp }]}>
@@ -3612,9 +3604,6 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
             <ScrollView
               style={{ flex: 1 }}
               showsVerticalScrollIndicator={false}
-              onScrollBeginDrag={() => { swScrollingRef.current = true; }}
-              onScrollEndDrag={() => { swScrollingRef.current = false; }}
-              onMomentumScrollEnd={() => { swScrollingRef.current = false; }}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
             >
               <View style={styles.cardTop}>
@@ -3709,6 +3698,7 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
 
           </View>
         </Animated.View>
+        </GestureDetector>
 
         <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents="box-none">
           <View style={styles.shiftDeckRow}>
