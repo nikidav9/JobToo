@@ -40,6 +40,44 @@ function writeChoice(value: 'accepted' | 'dismissed'): void {
   }
 }
 
+/**
+ * Убрать данные телеграма из адреса страницы.
+ *
+ * Мини-приложение получает от телеграма кусок вида
+ * `#tgWebAppData=user={"id":…,"first_name":…,"username":…}&signature=…&hash=…`
+ * — то есть идентификатор, имя, ник, ссылку на фотографию человека и подпись
+ * его входа. Метрика при первом попадании записывает адрес целиком, и всё это
+ * уезжает к ней как название страницы. В отчёте «популярные страницы» мы это и
+ * увидели: настоящие имена и ники пользователей.
+ *
+ * Передавать персональные данные посетителей стороннему обработчику мы не
+ * обещали — в политике сказано про аналитику посещений, а не про личность.
+ * Поэтому адрес чистится ДО загрузки счётчика.
+ *
+ * Чистить безопасно: параметр запуска приложение берёт из SDK телеграма
+ * (`initDataUnsafe.start_param`, см. lib/telegram.ts), а не из адреса, и к
+ * моменту согласия на cookie SDK его давно разобрал. Трогаем только ключи
+ * `tgWebApp*` — свои параметры вроде vacancyId остаются на месте.
+ */
+function stripTelegramDataFromUrl(): void {
+  if (typeof window === 'undefined' || !window.history?.replaceState) return;
+  try {
+    const { pathname, search, hash } = window.location;
+    const q = new URLSearchParams(search);
+    let changed = false;
+    for (const key of Array.from(q.keys())) {
+      if (key.startsWith('tgWebApp')) { q.delete(key); changed = true; }
+    }
+    const cleanHash = hash.includes('tgWebApp') ? '' : hash;
+    if (cleanHash !== hash) changed = true;
+    if (!changed) return;
+    const qs = q.toString();
+    window.history.replaceState(null, '', pathname + (qs ? `?${qs}` : '') + cleanHash);
+  } catch {
+    // Адрес почистить не вышло — это не повод ронять загрузку страницы.
+  }
+}
+
 // Загрузка счётчика Метрики. Повторный вызов безопасен: и наш флаг, и сам
 // сниппет проверяют, что тег уже вставлен.
 function loadMetrika(): void {
@@ -47,6 +85,9 @@ function loadMetrika(): void {
   const w = window as any;
   if (w.__ymLoaded) return;
   w.__ymLoaded = true;
+  // Порядок важен: сначала чистим адрес, потом грузим счётчик. Наоборот —
+  // первое попадание уйдёт с личными данными.
+  stripTelegramDataFromUrl();
   (function (m: any, e: any, t: string, r: string, i: string, k?: any, a?: any) {
     m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments); };
     m[i].l = 1 * (new Date() as any);
