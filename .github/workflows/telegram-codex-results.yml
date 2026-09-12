@@ -1,0 +1,54 @@
+name: Результаты Codex в рабочую Telegram-группу
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  notify:
+    if: >-
+      ${{ !github.event.issue.pull_request &&
+          contains(github.event.issue.body || '', '<!-- jobtoo-telegram') &&
+          contains(github.event.comment.user.login, 'codex') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Codex result to the originating Telegram topic
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, urllib.request
+
+          with open(os.environ['GITHUB_EVENT_PATH'], encoding='utf-8') as fh:
+              event = json.load(fh)
+
+          body = event['issue'].get('body') or ''
+          match = re.search(r'<!-- jobtoo-telegram chat=(-?\d+) thread=(\d+) message=(\d+) -->', body)
+          if not match:
+              raise SystemExit('Telegram marker is missing')
+
+          chat_id, thread_id, _ = map(int, match.groups())
+          issue = event['issue']
+          comment = (event['comment'].get('body') or '').strip()
+          if len(comment) > 3300:
+              comment = comment[:3300] + '…'
+          text = f"✅ Готово: #{issue['number']} {issue['title']}\n\n{comment}\n\n{issue['html_url']}"
+          payload = {'chat_id': chat_id, 'text': text, 'disable_web_page_preview': True}
+          if thread_id > 0:
+              payload['message_thread_id'] = thread_id
+
+          token = os.environ.get('TG_BOT_TOKEN', '')
+          if not token:
+              raise SystemExit('TG_BOT_TOKEN is missing')
+          data = json.dumps(payload, ensure_ascii=False).encode()
+          request = urllib.request.Request(
+              f'https://api.telegram.org/bot{token}/sendMessage',
+              data=data,
+              headers={'Content-Type': 'application/json'},
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              answer = json.load(response)
+          if not answer.get('ok'):
+              raise SystemExit(str(answer))
+          print(f"Telegram message {answer['result']['message_id']} sent")
+          PY

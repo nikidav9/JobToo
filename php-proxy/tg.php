@@ -70,6 +70,7 @@ function jt_secret(string $name, string $fallback = ''): string {
 // собирает app_secrets.php. Если он не задан — лучше явная тишина, чем
 // работа на ключе, который знает чужой.
 define('TG_BOT_TOKEN', jt_secret('TG_BOT_TOKEN'));
+define('TG_WORK_GROUP_CHAT_ID', (int)(getenv('TG_WORK_GROUP_CHAT_ID') ?: -1004358116342));
 
 // Ключ доступа к базе — та же схема, что и в db.php: сервисный ключ с
 // хостинга, анонимный лишь как запасной вариант. Подробности там же.
@@ -228,6 +229,60 @@ function tg(string $method, array $payload): array {
         if (is_array($dec)) return $dec;
     }
     return [];
+}
+
+/** Токен GitHub хранится отдельно от секретов приложения и наружу не уходит. */
+function github_token(): string {
+    $file = '/var/www/api/gh_token.php';
+    $value = is_readable($file) ? @include $file : null;
+    return is_string($value) ? trim($value) : '';
+}
+
+/** Создаёт задачу в GitHub; упоминание @codex запускает Codex Cloud. */
+function github_create_work_issue(string $text, int $chatId, int $threadId, int $messageId): array {
+    $token = github_token();
+    if ($token === '') return ['ok' => false, 'error' => 'GitHub-токен не настроен'];
+
+    $oneLine = trim((string)preg_replace('/\s+/u', ' ', $text));
+    $title = '[Telegram] ' . mb_substr($oneLine, 0, 90, 'UTF-8');
+    $body = "@codex Выполни задачу в репозитории JobToo. После выполнения подробно напиши, что сделано и как проверено.\n\n"
+          . $text
+          . "\n\n<!-- jobtoo-telegram chat={$chatId} thread={$threadId} message={$messageId} -->";
+
+    $ch = curl_init('https://api.github.com/repos/nikidav9/Jobbbrbeb/issues');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_HTTPHEADER => [
+            'Accept: application/vnd.github+json',
+            'Authorization: Bearer ' . $token,
+            'X-GitHub-Api-Version: 2022-11-28',
+            'User-Agent: JobToo-Telegram-Bridge',
+            'Content-Type: application/json',
+        ],
+        CURLOPT_POSTFIELDS => json_encode(['title' => $title, 'body' => $body], JSON_UNESCAPED_UNICODE),
+    ]);
+    $raw = curl_exec($ch);
+    $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    $result = json_decode($raw ?: 'null', true);
+    if ($status !== 201 || !is_array($result)) {
+        return ['ok' => false, 'error' => (string)($result['message'] ?? "GitHub HTTP {$status}")];
+    }
+    return [
+        'ok' => true,
+        'number' => (int)$result['number'],
+        'url' => (string)$result['html_url'],
+    ];
+}
+
+/** Ответ в ту же тему форума, откуда пришла задача. */
+function tg_work_reply(int $chatId, int $threadId, string $text): array {
+    $payload = ['chat_id' => $chatId, 'text' => $text, 'disable_web_page_preview' => true];
+    if ($threadId > 0) $payload['message_thread_id'] = $threadId;
+    return tg('sendMessage', $payload);
 }
 
 function expo_push_one(string $token, string $title, string $body): void {
@@ -485,7 +540,40 @@ $msg = $update['message'] ?? null;
 if (!$msg || empty($msg['chat']['id'])) { echo json_encode(['ok' => true]); exit; }
 
 $chatId = (int)$msg['chat']['id'];
-if (($msg['chat']['type'] ?? '') !== 'private') { echo json_encode(['ok' => true]); exit; }
+$chatType = (string)($msg['chat']['type'] ?? '');
+
+// Внутренняя рабочая группа: сообщения администраторов превращаются в задачи
+// Codex. Все ответы остаются в исходной теме Telegram. Публичные группы с
+// вакансиями сюда не попадают и продолжают жить по прежней логике.
+if ($chatId === TG_WORK_GROUP_CHAT_ID && in_array($chatType, ['group', 'supergroup'], true)) {
+    $text = trim((string)($msg['text'] ?? $msg['caption'] ?? ''));
+    $threadId = (int)($msg['message_thread_id'] ?? 0);
+    $messageId = (int)($msg['message_id'] ?? 0);
+    $fromId = (int)($msg['from']['id'] ?? 0);
+    if ($text === '' || $fromId === 0 || !empty($msg['from']['is_bot'])) {
+        echo json_encode(['ok' => true]); exit;
+    }
+
+    $member = tg('getChatMember', ['chat_id' => $chatId, 'user_id' => $fromId]);
+    $status = (string)($member['result']['status'] ?? '');
+    if (!in_array($status, ['creator', 'administrator'], true)) {
+        tg_work_reply($chatId, $threadId, '⛔ Задачи принимаются только от администраторов рабочей группы.');
+        echo json_encode(['ok' => true]); exit;
+    }
+
+    $issue = github_create_work_issue($text, $chatId, $threadId, $messageId);
+    if (empty($issue['ok'])) {
+        tg_work_reply($chatId, $threadId,
+            '⚠️ Не удалось передать задачу Codex: ' . (string)($issue['error'] ?? 'неизвестная ошибка'));
+        echo json_encode(['ok' => true]); exit;
+    }
+
+    tg_work_reply($chatId, $threadId,
+        "📥 Задачу получил. Передал Codex: #{$issue['number']}\n{$issue['url']}\n\nКогда работа завершится, отдельным сообщением пришлю результат сюда.");
+    echo json_encode(['ok' => true]); exit;
+}
+
+if ($chatType !== 'private') { echo json_encode(['ok' => true]); exit; }
 
 // ─── Ожидающие привязки Telegram ─────────────────────────────────────────
 // Ссылка вида t.me/bot?start=link_<id> доносит метку до бота только когда
