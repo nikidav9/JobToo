@@ -15,8 +15,9 @@ jobs:
         env:
           APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
           ADMIN_TOKEN: ${{ secrets.DASHBOARD_PASSWORD }}
+          YANDEX_METRIKA_TOKEN: ${{ secrets.YANDEX_METRIKA_TOKEN }}
         run: |
-          if [ -z "$APP_SECRET" ] || [ -z "$ADMIN_TOKEN" ]; then
+          if [ -z "$APP_SECRET" ] || [ -z "$ADMIN_TOKEN" ] || [ -z "$YANDEX_METRIKA_TOKEN" ]; then
             echo "Серверные секреты для задания не настроены"; exit 1
           fi
 
@@ -25,6 +26,7 @@ jobs:
               -H "Content-Type: application/json" \
               -H "X-App-Secret: $APP_SECRET" \
               -H "X-Admin-Token: $ADMIN_TOKEN" \
+              -H "X-Yandex-Metrika-Token: $YANDEX_METRIKA_TOKEN" \
               -d '{"fn":"cronDailyReport","args":[]}') || RESP=''
             echo "Response: $RESP"
             echo "$RESP" | grep -q '"sent":true' && exit 0
