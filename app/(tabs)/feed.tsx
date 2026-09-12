@@ -19,7 +19,7 @@ import {
   getTodayDates,
   nameColorFromString,
 } from '@/services/storage';
-import { companyInitials, isLavkaCompany, normalizeCompany } from '@/services/company';
+import { normalizeCompany } from '@/services/company';
 import { agoRu } from '@/services/time';
 import { scoreVacancyForWorker } from '@/services/matching';
 import { METRO_LINES } from '@/constants/metro';
@@ -66,8 +66,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { Chip } from '@/components/ui/Chip';
 import { VacancyDetailModal } from '@/components/feature/VacancyDetailModal';
-import { ExternalVacancySheet } from '@/components/feature/ExternalVacancySheet';
-import { LavkaLogo } from '@/components/ui/LavkaLogo';
+import { ExternalVacancyDetail } from '@/components/feature/ExternalVacancyDetail';
+import { CompanyMark } from '@/components/ui/CompanyMark';
 import { TabHeader } from '@/components/ui/TabHeader';
 import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import { MetroMap, MapListItem } from '@/components/feature/MetroMap';
@@ -110,21 +110,6 @@ function partnerAttributionUrl(raw: string, clickId: string, sourceId: string): 
 const GUEST_SKIP_LIMIT = 3;
 let guestSkipCount = 0;
 
-function CompanyMark({ company, size = 44 }: { company?: string | null; size?: number }) {
-  const name = normalizeCompany(company);
-  if (isLavkaCompany(name)) return <LavkaLogo size={size} />;
-  return (
-    <View
-      accessibilityLabel={`Логотип компании ${name}`}
-      style={[
-        styles.companyFallback,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: nameColorFromString(name) },
-      ]}
-    >
-      <Text style={styles.companyFallbackText}>{companyInitials(name)}</Text>
-    </View>
-  );
-}
 
 // ─── Web push permission banner (iOS PWA requires user gesture) ───────────────
 type WPState = 'ask' | 'retry' | 'denied' | 'hidden';
@@ -2597,30 +2582,26 @@ function WorkerFeed() {
         onClose={() => setFilterPicker(false)}
       />
 
-      <ExternalVacancySheet
+      <ExternalVacancyDetail
         vacancy={externalDetail}
         onClose={() => setExternalDetail(null)}
-        onOpenSource={(v) => { setExternalDetail(null); openShiftSource(v); }}
+        onOpenSource={(v: ExternalVacancy) => { setExternalDetail(null); openShiftSource(v); }}
+        locked={!!currentUser?.isGuest}
+        onLogin={() => { setExternalDetail(null); promptRegister({ vacancyKind: 'external' }); }}
       />
 
-      {/* Detail modal */}
+      {/* Подробности смены */}
       <VacancyDetailModal
         vacancy={detailVacancy}
         visible={!!detailVacancy}
         employer={detailEmployer}
         onClose={() => { setDetailVacancy(null); setDetailEmployer(null); }}
+        onShare={detailVacancy ? () => { void shareShiftVacancy(detailVacancy); } : undefined}
+        locked={!!currentUser?.isGuest}
+        onLogin={() => { setDetailVacancy(null); promptRegister({ vacancyKind: 'shift' }); }}
+        onChat={() => { setDetailVacancy(null); doMessageRef.current?.(); }}
         actions={
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            {detailVacancy && !('external' in detailVacancy) ? (
-              <TouchableOpacity
-                accessibilityLabel="Поделиться вакансией"
-                style={{ width: 46, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.divider, alignItems: 'center', justifyContent: 'center' }}
-                onPress={() => { void shareShiftVacancy(detailVacancy); }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="share-outline" size={19} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            ) : null}
             <TouchableOpacity
               style={styles.detailSkipBtn}
               onPress={() => { setDetailVacancy(null); doSkip(0.5); }}
@@ -3858,10 +3839,12 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
       ) : null}
 
       {/* Плашка подтверждения перехода к партнёрской вакансии (свайп вправо). */}
-      <ExternalVacancySheet
+      <ExternalVacancyDetail
         vacancy={permExternalDetail}
         onClose={() => setPermExternalDetail(null)}
-        onOpenSource={(v) => { setPermExternalDetail(null); void openExternalVacancy(v); }}
+        onOpenSource={(v: ExternalVacancy) => { setPermExternalDetail(null); void openExternalVacancy(v); }}
+        locked={isGuest}
+        onLogin={() => { setPermExternalDetail(null); promptRegister({ vacancyKind: 'external' }); }}
       />
 
       {externalConfirm ? (

@@ -28,3 +28,26 @@ test('agoRu: нет даты или дата в будущем', () => {
   assert.equal(agoRu('не дата'), '');
   assert.equal(agoRu(new Date(Date.now() + 60_000).toISOString()), 'только что');
 });
+
+import { domainOf } from '../services/time.ts';
+
+test('domainOf: домен источника без www', () => {
+  assert.equal(domainOf('https://hh.ru/vacancy/123?query=1'), 'hh.ru');
+  assert.equal(domainOf('https://www.superjob.ru/vakansii/x-456.html'), 'superjob.ru');
+  assert.equal(domainOf('http://trudvsem.ru/vacancy/abc'), 'trudvsem.ru');
+  assert.equal(domainOf('www.hh.ru/vacancy/1'), 'hh.ru');
+  assert.equal(domainOf('https://HH.RU:443/x'), 'hh.ru');
+  assert.equal(domainOf(undefined), '');
+  assert.equal(domainOf(''), '');
+  assert.equal(domainOf('не ссылка'), '');
+});
+
+import { plural } from '../services/time.ts';
+
+test('plural: места', () => {
+  assert.equal(plural(1, 'место', 'места', 'мест'), 'место');
+  assert.equal(plural(3, 'место', 'места', 'мест'), 'места');
+  assert.equal(plural(5, 'место', 'места', 'мест'), 'мест');
+  assert.equal(plural(11, 'место', 'места', 'мест'), 'мест');
+  assert.equal(plural(21, 'место', 'места', 'мест'), 'место');
+});

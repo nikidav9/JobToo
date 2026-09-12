@@ -14,10 +14,14 @@ import { ReplyBadge } from '@/components/feature/ReplyBadge';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Crypto from 'expo-crypto';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
-import { Colors, Radius, Shadow } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { normalizeCompany } from '@/services/storage';
 import { LavkaLogo } from '@/components/ui/LavkaLogo';
+import { CompanyMark } from '@/components/ui/CompanyMark';
+import { VacancyDetailHead, DetailChip } from '@/components/feature/VacancyDetailHead';
+import { VacancyContacts } from '@/components/feature/VacancyContacts';
+import { agoRu } from '@/services/time';
 import { SheetHandle, useSwipeToDismiss } from '@/components/ui/Sheet';
 import {
   dbApplyPermVacancy,
@@ -93,7 +97,7 @@ export default function PermVacancyDetailScreen() {
   }, [vacancyId, vacancy, currentUser, loading]);
   const employer = vacancy ? users.find(u => u.id === vacancy.employerId) : null;
 
-  const employerDisplayName = normalizeCompany();
+  const employerDisplayName = normalizeCompany(employer?.company || vacancy?.company);
 
 
   const myApp = useMemo(() => {
@@ -106,6 +110,18 @@ export default function PermVacancyDetailScreen() {
   // отклик, просто работодатель уже завершил подбор.
   const isApproved = myApp?.status === 'approved' || myApp?.status === 'hired';
   const isSaved = vacancy ? permSavedIds.includes(vacancy.id) : false;
+
+  const headChips: DetailChip[] = useMemo(() => {
+    if (!vacancy) return [];
+    const list: DetailChip[] = [];
+    if (vacancy.salary > 0) {
+      list.push({ label: `${vacancy.salary.toLocaleString('ru-RU')} ₽/мес`, variant: 'salary', icon: 'wallet-outline' });
+      list.push({ label: 'На руки', icon: 'checkmark-circle-outline' });
+    }
+    if (vacancy.schedule) list.push({ label: vacancy.schedule, icon: 'calendar-outline' });
+    if (vacancy.metroStation) list.push({ label: vacancy.metroStation, icon: 'subway-outline' });
+    return list;
+  }, [vacancy]);
 
   const metroLine = vacancy?.metroStation
     ? METRO_LINES.find(l => l.stations.includes(vacancy.metroStation!)) ?? null
@@ -312,23 +328,16 @@ export default function PermVacancyDetailScreen() {
           </View>
         ) : null}
 
-        {/* Title + company */}
-        <Text style={styles.jobTitle}>{vacancy.title}</Text>
-        <Text style={styles.companyName}>{employerDisplayName}</Text>
-
-        {/* Key info cards */}
-        <View style={styles.infoGrid}>
-          <View style={styles.infoCard}>
-            <Ionicons name="cash-outline" size={22} color={Colors.primary} />
-            <Text style={styles.infoCardLabel}>Зарплата</Text>
-            <Text style={styles.infoCardValue}>{vacancy.salary.toLocaleString('ru-RU')} ₽/мес</Text>
-          </View>
-          <View style={styles.infoCard}>
-            <Ionicons name="calendar-outline" size={22} color={Colors.primary} />
-            <Text style={styles.infoCardLabel}>График</Text>
-            <Text style={styles.infoCardValue}>{vacancy.schedule}</Text>
-          </View>
-        </View>
+        {/* Шапка общая со сменами и партнёрскими: кто, когда, что и на каких
+            условиях. Раньше здесь были заголовок с подписью и две карточки
+            «Зарплата/График» — свой макет, не совпадавший с остальными. */}
+        <VacancyDetailHead
+          logo={<CompanyMark company={employerDisplayName} size={34} />}
+          company={employerDisplayName}
+          postedAgo={agoRu(vacancy.createdAt)}
+          title={vacancy.title}
+          chips={headChips}
+        />
 
         {/* Location */}
         {(vacancy.metroStation || vacancy.address) ? (
@@ -388,6 +397,24 @@ export default function PermVacancyDetailScreen() {
             <Text style={styles.descText}>{vacancy.description}</Text>
           </View>
         ) : null}
+
+        {/* Контакты. У своей вакансии внешней ссылки нет, а телефон
+            работодателя — его персональные данные, показывать их работнику
+            без отдельного согласия нельзя. Поэтому контакт здесь — чат, и
+            открывается он после того, как отклик одобрят. */}
+        <VacancyContacts
+          contact={{
+            kind: 'chat',
+            company: employerDisplayName,
+            actionLabel: isApproved ? 'Написать в чате' : 'Чат откроется после одобрения отклика',
+            onOpen: () => {
+              if (isApproved) router.push('/chats');
+              else if (!isApplied) setApplyOpen(true);
+            },
+          }}
+          locked={isGuest}
+          onLogin={() => router.push({ pathname: '/login', params: { returnTo: `perm-vacancy-detail?vacancyId=${vacancyId}` } })}
+        />
 
         {/* Employer info */}
         <View style={styles.section}>
@@ -566,19 +593,7 @@ const styles = StyleSheet.create({
   statusBadge: { borderRadius: rs(10), paddingHorizontal: rs(14), paddingVertical: rs(8), alignSelf: 'flex-start' },
   statusTxt: { fontSize: rf(13), fontWeight: '700' },
 
-  jobTitle: { fontSize: rf(26), fontWeight: '800', color: Colors.textPrimary, lineHeight: rf(32) },
-  companyName: { fontSize: rf(14), color: Colors.textMuted, marginTop: rs(-8) },
 
-  infoGrid: { flexDirection: 'row', gap: rs(12) },
-  infoCard: {
-    flex: 1, backgroundColor: Colors.surface,
-    borderRadius: Radius.md, padding: rs(14),
-    alignItems: 'center', gap: rs(4),
-    borderWidth: 1, borderColor: Colors.divider,
-  },
-  infoCardIcon: { fontSize: rf(22) },
-  infoCardLabel: { fontSize: rf(11), color: Colors.textMuted, textTransform: 'uppercase', fontWeight: '600' },
-  infoCardValue: { fontSize: rf(15), fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
 
   section: { gap: rs(10) },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: rs(6) },
