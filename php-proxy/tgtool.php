@@ -105,6 +105,19 @@ switch ($action) {
         break;
     }
 
+    // Разовая настройка рабочей форум-группы. Название зафиксировано здесь,
+    // чтобы публичный пропуск приложения нельзя было использовать для
+    // бесконтрольного создания произвольных тем.
+    case 'createCompetitorsTopic': {
+        $res = tg('createForumTopic', [
+            'chat_id' => $WORK_GROUP,
+            'name' => 'Конкуренты',
+            'icon_color' => 7322096,
+        ]);
+        echo json_encode(['chat' => $WORK_GROUP, 'telegram' => $res], JSON_UNESCAPED_UNICODE);
+        break;
+    }
+
     // Нужно после смены токена: вебхук привязан к боту, но переставить его
     // может только тот, у кого есть действующий токен.
     case 'setWebhook': {
