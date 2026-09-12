@@ -103,24 +103,6 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
               </>
             ) : null}
 
-            {/* Адрес. На карточке он теперь обрезан двумя строками, а
-                поехать человеку нужно по полному — значит, здесь целиком. */}
-            {vacancy.address ? (
-              <>
-                <Text style={styles.secLabel}>Адрес</Text>
-                <Text style={styles.condText}>{vacancy.address}</Text>
-              </>
-            ) : null}
-
-            {/* Условия. С карточки они ушли сюда целиком: там прокрутки
-                больше нет, и разворачивать текст на месте некуда. */}
-            {vacancy.conditions ? (
-              <>
-                <Text style={styles.secLabel}>Условия</Text>
-                <Text style={styles.condText}>{vacancy.conditions}</Text>
-              </>
-            ) : null}
-
             {/* Norms */}
             {vacancy.normsAndPay ? (
               <>

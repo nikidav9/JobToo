@@ -4,7 +4,6 @@ import { Platform, AppState } from 'react-native';
 import * as Updates from 'expo-updates';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
@@ -207,15 +206,10 @@ export default function RootLayout() {
   }, []);
 
   return (
-    // Корень для жестов. На Android без него жесты react-native-gesture-handler
-    // молча не работают — а на нём держится свайп карточек в ленте. Вложенность
-    // безопасна: если обёртку когда-нибудь добавит и сам expo-router, вторая
-    // ничего не сломает.
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <AlertProvider>
-        {/* initialMetrics — чтобы безопасные отступы были известны сразу,
-            иначе на первом кадре они нулевые и низ экрана дёргается */}
-        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+    <AlertProvider>
+      {/* initialMetrics — чтобы безопасные отступы были известны сразу,
+          иначе на первом кадре они нулевые и низ экрана дёргается */}
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <AppProvider>
           <StatusBar style="dark" />
           <WebSplashController />
@@ -251,8 +245,7 @@ export default function RootLayout() {
           <CookieConsent />
           <ToastLayer />
         </AppProvider>
-        </SafeAreaProvider>
-      </AlertProvider>
-    </GestureHandlerRootView>
+      </SafeAreaProvider>
+    </AlertProvider>
   );
 }
