@@ -321,10 +321,10 @@ TMP=/tmp/jt-status.$$
       };
       $me = $get("getMe");
       echo "бот=" . ($me["ok"] ?? false ? ($me["result"]["username"] ?? "?") : ("не отвечает [" . ($why ?: ($me["description"] ?? "пустой ответ")) . "]"));
-      $g = $get("getChat?chat_id=-1004358116342");
+      $g = $get("getChat?chat_id=-1001709270025");
       echo " группа=" . ($g["ok"] ?? false ? ($g["result"]["title"] ?? "?") : ("отказ: " . ($g["description"] ?? "?")));
       if (($g["ok"] ?? false) && !empty($me["result"]["id"])) {
-        $m2 = $get("getChatMember?chat_id=-1004358116342&user_id=" . $me["result"]["id"]);
+        $m2 = $get("getChatMember?chat_id=-1001709270025&user_id=" . $me["result"]["id"]);
         echo " права=" . ($m2["ok"] ?? false ? ($m2["result"]["status"] ?? "?") : "не прочитать");
         $sm = $g["result"]["slow_mode_delay"] ?? 0;
         if ($sm) echo " медленный_режим=" . $sm . "с";

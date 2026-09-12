@@ -50,7 +50,8 @@ if ($TOKEN === '') {
 // Куда писать и куда слать вебхук — только отсюда, не из запроса. Пропуск к
 // этому файлу тот же, что у db.php, а он лежит в открытом коде: с адресом
 // из параметра ботом можно было бы писать в любой чат и увести вебхук.
-$GROUP = (int)(getenv('TG_GROUP_CHAT_ID') ?: -1004358116342);
+$GROUP = (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025);
+$WORK_GROUP = (int)(getenv('TG_WORK_GROUP_CHAT_ID') ?: -1004358116342);
 $HOOK  = getenv('TG_HOOK_URL') ?: 'https://tg.jobtoo.ru/api/tg.php';
 
 function tg(string $method, array $payload = [], string $verb = 'POST'): array {
@@ -83,6 +84,24 @@ switch ($action) {
             'disable_web_page_preview' => true,
         ]);
         echo json_encode(['chat' => $GROUP, 'telegram' => $res], JSON_UNESCAPED_UNICODE);
+        break;
+    }
+
+    // Внутренняя рабочая группа отделена от группы вакансий.
+    // Сюда не попадают объявления, дайджесты и сообщения соискателям.
+    case 'postToWorkGroup': {
+        $text = trim((string)($body['text'] ?? ''));
+        if ($text === '') { echo json_encode(['error' => 'Пустой текст'], JSON_UNESCAPED_UNICODE); exit; }
+        $payload = [
+            'chat_id' => $WORK_GROUP,
+            'text' => $text,
+            'parse_mode' => 'HTML',
+            'disable_web_page_preview' => true,
+        ];
+        $threadId = (int)($body['message_thread_id'] ?? 0);
+        if ($threadId > 0) $payload['message_thread_id'] = $threadId;
+        $res = tg('sendMessage', $payload);
+        echo json_encode(['chat' => $WORK_GROUP, 'telegram' => $res], JSON_UNESCAPED_UNICODE);
         break;
     }
 

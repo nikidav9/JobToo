@@ -1188,7 +1188,7 @@ function support_thread_set(string $userId, ?string $closedAt): bool {
     } catch (Throwable $e) { return false; }
 }
 
-define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1004358116342)); // группа «ПОДРАБОТКИ»
+define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025)); // группа «ПОДРАБОТКИ»
 
 /**
  * Validates Telegram WebApp initData signature (HMAC per official spec).
