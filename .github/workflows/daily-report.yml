@@ -1,6 +1,11 @@
 name: Daily Product Report
 
 on:
+  # Временный контрольный запуск после подключения Метрики. Удаляется сразу
+  # после проверки фактического ответа API и отправки в Telegram.
+  push:
+    branches: [main]
+    paths: ['.github/workflows/daily-report.yml']
   schedule:
     # 06:00 UTC = 09:00 МСК, каждый день
     - cron: '0 6 * * *'
