@@ -32,9 +32,9 @@ probe_url() {
   local -a family_args=()
   [[ "$family" != auto ]] && family_args=("$family")
   set +e
-  metrics=$(curl "${family_args[@]}" --silent --show-error --location \
+  metrics=$(curl "${family_args[@]}" --silent --show-error --location --compressed \
     --connect-timeout 8 --max-time 20 --output "$body" \
-    --write-out 'code=%{http_code} remote=%{remote_ip} tls=%{time_appconnect}s first_byte=%{time_starttransfer}s total=%{time_total}s' \
+    --write-out 'code=%{http_code} remote=%{remote_ip} bytes=%{size_download} tls=%{time_appconnect}s first_byte=%{time_starttransfer}s total=%{time_total}s' \
     "$url" 2>&1)
   rc=$?
   set -e
