@@ -210,7 +210,7 @@ jobs:
               -H "X-App-Secret: $APP_SECRET" \
               -H 'Content-Type: application/json' \
               --data "{\"action\":\"$action\"}" \
-              https://tg.jobtoo.ru/api/tgtool.php > "$output"
+              https://jobtoo.ru/api/tgtool.php > "$output"
           }
 
           call_tgtool setWebhook webhook-set.json
