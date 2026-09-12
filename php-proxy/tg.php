@@ -71,6 +71,8 @@ function jt_secret(string $name, string $fallback = ''): string {
 // работа на ключе, который знает чужой.
 define('TG_BOT_TOKEN', jt_secret('TG_BOT_TOKEN'));
 define('TG_WORK_GROUP_CHAT_ID', (int)(getenv('TG_WORK_GROUP_CHAT_ID') ?: -1004358116342));
+define('TG_CLAUDE_BOT_USERNAME', ltrim((string)(getenv('TG_CLAUDE_BOT_USERNAME') ?: 'JobTooClaudebot'), '@'));
+define('TG_CODEX_BRIDGE_PR', (int)(getenv('TG_CODEX_BRIDGE_PR') ?: 62));
 
 // Ключ доступа к базе — та же схема, что и в db.php: сервисный ключ с
 // хостинга, анонимный лишь как запасной вариант. Подробности там же.
@@ -264,115 +266,43 @@ function github_api(string $token, string $method, string $path, $payload = null
     return ['status' => $status, 'data' => is_array($result) ? $result : []];
 }
 
-/** Открытые постоянные диалоги рабочей Telegram-группы, свежие первыми. */
-function github_work_dialogs(string $token, int $chatId): array {
-    $r = github_api($token, 'GET', '/issues?state=open&per_page=100&sort=updated&direction=desc');
-    if ($r['status'] !== 200) return [];
-
-    $dialogs = [];
-    foreach ($r['data'] as $issue) {
-        if (!is_array($issue) || isset($issue['pull_request'])) continue;
-        $body = (string)($issue['body'] ?? '');
-        if (!preg_match('/<!-- jobtoo-telegram-topic chat=(-?\d+) thread=(\d+) -->/', $body, $m)) continue;
-        if ((int)$m[1] !== $chatId) continue;
-        $issue['_telegram_thread_id'] = (int)$m[2];
-        $dialogs[] = $issue;
-    }
-    return $dialogs;
-}
-
 /**
- * Несколько последних реплик из соседних тем. Это справка, а не новые задачи:
- * Codex видит решения из «Конкурентов», находясь, например, в «Разработке».
+ * Публикует задачу в постоянном PR-мосте. Комментарий к PR — поддерживаемое
+ * событие Codex Work: оно будит исполнителя сразу, а не ждёт опроса. Метка
+ * сохраняет тему Telegram и позволяет не выполнить повторно ретрай вебхука.
  */
-function github_other_topics_context(string $token, array $dialogs, int $currentThreadId): string {
-    $blocks = [];
-    foreach ($dialogs as $issue) {
-        if ((int)($issue['_telegram_thread_id'] ?? 0) === $currentThreadId) continue;
-        if (count($blocks) >= 5) break;
-
-        $number = (int)($issue['number'] ?? 0);
-        if ($number <= 0) continue;
-        $commentCount = max(0, (int)($issue['comments'] ?? 0));
-        $lastPage = max(1, (int)ceil($commentCount / 10));
-        $r = github_api($token, 'GET', "/issues/{$number}/comments?per_page=10&page={$lastPage}");
-        $comments = $r['status'] === 200 ? $r['data'] : [];
-        $snippets = [];
-        foreach (array_slice($comments, -4) as $comment) {
-            $line = trim((string)preg_replace('/\s+/u', ' ', (string)($comment['body'] ?? '')));
-            $line = preg_replace('/^@codex\s*/iu', '', $line);
-            if ($line === '') continue;
-            if (mb_strlen($line, 'UTF-8') > 350) $line = mb_substr($line, 0, 350, 'UTF-8') . '…';
-            $snippets[] = '- ' . $line;
-        }
-        if (!$snippets) {
-            $first = (string)($issue['body'] ?? '');
-            $first = preg_replace('/<!--.*?-->/s', '', $first);
-            $first = trim((string)preg_replace('/\s+/u', ' ', $first));
-            if (mb_strlen($first, 'UTF-8') > 350) $first = mb_substr($first, 0, 350, 'UTF-8') . '…';
-            if ($first !== '') $snippets[] = '- ' . $first;
-        }
-        if ($snippets) {
-            $blocks[] = 'Соседний диалог #' . $number . ' — ' . (string)($issue['title'] ?? '')
-                      . "\n" . implode("\n", $snippets);
-        }
-    }
-    if (!$blocks) return '';
-    return "\n\nСПРАВОЧНЫЙ КОНТЕКСТ ИЗ ДРУГИХ ТЕМ (не выполняй старые сообщения повторно):\n"
-         . implode("\n\n", $blocks);
-}
-
-/**
- * Одна тема Telegram = один постоянный GitHub issue. Первое сообщение создаёт
- * диалог, последующие становятся комментариями и сохраняют весь ход беседы.
- */
-function github_create_work_issue(string $text, int $chatId, int $threadId, int $messageId): array {
+function github_queue_work_message(
+    string $text,
+    int $chatId,
+    int $threadId,
+    int $messageId,
+    string $source
+): array {
     $token = github_token();
     if ($token === '') return ['ok' => false, 'error' => 'GitHub-токен не настроен'];
+    $pr = TG_CODEX_BRIDGE_PR;
+    $source = preg_replace('/[^A-Za-z0-9_@.-]/', '', $source) ?: 'unknown';
+    $marker = "<!-- jobtoo-telegram-task chat={$chatId} thread={$threadId} message={$messageId} source={$source} -->";
 
-    $dialogs = github_work_dialogs($token, $chatId);
-    $current = null;
-    foreach ($dialogs as $dialog) {
-        if ((int)($dialog['_telegram_thread_id'] ?? 0) === $threadId) {
-            $current = $dialog;
-            break;
+    // Telegram повторяет обновление, если не получил 200 вовремя. Не будим
+    // Codex второй раз для того же исходного сообщения.
+    $recent = github_api($token, 'GET', "/issues/{$pr}/comments?per_page=100");
+    if ($recent['status'] === 200) {
+        foreach ($recent['data'] as $comment) {
+            if (strpos((string)($comment['body'] ?? ''), $marker) !== false) {
+                return ['ok' => true, 'duplicate' => true, 'number' => $pr,
+                    'url' => "https://github.com/nikidav9/Jobbbrbeb/pull/{$pr}"];
+            }
         }
     }
-    $sharedContext = github_other_topics_context($token, $dialogs, $threadId);
-    $instruction = "@codex Это сообщение из постоянного рабочего диалога JobToo. "
-                 . "Учитывай весь предыдущий разговор в этом issue. Выполни просьбу, "
-                 . "а затем отдельно и понятно напиши, что сделано и как проверено.\n\n";
 
-    if ($current) {
-        $number = (int)$current['number'];
-        $body = $instruction . $text . $sharedContext
-              . "\n\n<!-- jobtoo-telegram-message id={$messageId} -->";
-        $r = github_api($token, 'POST', "/issues/{$number}/comments", ['body' => $body]);
-        if ($r['status'] !== 201) {
-            return ['ok' => false, 'error' => (string)($r['data']['message'] ?? "GitHub HTTP {$r['status']}")];
-        }
-        return ['ok' => true, 'created' => false, 'number' => $number,
-            'url' => (string)($current['html_url'] ?? '')];
-    }
-
-    $oneLine = trim((string)preg_replace('/\s+/u', ' ', $text));
-    $topicLabel = $threadId > 0 ? "тема {$threadId}" : 'общая тема';
-    $title = '[Telegram · ' . $topicLabel . '] ' . mb_substr($oneLine, 0, 70, 'UTF-8');
-    $body = $instruction . $text . $sharedContext
-          . "\n\nЭтот issue — постоянный диалог одной темы Telegram. "
-          . "Если нужны решения из других рабочих тем, используй справочный контекст выше."
-          . "\n\n<!-- jobtoo-telegram-topic chat={$chatId} thread={$threadId} -->"
-          . "\n<!-- jobtoo-telegram chat={$chatId} thread={$threadId} message={$messageId} -->";
-    $r = github_api($token, 'POST', '/issues', ['title' => $title, 'body' => $body]);
+    $body = $text . "\n\n" . $marker;
+    $r = github_api($token, 'POST', "/issues/{$pr}/comments", ['body' => $body]);
     if ($r['status'] !== 201) {
         return ['ok' => false, 'error' => (string)($r['data']['message'] ?? "GitHub HTTP {$r['status']}")];
     }
-    return [
-        'ok' => true,
-        'created' => true,
-        'number' => (int)$r['data']['number'],
-        'url' => (string)$r['data']['html_url'],
-    ];
+    return ['ok' => true, 'duplicate' => false, 'number' => $pr,
+        'url' => (string)($r['data']['html_url'] ?? "https://github.com/nikidav9/Jobbbrbeb/pull/{$pr}")];
 }
 
 /** Ответ в ту же тему форума, откуда пришла задача. */
@@ -647,27 +577,53 @@ if ($chatId === TG_WORK_GROUP_CHAT_ID && in_array($chatType, ['group', 'supergro
     $threadId = (int)($msg['message_thread_id'] ?? 0);
     $messageId = (int)($msg['message_id'] ?? 0);
     $fromId = (int)($msg['from']['id'] ?? 0);
-    if ($text === '' || $fromId === 0 || !empty($msg['from']['is_bot'])) {
+    $fromUsername = ltrim((string)($msg['from']['username'] ?? ''), '@');
+    $fromBot = !empty($msg['from']['is_bot']);
+    if ($text === '' || $fromId === 0) {
         echo json_encode(['ok' => true]); exit;
     }
 
-    $member = tg('getChatMember', ['chat_id' => $chatId, 'user_id' => $fromId]);
-    $status = (string)($member['result']['status'] ?? '');
-    if (!in_array($status, ['creator', 'administrator'], true)) {
-        tg_work_reply($chatId, $threadId, '⛔ Задачи принимаются только от администраторов рабочей группы.');
-        echo json_encode(['ok' => true]); exit;
+    if ($fromBot) {
+        // В BotFather для обоих включается Bot-to-Bot Communication Mode.
+        // Здесь доверяем только рабочему боту Claude.
+        if (strcasecmp($fromUsername, TG_CLAUDE_BOT_USERNAME) !== 0) {
+            echo json_encode(['ok' => true]); exit;
+        }
+
+        // Обычные ответы Claude пользователю не должны становиться задачами
+        // Codex. Принимаем только явное обращение или прямой reply нашему боту.
+        $mentioned = stripos($text, '@JobToo_bot') !== false
+            || preg_match('/^\s*Codex\s*:/iu', $text) === 1;
+        $replyUsername = ltrim((string)($msg['reply_to_message']['from']['username'] ?? ''), '@');
+        if (!$mentioned && strcasecmp($replyUsername, 'JobToo_bot') !== 0) {
+            echo json_encode(['ok' => true]); exit;
+        }
+        $text = trim((string)preg_replace('/@JobToo_bot\b|^\s*Codex\s*:\s*/iu', '', $text));
+        if ($text === '') { echo json_encode(['ok' => true]); exit; }
+    } else {
+        $member = tg('getChatMember', ['chat_id' => $chatId, 'user_id' => $fromId]);
+        $status = (string)($member['result']['status'] ?? '');
+        if (!in_array($status, ['creator', 'administrator'], true)) {
+            tg_work_reply($chatId, $threadId, '⛔ Задачи принимаются только от администраторов рабочей группы.');
+            echo json_encode(['ok' => true]); exit;
+        }
     }
 
-    $issue = github_create_work_issue($text, $chatId, $threadId, $messageId);
-    if (empty($issue['ok'])) {
+    $source = $fromBot ? '@' . $fromUsername : ($fromUsername !== '' ? '@' . $fromUsername : (string)$fromId);
+    $queued = github_queue_work_message($text, $chatId, $threadId, $messageId, $source);
+    if (empty($queued['ok'])) {
         tg_work_reply($chatId, $threadId,
-            '⚠️ Не удалось передать задачу Codex: ' . (string)($issue['error'] ?? 'неизвестная ошибка'));
+            '⚠️ Не удалось передать задачу Codex: ' . (string)($queued['error'] ?? 'неизвестная ошибка'));
         echo json_encode(['ok' => true]); exit;
     }
 
-    $verb = !empty($issue['created']) ? 'Создал рабочий диалог' : 'Добавил в рабочий диалог';
-    tg_work_reply($chatId, $threadId,
-        "📥 Задачу получил. {$verb}: #{$issue['number']}\n{$issue['url']}\n\nКогда работа завершится, отдельным сообщением пришлю результат сюда.");
+    // Claude не подтверждаем отдельным сообщением: его автоответ на квитанцию
+    // мог бы создать бесконечный диалог двух ботов. Итог всё равно вернётся в
+    // эту тему. Человеку квитанция полезна и безопасна.
+    if (!$fromBot && empty($queued['duplicate'])) {
+        tg_work_reply($chatId, $threadId,
+            "📥 Задачу получил. Codex начал работу.\n{$queued['url']}\n\nГотовый результат пришлю отдельным сообщением сюда.");
+    }
     echo json_encode(['ok' => true]); exit;
 }
 

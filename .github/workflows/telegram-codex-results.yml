@@ -7,9 +7,9 @@ on:
 jobs:
   notify:
     if: >-
-      ${{ !github.event.issue.pull_request &&
-          contains(github.event.issue.body || '', '<!-- jobtoo-telegram') &&
-          contains(github.event.comment.user.login, 'codex') }}
+      ${{ github.event.issue.pull_request &&
+          github.event.issue.number == 62 &&
+          contains(github.event.comment.body || '', '<!-- jobtoo-codex-result') }}
     runs-on: ubuntu-latest
     steps:
       - name: Send Codex result to the originating Telegram topic
@@ -22,17 +22,19 @@ jobs:
           with open(os.environ['GITHUB_EVENT_PATH'], encoding='utf-8') as fh:
               event = json.load(fh)
 
-          body = event['issue'].get('body') or ''
-          match = re.search(r'<!-- jobtoo-telegram chat=(-?\d+) thread=(\d+) message=(\d+) -->', body)
+          comment = (event['comment'].get('body') or '').strip()
+          match = re.search(
+              r'<!-- jobtoo-codex-result chat=(-?\d+) thread=(\d+) message=(\d+) -->',
+              comment,
+          )
           if not match:
               raise SystemExit('Telegram marker is missing')
 
           chat_id, thread_id, _ = map(int, match.groups())
-          issue = event['issue']
-          comment = (event['comment'].get('body') or '').strip()
+          comment = re.sub(r'\n*<!-- jobtoo-codex-result.*?-->\s*$', '', comment, flags=re.S).strip()
           if len(comment) > 3300:
               comment = comment[:3300] + '…'
-          text = f"✅ Готово: #{issue['number']} {issue['title']}\n\n{comment}\n\n{issue['html_url']}"
+          text = f"✅ Codex: готово\n\n{comment}"
           payload = {'chat_id': chat_id, 'text': text, 'disable_web_page_preview': True}
           if thread_id > 0:
               payload['message_thread_id'] = thread_id
