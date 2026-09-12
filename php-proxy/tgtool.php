@@ -50,7 +50,7 @@ if ($TOKEN === '') {
 // Куда писать и куда слать вебхук — только отсюда, не из запроса. Пропуск к
 // этому файлу тот же, что у db.php, а он лежит в открытом коде: с адресом
 // из параметра ботом можно было бы писать в любой чат и увести вебхук.
-$GROUP = (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025);
+$GROUP = (int)(getenv('TG_GROUP_CHAT_ID') ?: -1004358116342);
 $HOOK  = getenv('TG_HOOK_URL') ?: 'https://tg.jobtoo.ru/api/tg.php';
 
 function tg(string $method, array $payload = [], string $verb = 'POST'): array {
