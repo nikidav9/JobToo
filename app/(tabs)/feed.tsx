@@ -2,14 +2,16 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Animated, Dimensions, RefreshControl, Modal, FlatList,
-  TextInput, ActivityIndicator, Share, Platform, Linking,
+  TextInput, ActivityIndicator, Share, Platform, Linking, Pressable,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector } from 'react-native-gesture-handler';
+import Reanimated from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
+import { useSwipeDeck } from '@/hooks/useSwipeDeck';
 import { ExternalVacancy, Like, User, Vacancy, PermVacancy } from '@/constants/types';
 import {
   formatDate,
@@ -198,8 +200,6 @@ const wpStyles = StyleSheet.create({
 });
 
 const { width: SW } = Dimensions.get('window');
-const SWIPE_THRESHOLD = 80;
-const VELOCITY_THRESHOLD = 0.3;
 
 // Flat list of all metro stations with their line metadata
 const ALL_STATIONS = METRO_LINES.flatMap(l =>
@@ -1878,17 +1878,20 @@ function WorkerFeed() {
       }));
   }, [vacancies, partnerShifts, selectedDate, currentUser, filterSources]);
 
-  const pan = useRef(new Animated.ValueXY()).current;
+  // Решения по карточке объявлены ниже (им нужны данные и роутер), а жест
+  // собирается один раз и должен звать свежие. Поэтому через ссылку.
+  const swipeCbRef = useRef<((dir: 'want' | 'skip', vx: number) => void) | null>(null);
+  const deck = useSwipeDeck({
+    want: vx => swipeCbRef.current?.('want', vx),
+    skip: vx => swipeCbRef.current?.('skip', vx),
+  });
+
   const cardAreaRef = useRef<View>(null);
   const pendingLikeIds = useRef<Set<string>>(new Set());
   const swipingRef = useRef(false);
   const messagingRef = useRef(false);
   // Карточка, по которой человек сейчас пишет отклик (null — окно закрыто)
   const [applyFor, setApplyFor] = useState<Vacancy | null>(null);
-
-  const wantOpacity = pan.x.interpolate({ inputRange: [0, SWIPE_THRESHOLD], outputRange: [0, 1], extrapolate: 'clamp' });
-  const skipOpacity = pan.x.interpolate({ inputRange: [-SWIPE_THRESHOLD, 0], outputRange: [1, 0], extrapolate: 'clamp' });
-  const rotate = pan.x.interpolate({ inputRange: [-SW / 2, 0, SW / 2], outputRange: ['-8deg', '0deg', '8deg'], extrapolate: 'clamp' });
 
   useEffect(() => {
     const sync = () => {
@@ -1947,11 +1950,8 @@ function WorkerFeed() {
              - scoreVacancyForWorker(a, currentUser, ctx(a));
       });
     setCards(filtered);
-    if (!swipingRef.current) {
-      pan.flattenOffset();
-      pan.setValue({ x: 0, y: 0 });
-    }
-  }, [selectedDate, vacancies, partnerShifts, likes, myLikes, users, currentUser, filterStations, timeFilters, filterSources, deepLinkVacancyId]);
+    if (!swipingRef.current) deck.reset();
+  }, [selectedDate, vacancies, partnerShifts, likes, myLikes, users, currentUser, filterStations, timeFilters, filterSources, deepLinkVacancyId, deck]);
 
   const currentCard = cards[0];
   const currentEmployer = currentCard ? users.find(u => u.id === currentCard.employerId) : null;
@@ -1994,21 +1994,6 @@ function WorkerFeed() {
   }, [deepLinkVacancyId, currentCard, currentEmployer]);
   // Онбордингу: есть ли реальная карточка (иначе он покажет демо-карточку)
   useEffect(() => { setOnboardingFlag('hasShiftCard', !!currentCard); }, [currentCard]);
-  // Какие карточки развёрнуты (описание «Читать ещё»). По id вакансии — как в «Работе».
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [truncatedShiftDescriptions, setTruncatedShiftDescriptions] = useState<Set<string>>(new Set());
-  const toggleExpanded = (id: string) =>
-    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const rememberShiftDescriptionLines = (id: string, lines: number) => {
-    setTruncatedShiftDescriptions(prev => {
-      const shouldShow = lines > 6;
-      if (prev.has(id) === shouldShow) return prev;
-      const next = new Set(prev);
-      shouldShow ? next.add(id) : next.delete(id);
-      return next;
-    });
-  };
-
   useEffect(() => {
     if (!currentCard?.id || !currentUser?.id) return;
     const t = setTimeout(() => {
@@ -2036,29 +2021,14 @@ function WorkerFeed() {
   }, [currentCard, currentUser?.id, currentUser?.isGuest]);
 
   const animateCard = useCallback((dir: 'left' | 'right', velocity: number, cb: () => void) => {
-    const targetX = dir === 'right' ? SW * 1.5 : -SW * 1.5;
-    const duration = Math.max(180, Math.min(300, 250 / (Math.abs(velocity) + 0.5)));
     swipingRef.current = true;
     setSwiping(true);
-    Animated.parallel([
-      Animated.timing(pan.x, { toValue: targetX, duration, useNativeDriver: false }),
-      Animated.timing(pan.y, { toValue: dir === 'right' ? -40 : 40, duration, useNativeDriver: false }),
-    ]).start(() => {
-      pan.setValue({ x: 0, y: 0 });
+    deck.flyOut(dir, velocity, () => {
       swipingRef.current = false;
       setSwiping(false);
       cb();
     });
-  }, [pan]);
-
-  const snapBack = useCallback(() => {
-    Animated.spring(pan, {
-      toValue: { x: 0, y: 0 },
-      tension: 250,
-      friction: 22,
-      useNativeDriver: false,
-    }).start();
-  }, [pan]);
+  }, [deck]);
 
   const doSkip = useCallback((vx = 0.5) => {
     if (!currentCard || !currentUser || swiping) return;
@@ -2251,57 +2221,12 @@ function WorkerFeed() {
     }
   }, [applyFor, currentUser, refreshChats, router, showToast, promptRegister]);
 
-  const swipeCbRef = useRef<((dir: 'want' | 'skip', vx: number) => void) | null>(null);
-  const snapBackRef = useRef<(() => void) | null>(null);
   const doMessageRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     swipeCbRef.current = (dir, vx) => { if (dir === 'want') doWant(vx); else doSkip(vx); };
-    snapBackRef.current = snapBack;
     doMessageRef.current = doMessage;
   });
-
-  /**
-   * Свайп карточки — на react-native-gesture-handler, а не на PanResponder.
-   *
-   * Замена не из любви к новому. Карточка улетала от обычной прокрутки, и
-   * побороть это порогами не выходит в принципе. Палец, начиная листать, идёт
-   * дугой: за первые миллисекунды набегает десяток пикселей вбок при паре
-   * вниз. Любой порог в этот момент говорит «жест горизонтальный», свайп
-   * забирает его себе — и уже не отдаёт. PanResponder умеет только «беру
-   * сейчас»; сказать «я ошибся, это прокрутка, забирайте» он не умеет.
-   *
-   * Здесь для этого есть failOffsetY: жест насовсем проигрывает, если палец
-   * ушёл вниз больше чем на 12 пикселей до того, как набрал 20 вбок. То есть
-   * прокрутка забирает жест сама, а не отвоёвывает его у карточки.
-   *
-   * runOnJS — потому что двигаем обычный Animated.ValueXY, а не Reanimated:
-   * без него обработчики уходят на UI-поток, где этого значения нет.
-   */
-  const swipeGesture = useMemo(
-    () => Gesture.Pan()
-      .runOnJS(true)
-      .activeOffsetX([-20, 20])
-      .failOffsetY([-12, 12])
-      // translationX считается от начала жеста, поэтому смещение не копим —
-      // карточка и так приходит сюда на нуле после снапбэка или улёта.
-      .onUpdate(e => { pan.x.setValue(e.translationX); })
-      .onEnd(e => {
-        // Здесь скорость в пикселях в секунду, а пороги исторически в
-        // пикселях на миллисекунду — переводим, иначе любой свайп считался бы
-        // «быстрым» и карточка улетала бы от касания.
-        const vx = e.velocityX / 1000;
-        const dx = e.translationX;
-        if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) {
-          swipeCbRef.current?.('want', Math.abs(vx));
-        } else if (dx < -SWIPE_THRESHOLD || vx < -VELOCITY_THRESHOLD) {
-          swipeCbRef.current?.('skip', Math.abs(vx));
-        } else {
-          snapBackRef.current?.();
-        }
-      }),
-    [pan],
-  );
 
   const countShifts = (d: string, f: ShiftFilters) => {
     if (!currentUser) return 0;
@@ -2363,6 +2288,21 @@ function WorkerFeed() {
               );
             })}
           </ScrollView>
+          {/* Обновить вручную. Раньше это делалось потягиванием карточки вниз,
+              но карточка больше не прокручивается — тянуть нечего. Лента и так
+              обновляется сама по realtime, кнопка нужна на случай, когда связь
+              подвисла и человек хочет проверить прямо сейчас. */}
+          <TouchableOpacity
+            accessibilityLabel="Обновить ленту"
+            style={pS.inlineFilter}
+            onPress={() => { void onRefresh(); }}
+            disabled={refreshing}
+            activeOpacity={0.8}
+          >
+            {refreshing
+              ? <ActivityIndicator size="small" color={Colors.primary} />
+              : <Ionicons name="refresh-outline" size={20} color={Colors.textSecondary} />}
+          </TouchableOpacity>
           <TouchableOpacity
             style={[pS.inlineFilter, filtersActive ? pS.inlineFilterActive : null]}
             onPress={() => setFilterOpen(true)}
@@ -2468,117 +2408,99 @@ function WorkerFeed() {
           </ScrollView>
         ) : (
           <>
-            {cards[2] ? <View style={styles.ghost2} /> : null}
-            {cards[1] ? <View style={styles.ghost1} /> : null}
+            {cards[2] ? <Reanimated.View style={[styles.ghost2, deck.thirdCardStyle]} /> : null}
+            {cards[1] ? <Reanimated.View style={[styles.ghost1, deck.nextCardStyle]} /> : null}
 
-            <GestureDetector gesture={swipeGesture}>
-            <Animated.View
-              style={[styles.cardAnimated, { transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }] }]}
-            >
-              <View style={styles.card}>
-                <Animated.View style={[styles.wantOverlay, { opacity: wantOpacity }]}>
-                  <Text style={styles.wantText}>ХОЧУ ♥</Text>
-                </Animated.View>
-                <Animated.View style={[styles.skipOverlay, { opacity: skipOpacity }]}>
-                  <Text style={styles.skipText}>НЕТ ✕</Text>
-                </Animated.View>
+            <GestureDetector gesture={deck.gesture}>
+              <Reanimated.View style={[styles.cardAnimated, deck.cardStyle]} onLayout={deck.onCardLayout}>
+                <View style={styles.card}>
+                  <Reanimated.View style={[styles.wantOverlay, deck.wantStyle]}>
+                    <Text style={styles.wantText}>ХОЧУ ♥</Text>
+                  </Reanimated.View>
+                  <Reanimated.View style={[styles.skipOverlay, deck.skipStyle]}>
+                    <Text style={styles.skipText}>НЕТ ✕</Text>
+                  </Reanimated.View>
 
-                <ScrollView
-                  style={{ flex: 1 }}
-                  contentContainerStyle={{ paddingBottom: rs(28) }}
-                  showsVerticalScrollIndicator={false}
-                  // Пока карточка уезжает, листать её нельзя: жест либо
-                  // прокручивает, либо двигает карточку, но не оба разом.
-                  scrollEnabled={!swiping}
-                  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
-                >
-                  <View style={styles.cardTop}>
-                    <View style={styles.companyRow}>
-                      <CompanyMark company={currentCard.company} size={52} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.companyName} numberOfLines={1}>
-                          {normalizeCompany(currentCard.company)}
-                        </Text>
-                        <View style={styles.metroHintRow}>
-                          <Ionicons
-                            name={'external' in currentCard ? 'open-outline' : 'subway-outline'}
-                            size={12}
-                            color={Colors.textMuted}
-                          />
-                          <Text style={styles.metroHint}>
-                            {'external' in currentCard ? (currentCard.metroStation ?? '') : currentCard.metroStation}
+                  {/* Внутри карточки прокрутки нет — как у Tinder. Там на
+                      карточке только главное, а всё остальное открывается
+                      отдельным экраном по нажатию. Пока здесь жил ScrollView,
+                      два жеста делили одну площадь, и карточка уезжала от
+                      попытки полистать. Теперь спорить не с чем. */}
+                  <Pressable
+                    style={styles.cardBody}
+                    accessibilityRole="button"
+                    accessibilityLabel="Открыть подробности смены"
+                    onPress={() => {
+                      setDetailVacancy(currentCard);
+                      setDetailEmployer(currentEmployer ?? null);
+                    }}
+                  >
+                    <View style={styles.cardTop}>
+                      <View style={styles.companyRow}>
+                        <CompanyMark company={currentCard.company} size={52} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.companyName} numberOfLines={1}>
+                            {normalizeCompany(currentCard.company)}
                           </Text>
+                          <View style={styles.metroHintRow}>
+                            <Ionicons
+                              name={'external' in currentCard ? 'open-outline' : 'subway-outline'}
+                              size={12}
+                              color={Colors.textMuted}
+                            />
+                            <Text style={styles.metroHint}>
+                              {'external' in currentCard ? (currentCard.metroStation ?? '') : currentCard.metroStation}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.cardBadges}>
+                          {currentCard.isUrgent ? (
+                            <View style={styles.urgentTag}>
+                              <Ionicons name="flash" size={11} color="#92400E" />
+                              <Text style={styles.urgentTagTxt}>Срочно</Text>
+                            </View>
+                          ) : null}
+                          <SourceBadge partnerName={'external' in currentCard ? ((currentCard as PartnerShiftCard).external.sourceName ?? 'Партнёр') : undefined} />
                         </View>
                       </View>
-                      <View style={styles.cardBadges}>
-                        {currentCard.isUrgent ? (
-                          <View style={styles.urgentTag}>
-                            <Ionicons name="flash" size={11} color="#92400E" />
-                            <Text style={styles.urgentTagTxt}>Срочно</Text>
-                          </View>
-                        ) : null}
-                        <SourceBadge partnerName={'external' in currentCard ? ((currentCard as PartnerShiftCard).external.sourceName ?? 'Партнёр') : undefined} />
+
+                      <Text style={styles.jobTitle} numberOfLines={2}>{currentCard.title}</Text>
+
+                      <View style={styles.chipsRow}>
+                        <Chip label={`${currentCard.timeStart}–${currentCard.timeEnd}`} variant="time" icon="time-outline" />
+                        <Chip label={formatDate(currentCard.date)} variant="date" icon="calendar-outline" />
+                        {currentCard.noExperienceNeeded ? <Chip label="Без опыта" variant="exp" icon="school-outline" /> : null}
                       </View>
+
+                      {currentCard.address ? (
+                        <View style={styles.addressChip}>
+                          <Ionicons name="location-outline" size={15} color="#92400E" style={{ marginTop: 1 }} />
+                          <Text style={styles.addressChipText} numberOfLines={2}>{currentCard.address}</Text>
+                        </View>
+                      ) : null}
                     </View>
 
-                    <Text style={styles.jobTitle} numberOfLines={2}>{currentCard.title}</Text>
+                    <View style={styles.cardDivider} />
 
-                    <View style={styles.chipsRow}>
-                      <Chip label={`${currentCard.timeStart}–${currentCard.timeEnd}`} variant="time" icon="time-outline" />
-                      <Chip label={formatDate(currentCard.date)} variant="date" icon="calendar-outline" />
-                      {currentCard.noExperienceNeeded ? <Chip label="Без опыта" variant="exp" icon="school-outline" /> : null}
+                    {/* Условия обрезаны и не разворачиваются на месте:
+                        разворачивать некуда, карточка не прокручивается.
+                        Целиком они на экране подробностей. */}
+                    <View style={styles.cardMiddle}>
+                      {!('external' in currentCard) && currentCard.conditions ? (
+                        <View style={{ gap: rs(6) }}>
+                          <Text style={pS.sectionHead}>Условия</Text>
+                          <Text style={pS.desc} numberOfLines={5}>{currentCard.conditions}</Text>
+                        </View>
+                      ) : null}
                     </View>
 
-                    {currentCard.address ? (
-                      <View style={styles.addressChip}>
-                        <Ionicons name="location-outline" size={15} color="#92400E" style={{ marginTop: 1 }} />
-                        <Text style={styles.addressChipText} numberOfLines={3}>{currentCard.address}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-
-                  <View style={styles.cardDivider} />
-
-                  <View style={styles.cardMiddle}>
-                    {!('external' in currentCard) ? (
-                      <View style={{ gap: rs(12) }}>
-                        {currentCard.conditions ? (
-                          <View style={{ gap: rs(6) }}>
-                            <Text style={pS.sectionHead}>Условия</Text>
-                            <View style={{ position: 'relative' }}>
-                              <Text style={pS.desc} numberOfLines={expanded.has(currentCard.id) ? undefined : 6}>
-                                {currentCard.conditions}
-                              </Text>
-                              {!expanded.has(currentCard.id) ? (
-                                <Text
-                                  accessible={false}
-                                  style={[pS.desc, { position: 'absolute', opacity: 0, left: 0, right: 0, top: 0 }]}
-                                  onTextLayout={(e) => rememberShiftDescriptionLines(currentCard.id, e.nativeEvent.lines.length)}
-                                >
-                                  {currentCard.conditions}
-                                </Text>
-                              ) : null}
-                            </View>
-                            {(expanded.has(currentCard.id) || truncatedShiftDescriptions.has(currentCard.id)) ? (
-                              <TouchableOpacity style={pS.readMore} onPress={() => toggleExpanded(currentCard.id)} activeOpacity={0.7}>
-                                <Text style={pS.readMoreTxt}>{expanded.has(currentCard.id) ? 'Свернуть' : 'Читать ещё'}</Text>
-                                <Ionicons name={expanded.has(currentCard.id) ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.primary} />
-                              </TouchableOpacity>
-                            ) : null}
-                          </View>
-                        ) : null}
-                        {currentCard.normsAndPay ? (
-                          <View style={{ gap: rs(6) }}>
-                            <Text style={pS.sectionHead}>Нормативы и оплата</Text>
-                            <Text style={pS.desc}>{currentCard.normsAndPay}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                    ) : null}
-                  </View>
-                </ScrollView>
-              </View>
-            </Animated.View>
+                    <View style={styles.cardMoreRow}>
+                      <Ionicons name="information-circle-outline" size={16} color={Colors.primary} />
+                      <Text style={styles.cardMoreTxt}>Нажмите, чтобы открыть подробности</Text>
+                    </View>
+                  </Pressable>
+                </View>
+              </Reanimated.View>
             </GestureDetector>
 
             {/* Плавающие кнопки как в «Работе» и на образце: ✕ / ★ / ♥ и
@@ -2805,18 +2727,8 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
   const [permFilterOpen, setPermFilterOpen] = useState(false);
   // Какие карточки развёрнуты (описание «Читать ещё»). По id вакансии.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [truncatedDescriptions, setTruncatedDescriptions] = useState<Set<string>>(new Set());
   const toggleExpanded = (id: string) =>
     setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const rememberDescriptionLines = (id: string, lines: number) => {
-    setTruncatedDescriptions(prev => {
-      const shouldShow = lines > 5;
-      if (prev.has(id) === shouldShow) return prev;
-      const next = new Set(prev);
-      shouldShow ? next.add(id) : next.delete(id);
-      return next;
-    });
-  };
   const [filterPicker, setFilterPicker] = useState(false);
   const [minSalary, setMinSalary] = useState(0);
   const [applying, setApplying] = useState<string | null>(null);
@@ -2959,30 +2871,16 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
 
   // Все hooks свайп-колоды объявлены до раннего возврата: порядок hooks
   // остаётся одинаковым и при выходе пользователя, и при загрузке сессии.
-  const swPan = useRef(new Animated.ValueXY()).current;
   const [swSkipped, setSwSkipped] = useState<Set<string>>(new Set());
   const [swHistory, setSwHistory] = useState<string[]>([]);
-  const swBusy = useRef(false);
   const swWantRef = useRef<(vx?: number) => void>(() => {});
   const swSkipRef = useRef<(vx?: number) => void>(() => {});
-  const swSnapBackRef = useRef<() => void>(() => {});
-  // Тот же жест, что у колоды смен, и по той же причине — см. swipeGesture
-  // выше: карточка не должна уезжать, когда человек листает её содержимое.
-  const swSwipeGesture = useMemo(
-    () => Gesture.Pan()
-      .runOnJS(true)
-      .activeOffsetX([-20, 20])
-      .failOffsetY([-12, 12])
-      .onUpdate(e => { swPan.x.setValue(e.translationX); })
-      .onEnd(e => {
-        const vx = e.velocityX / 1000;
-        const dx = e.translationX;
-        if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) swWantRef.current(Math.abs(vx));
-        else if (dx < -SWIPE_THRESHOLD || vx < -VELOCITY_THRESHOLD) swSkipRef.current(Math.abs(vx));
-        else swSnapBackRef.current();
-      }),
-    [swPan],
-  );
+  // Та же физика, что у колоды смен, — один хук на обе, чтобы ощущение от
+  // свайпа не расходилось между вкладками.
+  const swDeck = useSwipeDeck({
+    want: vx => swWantRef.current(vx),
+    skip: vx => swSkipRef.current(vx),
+  });
 
   // «Назад»: вернуть последнюю пролистанную карточку наверх колоды. Отклик,
   // если он уже ушёл, не отзываем — как в сменах кнопка просто возвращает вид.
@@ -3506,27 +3404,8 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
   const deckActive = tab === 'open' || tab === 'saved';
   const deckCards = deckActive ? shownVacancies.filter(v => !swSkipped.has(v.id)) : [];
   const swTop = deckCards[0];
-  const swRotate = swPan.x.interpolate({ inputRange: [-SW / 2, 0, SW / 2], outputRange: ['-8deg', '0deg', '8deg'], extrapolate: 'clamp' });
-  const swWantOp = swPan.x.interpolate({ inputRange: [0, SWIPE_THRESHOLD], outputRange: [0, 1], extrapolate: 'clamp' });
-  const swSkipOp = swPan.x.interpolate({ inputRange: [-SWIPE_THRESHOLD, 0], outputRange: [1, 0], extrapolate: 'clamp' });
-
-  const swSnapBack = () => {
-    swBusy.current = false;
-    Animated.spring(swPan, { toValue: { x: 0, y: 0 }, useNativeDriver: false, friction: 6, tension: 60 }).start();
-  };
-  const swFly = (dir: 'left' | 'right', vx: number, after: () => void) => {
-    if (swBusy.current) return;
-    swBusy.current = true;
-    const duration = Math.max(180, Math.min(300, 250 / (Math.abs(vx) + 0.5)));
-    Animated.parallel([
-      Animated.timing(swPan.x, { toValue: (dir === 'right' ? SW : -SW) * 1.5, duration, useNativeDriver: false }),
-      Animated.timing(swPan.y, { toValue: dir === 'right' ? -40 : 40, duration, useNativeDriver: false }),
-    ]).start(() => {
-      swPan.setValue({ x: 0, y: 0 });
-      swBusy.current = false;
-      after();
-    });
-  };
+  const swSnapBack = swDeck.snapBack;
+  const swFly = swDeck.flyOut;
   // Вправо — принять: отклик (уходит в «Отклики» → матчи, ждёт ответа). В
   // «Избранном» вдобавок убираем из избранного. У партнёрских вакансий способ
   // отклика определяется режимом интеграции источника.
@@ -3565,7 +3444,6 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
   };
   swWantRef.current = swWant;
   swSkipRef.current = swSkip;
-  swSnapBackRef.current = swSnapBack;
 
   // Карточка колоды «Работа» — тот же макет, что у смены: рамка во весь экран,
   // чипы с иконками, снизу футер undo / ✕ / чат / ♥. Отличается только данными
@@ -3584,120 +3462,109 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
     const description = isExternal
       ? ((v as ExternalVacancy).description ?? '')
       : cleanDescription((v as PermVacancy).description);
-    const isOpen = expanded.has(v.id);
     return (
       <View style={styles.cardArea}>
-        {deckCards[2] ? <View style={styles.ghost2} /> : null}
-        {deckCards[1] ? <View style={styles.ghost1} /> : null}
-        <GestureDetector gesture={swSwipeGesture}>
-        <Animated.View
-          style={[styles.cardAnimated, { transform: [{ translateX: swPan.x }, { translateY: swPan.y }, { rotate: swRotate }] }]}
-        >
-          <View style={styles.card}>
-            <Animated.View style={[styles.wantOverlay, { opacity: swWantOp }]}>
-              <Text style={styles.wantText}>ОТКЛИК ♥</Text>
-            </Animated.View>
-            <Animated.View style={[styles.skipOverlay, { opacity: swSkipOp }]}>
-              <Text style={styles.skipText}>НЕТ ✕</Text>
-            </Animated.View>
+        {deckCards[2] ? <Reanimated.View style={[styles.ghost2, swDeck.thirdCardStyle]} /> : null}
+        {deckCards[1] ? <Reanimated.View style={[styles.ghost1, swDeck.nextCardStyle]} /> : null}
+        <GestureDetector gesture={swDeck.gesture}>
+          <Reanimated.View style={[styles.cardAnimated, swDeck.cardStyle]} onLayout={swDeck.onCardLayout}>
+            <View style={styles.card}>
+              <Reanimated.View style={[styles.wantOverlay, swDeck.wantStyle]}>
+                <Text style={styles.wantText}>ОТКЛИК ♥</Text>
+              </Reanimated.View>
+              <Reanimated.View style={[styles.skipOverlay, swDeck.skipStyle]}>
+                <Text style={styles.skipText}>НЕТ ✕</Text>
+              </Reanimated.View>
 
-            <ScrollView
-              style={{ flex: 1 }}
-              showsVerticalScrollIndicator={false}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
-            >
-              <View style={styles.cardTop}>
-                <View style={styles.companyRow}>
-                  <CompanyMark company={v.company ?? sourceName} size={52} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.companyName} numberOfLines={1}>{displayCompany}</Text>
-                    <View style={styles.metroHintRow}>
-                      <Ionicons name={isExternal ? 'open-outline' : 'subway-outline'} size={12} color={Colors.textMuted} />
-                      <Text style={styles.metroHint} numberOfLines={1}>
-                        {v.metroStation ?? (isExternal ? '' : 'Постоянная вакансия')}
+              {/* Как и в сменах: прокрутки внутри карточки нет, подробности —
+                  отдельным экраном. У партнёрских вакансий своей страницы у
+                  нас нет, их открывает кнопка источника снизу. */}
+              <Pressable
+                style={styles.cardBody}
+                accessibilityRole="button"
+                accessibilityLabel="Открыть подробности вакансии"
+                disabled={isExternal}
+                onPress={() => router.push({ pathname: '/perm-vacancy-detail', params: { vacancyId: v.id } })}
+              >
+                <View style={styles.cardTop}>
+                  <View style={styles.companyRow}>
+                    <CompanyMark company={v.company ?? sourceName} size={52} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.companyName} numberOfLines={1}>{displayCompany}</Text>
+                      <View style={styles.metroHintRow}>
+                        <Ionicons name={isExternal ? 'open-outline' : 'subway-outline'} size={12} color={Colors.textMuted} />
+                        <Text style={styles.metroHint} numberOfLines={1}>
+                          {v.metroStation ?? (isExternal ? '' : 'Постоянная вакансия')}
+                        </Text>
+                      </View>
+                    </View>
+                    <SourceBadge partnerName={isExternal ? (sourceName ?? 'Партнёр') : undefined} />
+                  </View>
+
+                  {!isExternal ? (
+                    <View style={pS.deckUtilityActions}>
+                      <TouchableOpacity
+                        accessibilityLabel="Поделиться вакансией"
+                        style={pS.deckUtilityBtn}
+                        onPress={() => { void shareVacancy(v as PermVacancy); }}
+                        activeOpacity={0.75}
+                      >
+                        <Ionicons name="share-outline" size={18} color={Colors.textSecondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        accessibilityLabel={permSavedIds.includes(v.id) ? 'Удалить из избранного' : 'Добавить в избранное'}
+                        style={[pS.deckUtilityBtn, permSavedIds.includes(v.id) && pS.deckUtilityBtnSaved]}
+                        onPress={() => toggleSaved(v as PermVacancy)}
+                        activeOpacity={0.75}
+                      >
+                        <Ionicons
+                          name={permSavedIds.includes(v.id) ? 'heart' : 'heart-outline'}
+                          size={18}
+                          color={permSavedIds.includes(v.id) ? Colors.red : Colors.textSecondary}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+
+                  <Text style={styles.jobTitle} numberOfLines={2}>{v.title}</Text>
+
+                  <View style={styles.chipsRow}>
+                    {salary > 0 ? <Chip label={`${salary.toLocaleString('ru-RU')} ₽/мес`} variant="salary" icon="wallet-outline" /> : null}
+                    <Chip label="На руки" variant="exp" icon="checkmark-circle-outline" />
+                    {schedule ? <Chip label={schedule} variant="time" icon="calendar-outline" /> : null}
+                    {workType ? <Chip label={workType} variant="work" icon="briefcase-outline" /> : null}
+                  </View>
+
+                  {(v.metroStation || v.address) ? (
+                    <View style={styles.addressChip}>
+                      <Ionicons name="location-outline" size={17} color={Colors.textMuted} />
+                      <Text style={styles.addressChipText} numberOfLines={2}>
+                        {[v.metroStation, v.address].filter(Boolean).join(' · ')}
                       </Text>
                     </View>
-                  </View>
-                  <SourceBadge partnerName={isExternal ? (sourceName ?? 'Партнёр') : undefined} />
+                  ) : null}
+                </View>
+
+                <View style={styles.cardDivider} />
+
+                <View style={styles.cardMiddle}>
+                  {description ? (
+                    <View style={{ gap: rs(6) }}>
+                      <Text style={pS.sectionHead}>Описание</Text>
+                      <Text style={pS.desc} numberOfLines={5}>{description}</Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 {!isExternal ? (
-                  <View style={pS.deckUtilityActions}>
-                    <TouchableOpacity
-                      accessibilityLabel="Поделиться вакансией"
-                      style={pS.deckUtilityBtn}
-                      onPress={() => { void shareVacancy(v as PermVacancy); }}
-                      activeOpacity={0.75}
-                    >
-                      <Ionicons name="share-outline" size={18} color={Colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      accessibilityLabel={permSavedIds.includes(v.id) ? 'Удалить из избранного' : 'Добавить в избранное'}
-                      style={[pS.deckUtilityBtn, permSavedIds.includes(v.id) && pS.deckUtilityBtnSaved]}
-                      onPress={() => toggleSaved(v as PermVacancy)}
-                      activeOpacity={0.75}
-                    >
-                      <Ionicons
-                        name={permSavedIds.includes(v.id) ? 'heart' : 'heart-outline'}
-                        size={18}
-                        color={permSavedIds.includes(v.id) ? Colors.red : Colors.textSecondary}
-                      />
-                    </TouchableOpacity>
+                  <View style={styles.cardMoreRow}>
+                    <Ionicons name="information-circle-outline" size={16} color={Colors.primary} />
+                    <Text style={styles.cardMoreTxt}>Нажмите, чтобы открыть подробности</Text>
                   </View>
                 ) : null}
-
-                <Text style={styles.jobTitle} numberOfLines={2}>{v.title}</Text>
-
-                <View style={styles.chipsRow}>
-                  {salary > 0 ? <Chip label={`${salary.toLocaleString('ru-RU')} ₽/мес`} variant="salary" icon="wallet-outline" /> : null}
-                  <Chip label="На руки" variant="exp" icon="checkmark-circle-outline" />
-                  {schedule ? <Chip label={schedule} variant="time" icon="calendar-outline" /> : null}
-                  {workType ? <Chip label={workType} variant="work" icon="briefcase-outline" /> : null}
-                </View>
-
-                {(v.metroStation || v.address) ? (
-                  <View style={styles.addressChip}>
-                    <Ionicons name="location-outline" size={17} color={Colors.textMuted} />
-                    <Text style={styles.addressChipText} numberOfLines={2}>
-                      {[v.metroStation, v.address].filter(Boolean).join(' · ')}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-                  </View>
-                ) : null}
-              </View>
-
-              <View style={styles.cardDivider} />
-
-              <View style={styles.cardMiddle}>
-                {description ? (
-                  <View style={{ gap: rs(6) }}>
-                    <Text style={pS.sectionHead}>Описание</Text>
-                    <View style={{ position: 'relative' }}>
-                      <Text style={pS.desc} numberOfLines={isOpen ? undefined : 5}>{description}</Text>
-                      {!isOpen ? (
-                        <Text
-                          accessible={false}
-                          style={[pS.desc, { position: 'absolute', opacity: 0, left: 0, right: 0, top: 0 }]}
-                          onTextLayout={(e) => rememberDescriptionLines(v.id, e.nativeEvent.lines.length)}
-                        >
-                          {description}
-                        </Text>
-                      ) : null}
-                    </View>
-                    {(isOpen || truncatedDescriptions.has(v.id)) ? (
-                      <TouchableOpacity style={pS.readMore} onPress={() => toggleExpanded(v.id)} activeOpacity={0.7}>
-                        <Text style={pS.readMoreTxt}>{isOpen ? 'Свернуть' : 'Читать ещё'}</Text>
-                        <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.primary} />
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-                ) : null}
-
-              </View>
-            </ScrollView>
-
-          </View>
-        </Animated.View>
+              </Pressable>
+            </View>
+          </Reanimated.View>
         </GestureDetector>
 
         <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents="box-none">
@@ -3801,6 +3668,19 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
           activeOpacity={0.8}
         >
           <Ionicons name="map-outline" size={16} color={Colors.textSecondary} />
+        </TouchableOpacity>
+        {/* Как и в сменах: карточка колоды больше не прокручивается, значит
+            потянуть её вниз для обновления нельзя — нужна кнопка. */}
+        <TouchableOpacity
+          accessibilityLabel="Обновить список"
+          style={pS.filtersBtn}
+          onPress={() => { void onRefresh(); }}
+          disabled={refreshing}
+          activeOpacity={0.8}
+        >
+          {refreshing
+            ? <ActivityIndicator size="small" color={Colors.primary} />
+            : <Ionicons name="refresh-outline" size={16} color={Colors.textSecondary} />}
         </TouchableOpacity>
       </View>
 
@@ -4731,6 +4611,14 @@ const styles = StyleSheet.create({
   ghost1: { position: 'absolute', left: rs(10), right: rs(10), top: rs(10), bottom: rs(164), backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.97 }, { translateY: 6 }], opacity: 0.5, zIndex: 0, ...Shadow.card },
   ghost2: { position: 'absolute', left: rs(10), right: rs(10), top: rs(10), bottom: rs(164), backgroundColor: Colors.bg, borderRadius: Radius.xl, transform: [{ scale: 0.94 }, { translateY: 12 }], opacity: 0.3, zIndex: 0, ...Shadow.card },
   cardAnimated: { flex: 1, zIndex: 1, elevation: 10 },
+  // Тело занимает карточку целиком, чтобы нажатие ловилось всюду, а
+  // подсказка «подробнее» прижималась к низу.
+  cardBody: { flex: 1 },
+  cardMoreRow: {
+    marginTop: 'auto', flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: rs(6), paddingVertical: rs(12), borderTopWidth: 1, borderTopColor: Colors.divider,
+  },
+  cardMoreTxt: { fontSize: rf(12.5), fontWeight: '600', color: Colors.primary },
   card: { flex: 1, backgroundColor: Colors.bg, borderRadius: Radius.xl, ...Shadow.strong, overflow: 'hidden', borderWidth: 1, borderColor: Colors.inputBorder },
   wantOverlay: { position: 'absolute', top: rs(20), left: rs(20), zIndex: 10, backgroundColor: Colors.green, borderRadius: rs(10), paddingHorizontal: rs(14), paddingVertical: rs(8), transform: [{ rotate: '-10deg' }] },
   wantText: { color: '#fff', fontSize: rf(20), fontWeight: '800' },
