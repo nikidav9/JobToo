@@ -2425,89 +2425,107 @@ function WorkerFeed() {
             {cards[2] ? <View style={styles.ghost2} /> : null}
             {cards[1] ? <View style={styles.ghost1} /> : null}
 
-            <GestureDetector gesture={deck.gesture}>
-              <Reanimated.View style={[styles.cardAnimated, deck.cardStyle]}>
-                <View style={styles.card}>
-                  <Reanimated.View style={[styles.wantOverlay, deck.wantStyle]}>
-                    <Text style={styles.wantText}>ХОЧУ ♥</Text>
-                  </Reanimated.View>
-                  <Reanimated.View style={[styles.skipOverlay, deck.skipStyle]}>
-                    <Text style={styles.skipText}>НЕТ ✕</Text>
-                  </Reanimated.View>
+            {/* Потягивание вниз обновляет ленту. Список ровно по высоте карточки,
+                прокручивать в нём нечего — он здесь только ради RefreshControl:
+                внутри самой карточки прокрутки нет, и потянуть её нельзя.
 
-                  {/* Прокрутки внутри карточки нет. Карточка показывает то, по
-                      чему принимают решение, а весь текст открывается по
-                      «Читать полностью». Пока здесь жил ScrollView, два жеста
-                      делили одну площадь и карточка уезжала от попытки
-                      полистать; теперь спорить не с чем. */}
-                  <Pressable
-                    style={styles.cardBody}
-                    accessibilityRole="button"
-                    accessibilityLabel="Открыть вакансию полностью"
-                    onPress={() => openShiftDetail(currentCard)}
-                  >
-                    <View style={styles.cardTop}>
-                      <View style={styles.companyRow}>
-                        <CompanyMark company={currentCard.company} size={34} />
-                        <View style={{ flex: 1 }}>
-                          {/* Компания и когда выложили — одной строкой, как на
-                              образце: это подпись к карточке, а не заголовок. */}
-                          <Text style={styles.companyName} numberOfLines={1}>
-                            {normalizeCompany(currentCard.company)}
-                            {postedAgo ? <Text style={styles.postedAgo}>{` · ${postedAgo}`}</Text> : null}
-                          </Text>
+                Со свайпом это не спорит: жест карточки срабатывает на восьми
+                пикселях вбок, а на двадцати вниз проигрывает и отдаёт касание
+                списку (см. failOffsetY в useSwipeDeck).
+
+                «Призраки» колоды остались снаружи: они позиционированы абсолютно
+                от области карточек, и внутри списка их отступы сложились бы с её
+                внутренними полями. */}
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ flexGrow: 1 }}
+              showsVerticalScrollIndicator={false}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
+            >
+              <GestureDetector gesture={deck.gesture}>
+                <Reanimated.View style={[styles.cardAnimated, deck.cardStyle]}>
+                  <View style={styles.card}>
+                    <Reanimated.View style={[styles.wantOverlay, deck.wantStyle]}>
+                      <Text style={styles.wantText}>ХОЧУ ♥</Text>
+                    </Reanimated.View>
+                    <Reanimated.View style={[styles.skipOverlay, deck.skipStyle]}>
+                      <Text style={styles.skipText}>НЕТ ✕</Text>
+                    </Reanimated.View>
+
+                    {/* Прокрутки внутри карточки нет. Карточка показывает то, по
+                        чему принимают решение, а весь текст открывается по
+                        «Читать полностью». Пока здесь жил ScrollView, два жеста
+                        делили одну площадь и карточка уезжала от попытки
+                        полистать; теперь спорить не с чем. */}
+                    <Pressable
+                      style={styles.cardBody}
+                      accessibilityRole="button"
+                      accessibilityLabel="Открыть вакансию полностью"
+                      onPress={() => openShiftDetail(currentCard)}
+                    >
+                      <View style={styles.cardTop}>
+                        <View style={styles.companyRow}>
+                          <CompanyMark company={currentCard.company} size={34} />
+                          <View style={{ flex: 1 }}>
+                            {/* Компания и когда выложили — одной строкой, как на
+                                образце: это подпись к карточке, а не заголовок. */}
+                            <Text style={styles.companyName} numberOfLines={1}>
+                              {normalizeCompany(currentCard.company)}
+                              {postedAgo ? <Text style={styles.postedAgo}>{` · ${postedAgo}`}</Text> : null}
+                            </Text>
+                          </View>
+                          <View style={styles.cardBadges}>
+                            {currentCard.isUrgent ? (
+                              <View style={styles.urgentTag}>
+                                <Ionicons name="flash" size={11} color="#92400E" />
+                                <Text style={styles.urgentTagTxt}>Срочно</Text>
+                              </View>
+                            ) : null}
+                            <SourceBadge partnerName={'external' in currentCard ? ((currentCard as PartnerShiftCard).external.sourceName ?? 'Партнёр') : undefined} />
+                          </View>
                         </View>
-                        <View style={styles.cardBadges}>
-                          {currentCard.isUrgent ? (
-                            <View style={styles.urgentTag}>
-                              <Ionicons name="flash" size={11} color="#92400E" />
-                              <Text style={styles.urgentTagTxt}>Срочно</Text>
-                            </View>
+
+                        <Text style={styles.jobTitle} numberOfLines={2}>{currentCard.title}</Text>
+
+                        {/* Чипы одного спокойного цвета и одного размера, кроме
+                            денег: цветом выделяется только то, ради чего карточку
+                            и открывают. Адрес — такой же чип, а не толстая
+                            плашка, которой он был раньше. */}
+                        <View style={styles.chipsRow}>
+                          {payLabel ? <Chip label={payLabel} variant="salary" icon="wallet-outline" /> : null}
+                          <Chip label={`${currentCard.timeStart}–${currentCard.timeEnd}`} variant="neutral" icon="time-outline" />
+                          <Chip label={formatDate(currentCard.date)} variant="neutral" icon="calendar-outline" />
+                          {currentCard.metroStation ? <Chip label={currentCard.metroStation} variant="neutral" icon="subway-outline" /> : null}
+                          {currentCard.noExperienceNeeded ? <Chip label="Без опыта" variant="neutral" icon="school-outline" /> : null}
+                          {currentCard.address ? <Chip label={currentCard.address} variant="neutral" icon="location-outline" /> : null}
+                        </View>
+                      </View>
+
+                      <View style={styles.cardDivider} />
+
+                      <View style={styles.cardMiddle}>
+                        {/* Ссылка идёт сразу за текстом, как на образце. Если
+                            места мало, ужимается текст, а не ссылка: без
+                            прокрутки уехавшую за край ссылку уже ничем не
+                            достать. */}
+                        <View style={styles.cardSummary}>
+                          {shiftSummary ? (
+                            <Text style={pS.desc} numberOfLines={4}>{shiftSummary}</Text>
                           ) : null}
-                          <SourceBadge partnerName={'external' in currentCard ? ((currentCard as PartnerShiftCard).external.sourceName ?? 'Партнёр') : undefined} />
                         </View>
+                        <TouchableOpacity
+                          style={styles.readFullRow}
+                          onPress={() => openShiftDetail(currentCard)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.readFullTxt}>Читать полностью</Text>
+                        </TouchableOpacity>
                       </View>
-
-                      <Text style={styles.jobTitle} numberOfLines={2}>{currentCard.title}</Text>
-
-                      {/* Чипы одного спокойного цвета и одного размера, кроме
-                          денег: цветом выделяется только то, ради чего карточку
-                          и открывают. Адрес — такой же чип, а не толстая
-                          плашка, которой он был раньше. */}
-                      <View style={styles.chipsRow}>
-                        {payLabel ? <Chip label={payLabel} variant="salary" icon="wallet-outline" /> : null}
-                        <Chip label={`${currentCard.timeStart}–${currentCard.timeEnd}`} variant="neutral" icon="time-outline" />
-                        <Chip label={formatDate(currentCard.date)} variant="neutral" icon="calendar-outline" />
-                        {currentCard.metroStation ? <Chip label={currentCard.metroStation} variant="neutral" icon="subway-outline" /> : null}
-                        {currentCard.noExperienceNeeded ? <Chip label="Без опыта" variant="neutral" icon="school-outline" /> : null}
-                        {currentCard.address ? <Chip label={currentCard.address} variant="neutral" icon="location-outline" /> : null}
-                      </View>
-                    </View>
-
-                    <View style={styles.cardDivider} />
-
-                    <View style={styles.cardMiddle}>
-                      {/* Ссылка идёт сразу за текстом, как на образце. Если
-                          места мало, ужимается текст, а не ссылка: без
-                          прокрутки уехавшую за край ссылку уже ничем не
-                          достать. */}
-                      <View style={styles.cardSummary}>
-                        {shiftSummary ? (
-                          <Text style={pS.desc} numberOfLines={4}>{shiftSummary}</Text>
-                        ) : null}
-                      </View>
-                      <TouchableOpacity
-                        style={styles.readFullRow}
-                        onPress={() => openShiftDetail(currentCard)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.readFullTxt}>Читать полностью</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </Pressable>
-                </View>
-              </Reanimated.View>
-            </GestureDetector>
+                    </Pressable>
+                  </View>
+                </Reanimated.View>
+              </GestureDetector>
+            </ScrollView>
 
             {/* Плавающие кнопки как в «Работе» и на образце: ✕ / ★ / ♥ и
                 подсказка «Свайпай». Раньше это была плоская панель внутри
@@ -3486,92 +3504,110 @@ function WorkerPermMode({ onUndoChange }: { onUndoChange?: (action: (() => void)
       <View style={styles.cardArea}>
         {deckCards[2] ? <View style={styles.ghost2} /> : null}
         {deckCards[1] ? <View style={styles.ghost1} /> : null}
-        <GestureDetector gesture={swDeck.gesture}>
-          <Reanimated.View style={[styles.cardAnimated, swDeck.cardStyle]}>
-            <View style={styles.card}>
-              <Reanimated.View style={[styles.wantOverlay, swDeck.wantStyle]}>
-                <Text style={styles.wantText}>ОТКЛИК ♥</Text>
-              </Reanimated.View>
-              <Reanimated.View style={[styles.skipOverlay, swDeck.skipStyle]}>
-                <Text style={styles.skipText}>НЕТ ✕</Text>
-              </Reanimated.View>
+        {/* Потягивание вниз обновляет ленту. Список ровно по высоте карточки,
+            прокручивать в нём нечего — он здесь только ради RefreshControl:
+            внутри самой карточки прокрутки нет, и потянуть её нельзя.
 
-              {/* Как и в сменах: прокрутки внутри нет, весь текст — по
-                  «Читать полностью». У своих вакансий это наш экран, у
-                  партнёрских — окно с описанием источника и переходом к нему. */}
-              <Pressable
-                style={styles.cardBody}
-                accessibilityRole="button"
-                accessibilityLabel="Открыть вакансию полностью"
-                onPress={() => openPermDetail(v)}
-              >
-                <View style={styles.cardTop}>
-                  <View style={styles.companyRow}>
-                    <CompanyMark company={v.company ?? sourceName} size={34} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.companyName} numberOfLines={1}>
-                        {displayCompany}
-                        {posted ? <Text style={styles.postedAgo}>{` · ${posted}`}</Text> : null}
-                      </Text>
+            Со свайпом это не спорит: жест карточки срабатывает на восьми
+            пикселях вбок, а на двадцати вниз проигрывает и отдаёт касание
+            списку (см. failOffsetY в useSwipeDeck).
+
+            «Призраки» колоды остались снаружи: они позиционированы абсолютно
+            от области карточек, и внутри списка их отступы сложились бы с её
+            внутренними полями. */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />}
+        >
+          <GestureDetector gesture={swDeck.gesture}>
+            <Reanimated.View style={[styles.cardAnimated, swDeck.cardStyle]}>
+              <View style={styles.card}>
+                <Reanimated.View style={[styles.wantOverlay, swDeck.wantStyle]}>
+                  <Text style={styles.wantText}>ОТКЛИК ♥</Text>
+                </Reanimated.View>
+                <Reanimated.View style={[styles.skipOverlay, swDeck.skipStyle]}>
+                  <Text style={styles.skipText}>НЕТ ✕</Text>
+                </Reanimated.View>
+
+                {/* Как и в сменах: прокрутки внутри нет, весь текст — по
+                    «Читать полностью». У своих вакансий это наш экран, у
+                    партнёрских — окно с описанием источника и переходом к нему. */}
+                <Pressable
+                  style={styles.cardBody}
+                  accessibilityRole="button"
+                  accessibilityLabel="Открыть вакансию полностью"
+                  onPress={() => openPermDetail(v)}
+                >
+                  <View style={styles.cardTop}>
+                    <View style={styles.companyRow}>
+                      <CompanyMark company={v.company ?? sourceName} size={34} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.companyName} numberOfLines={1}>
+                          {displayCompany}
+                          {posted ? <Text style={styles.postedAgo}>{` · ${posted}`}</Text> : null}
+                        </Text>
+                      </View>
+                      <SourceBadge partnerName={isExternal ? (sourceName ?? 'Партнёр') : undefined} />
                     </View>
-                    <SourceBadge partnerName={isExternal ? (sourceName ?? 'Партнёр') : undefined} />
-                  </View>
 
-                  {!isExternal ? (
-                    <View style={pS.deckUtilityActions}>
-                      <TouchableOpacity
-                        accessibilityLabel="Поделиться вакансией"
-                        style={pS.deckUtilityBtn}
-                        onPress={() => { if (swDeck.wasSwipe()) return; void shareVacancy(v as PermVacancy); }}
-                        activeOpacity={0.75}
-                      >
-                        <Ionicons name="share-outline" size={18} color={Colors.textSecondary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        accessibilityLabel={permSavedIds.includes(v.id) ? 'Удалить из избранного' : 'Добавить в избранное'}
-                        style={[pS.deckUtilityBtn, permSavedIds.includes(v.id) && pS.deckUtilityBtnSaved]}
-                        onPress={() => { if (swDeck.wasSwipe()) return; toggleSaved(v as PermVacancy); }}
-                        activeOpacity={0.75}
-                      >
-                        <Ionicons
-                          name={permSavedIds.includes(v.id) ? 'heart' : 'heart-outline'}
-                          size={18}
-                          color={permSavedIds.includes(v.id) ? Colors.red : Colors.textSecondary}
-                        />
-                      </TouchableOpacity>
+                    {!isExternal ? (
+                      <View style={pS.deckUtilityActions}>
+                        <TouchableOpacity
+                          accessibilityLabel="Поделиться вакансией"
+                          style={pS.deckUtilityBtn}
+                          onPress={() => { if (swDeck.wasSwipe()) return; void shareVacancy(v as PermVacancy); }}
+                          activeOpacity={0.75}
+                        >
+                          <Ionicons name="share-outline" size={18} color={Colors.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          accessibilityLabel={permSavedIds.includes(v.id) ? 'Удалить из избранного' : 'Добавить в избранное'}
+                          style={[pS.deckUtilityBtn, permSavedIds.includes(v.id) && pS.deckUtilityBtnSaved]}
+                          onPress={() => { if (swDeck.wasSwipe()) return; toggleSaved(v as PermVacancy); }}
+                          activeOpacity={0.75}
+                        >
+                          <Ionicons
+                            name={permSavedIds.includes(v.id) ? 'heart' : 'heart-outline'}
+                            size={18}
+                            color={permSavedIds.includes(v.id) ? Colors.red : Colors.textSecondary}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+
+                    <Text style={styles.jobTitle} numberOfLines={2}>{v.title}</Text>
+
+                    <View style={styles.chipsRow}>
+                      {salary > 0 ? <Chip label={`${salary.toLocaleString('ru-RU')} ₽/мес`} variant="salary" icon="wallet-outline" /> : null}
+                      <Chip label="На руки" variant="neutral" icon="checkmark-circle-outline" />
+                      {schedule ? <Chip label={schedule} variant="neutral" icon="calendar-outline" /> : null}
+                      {workType ? <Chip label={workType} variant="neutral" icon="briefcase-outline" /> : null}
+                      {v.metroStation ? <Chip label={v.metroStation} variant="neutral" icon="subway-outline" /> : null}
+                      {v.address ? <Chip label={v.address} variant="neutral" icon="location-outline" /> : null}
                     </View>
-                  ) : null}
-
-                  <Text style={styles.jobTitle} numberOfLines={2}>{v.title}</Text>
-
-                  <View style={styles.chipsRow}>
-                    {salary > 0 ? <Chip label={`${salary.toLocaleString('ru-RU')} ₽/мес`} variant="salary" icon="wallet-outline" /> : null}
-                    <Chip label="На руки" variant="neutral" icon="checkmark-circle-outline" />
-                    {schedule ? <Chip label={schedule} variant="neutral" icon="calendar-outline" /> : null}
-                    {workType ? <Chip label={workType} variant="neutral" icon="briefcase-outline" /> : null}
-                    {v.metroStation ? <Chip label={v.metroStation} variant="neutral" icon="subway-outline" /> : null}
-                    {v.address ? <Chip label={v.address} variant="neutral" icon="location-outline" /> : null}
                   </View>
-                </View>
 
-                <View style={styles.cardDivider} />
+                  <View style={styles.cardDivider} />
 
-                <View style={styles.cardMiddle}>
-                  <View style={styles.cardSummary}>
-                    {description ? <Text style={pS.desc} numberOfLines={4}>{description}</Text> : null}
+                  <View style={styles.cardMiddle}>
+                    <View style={styles.cardSummary}>
+                      {description ? <Text style={pS.desc} numberOfLines={4}>{description}</Text> : null}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.readFullRow}
+                      onPress={() => openPermDetail(v)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.readFullTxt}>Читать полностью</Text>
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    style={styles.readFullRow}
-                    onPress={() => openPermDetail(v)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.readFullTxt}>Читать полностью</Text>
-                  </TouchableOpacity>
-                </View>
-              </Pressable>
-            </View>
-          </Reanimated.View>
-        </GestureDetector>
+                </Pressable>
+              </View>
+            </Reanimated.View>
+          </GestureDetector>
+        </ScrollView>
 
         <View style={[styles.shiftDeckActions, { bottom: tabBarHeight + rs(18) }]} pointerEvents="box-none">
           <View style={styles.shiftDeckRow}>
