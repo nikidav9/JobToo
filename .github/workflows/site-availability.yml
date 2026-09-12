@@ -7,9 +7,6 @@ on:
     # проверки лишь раз в 2–4 часа и создавал ложное чувство наблюдения.
     - cron: '*/30 * * * *'
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths: [.github/workflows/site-availability.yml]
 
 concurrency:
   group: jobtoo-site-availability
