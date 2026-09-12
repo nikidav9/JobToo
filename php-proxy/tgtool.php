@@ -64,9 +64,40 @@ function tg(string $method, array $payload = [], string $verb = 'POST'): array {
         $opts[CURLOPT_POSTFIELDS] = json_encode($payload, JSON_UNESCAPED_UNICODE);
     }
     curl_setopt_array($ch, $opts);
-    $resp = curl_exec($ch); curl_close($ch);
-    $dec = json_decode($resp ?: 'null', true);
-    return is_array($dec) ? $dec : ['ok' => false, 'raw' => $resp];
+    $resp = curl_exec($ch);
+    $curlError = curl_error($ch);
+    $curlErrno = curl_errno($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    // Три разных отказа требуют трёх разных действий. Если curl_exec вернул
+    // false, Telegram запрос вообще не видел. Строка без JSON означает, что
+    // ответ пришёл, но мы его не поняли. И только корректный JSON с ok=false
+    // является отказом самого Telegram.
+    if ($resp === false) {
+        return [
+            'ok' => false,
+            'error_kind' => 'transport',
+            'curl_error' => $curlError,
+            'curl_errno' => $curlErrno,
+            'http_code' => $httpCode,
+        ];
+    }
+    $dec = json_decode($resp, true);
+    if (!is_array($dec)) {
+        return [
+            'ok' => false,
+            'error_kind' => 'invalid_response',
+            'json_error' => json_last_error_msg(),
+            'http_code' => $httpCode,
+            'raw' => substr($resp, 0, 500),
+        ];
+    }
+    if (($dec['ok'] ?? false) !== true) {
+        $dec['error_kind'] = 'telegram';
+        $dec['http_code'] = $httpCode;
+    }
+    return $dec;
 }
 
 $body   = json_decode((string)file_get_contents('php://input'), true);
