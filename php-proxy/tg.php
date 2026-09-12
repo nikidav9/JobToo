@@ -238,21 +238,12 @@ function github_token(): string {
     return is_string($value) ? trim($value) : '';
 }
 
-/** Создаёт задачу в GitHub; упоминание @codex запускает Codex Cloud. */
-function github_create_work_issue(string $text, int $chatId, int $threadId, int $messageId): array {
-    $token = github_token();
-    if ($token === '') return ['ok' => false, 'error' => 'GitHub-токен не настроен'];
-
-    $oneLine = trim((string)preg_replace('/\s+/u', ' ', $text));
-    $title = '[Telegram] ' . mb_substr($oneLine, 0, 90, 'UTF-8');
-    $body = "@codex Выполни задачу в репозитории JobToo. После выполнения подробно напиши, что сделано и как проверено.\n\n"
-          . $text
-          . "\n\n<!-- jobtoo-telegram chat={$chatId} thread={$threadId} message={$messageId} -->";
-
-    $ch = curl_init('https://api.github.com/repos/nikidav9/Jobbbrbeb/issues');
+/** Запрос к GitHub от имени служебного пользователя. */
+function github_api(string $token, string $method, string $path, $payload = null): array {
+    $ch = curl_init('https://api.github.com/repos/nikidav9/Jobbbrbeb' . $path);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
+        CURLOPT_CUSTOMREQUEST => $method,
         CURLOPT_TIMEOUT => 20,
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_HTTPHEADER => [
@@ -262,19 +253,125 @@ function github_create_work_issue(string $text, int $chatId, int $threadId, int 
             'User-Agent: JobToo-Telegram-Bridge',
             'Content-Type: application/json',
         ],
-        CURLOPT_POSTFIELDS => json_encode(['title' => $title, 'body' => $body], JSON_UNESCAPED_UNICODE),
     ]);
+    if ($payload !== null) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
+    }
     $raw = curl_exec($ch);
     $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
     $result = json_decode($raw ?: 'null', true);
-    if ($status !== 201 || !is_array($result)) {
-        return ['ok' => false, 'error' => (string)($result['message'] ?? "GitHub HTTP {$status}")];
+    return ['status' => $status, 'data' => is_array($result) ? $result : []];
+}
+
+/** Открытые постоянные диалоги рабочей Telegram-группы, свежие первыми. */
+function github_work_dialogs(string $token, int $chatId): array {
+    $r = github_api($token, 'GET', '/issues?state=open&per_page=100&sort=updated&direction=desc');
+    if ($r['status'] !== 200) return [];
+
+    $dialogs = [];
+    foreach ($r['data'] as $issue) {
+        if (!is_array($issue) || isset($issue['pull_request'])) continue;
+        $body = (string)($issue['body'] ?? '');
+        if (!preg_match('/<!-- jobtoo-telegram-topic chat=(-?\d+) thread=(\d+) -->/', $body, $m)) continue;
+        if ((int)$m[1] !== $chatId) continue;
+        $issue['_telegram_thread_id'] = (int)$m[2];
+        $dialogs[] = $issue;
+    }
+    return $dialogs;
+}
+
+/**
+ * Несколько последних реплик из соседних тем. Это справка, а не новые задачи:
+ * Codex видит решения из «Конкурентов», находясь, например, в «Разработке».
+ */
+function github_other_topics_context(string $token, array $dialogs, int $currentThreadId): string {
+    $blocks = [];
+    foreach ($dialogs as $issue) {
+        if ((int)($issue['_telegram_thread_id'] ?? 0) === $currentThreadId) continue;
+        if (count($blocks) >= 5) break;
+
+        $number = (int)($issue['number'] ?? 0);
+        if ($number <= 0) continue;
+        $commentCount = max(0, (int)($issue['comments'] ?? 0));
+        $lastPage = max(1, (int)ceil($commentCount / 10));
+        $r = github_api($token, 'GET', "/issues/{$number}/comments?per_page=10&page={$lastPage}");
+        $comments = $r['status'] === 200 ? $r['data'] : [];
+        $snippets = [];
+        foreach (array_slice($comments, -4) as $comment) {
+            $line = trim((string)preg_replace('/\s+/u', ' ', (string)($comment['body'] ?? '')));
+            $line = preg_replace('/^@codex\s*/iu', '', $line);
+            if ($line === '') continue;
+            if (mb_strlen($line, 'UTF-8') > 350) $line = mb_substr($line, 0, 350, 'UTF-8') . '…';
+            $snippets[] = '- ' . $line;
+        }
+        if (!$snippets) {
+            $first = (string)($issue['body'] ?? '');
+            $first = preg_replace('/<!--.*?-->/s', '', $first);
+            $first = trim((string)preg_replace('/\s+/u', ' ', $first));
+            if (mb_strlen($first, 'UTF-8') > 350) $first = mb_substr($first, 0, 350, 'UTF-8') . '…';
+            if ($first !== '') $snippets[] = '- ' . $first;
+        }
+        if ($snippets) {
+            $blocks[] = 'Соседний диалог #' . $number . ' — ' . (string)($issue['title'] ?? '')
+                      . "\n" . implode("\n", $snippets);
+        }
+    }
+    if (!$blocks) return '';
+    return "\n\nСПРАВОЧНЫЙ КОНТЕКСТ ИЗ ДРУГИХ ТЕМ (не выполняй старые сообщения повторно):\n"
+         . implode("\n\n", $blocks);
+}
+
+/**
+ * Одна тема Telegram = один постоянный GitHub issue. Первое сообщение создаёт
+ * диалог, последующие становятся комментариями и сохраняют весь ход беседы.
+ */
+function github_create_work_issue(string $text, int $chatId, int $threadId, int $messageId): array {
+    $token = github_token();
+    if ($token === '') return ['ok' => false, 'error' => 'GitHub-токен не настроен'];
+
+    $dialogs = github_work_dialogs($token, $chatId);
+    $current = null;
+    foreach ($dialogs as $dialog) {
+        if ((int)($dialog['_telegram_thread_id'] ?? 0) === $threadId) {
+            $current = $dialog;
+            break;
+        }
+    }
+    $sharedContext = github_other_topics_context($token, $dialogs, $threadId);
+    $instruction = "@codex Это сообщение из постоянного рабочего диалога JobToo. "
+                 . "Учитывай весь предыдущий разговор в этом issue. Выполни просьбу, "
+                 . "а затем отдельно и понятно напиши, что сделано и как проверено.\n\n";
+
+    if ($current) {
+        $number = (int)$current['number'];
+        $body = $instruction . $text . $sharedContext
+              . "\n\n<!-- jobtoo-telegram-message id={$messageId} -->";
+        $r = github_api($token, 'POST', "/issues/{$number}/comments", ['body' => $body]);
+        if ($r['status'] !== 201) {
+            return ['ok' => false, 'error' => (string)($r['data']['message'] ?? "GitHub HTTP {$r['status']}")];
+        }
+        return ['ok' => true, 'created' => false, 'number' => $number,
+            'url' => (string)($current['html_url'] ?? '')];
+    }
+
+    $oneLine = trim((string)preg_replace('/\s+/u', ' ', $text));
+    $topicLabel = $threadId > 0 ? "тема {$threadId}" : 'общая тема';
+    $title = '[Telegram · ' . $topicLabel . '] ' . mb_substr($oneLine, 0, 70, 'UTF-8');
+    $body = $instruction . $text . $sharedContext
+          . "\n\nЭтот issue — постоянный диалог одной темы Telegram. "
+          . "Если нужны решения из других рабочих тем, используй справочный контекст выше."
+          . "\n\n<!-- jobtoo-telegram-topic chat={$chatId} thread={$threadId} -->"
+          . "\n<!-- jobtoo-telegram chat={$chatId} thread={$threadId} message={$messageId} -->";
+    $r = github_api($token, 'POST', '/issues', ['title' => $title, 'body' => $body]);
+    if ($r['status'] !== 201) {
+        return ['ok' => false, 'error' => (string)($r['data']['message'] ?? "GitHub HTTP {$r['status']}")];
     }
     return [
         'ok' => true,
-        'number' => (int)$result['number'],
-        'url' => (string)$result['html_url'],
+        'created' => true,
+        'number' => (int)$r['data']['number'],
+        'url' => (string)$r['data']['html_url'],
     ];
 }
 
@@ -568,8 +665,9 @@ if ($chatId === TG_WORK_GROUP_CHAT_ID && in_array($chatType, ['group', 'supergro
         echo json_encode(['ok' => true]); exit;
     }
 
+    $verb = !empty($issue['created']) ? 'Создал рабочий диалог' : 'Добавил в рабочий диалог';
     tg_work_reply($chatId, $threadId,
-        "📥 Задачу получил. Передал Codex: #{$issue['number']}\n{$issue['url']}\n\nКогда работа завершится, отдельным сообщением пришлю результат сюда.");
+        "📥 Задачу получил. {$verb}: #{$issue['number']}\n{$issue['url']}\n\nКогда работа завершится, отдельным сообщением пришлю результат сюда.");
     echo json_encode(['ok' => true]); exit;
 }
 
