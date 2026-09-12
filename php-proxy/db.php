@@ -140,7 +140,7 @@ if (!$fn) { jt_respond(['error' => 'Missing fn'], 400); exit; }
 // закрыты, а пользовательские сценарии продолжают работать.
 $adminFns = [
     'dbKeyKind', 'adminResetPassword', 'dbMigrateChatMedia', 'dbDeleteUser',
-    'cronEveningDigest', 'cronDailyNudges', 'cronShiftNudge',
+    'cronEveningDigest', 'cronDailyReport', 'cronDailyNudges', 'cronShiftNudge',
     'tgBroadcast', 'tgSendToUsers', 'surveyDormantSend', 'surveyResults',
     'scoreRecalcAll', 'billingReport',
     'extSourcesList', 'extSourceSave', 'extSourceDelete', 'extStats',
@@ -1189,6 +1189,7 @@ function support_thread_set(string $userId, ?string $closedAt): bool {
 }
 
 define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025)); // группа «ПОДРАБОТКИ»
+define('TG_WORK_GROUP_CHAT_ID', (int)(getenv('TG_WORK_GROUP_CHAT_ID') ?: -1004358116342));
 
 /**
  * Validates Telegram WebApp initData signature (HMAC per official spec).
@@ -1217,7 +1218,7 @@ function tg_validate_init_data(string $initData): ?array {
  * Sends a message to a Telegram user via Bot API. Never throws.
  * $withAppButton: true — кнопка на главную мини-аппа; string — свой URL кнопки.
  */
-function tg_send_message(int $chatId, string $text, bool|string $withAppButton = false, string $btnText = '🚀 Откликнуться в JobToo', ?array $keyboard = null): bool {
+function tg_send_message(int $chatId, string $text, bool|string $withAppButton = false, string $btnText = '🚀 Откликнуться в JobToo', ?array $keyboard = null, ?int $messageThreadId = null): bool {
     if (TG_BOT_TOKEN === '') return false;
     $payload = [
         'chat_id' => $chatId,
@@ -1225,6 +1226,9 @@ function tg_send_message(int $chatId, string $text, bool|string $withAppButton =
         'parse_mode' => 'HTML',
         'disable_web_page_preview' => true,
     ];
+    if ($messageThreadId !== null && $messageThreadId > 0) {
+        $payload['message_thread_id'] = $messageThreadId;
+    }
     // Готовая клавиатура — для сообщений с кнопками ответа, вроде «одобрить
     // или отклонить». Раньше такие отправлялись мимо этой функции, своим
     // curl, — и мимо повтора при обрыве связи вместе с ним. То есть
@@ -2626,6 +2630,99 @@ try {
                     . "\n\nОткликнись первым — прямо в Телеграме 👇";
                 tg_send_message((int)TG_GROUP_CHAT_ID, $txt, true);
                 $data['posted'] = true;
+            }
+            break;
+        }
+
+        // Ежедневный продуктовый отчёт во внутреннюю группу, тема «Отчёты».
+        // Это отдельный сценарий: пользовательские дайджесты и напоминания
+        // выше и ниже не меняем и не связываем с операционной статистикой.
+        case 'cronDailyReport': {
+            $now = time();
+            $cut24 = gmdate('Y-m-d\\TH:i:s\\Z', $now - 86400);
+            $cut48 = gmdate('Y-m-d\\TH:i:s\\Z', $now - 2 * 86400);
+
+            $newWorkers = sb_count('jm_users', [
+                'role' => 'eq.worker', 'created_at' => 'gte.' . $cut24,
+            ]);
+            $previousWorkers = sb_count('jm_users', [
+                'role' => 'eq.worker',
+                'and' => '(created_at.gte.' . $cut48 . ',created_at.lt.' . $cut24 . ')',
+            ]);
+            $shiftApplications = sb_count('jm_likes', [
+                'worker_liked' => 'eq.true', 'created_at' => 'gte.' . $cut24,
+            ]);
+            $permApplications = sb_count('jm_perm_applications', [
+                'created_at' => 'gte.' . $cut24,
+            ]);
+            $applications = $shiftApplications + $permApplications;
+            $newShifts = sb_count('jm_vacancies', ['created_at' => 'gte.' . $cut24]);
+            $newVacancies = sb_count('jm_perm_vacancies', ['created_at' => 'gte.' . $cut24]);
+            $partnerVacancies = sb_count('jm_ext_vacancies', [
+                'environment' => 'eq.production', 'first_seen_at' => 'gte.' . $cut24,
+            ]);
+
+            $lastImportTs = null;
+            $sources = sb_select_all('jm_ext_sources', [
+                'environment' => 'eq.production', 'enabled' => 'is.true',
+            ], 'last_success_at');
+            foreach ($sources as $source) {
+                $ts = !empty($source['last_success_at'])
+                    ? strtotime((string)$source['last_success_at']) : false;
+                if ($ts !== false && ($lastImportTs === null || $ts > $lastImportTs)) {
+                    $lastImportTs = $ts;
+                }
+            }
+            $importSilent = $lastImportTs === null || $lastImportTs < $now - 86400;
+            $lastImport = 'никогда';
+            if ($lastImportTs !== null) {
+                $lastImport = (new DateTimeImmutable('@' . $lastImportTs))
+                    ->setTimezone(new DateTimeZone('Europe/Moscow'))
+                    ->format('d.m.Y H:i') . ' МСК';
+            }
+
+            $tomorrowMsk = gmdate('Y-m-d', $now + 3 * 3600 + 86400);
+            $tomorrowShifts = sb_count('jm_vacancies', [
+                'status' => 'eq.open', 'date' => 'eq.' . $tomorrowMsk,
+            ]);
+
+            $alerts = [];
+            if ($applications === 0) $alerts[] = 'откликов за сутки — 0';
+            if ($importSilent) $alerts[] = 'партнёрский импорт молчит больше 24 часов';
+            if ($newWorkers === 0 && $previousWorkers > 0) {
+                $alerts[] = 'новых работников — 0, хотя накануне были';
+            }
+
+            $lines = [];
+            if ($alerts) $lines[] = '🚨 <b>Тревога:</b> ' . implode('; ', $alerts);
+            $lines[] = '📊 <b>JobToo — отчёт за сутки</b>';
+            $lines[] = '';
+            $lines[] = "👷 Новых работников: <b>{$newWorkers}</b>";
+            $lines[] = "📨 Откликов: <b>{$applications}</b> (смены {$shiftApplications}, вакансии {$permApplications})";
+            $lines[] = "🏢 Свои публикации: вакансии <b>{$newVacancies}</b>, смены <b>{$newShifts}</b>";
+            $lines[] = "🤝 Новых партнёрских вакансий: <b>{$partnerVacancies}</b>";
+            $lines[] = "🔄 Последний успешный импорт: {$lastImport}";
+            $lines[] = "📅 Открытых смен на завтра: <b>{$tomorrowShifts}</b>";
+            $text = implode("\n", $lines);
+
+            $sent = tg_send_message(
+                (int)TG_WORK_GROUP_CHAT_ID, $text, false,
+                '🚀 Откликнуться в JobToo', null, 29
+            );
+            $data = [
+                'sent' => $sent, 'text' => $text,
+                'stats' => [
+                    'new_workers' => $newWorkers,
+                    'applications' => $applications,
+                    'new_vacancies' => $newVacancies,
+                    'new_shifts' => $newShifts,
+                    'partner_vacancies' => $partnerVacancies,
+                    'last_import_at' => $lastImportTs !== null ? gmdate('c', $lastImportTs) : null,
+                    'tomorrow_shifts' => $tomorrowShifts,
+                ],
+            ];
+            if (!$sent && isset($GLOBALS['jt_last_tg_error'])) {
+                $data['telegram_error'] = $GLOBALS['jt_last_tg_error'];
             }
             break;
         }
