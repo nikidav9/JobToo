@@ -2,8 +2,14 @@ name: Проверка доступности сайта
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    # GitHub Actions не гарантирует точное время запуска: даже этот честный
+    # интервал под нагрузкой может задержаться. */5 раньше фактически давал
+    # проверки лишь раз в 2–4 часа и создавал ложное чувство наблюдения.
+    - cron: '*/30 * * * *'
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/site-availability.yml]
 
 concurrency:
   group: jobtoo-site-availability
