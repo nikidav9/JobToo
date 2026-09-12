@@ -103,6 +103,25 @@ export function VacancyDetailModal({ vacancy, visible, onClose, employer, action
               </>
             ) : null}
 
+            {/* Адрес. На карточке он теперь короткий чип в одну строку, а
+                ехать человеку нужно по полному — значит, здесь целиком. */}
+            {vacancy.address ? (
+              <>
+                <Text style={styles.secLabel}>Адрес</Text>
+                <Text style={styles.condText}>{vacancy.address}</Text>
+              </>
+            ) : null}
+
+            {/* Условия. На карточке они обрезаны, и разворачивать их там
+                некуда — прокрутки внутри карточки нет. Сюда и ведёт
+                «Читать полностью». */}
+            {vacancy.conditions ? (
+              <>
+                <Text style={styles.secLabel}>Условия</Text>
+                <Text style={styles.condText}>{vacancy.conditions}</Text>
+              </>
+            ) : null}
+
             {/* Norms */}
             {vacancy.normsAndPay ? (
               <>
