@@ -189,6 +189,52 @@ jobs:
           rm -f payload.json resp.json
           [ "$code" = "200" ]
 
+      # Telegram silently removes the webhook when setWebhook is accidentally
+      # called with an empty URL. Delivering the bot token alone does not put
+      # it back, so every successful server release explicitly restores the
+      # binding and verifies the URL through the server-side helper. The bot
+      # token never leaves the Moscow server.
+      - name: Restore and verify Telegram webhook
+        env:
+          APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+        run: |
+          if [ -z "$APP_SECRET" ]; then
+            echo "EXPO_PUBLIC_APP_SECRET не задан — вебхук нельзя проверить"
+            exit 1
+          fi
+
+          call_tgtool() {
+            action="$1"
+            output="$2"
+            curl -sS --retry 6 --retry-all-errors --retry-delay 10 -m 30 \
+              -H "X-App-Secret: $APP_SECRET" \
+              -H 'Content-Type: application/json' \
+              --data "{\"action\":\"$action\"}" \
+              https://tg.jobtoo.ru/api/tgtool.php > "$output"
+          }
+
+          call_tgtool setWebhook webhook-set.json
+          call_tgtool webhookInfo webhook-info.json
+          python3 - <<'PY'
+          import json
+
+          with open('webhook-set.json', encoding='utf-8') as fh:
+              changed = json.load(fh)
+          with open('webhook-info.json', encoding='utf-8') as fh:
+              current = json.load(fh)
+
+          target = changed.get('target', '')
+          if not changed.get('telegram', {}).get('ok'):
+              raise SystemExit(f"Telegram отклонил setWebhook: {changed}")
+          if not current.get('ok'):
+              raise SystemExit(f"getWebhookInfo завершился ошибкой: {current}")
+          actual = current.get('result', {}).get('url', '')
+          if not target or actual != target:
+              raise SystemExit(f"Неверный адрес вебхука: {actual!r}, ожидался {target!r}")
+          print(f"Telegram webhook активен: {actual}")
+          PY
+          rm -f webhook-set.json webhook-info.json
+
       # Тот же сайт — для московского сервера.
       #
       # Туда нет ни FTP, ни ssh, и заводить их значит класть ключ в настройки
