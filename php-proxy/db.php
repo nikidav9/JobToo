@@ -86,7 +86,7 @@ define('SB_KEY', sb_resolve_key());
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-App-Secret, X-Admin-Token, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, X-App-Secret, X-Admin-Token, X-Yandex-Metrika-Token, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -140,7 +140,7 @@ if (!$fn) { jt_respond(['error' => 'Missing fn'], 400); exit; }
 // закрыты, а пользовательские сценарии продолжают работать.
 $adminFns = [
     'dbKeyKind', 'adminResetPassword', 'dbMigrateChatMedia', 'dbDeleteUser',
-    'cronEveningDigest', 'cronDailyNudges', 'cronShiftNudge',
+    'cronEveningDigest', 'cronDailyReport', 'cronDailyNudges', 'cronShiftNudge',
     'tgBroadcast', 'tgSendToUsers', 'surveyDormantSend', 'surveyResults',
     'scoreRecalcAll', 'billingReport',
     'extSourcesList', 'extSourceSave', 'extSourceDelete', 'extStats',
@@ -401,6 +401,86 @@ function sb_count(string $t, array $f = []): int {
     if (!is_string($resp)) return 0;
     // Content-Range: 0-0/357
     return preg_match('#Content-Range:\s*[^/]+/(\d+)#i', $resp, $m) ? (int)$m[1] : 0;
+}
+
+const YANDEX_METRIKA_COUNTER_ID = 109805381;
+
+/** Один запрос к Reporting API. Неполный отчёт не отправляем. */
+function ym_stat(string $token, array $params): array {
+    $params = array_merge([
+        'ids' => YANDEX_METRIKA_COUNTER_ID,
+        'accuracy' => 'full',
+    ], $params);
+    $url = 'https://api-metrika.yandex.net/stat/v1/data?'
+        . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Authorization: OAuth ' . $token],
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $raw = curl_exec($ch);
+    $error = curl_error($ch);
+    $errno = curl_errno($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($raw === false) {
+        throw new RuntimeException("Яндекс.Метрика недоступна: curl {$errno}: {$error}");
+    }
+    $result = json_decode($raw, true);
+    if ($code >= 400 || !is_array($result)) {
+        $description = is_array($result)
+            ? (string)($result['message'] ?? $result['errors'][0]['message'] ?? '')
+            : json_last_error_msg();
+        throw new RuntimeException("Яндекс.Метрика ответила HTTP {$code}: {$description}");
+    }
+    return $result;
+}
+
+function ym_daily_report(string $token): array {
+    $tz = new DateTimeZone('Europe/Moscow');
+    $today = (new DateTimeImmutable('now', $tz))->setTime(0, 0);
+    $day = $today->modify('-1 day');
+    $previousDay = $today->modify('-2 days');
+    $metrics = 'ym:s:visits,ym:s:users,ym:s:bounceRate';
+    $bySource = ym_stat($token, [
+        'date1' => $day->format('Y-m-d'),
+        'date2' => $day->format('Y-m-d'),
+        'metrics' => $metrics,
+        'dimensions' => 'ym:s:lastSignTrafficSource',
+        'limit' => 100,
+    ]);
+    $previous = ym_stat($token, [
+        'date1' => $previousDay->format('Y-m-d'),
+        'date2' => $previousDay->format('Y-m-d'),
+        'metrics' => 'ym:s:visits',
+    ]);
+    $search30 = ym_stat($token, [
+        'date1' => $day->modify('-29 days')->format('Y-m-d'),
+        'date2' => $day->format('Y-m-d'),
+        'metrics' => 'ym:s:visits',
+        'filters' => "ym:s:lastSignTrafficSource=='organic'",
+    ]);
+
+    $totals = $bySource['totals'] ?? [];
+    $sources = ['organic' => 0, 'direct' => 0, 'referral' => 0, 'social' => 0];
+    foreach (($bySource['data'] ?? []) as $row) {
+        $source = (string)($row['dimensions'][0]['id'] ?? '');
+        if (array_key_exists($source, $sources)) {
+            $sources[$source] = (int)round((float)($row['metrics'][0] ?? 0));
+        }
+    }
+    return [
+        'date' => $day->format('d.m.Y'),
+        'visits' => (int)round((float)($totals[0] ?? 0)),
+        'users' => (int)round((float)($totals[1] ?? 0)),
+        'bounce_rate' => (float)($totals[2] ?? 0),
+        'previous_visits' => (int)round((float)($previous['totals'][0] ?? 0)),
+        'search_30d' => (int)round((float)($search30['totals'][0] ?? 0)),
+        'sources' => $sources,
+    ];
 }
 
 // Поля пользователя, которые можно отдавать клиенту.
@@ -1189,6 +1269,7 @@ function support_thread_set(string $userId, ?string $closedAt): bool {
 }
 
 define('TG_GROUP_CHAT_ID', (int)(getenv('TG_GROUP_CHAT_ID') ?: -1001709270025)); // группа «ПОДРАБОТКИ»
+define('TG_WORK_GROUP_CHAT_ID', (int)(getenv('TG_WORK_GROUP_CHAT_ID') ?: -1004358116342));
 
 /**
  * Validates Telegram WebApp initData signature (HMAC per official spec).
@@ -1217,7 +1298,7 @@ function tg_validate_init_data(string $initData): ?array {
  * Sends a message to a Telegram user via Bot API. Never throws.
  * $withAppButton: true — кнопка на главную мини-аппа; string — свой URL кнопки.
  */
-function tg_send_message(int $chatId, string $text, bool|string $withAppButton = false, string $btnText = '🚀 Откликнуться в JobToo', ?array $keyboard = null): bool {
+function tg_send_message(int $chatId, string $text, bool|string $withAppButton = false, string $btnText = '🚀 Откликнуться в JobToo', ?array $keyboard = null, ?int $messageThreadId = null): bool {
     if (TG_BOT_TOKEN === '') return false;
     $payload = [
         'chat_id' => $chatId,
@@ -1225,6 +1306,9 @@ function tg_send_message(int $chatId, string $text, bool|string $withAppButton =
         'parse_mode' => 'HTML',
         'disable_web_page_preview' => true,
     ];
+    if ($messageThreadId !== null && $messageThreadId > 0) {
+        $payload['message_thread_id'] = $messageThreadId;
+    }
     // Готовая клавиатура — для сообщений с кнопками ответа, вроде «одобрить
     // или отклонить». Раньше такие отправлялись мимо этой функции, своим
     // curl, — и мимо повтора при обрыве связи вместе с ним. То есть
@@ -2626,6 +2710,114 @@ try {
                     . "\n\nОткликнись первым — прямо в Телеграме 👇";
                 tg_send_message((int)TG_GROUP_CHAT_ID, $txt, true);
                 $data['posted'] = true;
+            }
+            break;
+        }
+
+        // Ежедневный продуктовый отчёт во внутреннюю группу, тема «Отчёты».
+        // Это отдельный сценарий: пользовательские дайджесты и напоминания
+        // выше и ниже не меняем и не связываем с операционной статистикой.
+        case 'cronDailyReport': {
+            $now = time();
+            $cut24 = gmdate('Y-m-d\\TH:i:s\\Z', $now - 86400);
+            $cut48 = gmdate('Y-m-d\\TH:i:s\\Z', $now - 2 * 86400);
+            $metrikaToken = trim((string)($_SERVER['HTTP_X_YANDEX_METRIKA_TOKEN'] ?? ''));
+            if ($metrikaToken === '') {
+                throw new RuntimeException('YANDEX_METRIKA_TOKEN не передан');
+            }
+            $metrika = ym_daily_report($metrikaToken);
+
+            $newWorkers = sb_count('jm_users', [
+                'role' => 'eq.worker', 'created_at' => 'gte.' . $cut24,
+            ]);
+            $previousWorkers = sb_count('jm_users', [
+                'role' => 'eq.worker',
+                'and' => '(created_at.gte.' . $cut48 . ',created_at.lt.' . $cut24 . ')',
+            ]);
+            $shiftApplications = sb_count('jm_likes', [
+                'worker_liked' => 'eq.true', 'created_at' => 'gte.' . $cut24,
+            ]);
+            $permApplications = sb_count('jm_perm_applications', [
+                'created_at' => 'gte.' . $cut24,
+            ]);
+            $applications = $shiftApplications + $permApplications;
+            $newShifts = sb_count('jm_vacancies', ['created_at' => 'gte.' . $cut24]);
+            $newVacancies = sb_count('jm_perm_vacancies', ['created_at' => 'gte.' . $cut24]);
+            $partnerVacancies = sb_count('jm_ext_vacancies', [
+                'environment' => 'eq.production', 'first_seen_at' => 'gte.' . $cut24,
+            ]);
+
+            $lastImportTs = null;
+            $sources = sb_select_all('jm_ext_sources', [
+                'environment' => 'eq.production', 'enabled' => 'is.true',
+            ], 'last_success_at');
+            foreach ($sources as $source) {
+                $ts = !empty($source['last_success_at'])
+                    ? strtotime((string)$source['last_success_at']) : false;
+                if ($ts !== false && ($lastImportTs === null || $ts > $lastImportTs)) {
+                    $lastImportTs = $ts;
+                }
+            }
+            $importSilent = $lastImportTs === null || $lastImportTs < $now - 86400;
+            $lastImport = 'никогда';
+            if ($lastImportTs !== null) {
+                $lastImport = (new DateTimeImmutable('@' . $lastImportTs))
+                    ->setTimezone(new DateTimeZone('Europe/Moscow'))
+                    ->format('d.m.Y H:i') . ' МСК';
+            }
+
+            $tomorrowMsk = gmdate('Y-m-d', $now + 3 * 3600 + 86400);
+            $tomorrowShifts = sb_count('jm_vacancies', [
+                'status' => 'eq.open', 'date' => 'eq.' . $tomorrowMsk,
+            ]);
+
+            $alerts = [];
+            if ($applications === 0) $alerts[] = 'откликов за сутки — 0';
+            if ($importSilent) $alerts[] = 'партнёрский импорт молчит больше 24 часов';
+            if ($newWorkers === 0 && $previousWorkers > 0) {
+                $alerts[] = 'новых работников — 0, хотя накануне были';
+            }
+            if ($metrika['visits'] === 0 && $metrika['previous_visits'] > 0) {
+                $alerts[] = 'визитов за сутки — 0, хотя накануне были';
+            }
+
+            $lines = [];
+            if ($alerts) $lines[] = '🚨 <b>Тревога:</b> ' . implode('; ', $alerts);
+            $lines[] = '📊 <b>JobToo — отчёт за сутки</b>';
+            $lines[] = '';
+            $lines[] = "👷 Новых работников: <b>{$newWorkers}</b>";
+            $lines[] = "📨 Откликов: <b>{$applications}</b> (смены {$shiftApplications}, вакансии {$permApplications})";
+            $lines[] = "🏢 Свои публикации: вакансии <b>{$newVacancies}</b>, смены <b>{$newShifts}</b>";
+            $lines[] = "🤝 Новых партнёрских вакансий: <b>{$partnerVacancies}</b>";
+            $lines[] = "🔄 Последний успешный импорт: {$lastImport}";
+            $lines[] = "📅 Открытых смен на завтра: <b>{$tomorrowShifts}</b>";
+            $bounceRate = number_format($metrika['bounce_rate'], 1, ',', ' ');
+            $sources = $metrika['sources'];
+            $lines[] = '';
+            $lines[] = "📈 Метрика за {$metrika['date']}: визиты <b>{$metrika['visits']}</b>, посетители <b>{$metrika['users']}</b>, отказы <b>{$bounceRate}%</b>";
+            $lines[] = "🧭 Источники: поиск <b>{$sources['organic']}</b>, прямые <b>{$sources['direct']}</b>, переходы <b>{$sources['referral']}</b>, соцсети <b>{$sources['social']}</b>";
+            $lines[] = "🔎 Поиск за 30 дней: <b>{$metrika['search_30d']}</b> визитов";
+            $text = implode("\n", $lines);
+
+            $sent = tg_send_message(
+                (int)TG_WORK_GROUP_CHAT_ID, $text, false,
+                '🚀 Откликнуться в JobToo', null, 29
+            );
+            $data = [
+                'sent' => $sent, 'text' => $text,
+                'stats' => [
+                    'new_workers' => $newWorkers,
+                    'applications' => $applications,
+                    'new_vacancies' => $newVacancies,
+                    'new_shifts' => $newShifts,
+                    'partner_vacancies' => $partnerVacancies,
+                    'last_import_at' => $lastImportTs !== null ? gmdate('c', $lastImportTs) : null,
+                    'tomorrow_shifts' => $tomorrowShifts,
+                    'metrika' => $metrika,
+                ],
+            ];
+            if (!$sent && isset($GLOBALS['jt_last_tg_error'])) {
+                $data['telegram_error'] = $GLOBALS['jt_last_tg_error'];
             }
             break;
         }

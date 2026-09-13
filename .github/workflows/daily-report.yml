@@ -1,0 +1,36 @@
+name: Daily Product Report
+
+on:
+  schedule:
+    # 06:00 UTC = 09:00 МСК, каждый день
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  report:
+    name: Post daily product report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call cronDailyReport
+        env:
+          APP_SECRET: ${{ secrets.EXPO_PUBLIC_APP_SECRET }}
+          ADMIN_TOKEN: ${{ secrets.DASHBOARD_PASSWORD }}
+          YANDEX_METRIKA_TOKEN: ${{ secrets.YANDEX_METRIKA_TOKEN }}
+        run: |
+          if [ -z "$APP_SECRET" ] || [ -z "$ADMIN_TOKEN" ] || [ -z "$YANDEX_METRIKA_TOKEN" ]; then
+            echo "Серверные секреты для задания не настроены"; exit 1
+          fi
+
+          for attempt in 1 2 3 4 5; do
+            RESP=$(curl -fsS -X POST "https://jobtoo.ru/api/db.php" \
+              -H "Content-Type: application/json" \
+              -H "X-App-Secret: $APP_SECRET" \
+              -H "X-Admin-Token: $ADMIN_TOKEN" \
+              -H "X-Yandex-Metrika-Token: $YANDEX_METRIKA_TOKEN" \
+              -d '{"fn":"cronDailyReport","args":[]}') || RESP=''
+            echo "Response: $RESP"
+            echo "$RESP" | grep -q '"sent":true' && exit 0
+            [ "$attempt" -lt 5 ] && sleep 30
+          done
+
+          echo "cronDailyReport failed"; exit 1

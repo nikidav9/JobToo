@@ -213,8 +213,74 @@ jobs:
               https://jobtoo.ru/api/tgtool.php > "$output"
           }
 
-          call_tgtool setWebhook webhook-set.json
-          call_tgtool webhookInfo webhook-info.json
+          # Повторяем ответ именно Telegram, а не только HTTP-запрос к нашему
+          # серверу: tgtool может ответить 200, когда его исходящий запрос упал.
+          call_tgtool_with_retry() {
+            action="$1"
+            output="$2"
+            for attempt in 1 2 3; do
+              call_tgtool "$action" "$output"
+              if ACTION="$action" OUTPUT="$output" python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.environ['OUTPUT'], encoding='utf-8') as fh:
+              response = json.load(fh)
+          if os.environ['ACTION'] == 'setWebhook':
+              response = response.get('telegram', {})
+          raise SystemExit(0 if response.get('ok') else 1)
+          PY
+              then
+                return 0
+              fi
+              if [ "$attempt" -lt 3 ]; then
+                echo "$action: попытка $attempt не удалась, повтор через 10 секунд"
+                sleep 10
+              fi
+            done
+            return 1
+          }
+
+          explain_tgtool_failure() {
+            action="$1"
+            output="$2"
+            ACTION="$action" OUTPUT="$output" python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.environ['OUTPUT'], encoding='utf-8') as fh:
+              response = json.load(fh)
+          telegram = response.get('telegram', response)
+          action = os.environ['ACTION']
+          kind = telegram.get('error_kind', 'telegram')
+          if kind == 'transport':
+              raise SystemExit(
+                  f'{action}: сервер не достучался до Telegram: '
+                  f"curl errno {telegram.get('curl_errno', '?')}: "
+                  f"{telegram.get('curl_error') or 'без текста'}; "
+                  f"HTTP {telegram.get('http_code', 0)}"
+              )
+          if kind == 'invalid_response':
+              raise SystemExit(
+                  f'{action}: сервер получил от Telegram неразбираемый ответ: '
+                  f"HTTP {telegram.get('http_code', 0)}; "
+                  f"{telegram.get('json_error', 'ошибка JSON')}; "
+                  f"raw={telegram.get('raw', '')!r}"
+              )
+          raise SystemExit(
+              f'{action}: Telegram отказал: '
+              f"{telegram.get('description', 'без описания')} "
+              f"(HTTP {telegram.get('http_code', 0)}, "
+              f"error_code={telegram.get('error_code', '?')})"
+          )
+          PY
+          }
+
+          call_tgtool_with_retry setWebhook webhook-set.json \
+            || explain_tgtool_failure setWebhook webhook-set.json
+
+          call_tgtool_with_retry webhookInfo webhook-info.json \
+            || explain_tgtool_failure webhookInfo webhook-info.json
           python3 - <<'PY'
           import json
 
@@ -224,8 +290,6 @@ jobs:
               current = json.load(fh)
 
           target = changed.get('target', '')
-          if not changed.get('telegram', {}).get('ok'):
-              raise SystemExit(f"Telegram отклонил setWebhook: {changed}")
           if not current.get('ok'):
               raise SystemExit(f"getWebhookInfo завершился ошибкой: {current}")
           actual = current.get('result', {}).get('url', '')

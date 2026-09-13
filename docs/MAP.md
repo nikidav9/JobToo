@@ -99,6 +99,8 @@
 ### Выкладка
 - Пуш в `main` запускает: `ci.yml`, `deploy-regru.yml` (сайт на московский сервер),
   `eas-update.yml` (обновление приложения по воздуху).
+- `public/robots.txt`, `public/sitemap.xml` — поисковые правила и карта только
+  существующих публичных страниц; файловые URL без файла получают 404 в nginx.
 - `infra/bootstrap.sh` — сервер раз в минуту проверяет обновления и тянет их сам.
 - Регулярные задачи: `evening-digest.yml` (16:00 UTC), `daily-nudges.yml` (07:00),
   `partner-monthly-report.yml`, `site-availability.yml` (каждые 5 минут).
