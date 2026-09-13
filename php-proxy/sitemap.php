@@ -15,6 +15,9 @@
 
 require_once __DIR__ . '/sb_lite.php';
 require_once __DIR__ . '/vacancy_url.php';
+// Берём из сводных страниц только перечень: константа гасит их точку входа.
+define('LANDING_PAGE_LIB_ONLY', true);
+require_once __DIR__ . '/landing_page.php';
 
 const SM_SITE = 'https://jobtoo.ru';
 
@@ -64,6 +67,12 @@ foreach ($sources as $src) {
         $lastmod = sm_day($r['updated_at'] ?? '') ?: sm_day($r['created_at'] ?? '');
         $body .= sm_url(SM_SITE . $src['prefix'] . $id, $lastmod);
     }
+}
+
+// Сводные страницы: «работа комплектовщиком у Алтуфьево». Перечень считает
+// сам landing_page.php — там же порог, ниже которого страницы нет.
+foreach (lp_index() as $path) {
+    $body .= sm_url(SM_SITE . $path);
 }
 
 header('Content-Type: application/xml; charset=utf-8');

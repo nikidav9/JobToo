@@ -45,13 +45,15 @@ check("карта сайта отдаётся страницей, а не фай
 check("статического sitemap.xml больше нет", not (root / "public/sitemap.xml").exists())
 check("robots.txt остался файлом", "try_files /robots.txt =404" in nginx)
 
+check("есть маршрут сводной страницы", "location ~ ^/rabota/" in nginx)
+check("сводные страницы подключены", "landing_page.php" in nginx)
 check("есть маршрут постоянной вакансии", "location ~ ^/v/" in nginx)
 check("есть маршрут смены", "location ~ ^/s/" in nginx)
 check("страница вакансии подключена", "vacancy_page.php" in nginx)
 
 # QUERY_STRING должен идти ПОСЛЕ include fastcgi_params: тот выставляет его из
 # $query_string и затёр бы наш, а страница осталась бы без идентификатора.
-for block in re.findall(r"location ~ \^/[vs]/[^{]*\{(.*?)\n    \}", nginx, re.S):
+for block in re.findall(r"location ~ \^/(?:[vs]|rabota)/[^{]*\{(.*?)\n    \}", nginx, re.S):
     check(
         "QUERY_STRING задан после include fastcgi_params",
         block.index("include fastcgi_params") < block.index("fastcgi_param QUERY_STRING"),
@@ -63,13 +65,14 @@ for block in re.findall(r"location ~ \^/[vs]/[^{]*\{(.*?)\n    \}", nginx, re.S)
 ext_rule = nginx.index("(?!api/|rest/|realtime/|storage/)")
 check("страницы вакансий объявлены раньше правила о расширениях", nginx.index("location ~ ^/v/") < ext_rule)
 check("страницы смен объявлены раньше правила о расширениях", nginx.index("location ~ ^/s/") < ext_rule)
+check("сводные страницы объявлены раньше правила о расширениях", nginx.index("location ~ ^/rabota/") < ext_rule)
 
 # То, что чинили раньше, должно остаться целым.
 check("несуществующий файл отдаёт 404", "try_files $uri =404" in nginx)
 check("маршрутизация приложения на месте", "try_files $uri $uri/ /index.html" in nginx)
 
 # ── сами страницы ─────────────────────────────────────────────────────────────
-for php in ("vacancy_page.php", "sitemap.php", "vacancy_url.php"):
+for php in ("vacancy_page.php", "sitemap.php", "vacancy_url.php", "landing_page.php"):
     path = root / "php-proxy" / php
     check(f"{php} существует", path.exists())
     if path.exists():
@@ -82,6 +85,12 @@ check("есть канонический адрес", 'rel="canonical"' in page)
 # Закрытую вакансию не удаляем: страница накопила вес, а ссылки на неё остались
 # снаружи. Вместо удаления — отметка и срок действия в прошлом.
 check("закрытая вакансия остаётся страницей", "вакансия закрыта" in page.lower())
+
+# Тонкая страница без содержания понижает весь сайт, а не только себя, поэтому
+# у сводных страниц есть порог, ниже которого страницы не существует.
+landing = (root / "php-proxy/landing_page.php").read_text(encoding="utf-8")
+check("у сводных страниц есть порог", "LP_MIN" in landing)
+check("карта сайта берёт перечень у самих страниц", "lp_index()" in (root / "php-proxy/sitemap.php").read_text(encoding="utf-8"))
 
 if failures:
     print("seo infrastructure: ПРОВАЛЫ")
