@@ -449,7 +449,10 @@ function ym_daily_report(string $token): array {
         'date1' => $day->format('Y-m-d'),
         'date2' => $day->format('Y-m-d'),
         'metrics' => $metrics,
-        'dimensions' => 'ym:s:lastSignTrafficSource',
+        // Источник самого визита, а не «последний значимый». lastSign
+        // приписывает поиску последующие прямые заходы того же человека:
+        // по нему выходило 29 визитов из поиска там, где их было 3.
+        'dimensions' => 'ym:s:lastTrafficSource',
         'limit' => 100,
     ]);
     $previous = ym_stat($token, [
@@ -460,8 +463,8 @@ function ym_daily_report(string $token): array {
     $search30 = ym_stat($token, [
         'date1' => $day->modify('-29 days')->format('Y-m-d'),
         'date2' => $day->format('Y-m-d'),
-        'metrics' => 'ym:s:visits',
-        'filters' => "ym:s:lastSignTrafficSource=='organic'",
+        'metrics' => 'ym:s:visits,ym:s:users',
+        'filters' => "ym:s:lastTrafficSource=='organic'",
     ]);
 
     $totals = $bySource['totals'] ?? [];
@@ -479,6 +482,9 @@ function ym_daily_report(string $token): array {
         'bounce_rate' => (float)($totals[2] ?? 0),
         'previous_visits' => (int)round((float)($previous['totals'][0] ?? 0)),
         'search_30d' => (int)round((float)($search30['totals'][0] ?? 0)),
+        // Люди важнее визитов: три визита от трёх человек и три от одного —
+        // разные новости, а по одному числу их не отличить.
+        'search_30d_users' => (int)round((float)($search30['totals'][1] ?? 0)),
         'sources' => $sources,
     ];
 }
@@ -2796,7 +2802,7 @@ try {
             $lines[] = '';
             $lines[] = "📈 Метрика за {$metrika['date']}: визиты <b>{$metrika['visits']}</b>, посетители <b>{$metrika['users']}</b>, отказы <b>{$bounceRate}%</b>";
             $lines[] = "🧭 Источники: поиск <b>{$sources['organic']}</b>, прямые <b>{$sources['direct']}</b>, переходы <b>{$sources['referral']}</b>, соцсети <b>{$sources['social']}</b>";
-            $lines[] = "🔎 Поиск за 30 дней: <b>{$metrika['search_30d']}</b> визитов";
+            $lines[] = "🔎 Поиск за 30 дней: <b>{$metrika['search_30d']}</b> визитов от <b>{$metrika['search_30d_users']}</b> человек";
             $text = implode("\n", $lines);
 
             $sent = tg_send_message(
