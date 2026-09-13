@@ -47,6 +47,12 @@ jobs:
       - name: Isolated partner sandbox flow
         run: php tests/partner_sandbox_e2e_test.php
 
+      - name: Страница вакансии отдаёт содержимое и разметку
+        run: php tests/vacancy_page_test.php
+
+      - name: Сводные страницы считают, а не выдумывают
+        run: php tests/landing_page_test.php
+
       - name: Service worker and infrastructure syntax
         run: |
           node --check public/sw.js
